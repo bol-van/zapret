@@ -33,7 +33,7 @@ struct params_s
     gid_t gid;
     uint16_t port;
     bool daemon;
-    bool hostcase,methodcase;
+    bool hostcase,methodcase,methodspace;
     enum splithttpreq split_http_req;
     int maxconn;
 };
@@ -77,11 +77,13 @@ void close_tcp_conn(tproxy_conn_t *conn, struct tailhead *conn_list,
 static const char *http_split_methods[]={"GET /","POST /","HEAD /","OPTIONS /",NULL};
 static const char *http_split_host[]={"\r\nHost: ",NULL};
 
+#define RD_BLOCK_SIZE 8192
+
 bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
     int numbytes;
     int fd_in, fd_out;
     bool bOutgoing;
-    ssize_t rd=0,wr=0;
+    ssize_t rd=0,wr=0,bs;
 
     //Easy way to determin which socket is ready for reading
     //TODO: Optimize. This one allows me quick lookup for conn, but
@@ -104,40 +106,63 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
     {
         if (bOutgoing)
         {
-	    char buf[8192],*p;
-	    ssize_t l,split_pos=0;
-	    const char **split_array,**split_item;
+	    char buf[RD_BLOCK_SIZE+1],*p;
+	    ssize_t l,split_pos=0,pos;
+	    const char **split_array,**split_item,**item;
 
-	    rd = recv(fd_in,buf,sizeof(buf),MSG_DONTWAIT);
+	    rd = recv(fd_in,buf,RD_BLOCK_SIZE,MSG_DONTWAIT);
 	    if (rd>0)
 	    {
+	    	bs = rd;
+	    	if (params.methodspace)
+	    	{
+    		    for(item=http_split_methods;*item;item++)
+		    {
+		        l = strlen(*item);
+		        if (p=find_bin(buf,bs,*item,l))
+		        {
+				pos = p-buf;
+				printf("Found http method '%s' at pos %d. Adding extra space.\n",*item,pos);
+				p += l-1;
+				pos += l-1;
+				memmove(p+1,p,bs-pos);
+				*p = ' '; // insert extra space
+				bs++; // block will grow by 1 byte
+				split_pos = pos; // remember split positing and use it if required
+				break;
+			}
+		    }
+	    	}
 		switch (params.split_http_req)
 		{
 		    case split_method:
-			split_array = http_split_methods;
+		    	// do we have already split position ? if so use it without another search
+			split_array = split_pos ? NULL : http_split_methods;
 			break;
 		    case split_host:
 			split_array = http_split_host;
 			break;
 		    default:
 			split_array = NULL;
+	  	  	split_pos=0;
 		}
 		if (split_array)
 		{
     		    for(split_item=split_array;*split_item;split_item++)
 		    {
 		        l = strlen(*split_item);
-		        if (p=find_bin(buf,rd,*split_item,l))
+		        if (p=find_bin(buf,bs,*split_item,l))
 		        {
 				split_pos = p-buf;
 				printf("Found split item '%s' at pos %d\n",*split_item,split_pos);
 				split_pos += l-1;
+				break;
 			}
 		    }
 		}
 		if (params.hostcase)
 		{
-		    if (p=find_bin(buf,rd,"\r\nHost: ",8))
+		    if (p=find_bin(buf,bs,"\r\nHost: ",8))
 		    {
 			printf("Changing 'Host:' => 'host:' at pos %d\n",p-buf);
 			p[2]='h';
@@ -148,7 +173,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
     		    for(split_item=http_split_methods;*split_item;split_item++)
 		    {
 		        l = strlen(*split_item);
-		    	if (p=find_bin(buf,rd,*split_item,l))
+		    	if (p=find_bin(buf,bs,*split_item,l))
 		 	{
 				printf("Changing '%s' case\n",*split_item);
 				*p += 'a'-'A';
@@ -160,11 +185,11 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		{
 		    wr=send_with_flush(fd_out,buf,split_pos,0);
 		    if (wr>=0)
-			wr=send(fd_out,buf+split_pos,rd-split_pos,0);
+			wr=send(fd_out,buf+split_pos,bs-split_pos,0);
 		}
 		else
 		{
-		    wr=send(fd_out,buf,rd,0);
+		    wr=send(fd_out,buf,bs,0);
 		}
 	    }
 	}
@@ -341,7 +366,7 @@ int8_t block_sigpipe(){
 
 void exithelp()
 {
-    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --hostcase\t\t; change Host: => host:\n --methodcase\t\t; change GET => gET, POST=>pOST, ...\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
+    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --hostcase\t\t; change Host: => host:\n --methodcase\t\t; change GET => gET, POST=>pOST, ...\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
     exit(1);
 }
 
@@ -364,6 +389,7 @@ void parse_params(int argc, char *argv[])
         {"hostcase",no_argument,0,0},// optidx=7
         {"methodcase",no_argument,0,0},// optidx=8
         {"split-http-req",required_argument,0,0},// optidx=9
+        {"methodspace",no_argument,0,0},// optidx=10
         {NULL,0,NULL,0}
     };
     while ((v=getopt_long_only(argc,argv,"",long_options,&option_index))!=-1)
@@ -427,6 +453,9 @@ void parse_params(int argc, char *argv[])
 		fprintf(stderr,"Invalid argument for split-http-req\n");
 		exit(1);
 	    }
+	    break;
+	case 10: /* methodspace */
+	    params.methodspace = true;
 	    break;
 	}
     }
