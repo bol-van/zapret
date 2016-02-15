@@ -1,0 +1,5 @@
+# put it to /etc/firewall.user
+
+# for BEELINE ISP
+iptables -t mangle -D POSTROUTING -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass 2>/dev/null
+iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass

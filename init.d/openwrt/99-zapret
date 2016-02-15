@@ -1,0 +1,35 @@
+# copy it to /etc/hotplug.d/firewall/99-zapret
+
+# CHOOSE ISP HERE. UNCOMMENT ONLY ONE LINE.
+# if your ISP not in list then comment all lines
+ISP=domru
+
+TPPORT=1188
+TPWS_USER=daemon
+
+case "$ACTION" in
+    add)
+    case "$ISP" in
+	domru)
+	case "$INTERFACE" in
+	    wan)
+	    # BLOCK SPOOFED DNS FROM DOMRU
+	    iptables -t raw -C PREROUTING -i $DEVICE -p udp --sport 53 -m string --hex-string "|5cfff164|" --algo bm -j DROP --from 40 --to 300 ||
+	     iptables -t raw -I PREROUTING -i $DEVICE -p udp --sport 53 -m string --hex-string "|5cfff164|" --algo bm -j DROP --from 40 --to 300
+	    iptables -t raw -C PREROUTING -i $DEVICE -p udp --sport 53 -m string --hex-string "|2a022698a00000000000000000000064|" --algo bm -j DROP --from 40 --to 300 ||
+	     iptables -t raw -I PREROUTING -i $DEVICE -p udp --sport 53 -m string --hex-string "|2a022698a00000000000000000000064|" --algo bm -j DROP --from 40 --to 300
+	    # DNAT for local traffic
+	    iptables -t nat -C OUTPUT -p tcp --dport 80 -o $DEVICE -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT ||
+	     iptables -t nat -I OUTPUT -p tcp --dport 80 -o $DEVICE -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+	    ;;
+	    
+	    lan)
+	    # DNAT for pass-thru traffic
+	    sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+	    iptables -t nat -C prerouting_lan_rule -p tcp --dport 80 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT ||
+	     iptables -t nat -I prerouting_lan_rule -p tcp --dport 80 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+	    ;;
+     	esac
+	;;
+    esac
+esac

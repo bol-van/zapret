@@ -1,0 +1,24 @@
+v1
+
+Initial release
+
+v2
+
+nfqws : command line options change. now using standard getopt.
+nfqws : added options for window size changing and "Host:" case change
+ISP support : tested on mns.ru and beeline (corbina)
+init scripts : rewritten init scripts for simple choise of ISP
+create_ipset : now using 'ipset restore', it works much faster
+readme : updated. now using UTF-8 charset.
+
+v3
+
+tpws : added transparent proxy (supports TPROXY and DNAT).
+       can help when ISP tracks whole HTTP session, not only the beginning
+ipset : added zapret-hosts-user.txt which contain user defined host names to be resolved
+        and added to zapret ip list
+ISP support : dom.ru support via TPROXY/DNAT
+ISP support : successfully tested sknt.ru on 'domru' configuration
+  other configs will probably also work, but cannot test
+compile : openwrt compile howto
+

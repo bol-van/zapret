@@ -1,0 +1,53 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2006-2011 OpenWrt.org
+
+# CHOOSE ISP HERE. UNCOMMENT ONLY ONE LINE.
+#ISP=mns
+#ISP=beeline
+ISP=domru
+
+# !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user or /etc/hotplug.d/firewall/99-zapret
+
+QNUM=200
+TPPORT=1188
+ROUTE_TABLE_NUM=100
+NFQWS=/opt/zapret/nfq/nfqws
+TPWS=/opt/zapret/tpws/tpws
+IPSET_CR=/opt/zapret/ipset/create_ipset.sh
+TPWS_USER=daemon
+
+# start betfore firewall - we need ipset populated
+START=18
+
+get_daemon() {
+	case "${ISP}" in
+	    mns)
+		DAEMON_OPTS="--qnum=$QNUM --wsize=4"
+		DAEMON=$NFQWS
+		;;
+	    beeline)
+		DAEMON_OPTS="--qnum=$QNUM --hostcase"
+		DAEMON=$NFQWS
+		;;
+	    domru)
+		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
+		DAEMON=$TPWS
+		;;
+	esac
+}
+
+
+start() {
+	echo "Creating ipset"
+	($IPSET_CR)
+
+	get_daemon
+	echo "Starting $DAEMON"
+	service_start $DAEMON --daemon $DAEMON_OPTS
+}
+
+stop() {
+	get_daemon
+	service_stop $DAEMON
+}
+
