@@ -25,3 +25,4 @@ compile : openwrt compile howto
 v4
 
 tpws : added ability to insert extra space after http method : "GET /" => "GET  /"
+ISP support : TKT support

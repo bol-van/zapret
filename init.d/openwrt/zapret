@@ -3,6 +3,7 @@
 
 # CHOOSE ISP HERE. UNCOMMENT ONLY ONE LINE.
 #ISP=mns
+#ISP=tkt
 #ISP=beeline
 ISP=domru
 
@@ -21,7 +22,7 @@ START=18
 
 get_daemon() {
 	case "${ISP}" in
-	    mns)
+	    mns|tkt)
 		DAEMON_OPTS="--qnum=$QNUM --wsize=4"
 		DAEMON=$NFQWS
 		;;
