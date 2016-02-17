@@ -3,9 +3,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <linux/ip.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <linux/tcp.h>
-#include <netinet/in.h>
+//#include <netinet/in.h>
 #include <linux/types.h>
 #include <linux/netfilter.h>		/* for NF_ACCEPT */
 #include <libnetfilter_queue/libnetfilter_queue.h>
@@ -15,19 +16,21 @@
 
 bool proto_check_ipv4(unsigned char *data,int len)
 {
-	return 	len && (data[0] & 0xF0)==0x40 &&
+	return 	len>=20 && (data[0] & 0xF0)==0x40 &&
 		len>=((data[0] & 0x0F)<<2);
 }
+// move to transport protocol
 void proto_skip_ipv4(unsigned char **data,int *len)
 {
 	int l;
+	
 	l = (**data & 0x0F)<<2;
 	*data += l;
 	*len -= l;
 }
 bool proto_check_tcp(unsigned char *data,int len)
 {
-	return	len>=((data[12] & 0xF0)>>2);
+	return	len>=20 && len>=((data[12] & 0xF0)>>2);
 }
 void proto_skip_tcp(unsigned char **data,int *len)
 {
@@ -35,6 +38,51 @@ void proto_skip_tcp(unsigned char **data,int *len)
 	l = ((*data)[12] & 0xF0)>>2;
 	*data += l;
 	*len -= l;
+}
+
+bool proto_check_ipv6(unsigned char *data,int len)
+{
+	return 	len>=40 && (data[0] & 0xF0)==0x60 &&
+		(len-40)>=htons(*(uint16_t*)(data+4)); // payload length
+}
+// move to transport protocol
+// proto_type = 0 => error
+void proto_skip_ipv6(unsigned char **data,int *len,uint8_t *proto_type)
+{
+	int hdrlen;
+	uint8_t HeaderType;
+	
+	*proto_type = 0; // put error in advance
+	
+	HeaderType = (*data)[6]; // NextHeader field
+	*data += 40; *len -= 40; // skip ipv6 base header
+	while(*len>0) // need at least one byte for NextHeader field
+	{
+		switch(HeaderType)
+		{
+			case 0: // Hop-by-Hop Options
+			case 60: // Destination Options
+			case 43: // routing
+				if (*len<2) return; // error
+				hdrlen = 8+((*data)[1]<<3);
+				break;
+			case 44: // fragment
+				hdrlen = 4;
+				break;
+			case 59: // no next header
+				return; // error
+			default:
+				// we found some meaningful payload. it can be tcp, udp, icmp or some another exotic shit
+				*proto_type = HeaderType;
+				return;
+		}
+		if (*len<hdrlen) return; // error
+		HeaderType = **data;
+		// advance to the next header location
+		*len -= hdrlen;
+		*data += hdrlen;
+	}
+	// we have garbage
 }
 
 unsigned char *find_bin(unsigned char *data,int len,const void *blk,int blk_len)
@@ -60,10 +108,10 @@ static inline bool tcp_synack_segment( const struct tcphdr *tcphdr )
 		tcphdr->fin == 0;
 }
 
-uint16_t checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_addr)
+uint16_t tcp_checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_addr)
 {
 	const uint16_t *buf=buff;
-	uint16_t *ip_src=(void *)&src_addr, *ip_dst=(void *)&dest_addr;
+	uint16_t *ip_src=(uint16_t *)&src_addr, *ip_dst=(uint16_t *)&dest_addr;
 	uint32_t sum;
 	int length=len;
 
@@ -79,6 +127,7 @@ uint16_t checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_
 	if ( len & 1 )
 		// Add the padding if the packet lenght is odd
 		sum += *((uint8_t *)buf);
+		
 	// Add the pseudo-header
 	sum += *(ip_src++);
 	sum += *ip_src;
@@ -86,6 +135,7 @@ uint16_t checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_
 	sum += *ip_dst;
 	sum += htons(IPPROTO_TCP);
 	sum += htons(length);
+	
 	// Add the carries
 	while (sum >> 16)
 		sum = (sum & 0xFFFF) + (sum >> 16);
@@ -96,7 +146,59 @@ uint16_t checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_
 void tcp_fix_checksum(struct tcphdr *tcp,int len, in_addr_t src_addr, in_addr_t dest_addr)
 {
 	tcp->check = 0;
-	tcp->check = checksum(tcp,len,src_addr,dest_addr);
+	tcp->check = tcp_checksum(tcp,len,src_addr,dest_addr);
+}
+uint16_t tcp6_checksum(const void *buff, int len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
+{
+	const uint16_t *buf=buff;
+	const uint16_t *ip_src=(uint16_t *)src_addr, *ip_dst=(uint16_t *)dest_addr;
+	uint32_t sum;
+	int length=len;
+	
+	// Calculate the sum
+	sum = 0;
+	while (len > 1)
+	{
+		sum += *buf++;
+		if (sum & 0x80000000)
+			sum = (sum & 0xFFFF) + (sum >> 16);
+		len -= 2;
+	}
+	if ( len & 1 )
+		// Add the padding if the packet lenght is odd
+		sum += *((uint8_t *)buf);
+	
+	// Add the pseudo-header
+	sum += *(ip_src++);
+	sum += *(ip_src++);
+	sum += *(ip_src++);
+	sum += *(ip_src++);
+	sum += *(ip_src++);
+	sum += *(ip_src++);
+	sum += *(ip_src++);
+	sum += *ip_src;
+	sum += *(ip_dst++);
+	sum += *(ip_dst++);
+	sum += *(ip_dst++);
+	sum += *(ip_dst++);
+	sum += *(ip_dst++);
+	sum += *(ip_dst++);
+	sum += *(ip_dst++);
+	sum += *ip_dst;
+	sum += htons(IPPROTO_TCP);
+	sum += htons(length);
+	
+	// Add the carries
+	while (sum >> 16)
+		sum = (sum & 0xFFFF) + (sum >> 16);
+
+	// Return the one's complement of sum
+	return (uint16_t)(~sum);
+}
+void tcp6_fix_checksum(struct tcphdr *tcp,int len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
+{
+	tcp->check = 0;
+	tcp->check = tcp6_checksum(tcp,len,src_addr,dest_addr);
 }
 
 void tcp_rewrite_winsize(struct tcphdr *tcp,uint16_t winsize)
@@ -144,33 +246,53 @@ struct cbdata_s
 bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata)
 {
 	struct iphdr *iphdr = NULL;
+	struct ip6_hdr *ip6hdr = NULL;
 	struct tcphdr *tcphdr = NULL;
 	unsigned char *p;
 	int len_tcp;
 	bool bRet = false;
-
+	uint8_t proto;
+	
 	if (proto_check_ipv4(data,len))
 	{
 		iphdr = (struct iphdr *) data;
+		proto = iphdr->protocol;
 		proto_skip_ipv4(&data,&len);
-		if (iphdr->protocol==6 && proto_check_tcp(data,len))
+	}
+	else if (proto_check_ipv6(data,len))
+	{
+		ip6hdr = (struct ip6_hdr *) data;
+		proto_skip_ipv6(&data,&len,&proto);
+	}
+	else
+	{
+		// not ipv6 and not ipv4
+		return false;
+	}
+	
+	if (proto==IPPROTO_TCP && proto_check_tcp(data,len))
+	{
+		tcphdr = (struct tcphdr *) data;
+		len_tcp = len;
+		proto_skip_tcp(&data,&len);
+		//printf("got TCP packet. payload_len=%d\n",len);
+		if (cbdata->wsize && tcp_synack_segment(tcphdr))
 		{
-			tcphdr = (struct tcphdr *) data;
-			len_tcp = len;
-			proto_skip_tcp(&data,&len);
-			//printf("got TCP packet. payload_len=%d\n",len);
-			if (cbdata->wsize && tcp_synack_segment(tcphdr))
-			{
-				tcp_rewrite_winsize(tcphdr,(uint16_t)cbdata->wsize);
-				bRet = true;
-			}
-			if (cbdata->hostcase && (p = find_bin(data,len,"\r\nHost: ",8)))
-			{
-				printf("modifying Host: => host:\n");
-				p[2]='h'; // "Host:" => "host:"
-				bRet = true;
-			}
-			if (bRet) tcp_fix_checksum(tcphdr,len_tcp,iphdr->saddr,iphdr->daddr);
+			tcp_rewrite_winsize(tcphdr,(uint16_t)cbdata->wsize);
+			bRet = true;
+		}
+		if (cbdata->hostcase && (p = find_bin(data,len,"\r\nHost: ",8)))
+		{
+			printf("modifying Host: => host:\n");
+			p[2]='h'; // "Host:" => "host:"
+			bRet = true;
+		}
+		if (bRet)
+		{
+			if (iphdr)
+				tcp_fix_checksum(tcphdr,len_tcp,iphdr->saddr,iphdr->daddr);
+			else
+				tcp6_fix_checksum(tcphdr,len_tcp,&ip6hdr->ip6_src,&ip6hdr->ip6_dst);
 		}
 	}
 	return bRet;
