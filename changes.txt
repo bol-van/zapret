@@ -29,4 +29,4 @@ ISP support : TKT support
 
 v5
 
-nfqws : ipv6 support â nfqws
+nfqws : ipv6 support in nfqws
