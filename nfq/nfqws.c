@@ -67,7 +67,7 @@ void proto_skip_ipv6(unsigned char **data,int *len,uint8_t *proto_type)
 				hdrlen = 8+((*data)[1]<<3);
 				break;
 			case 44: // fragment
-				hdrlen = 4;
+				hdrlen = 8;
 				break;
 			case 59: // no next header
 				return; // error
