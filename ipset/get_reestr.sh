@@ -13,7 +13,7 @@ ZURL=http://reestr.rublacklist.net/api/current
 
 $EXEDIR/get_user.sh
 
-curl --fail --max-time 60 --max-filesize 10485760 "$ZURL" >$ZREESTR && {
+curl --fail --max-time 60 --max-filesize 20971520 "$ZURL" >$ZREESTR && {
  dlsize=$(wc -c "$ZREESTR" | cut -f 1 -d ' ')
  if test $dlsize -lt 204800; then
   echo list file is too small. can be bad.
