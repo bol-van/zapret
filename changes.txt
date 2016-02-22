@@ -30,3 +30,7 @@ ISP support : TKT support
 v5
 
 nfqws : ipv6 support in nfqws
+
+v6
+
+ipset : added "get_antizapret.sh"
