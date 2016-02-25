@@ -33,7 +33,7 @@ struct params_s
     gid_t gid;
     uint16_t port;
     bool daemon;
-    bool hostcase,methodcase,methodspace;
+    bool hostcase,hostdot,methodspace;
     enum splithttpreq split_http_req;
     int maxconn;
 };
@@ -106,8 +106,8 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
     {
         if (bOutgoing)
         {
-	    char buf[RD_BLOCK_SIZE+1],*p;
-	    ssize_t l,split_pos=0,pos;
+	    char buf[RD_BLOCK_SIZE+2],*p,*phost=NULL;
+	    ssize_t l,split_pos=0,method_split_pos=0,host_split_pos=0,pos;
 	    const char **split_array,**split_item,**item;
 
 	    rd = recv(fd_in,buf,RD_BLOCK_SIZE,MSG_DONTWAIT);
@@ -128,19 +128,48 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 				memmove(p+1,p,bs-pos);
 				*p = ' '; // insert extra space
 				bs++; // block will grow by 1 byte
-				split_pos = pos; // remember split positing and use it if required
+				method_split_pos = pos; // remember split position and use it if required
 				break;
 			}
+		    }
+	    	}
+	    	if (params.hostdot)
+	    	{
+		    if (phost=find_bin(buf,bs,"\r\nHost: ",8))
+		    {
+			host_split_pos = phost-buf+7;
+		    	p = phost+8;
+		    	while(p<(buf+bs) && *p!='\r' && *p!='\n') p++;
+		    	if (p<(buf+bs))
+		    	{
+		    		pos = p-buf;
+				printf("Adding dot to host name at pos %d\n",pos);
+				memmove(p+1,p,bs-pos);
+				*p = '.'; // insert dot
+				bs++; // block will grow by 1 byte
+		    	}
 		    }
 	    	}
 		switch (params.split_http_req)
 		{
 		    case split_method:
 		    	// do we have already split position ? if so use it without another search
-			split_array = split_pos ? NULL : http_split_methods;
+		    	if (method_split_pos)
+		    	{
+				split_array = NULL;
+				split_pos = method_split_pos;
+			}
+			else
+				split_array = http_split_methods;
 			break;
 		    case split_host:
-			split_array = http_split_host;
+		    	if (host_split_pos)
+		    	{
+				split_array = NULL;
+				split_pos = host_split_pos;
+		    	}
+		    	else
+				split_array = http_split_host;
 			break;
 		    default:
 			split_array = NULL;
@@ -148,6 +177,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		}
 		if (split_array)
 		{
+		    // we havent found split post yet. need to search.
     		    for(split_item=split_array;*split_item;split_item++)
 		    {
 		        l = strlen(*split_item);
@@ -162,27 +192,15 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		}
 		if (params.hostcase)
 		{
-		    if (p=find_bin(buf,bs,"\r\nHost: ",8))
+		    if (phost || (phost=find_bin(buf,bs,"\r\nHost: ",8)))
 		    {
-			printf("Changing 'Host:' => 'host:' at pos %d\n",p-buf);
-			p[2]='h';
-		    }
-		}
-		if (params.methodcase)
-		{
-    		    for(split_item=http_split_methods;*split_item;split_item++)
-		    {
-		        l = strlen(*split_item);
-		    	if (p=find_bin(buf,bs,*split_item,l))
-		 	{
-				printf("Changing '%s' case\n",*split_item);
-				*p += 'a'-'A';
-				break;
-			}
+			printf("Changing 'Host:' => 'host:' at pos %d\n",phost-buf);
+			phost[2]='h';
 		    }
 		}
 		if (split_pos)
 		{
+		    printf("Splitting at pos %d\n",split_pos);
 		    wr=send_with_flush(fd_out,buf,split_pos,0);
 		    if (wr>=0)
 			wr=send(fd_out,buf+split_pos,bs-split_pos,0);
@@ -366,7 +384,7 @@ int8_t block_sigpipe(){
 
 void exithelp()
 {
-    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --hostcase\t\t; change Host: => host:\n --methodcase\t\t; change GET => gET, POST=>pOST, ...\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
+    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --hostcase\t\t; change Host: => host:\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
     exit(1);
 }
 
@@ -387,7 +405,7 @@ void parse_params(int argc, char *argv[])
         {"user",required_argument,0,0},// optidx=5
         {"maxconn",required_argument,0,0},// optidx=6
         {"hostcase",no_argument,0,0},// optidx=7
-        {"methodcase",no_argument,0,0},// optidx=8
+        {"hostdot",no_argument,0,0},// optidx=8
         {"split-http-req",required_argument,0,0},// optidx=9
         {"methodspace",no_argument,0,0},// optidx=10
         {NULL,0,NULL,0}
@@ -440,8 +458,8 @@ void parse_params(int argc, char *argv[])
 	case 7: /* hostcase */
 	    params.hostcase = true;
 	    break;
-	case 8: /* methodcase */
-	    params.methodcase = true;
+	case 8: /* hostdot */
+	    params.hostdot = true;
 	    break;
 	case 9: /* split-http-req */
 	    if (!strcmp(optarg,"method"))
