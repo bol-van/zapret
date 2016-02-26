@@ -7,7 +7,7 @@
 #ISP=beeline
 ISP=domru
 
-# !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user or /etc/hotplug.d/firewall/99-zapret
+# !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user
 
 QNUM=200
 TPPORT=1188
@@ -19,6 +19,26 @@ TPWS_USER=daemon
 
 # start betfore firewall - we need ipset populated
 START=18
+
+
+# must execute /etc/firewall.user on every firewall reload
+set_firewall_user_reload() {
+	i=0
+	while true
+	do
+	 path=$(uci -q get firewall.@include[$i].path)
+	 [ -n "$path" ] || break
+	 [ "$path" == "/etc/firewall.user" ] && {
+	   reload=$(uci -q get firewall.@include[$i].reload)
+	   [ "$reload" = "1" ] || {
+	     echo Setting 'reload' call option to /etc/firewall.user
+	     uci set firewall.@include[$i].reload=1
+	     uci commit firewall
+	   }
+	 }
+	 i=$((i+1))
+	done
+}
 
 get_daemon() {
 	case "${ISP}" in
@@ -43,6 +63,7 @@ get_daemon() {
 
 
 start() {
+	set_firewall_user_reload
 	echo "Creating ipset"
 	($IPSET_CR)
 

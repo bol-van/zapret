@@ -1,4 +1,4 @@
-﻿zapret v.7
+﻿zapret v.8
 
 Для чего это надо
 -----------------
@@ -242,9 +242,7 @@ opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptable
 В /etc/init.d/zapret выбрать пераметр "ISP". В зависимости от него будут применены нужные правила.
 /etc/init.d/zapret enable
 /etc/init.d/zapret start
-В зависимости от вашего провайдера либо внести нужные записи в /etc/firewall.user, либо
-скопировать 99-zapret в /etc/hotplug.d/firewall (сначала нужно mkdir /etc/hotplug.d/firewall).
-В /etc/hotplug.d/firewall/99-zapret выбрать нужного провайдера.
+В зависимости от вашего провайдера внести нужные записи в /etc/firewall.user.
 /etc/init.d/firewall restart
 Посмотреть через iptables -L или через luci вкладку "firewall" появились ли нужные правила.
 Зашедулить задание обновления листа :

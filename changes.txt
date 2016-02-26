@@ -38,3 +38,7 @@ ipset : added "get_antizapret.sh"
 v7
 
 tpws : added ability to insert "." after Host: name
+
+v8
+
+openwrt init : removed hotplug.d/firewall because of race conditions. now only use /etc/firewall.user
