@@ -42,3 +42,8 @@ tpws : added ability to insert "." after Host: name
 v8
 
 openwrt init : removed hotplug.d/firewall because of race conditions. now only use /etc/firewall.user
+
+v9
+
+ipban : added ipban ipset. place domains banned by ip to zapret-hosts-user-ipban.txt
+	these IPs must be soxified for both http and https

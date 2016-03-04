@@ -6,20 +6,27 @@ EXEDIR=$(dirname $SCRIPT)
 
 . "$EXEDIR/def.sh"
 
-TEMPIPSET=/tmp/ipset.$ZIPSET.tmp
 
-ipset flush $ZIPSET || ipset create $ZIPSET hash:ip
+create_ipset()
+{
+ipset flush $1 2>/dev/null || ipset create $1 hash:ip
 
-for f in "$ZIPLIST" "$ZIPLIST_USER"
+local TEMPIPSET=/tmp/ipset.$1.tmp
+
+for f in "$2" "$3"
 do
  [ -f $TEMPIPSET ] && rm -f $TEMPIPSET
- [ -n "$f" ] && {
-  echo Adding $f
+ [ -f "$f" ] && {
+  echo Adding to ipset "$1" : $f
   sort $f | uniq | while read ip;
   do
-   echo add $ZIPSET $ip >>$TEMPIPSET
+   echo add $1 $ip >>$TEMPIPSET
   done
   ipset -! restore <$TEMPIPSET 2>&1
   rm -f $TEMPIPSET
  }
 done
+}
+
+create_ipset $ZIPSET $ZIPLIST $ZIPLIST_USER
+create_ipset $ZIPSET_IPBAN $ZIPLIST_IPBAN $ZIPLIST_USER_IPBAN
