@@ -5,6 +5,7 @@ ISP=mns
 #ISP=rt
 #ISP=beeline
 #ISP=domru
+#ISP=tiera
 
 # CHOSE NETWORK INTERFACE BEHIND NAT
 SLAVE_ETH=eth0
@@ -57,8 +58,23 @@ case "$1" in
 		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 		 iptables -t nat -I OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		# BLOCK SPOOFED DNS FROM DOMRU
+		iptables -t raw -C PREROUTING -p udp --sport 53 -m string --hex-string "|5cfff164|" --algo bm -j DROP --from 40 --to 300 ||
+		 iptables -t raw -I PREROUTING -p udp --sport 53 -m string --hex-string "|5cfff164|" --algo bm -j DROP --from 40 --to 300
+		iptables -t raw -C PREROUTING -p udp --sport 53 -m string --hex-string "|2a022698a00000000000000000000064|" --algo bm -j DROP --from 40 --to 300 ||
+		 iptables -t raw -I PREROUTING -p udp --sport 53 -m string --hex-string "|2a022698a00000000000000000000064|" --algo bm -j DROP --from 40 --to 300
 		DAEMON=$TPWS
 		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=host --user=$TPWS_USER --bind-addr=127.0.0.1"
+		;;
+	    tiera)
+		adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
+		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+		iptables -t nat -C PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		DAEMON=$TPWS
+		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --user=$TPWS_USER --bind-addr=127.0.0.1"
 		;;
 	esac
 
@@ -80,6 +96,14 @@ case "$1" in
 		DAEMON=$NFQWS
 		;;
 	    domru)
+		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=0
+		iptables -t nat -D PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		iptables -t nat -D OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		iptables -t raw -D PREROUTING -p udp --sport 53 -m string --hex-string "|5cfff164|" --algo bm -j DROP --from 40 --to 300
+		iptables -t raw -D PREROUTING -p udp --sport 53 -m string --hex-string "|2a022698a00000000000000000000064|" --algo bm -j DROP --from 40 --to 300
+		DAEMON=$TPWS
+		;;
+	    tiera)
 		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=0
 		iptables -t nat -D PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -D OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT

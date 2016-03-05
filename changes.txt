@@ -47,3 +47,5 @@ v9
 
 ipban : added ipban ipset. place domains banned by ip to zapret-hosts-user-ipban.txt
 	these IPs must be soxified for both http and https
+ISP support : tiera support
+ISP support : added DNS filtering to ubuntu and debian scripts

@@ -5,7 +5,9 @@
 #ISP=mns
 #ISP=rt
 #ISP=beeline
-ISP=domru
+#ISP=domru
+ISP=tiera
+#ISP=none
 
 # !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user
 
@@ -58,6 +60,10 @@ get_daemon() {
 		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
 		DAEMON=$TPWS
 		;;
+	    tiera)
+		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
+		DAEMON=$TPWS
+		;;
 	esac
 }
 
@@ -68,12 +74,16 @@ start() {
 	($IPSET_CR)
 
 	get_daemon
-	echo "Starting $DAEMON"
-	service_start $DAEMON --daemon $DAEMON_OPTS
+	[ -n "$DAEMON" ] && {
+	    echo "Starting $DAEMON"
+	    service_start $DAEMON --daemon $DAEMON_OPTS
+	}
 }
 
 stop() {
 	get_daemon
-	service_stop $DAEMON
+	[ -n "$DAEMON" ] && {
+	    service_stop $DAEMON
+	}
 }
 
