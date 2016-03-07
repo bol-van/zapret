@@ -35,6 +35,7 @@ struct params_s
     bool daemon;
     bool hostcase,hostdot,methodspace;
     enum splithttpreq split_http_req;
+    int split_pos;
     int maxconn;
 };
 
@@ -150,30 +151,38 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		    	}
 		    }
 	    	}
-		switch (params.split_http_req)
+		if (params.split_pos)
 		{
-		    case split_method:
-		    	// do we have already split position ? if so use it without another search
-		    	if (method_split_pos)
-		    	{
-				split_array = NULL;
-				split_pos = method_split_pos;
-			}
-			else
-				split_array = http_split_methods;
-			break;
-		    case split_host:
-		    	if (host_split_pos)
-		    	{
-				split_array = NULL;
-				split_pos = host_split_pos;
-		    	}
-		    	else
-				split_array = http_split_host;
-			break;
-		    default:
 			split_array = NULL;
-	  	  	split_pos=0;
+			split_pos = params.split_pos<bs ? params.split_pos : 0;
+		}
+		else
+		{
+			switch (params.split_http_req)
+			{
+			    case split_method:
+			    	// do we have already split position ? if so use it without another search
+			    	if (method_split_pos)
+			    	{
+					split_array = NULL;
+					split_pos = method_split_pos;
+				}
+				else
+					split_array = http_split_methods;
+				break;
+			    case split_host:
+			    	if (host_split_pos)
+			    	{
+					split_array = NULL;
+					split_pos = host_split_pos;
+			    	}
+			    	else
+					split_array = http_split_host;
+				break;
+			    default:
+				split_array = NULL;
+		  	  	split_pos=0;
+			}
 		}
 		if (split_array)
 		{
@@ -384,7 +393,7 @@ int8_t block_sigpipe(){
 
 void exithelp()
 {
-    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --hostcase\t\t; change Host: => host:\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
+    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
     exit(1);
 }
 
@@ -407,7 +416,8 @@ void parse_params(int argc, char *argv[])
         {"hostcase",no_argument,0,0},// optidx=7
         {"hostdot",no_argument,0,0},// optidx=8
         {"split-http-req",required_argument,0,0},// optidx=9
-        {"methodspace",no_argument,0,0},// optidx=10
+        {"split-pos",required_argument,0,0},// optidx=10
+        {"methodspace",no_argument,0,0},// optidx=11
         {NULL,0,NULL,0}
     };
     while ((v=getopt_long_only(argc,argv,"",long_options,&option_index))!=-1)
@@ -472,7 +482,17 @@ void parse_params(int argc, char *argv[])
 		exit(1);
 	    }
 	    break;
-	case 10: /* methodspace */
+	case 10: /* split-pos */
+	    i = atoi(optarg);
+	    if (i)
+		params.split_pos = i;
+	    else
+	    {
+		fprintf(stderr,"Invalid argument for split-pos\n");
+		exit(1);
+	    }
+	    break;
+	case 11: /* methodspace */
 	    params.methodspace = true;
 	    break;
 	}

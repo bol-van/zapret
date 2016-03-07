@@ -1,13 +1,12 @@
-CFLAGS=-Wall
-LIBS=-lnetfilter_queue -lnfnetlink
+CC = gcc
+CFLAGS = -s
+LIBS = -lnetfilter_queue -lnfnetlink
+SRC_FILES = *.c
 
 all: nfqws
 
-nfqws: nfqws.o
-	$(CC) $(CFLAGS) -o "$@" $< $(LIBS) 
-
-nfqws.o: nfqws.c
-	$(CC) $(CFLAGS) -c $<
+nfqws: $(SRC_FILES)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 clean:
-	rm -f *.o nfqws
+	rm -f nfqws *.o

@@ -49,3 +49,7 @@ ipban : added ipban ipset. place domains banned by ip to zapret-hosts-user-ipban
 	these IPs must be soxified for both http and https
 ISP support : tiera support
 ISP support : added DNS filtering to ubuntu and debian scripts
+
+v10
+
+tpws : added split-pos option. split every message at specified position

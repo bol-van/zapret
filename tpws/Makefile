@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = 
+CFLAGS = -s
 LIBS = 
 SRC_FILES = *.c
 
@@ -10,5 +10,3 @@ tpws: $(SRC_FILES)
 
 clean:
 	rm -f tpws *.o
-
-.PHONY: clean
