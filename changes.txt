@@ -53,3 +53,7 @@ ISP support : added DNS filtering to ubuntu and debian scripts
 v10
 
 tpws : added split-pos option. split every message at specified position
+
+v11
+
+ipset : scripts optimizations

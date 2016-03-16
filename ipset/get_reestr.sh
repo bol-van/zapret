@@ -11,7 +11,7 @@ ZDIG=/tmp/zapret-dig.txt
 ZIPLISTTMP=/tmp/zapret-ip.txt
 ZURL=http://reestr.rublacklist.net/api/current
 
-$EXEDIR/get_user.sh
+getuser
 
 curl --fail --max-time 60 --max-filesize 20971520 "$ZURL" >$ZREESTR && {
  dlsize=$(wc -c "$ZREESTR" | cut -f 1 -d ' ')

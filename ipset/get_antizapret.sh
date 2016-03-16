@@ -9,7 +9,7 @@ EXEDIR=$(dirname $SCRIPT)
 ZURL=http://antizapret.prostovpn.org/proxy.pac
 ZIPLISTTMP=/tmp/zapret-ip.txt
 
-$EXEDIR/get_user.sh
+getuser
 
 curl --fail --max-time 60 --max-filesize 4194304 "$ZURL" | sed -nre "s/\"([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\"/\1\n/gp" | sed -nre "s/^[^0-9]*([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$/\1/p" >$ZIPLISTTMP &&
 {
