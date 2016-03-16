@@ -18,6 +18,7 @@ do
  [ -f $TEMPIPSET ] && rm -f $TEMPIPSET
  [ -f "$f" ] && {
   echo Adding to ipset "$1" : $f
+  touch $TEMPIPSET
   sort $f | uniq | while read ip;
   do
    echo add $1 $ip >>$TEMPIPSET
