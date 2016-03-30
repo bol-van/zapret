@@ -57,3 +57,7 @@ tpws : added split-pos option. split every message at specified position
 v11
 
 ipset : scripts optimizations
+
+v12
+
+nfqws : fix wrong tcp checksum calculation if packet length is odd and platform is big-endian

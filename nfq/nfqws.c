@@ -125,8 +125,12 @@ uint16_t tcp_checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t d
 		len -= 2;
 	}
 	if ( len & 1 )
+	{
 		// Add the padding if the packet lenght is odd
-		sum += *((uint8_t *)buf);
+		uint16_t v=0;
+		*(uint8_t *)&v = *((uint8_t *)buf);
+		sum += v;
+	}
 		
 	// Add the pseudo-header
 	sum += *(ip_src++);
@@ -165,8 +169,12 @@ uint16_t tcp6_checksum(const void *buff, int len, const struct in6_addr *src_add
 		len -= 2;
 	}
 	if ( len & 1 )
+	{
 		// Add the padding if the packet lenght is odd
-		sum += *((uint8_t *)buf);
+		uint16_t v=0;
+		*(uint8_t *)&v = *((uint8_t *)buf);
+		sum += v;
+	}
 	
 	// Add the pseudo-header
 	sum += *(ip_src++);
