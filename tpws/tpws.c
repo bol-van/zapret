@@ -123,7 +123,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		        if (p=find_bin(buf,bs,*item,l))
 		        {
 				pos = p-buf;
-				printf("Found http method '%s' at pos %d. Adding extra space.\n",*item,pos);
+				printf("Found http method '%s' at pos %d. Adding extra space.\n",*item,(unsigned int)pos);
 				p += l-1;
 				pos += l-1;
 				memmove(p+1,p,bs-pos);
@@ -144,7 +144,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		    	if (p<(buf+bs))
 		    	{
 		    		pos = p-buf;
-				printf("Adding dot to host name at pos %d\n",pos);
+				printf("Adding dot to host name at pos %d\n",(unsigned int)pos);
 				memmove(p+1,p,bs-pos);
 				*p = '.'; // insert dot
 				bs++; // block will grow by 1 byte
@@ -193,7 +193,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		        if (p=find_bin(buf,bs,*split_item,l))
 		        {
 				split_pos = p-buf;
-				printf("Found split item '%s' at pos %d\n",*split_item,split_pos);
+				printf("Found split item '%s' at pos %d\n",*split_item,(unsigned int)split_pos);
 				split_pos += l-1;
 				break;
 			}
@@ -203,13 +203,13 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		{
 		    if (phost || (phost=find_bin(buf,bs,"\r\nHost: ",8)))
 		    {
-			printf("Changing 'Host:' => 'host:' at pos %d\n",phost-buf);
+			printf("Changing 'Host:' => 'host:' at pos %d\n",(unsigned int)(phost-buf));
 			phost[2]='h';
 		    }
 		}
 		if (split_pos)
 		{
-		    printf("Splitting at pos %d\n",split_pos);
+		    printf("Splitting at pos %d\n",(unsigned int)split_pos);
 		    wr=send_with_flush(fd_out,buf,split_pos,0);
 		    if (wr>=0)
 			wr=send(fd_out,buf+split_pos,bs-split_pos,0);
@@ -393,7 +393,7 @@ int8_t block_sigpipe(){
 
 void exithelp()
 {
-    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
+    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
     exit(1);
 }
 
