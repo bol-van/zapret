@@ -61,7 +61,8 @@ start_service() {
 Включить автозагрузку : /etc/init.d/socks_vps enable
 Проверка : curl --socks5 127.0.0.1:1098 https://btc-e.com
 Организовать прозрачную соксификацию
-Установить пакет redsocks. Для более старых версий openwrt его придется собирать самим.
+Установить пакет redsocks. Redsocks есть готовый для CC 15.01 и DD, для более старых версий openwrt его можно взять c http://downloads.openwrt.org, либо воспользоваться прекомпилированным статическим бинариком из комплекта "zapret".
+Если вы берете ipk с downloads.openwrt.org, то имейте в виду переход с uclibc в CC на musl в DD. Динамические бинарики между ними несовместимы.
 /etc/redsocks.conf :
 скрытый текст
 После чего перезапускаем : /etc/init.d/redsocks restart
