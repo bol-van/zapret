@@ -11,7 +11,7 @@ ZIPLISTTMP=/tmp/zapret-ip.txt
 
 getuser
 
-curl --fail --max-time 60 --max-filesize 33554432 -k -L "$ZURL" | \
+curl --fail --max-time 300 --max-filesize 33554432 -k -L "$ZURL" | \
     sed -nre "s/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/\1\n/gp" | \
     sed -nre "s/^[^0-9]*([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$/\1/p" | \
     grep -vE '^192.168.[0-9]*.[0-9]*$' | grep -vE '^127.[0-9]*.[0-9]*.[0-9]*$' | grep -vE '^10.[0-9]*.[0-9]*.[0-9]*$' \
