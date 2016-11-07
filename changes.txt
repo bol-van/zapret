@@ -65,3 +65,8 @@ nfqws : fix wrong tcp checksum calculation if packet length is odd and platform 
 v13
 
 added binaries
+
+v14
+
+change get_antizapret script to work with https://github.com/zapret-info/z-i/raw/master/dump.csv
+filter out 192.168.*, 127.*, 10.* from blocked ips
