@@ -6,25 +6,18 @@ EXEDIR=$(dirname $SCRIPT)
 
 . "$EXEDIR/def.sh"
 
-
 create_ipset()
 {
 ipset flush $1 2>/dev/null || ipset create $1 hash:ip
-
-local TEMPIPSET=/tmp/ipset.$1.tmp
-
 for f in "$2" "$3"
 do
- [ -f $TEMPIPSET ] && rm -f $TEMPIPSET
  [ -f "$f" ] && {
-  echo Adding to ipset "$1" : $f
-  touch $TEMPIPSET
-  sort $f | uniq | while read ip;
-  do
-   echo add $1 $ip >>$TEMPIPSET
-  done
-  ipset -! restore <$TEMPIPSET 2>&1
-  rm -f $TEMPIPSET
+  echo Adding to ipset $1 : $f
+  if [ -f "$ZIPLIST_EXCLUDE" ] ; then
+   grep -vxf $ZIPLIST_EXCLUDE "$f" | sort -u | while read ip; do echo add $1 $ip; done | ipset -! restore
+  else
+   sort -u "$f" | while read ip; do echo add $1 $ip; done | ipset -! restore
+  fi
  }
 done
 }

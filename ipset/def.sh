@@ -1,5 +1,6 @@
 ZIPSET=zapret
 ZIPLIST=$EXEDIR/zapret-ip.txt
+ZIPLIST_EXCLUDE=$EXEDIR/zapret-ip-exclude.txt
 ZIPLIST_USER=$EXEDIR/zapret-ip-user.txt
 ZUSERLIST=$EXEDIR/zapret-hosts-user.txt
 
