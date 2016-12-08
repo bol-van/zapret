@@ -59,7 +59,7 @@ case "$1" in
 		iptables -t mangle -C POSTROUTING -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null ||
 		 iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num $QNUM --queue-bypass
 		DAEMON=$NFQWS
-		DAEMON_OPTS="--qnum=$QNUM --hostcase"
+		DAEMON_OPTS="--qnum=$QNUM --hostspell=HOST"
 		;;
 	    domru)
 		adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
