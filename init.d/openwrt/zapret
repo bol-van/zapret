@@ -4,10 +4,14 @@
 # CHOOSE ISP HERE. UNCOMMENT ONLY ONE LINE.
 #ISP=mns
 #ISP=rt
-#ISP=beeline
+ISP=beeline
 #ISP=domru
-ISP=tiera
+#ISP=tiera
 #ISP=none
+
+USE_PROCD=1
+# start betfore firewall - we need ipset populated
+START=18
 
 # !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user
 
@@ -18,9 +22,6 @@ NFQWS=/opt/zapret/nfq/nfqws
 TPWS=/opt/zapret/tpws/tpws
 IPSET_CR=/opt/zapret/ipset/create_ipset.sh
 TPWS_USER=daemon
-
-# start betfore firewall - we need ipset populated
-START=18
 
 
 # must execute /etc/firewall.user on every firewall reload
@@ -53,7 +54,7 @@ get_daemon() {
 		DAEMON=$NFQWS
 		;;
 	    beeline)
-		DAEMON_OPTS="--qnum=$QNUM --hostcase"
+		DAEMON_OPTS="--qnum=$QNUM --hostspell=HOST"
 		DAEMON=$NFQWS
 		;;
 	    domru)
@@ -68,7 +69,7 @@ get_daemon() {
 }
 
 
-start() {
+start_service() {
 	set_firewall_user_reload
 	echo "Creating ipset"
 	($IPSET_CR)
@@ -76,14 +77,8 @@ start() {
 	get_daemon
 	[ -n "$DAEMON" ] && {
 	    echo "Starting $DAEMON"
-	    service_start $DAEMON --daemon $DAEMON_OPTS
+	    procd_open_instance
+	    procd_set_param command $DAEMON $DAEMON_OPTS
+	    procd_close_instance
 	}
 }
-
-stop() {
-	get_daemon
-	[ -n "$DAEMON" ] && {
-	    service_stop $DAEMON
-	}
-}
-

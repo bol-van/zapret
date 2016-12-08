@@ -70,3 +70,10 @@ v14
 
 change get_antizapret script to work with https://github.com/zapret-info/z-i/raw/master/dump.csv
 filter out 192.168.*, 127.*, 10.* from blocked ips
+
+v15
+
+added --hostspell option to nfqws and tpws
+ISP support : beeline now catches "host" but other spellings still work
+openwrt/LEDE : changed init script to work with procd
+tpws, nfqws : minor cosmetic fixes

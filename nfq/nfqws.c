@@ -248,6 +248,7 @@ struct cbdata_s
 	int wsize;
 	int qnum;
 	bool hostcase;
+	char hostspell[4];
 };
 
 // ret: false - not modified, true - modified
@@ -291,8 +292,8 @@ bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata
 		}
 		if (cbdata->hostcase && (p = find_bin(data,len,"\r\nHost: ",8)))
 		{
-			printf("modifying Host: => host:\n");
-			p[2]='h'; // "Host:" => "host:"
+			printf("modifying Host: => %c%c%c%c:\n",cbdata->hostspell[0],cbdata->hostspell[1],cbdata->hostspell[2],cbdata->hostspell[3]);
+			memcpy(p+2,cbdata->hostspell,4);
 			bRet = true;
 		}
 		if (bRet)
@@ -349,7 +350,7 @@ bool droproot(uid_t uid, gid_t gid)
 
 void exithelp()
 {
-	printf(" --qnum=<nfqueue_number>\n --wsize=<window_size>\t; set window size. 0 = do not modify\n --hostcase\t\t; change Host: => host:\n --daemon\t\t; daemonize\n");
+	printf(" --qnum=<nfqueue_number>\n --wsize=<window_size>\t; set window size. 0 = do not modify\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --daemon\t\t; daemonize\n");
 	exit(1);
 }
 
@@ -368,12 +369,15 @@ int main(int argc, char **argv)
 	gid_t gid;
 
 	memset(&cbdata,0,sizeof(cbdata));
+	memcpy(cbdata.hostspell,"host",4); // default hostspell
+	
 	const struct option long_options[] = {
     	    {"qnum",required_argument,0,0},	// optidx=0
     	    {"daemon",no_argument,0,0},		// optidx=1
     	    {"wsize",required_argument,0,0},	// optidx=2
     	    {"hostcase",no_argument,0,0},	// optidx=3
-    	    {"user",required_argument,0,0},	// optidx=4
+    	    {"hostspell",required_argument,0,0}, // optidx=4
+    	    {"user",required_argument,0,0},	// optidx=5
     	    {NULL,0,NULL,0}
 	};
 	if (argc<2) exithelp();
@@ -397,14 +401,23 @@ int main(int argc, char **argv)
 		    cbdata.wsize=atoi(optarg);
 		    if (cbdata.wsize<0 || cbdata.wsize>65535)
 		    {
-			fprintf(stdout,"bad qnum\n");
+			fprintf(stdout,"bad wsize\n");
 			exit(1);
 		    }
 		    break;
 		case 3: /* hostcase */
 		    cbdata.hostcase = true;
 		    break;
-		case 4: /* user */
+		case 4: /* hostspell */
+		    if (strlen(optarg)!=4)
+		    {
+			fprintf(stdout,"hostspell must be exactly 4 chars long\n");
+			exit(1);
+		    }
+		    cbdata.hostcase = true;
+		    memcpy(cbdata.hostspell,optarg,4);
+		    break;
+		case 5: /* user */
 	    	{
 	    		struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)

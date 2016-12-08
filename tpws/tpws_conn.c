@@ -1,17 +1,16 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
-#include <errno.h>
-#include <string.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
-#include <stdlib.h>
-#include "linux/netfilter_ipv4.h"
+#include <linux/netfilter_ipv4.h>
 #include <ifaddrs.h>
 
 #include "tpws_conn.h"

@@ -34,6 +34,7 @@ struct params_s
     uint16_t port;
     bool daemon;
     bool hostcase,hostdot,methodspace;
+    char hostspell[4];
     enum splithttpreq split_http_req;
     int split_pos;
     int maxconn;
@@ -123,7 +124,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		        if (p=find_bin(buf,bs,*item,l))
 		        {
 				pos = p-buf;
-				printf("Found http method '%s' at pos %d. Adding extra space.\n",*item,(unsigned int)pos);
+				printf("Found http method '%s' at pos %zd. Adding extra space.\n",*item,pos);
 				p += l-1;
 				pos += l-1;
 				memmove(p+1,p,bs-pos);
@@ -144,7 +145,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		    	if (p<(buf+bs))
 		    	{
 		    		pos = p-buf;
-				printf("Adding dot to host name at pos %d\n",(unsigned int)pos);
+				printf("Adding dot to host name at pos %zd\n",pos);
 				memmove(p+1,p,bs-pos);
 				*p = '.'; // insert dot
 				bs++; // block will grow by 1 byte
@@ -193,7 +194,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		        if (p=find_bin(buf,bs,*split_item,l))
 		        {
 				split_pos = p-buf;
-				printf("Found split item '%s' at pos %d\n",*split_item,(unsigned int)split_pos);
+				printf("Found split item '%s' at pos %zd\n",*split_item,split_pos);
 				split_pos += l-1;
 				break;
 			}
@@ -203,13 +204,13 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		{
 		    if (phost || (phost=find_bin(buf,bs,"\r\nHost: ",8)))
 		    {
-			printf("Changing 'Host:' => 'host:' at pos %d\n",(unsigned int)(phost-buf));
-			phost[2]='h';
+			printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n",params.hostspell[0],params.hostspell[1],params.hostspell[2],params.hostspell[3],phost-buf+2);
+			memcpy(phost+2,params.hostspell,4);
 		    }
 		}
 		if (split_pos)
 		{
-		    printf("Splitting at pos %d\n",(unsigned int)split_pos);
+		    printf("Splitting at pos %zd\n",split_pos);
 		    wr=send_with_flush(fd_out,buf,split_pos,0);
 		    if (wr>=0)
 			wr=send(fd_out,buf+split_pos,bs-split_pos,0);
@@ -393,7 +394,7 @@ int8_t block_sigpipe(){
 
 void exithelp()
 {
-    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
+    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
     exit(1);
 }
 
@@ -403,6 +404,7 @@ void parse_params(int argc, char *argv[])
     int v,i;
 
     memset(&params,0,sizeof(params));
+    memcpy(params.hostspell,"host",4); // default hostspell
     params.maxconn = DEFAULT_MAX_CONN;
     
     const struct option long_options[] = {
@@ -414,10 +416,11 @@ void parse_params(int argc, char *argv[])
         {"user",required_argument,0,0},// optidx=5
         {"maxconn",required_argument,0,0},// optidx=6
         {"hostcase",no_argument,0,0},// optidx=7
-        {"hostdot",no_argument,0,0},// optidx=8
-        {"split-http-req",required_argument,0,0},// optidx=9
-        {"split-pos",required_argument,0,0},// optidx=10
-        {"methodspace",no_argument,0,0},// optidx=11
+        {"hostspell",required_argument,0,0},// optidx=8
+        {"hostdot",no_argument,0,0},// optidx=9
+        {"split-http-req",required_argument,0,0},// optidx=10
+        {"split-pos",required_argument,0,0},// optidx=11
+        {"methodspace",no_argument,0,0},// optidx=12
         {NULL,0,NULL,0}
     };
     while ((v=getopt_long_only(argc,argv,"",long_options,&option_index))!=-1)
@@ -468,10 +471,19 @@ void parse_params(int argc, char *argv[])
 	case 7: /* hostcase */
 	    params.hostcase = true;
 	    break;
-	case 8: /* hostdot */
+	case 8: /* hostspell */
+	    if (strlen(optarg)!=4)
+	    {
+		fprintf(stdout,"hostspell must be exactly 4 chars long\n");
+		exit(1);
+	    }
+	    params.hostcase = true;
+	    memcpy(params.hostspell,optarg,4);
+	    break;
+	case 9: /* hostdot */
 	    params.hostdot = true;
 	    break;
-	case 9: /* split-http-req */
+	case 10: /* split-http-req */
 	    if (!strcmp(optarg,"method"))
 		params.split_http_req = split_method;
 	    else if (!strcmp(optarg,"host"))
@@ -482,7 +494,7 @@ void parse_params(int argc, char *argv[])
 		exit(1);
 	    }
 	    break;
-	case 10: /* split-pos */
+	case 11: /* split-pos */
 	    i = atoi(optarg);
 	    if (i)
 		params.split_pos = i;
@@ -492,7 +504,7 @@ void parse_params(int argc, char *argv[])
 		exit(1);
 	    }
 	    break;
-	case 11: /* methodspace */
+	case 12: /* methodspace */
 	    params.methodspace = true;
 	    break;
 	}
