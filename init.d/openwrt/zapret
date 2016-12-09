@@ -7,7 +7,10 @@
 ISP=beeline
 #ISP=domru
 #ISP=tiera
-#ISP=none
+
+# If ISP is unlisted then uncomment "custom"
+# Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
+#ISP=custom
 
 USE_PROCD=1
 # start betfore firewall - we need ipset populated
@@ -64,6 +67,13 @@ get_daemon() {
 	    tiera)
 		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
 		DAEMON=$TPWS
+		;;
+	    custom)
+		# PLACEHOLDER
+		echo !!! NEED ATTENTION !!!
+		echo Select which daemon and what options work for you
+		DAEMON_OPTS=20
+		DAEMON=/bin/sleep
 		;;
 	esac
 }

@@ -17,6 +17,10 @@ ISP=mns
 #ISP=domru
 #ISP=tiera
 
+# If ISP is unlisted then uncomment "custom"
+# Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
+#ISP=custom
+
 # CHOSE NETWORK INTERFACE BEHIND NAT
 SLAVE_ETH=eth0
 
@@ -90,6 +94,16 @@ case "$1" in
 		DAEMON=$TPWS
 		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --user=$TPWS_USER --bind-addr=127.0.0.1"
 		;;
+	    custom)
+		# PLACEHOLDER
+		echo !!! NEED ATTENTION !!!
+		echo Select daemon and options that work for you
+		echo \(optional\) Prepare environment for running daemon
+		echo Configure iptables for required actions
+		echo Study how other sections work
+		DAEMON=/bin/sleep
+		DAEMON_OPTS=20
+		;;
 	esac
 
 	echo -n "Starting $DESC: "
@@ -124,6 +138,13 @@ case "$1" in
 		iptables -t nat -D PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -D OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		DAEMON=$TPWS
+		;;
+	    custom)
+		# PLACEHOLDER
+		echo !!! NEED ATTENTION !!!
+		echo Clear firewall rules here. Remove iptables changes made previously.
+		echo Select which daemon to stop.
+		echo Study how other sections work
 		;;
 	esac
 
