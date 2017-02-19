@@ -49,7 +49,7 @@ set_firewall_user_reload() {
 get_daemon() {
 	case "${ISP}" in
 	    mns)
-		DAEMON_OPTS="--qnum=$QNUM --wsize=4"
+		DAEMON_OPTS="--qnum=$QNUM --wsize=3"
 		DAEMON=$NFQWS
 		;;
 	    rt)
