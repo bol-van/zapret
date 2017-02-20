@@ -109,8 +109,8 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
         if (bOutgoing)
         {
 	    char buf[RD_BLOCK_SIZE+2],*p,*phost=NULL;
-	    ssize_t l,split_pos=0,method_split_pos=0,host_split_pos=0,pos;
-	    const char **split_array,**split_item,**item;
+	    ssize_t l,split_pos=0,method_split_pos=0,host_split_pos=0,split_array_pos_offset=1,pos;
+	    const char **split_array=NULL, **split_item, **item;
 
 	    rd = recv(fd_in,buf,RD_BLOCK_SIZE,MSG_DONTWAIT);
 	    if (rd>0)
@@ -130,7 +130,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 				memmove(p+1,p,bs-pos);
 				*p = ' '; // insert extra space
 				bs++; // block will grow by 1 byte
-				method_split_pos = pos; // remember split position and use it if required
+				method_split_pos = pos-2; // remember split position and use it if required
 				break;
 			}
 		    }
@@ -154,7 +154,6 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 	    	}
 		if (params.split_pos)
 		{
-			split_array = NULL;
 			split_pos = params.split_pos<bs ? params.split_pos : 0;
 		}
 		else
@@ -164,25 +163,19 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 			    case split_method:
 			    	// do we have already split position ? if so use it without another search
 			    	if (method_split_pos)
-			    	{
-					split_array = NULL;
 					split_pos = method_split_pos;
-				}
 				else
+				{
 					split_array = http_split_methods;
+					split_array_pos_offset = 3;
+				}
 				break;
 			    case split_host:
 			    	if (host_split_pos)
-			    	{
-					split_array = NULL;
 					split_pos = host_split_pos;
-			    	}
 			    	else
 					split_array = http_split_host;
 				break;
-			    default:
-				split_array = NULL;
-		  	  	split_pos=0;
 			}
 		}
 		if (split_array)
@@ -194,8 +187,8 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		        if (p=find_bin(buf,bs,*split_item,l))
 		        {
 				split_pos = p-buf;
-				printf("Found split item '%s' at pos %zd\n",*split_item,split_pos);
-				split_pos += l-1;
+				printf("Found split item '%s' at pos %zd. Split offset is -%zd.\n",*split_item,split_pos,split_array_pos_offset);
+				split_pos += l-split_array_pos_offset;
 				break;
 			}
 		    }
