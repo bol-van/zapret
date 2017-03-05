@@ -279,6 +279,7 @@ status, output messages : systemctl status zapret
 Установить дополнительные пакеты :
 opkg update
 opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl bind-tools
+(для новых LEDE) opkg install kmod-ipt-raw
 
 Самая главная трудность - скомпилировать программы на C. Это можно сделать на linux x64 при помощи SDK, который
 можно скачать с официального сайта openwrt или LEDE. Но процесс кросс компиляции - это всегда сложности.
