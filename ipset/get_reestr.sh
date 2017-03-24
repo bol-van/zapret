@@ -23,7 +23,7 @@ curl --fail --max-time 300 --max-filesize 20971520 "$ZURL" >$ZREESTR && {
  sed -nre 's/^[^;]*;([^;|\\]{4,250})\;.*/\1/p' $ZREESTR | sort | uniq >$ZDIG
  rm -f $ZREESTR
  echo digging started ...
- dig A +short +time=8 +tries=2 -f $ZDIG | grep -E '^[^;].*[^.]$' | grep -vE '^192.168.[0-9]*.[0-9]*$' | grep -vE '^127.[0-9]*.[0-9]*.[0-9]*$' | grep -vE '^10.[0-9]*.[0-9]*.[0-9]*$' >$ZIPLISTTMP || {
+ dig A +short +time=8 +tries=2 -f $ZDIG | grep -E '^[^;].*[^\.]$' | grep -vE '^192\.168\.[0-9]+\.[0-9]+$' | grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' >$ZIPLISTTMP || {
   rm -f $ZDIG
   exit 1
  }
