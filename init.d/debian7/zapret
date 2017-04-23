@@ -16,6 +16,7 @@ ISP=mns
 #ISP=beeline
 #ISP=domru
 #ISP=tiera
+#ISP=athome
 
 # If ISP is unlisted then uncomment "custom"
 # Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
@@ -94,6 +95,16 @@ case "$1" in
 		DAEMON=$TPWS
 		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --user=$TPWS_USER --bind-addr=127.0.0.1"
 		;;
+	    athome)
+		adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
+		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+		iptables -t nat -C PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
+		DAEMON=$TPWS
+		DAEMON_OPTS="--port=$TPPORT --split-http-req=method --user=$TPWS_USER --bind-addr=127.0.0.1"
+		;;
 	    custom)
 		# PLACEHOLDER
 		echo !!! NEED ATTENTION !!!
@@ -133,7 +144,7 @@ case "$1" in
 		iptables -t raw -D PREROUTING -p udp --sport 53 -m string --hex-string "|2a022698a00000000000000000000110|" --algo bm -j DROP --from 40 --to 300
 		DAEMON=$TPWS
 		;;
-	    tiera)
+	    tiera|athome)
 		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=0
 		iptables -t nat -D PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -D OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT

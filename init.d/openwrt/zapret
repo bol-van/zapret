@@ -2,11 +2,12 @@
 # Copyright (C) 2006-2011 OpenWrt.org
 
 # CHOOSE ISP HERE. UNCOMMENT ONLY ONE LINE.
-#ISP=mns
+ISP=mns
 #ISP=rt
-ISP=beeline
+#ISP=beeline
 #ISP=domru
 #ISP=tiera
+#ISP=athome
 
 # If ISP is unlisted then uncomment "custom"
 # Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
@@ -66,6 +67,10 @@ get_daemon() {
 		;;
 	    tiera)
 		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
+		DAEMON=$TPWS
+		;;
+	    athome)
+		DAEMON_OPTS="--port=$TPPORT --split-http-req=method --bind-addr=127.0.0.1 --user=$TPWS_USER"
 		DAEMON=$TPWS
 		;;
 	    custom)

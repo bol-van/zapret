@@ -82,3 +82,7 @@ v16
 
 tpws: split-http-req=method : split inside method name, not after
 ISP support : mns.ru changed split pos to 3 (got redirect page with HEAD req : curl -I ej.ru)
+
+v17
+
+ISP support : athome moved from nfqws to tpws because of instability and http request hangs
