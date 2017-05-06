@@ -8,7 +8,7 @@ EXEDIR=$(dirname $SCRIPT)
 
 ZREESTR=/tmp/reestr.txt
 ZANTIZAPRET=/tmp/antizapret.txt
-ZURL_REESTR=http://reestr.rublacklist.net/api/current
+ZURL_REESTR=http://reestr.rublacklist.net/api/ips
 ZURL_ANTIZAPRET=http://antizapret.prostovpn.org/iplist.txt
 
 getuser
