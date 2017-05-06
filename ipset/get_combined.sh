@@ -30,7 +30,7 @@ curl --fail --max-time 300 --max-filesize 33554432 -k -L "$ZURL_ANTIZAPRET" |
  grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' >$ZANTIZAPRET
 dlsize=$(wc -c "$ZANTIZAPRET" | cut -f 1 -d ' ')
 if test $dlsize -lt 10240; then
- echo reestr ip list is too small. can be bad.
+ echo antizapret ip list is too small. can be bad.
  exit 2
 fi
 
