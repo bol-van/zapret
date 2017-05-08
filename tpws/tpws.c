@@ -33,7 +33,7 @@ struct params_s
     gid_t gid;
     uint16_t port;
     bool daemon;
-    bool hostcase,hostdot,methodspace;
+    bool hostcase,hostdot,hosttab,methodspace,methodeol,unixeol;
     char hostspell[4];
     enum splithttpreq split_http_req;
     int split_pos;
@@ -108,7 +108,7 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
     {
         if (bOutgoing)
         {
-	    char buf[RD_BLOCK_SIZE+2],*p,*phost=NULL;
+	    char buf[RD_BLOCK_SIZE+4],*p,*phost=NULL;
 	    ssize_t l,split_pos=0,method_split_pos=0,host_split_pos=0,split_array_pos_offset=1,pos;
 	    const char **split_array=NULL, **split_item, **item;
 
@@ -116,6 +116,19 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 	    if (rd>0)
 	    {
 	    	bs = rd;
+
+		if (params.unixeol)
+		{
+		    printf("Replacing 0D0A to 0A\n");
+		    p = buf;
+		    while (p=find_bin(p,buf+bs-p,"\r\n",2))
+		    {
+			*p = '\n'; p++;
+			memmove(p,p+1,buf+bs-p-1);
+			bs--;
+		    }
+		}
+
 	    	if (params.methodspace)
 	    	{
     		    for(item=http_split_methods;*item;item++)
@@ -135,9 +148,9 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 			}
 		    }
 	    	}
-	    	if (params.hostdot)
+	    	if (params.hostdot || params.hosttab)
 	    	{
-		    if (phost=find_bin(buf,bs,"\r\nHost: ",8))
+		    if (phost=find_bin(buf,bs,params.unixeol ? "\nHost: " : "\r\nHost: ",params.unixeol ? 7 : 8))
 		    {
 			host_split_pos = phost-buf+7;
 		    	p = phost+8;
@@ -145,9 +158,9 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		    	if (p<(buf+bs))
 		    	{
 		    		pos = p-buf;
-				printf("Adding dot to host name at pos %zd\n",pos);
+				printf("Adding %s to host name at pos %zd\n",params.hostdot ? "dot" : "tab",pos);
 				memmove(p+1,p,bs-pos);
-				*p = '.'; // insert dot
+				*p = params.hostdot ? '.' : '\t'; // insert dot or tab
 				bs++; // block will grow by 1 byte
 		    	}
 		    }
@@ -195,10 +208,29 @@ bool handle_epollin(tproxy_conn_t *conn,int *data_transferred){
 		}
 		if (params.hostcase)
 		{
-		    if (phost || (phost=find_bin(buf,bs,"\r\nHost: ",8)))
+		    if (phost || (phost=find_bin(buf,bs,params.unixeol ? "\nHost: " : "\r\nHost: ",params.unixeol ? 7 : 8)))
 		    {
 			printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n",params.hostspell[0],params.hostspell[1],params.hostspell[2],params.hostspell[3],phost-buf+2);
 			memcpy(phost+2,params.hostspell,4);
+		    }
+		}
+		if (params.methodeol)
+		{
+		    printf("Adding EOL before method\n");
+		    if (params.unixeol)
+		    {
+			memmove(buf+1,buf,bs);
+			bs++;;
+			buf[0]='\n';
+			if (split_pos) split_pos++;
+		    }
+		    else
+		    {
+			memmove(buf+2,buf,bs);
+			bs+=2;
+			buf[0]='\r';
+			buf[1]='\n';
+			if (split_pos) split_pos+=2;
 		    }
 		}
 		if (split_pos)
@@ -387,7 +419,7 @@ int8_t block_sigpipe(){
 
 void exithelp()
 {
-    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --hostdot\t\t; add \".\" after Host: name\n --methodspace\t\t; add extra space after method\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
+    printf(" --bind-addr=<ipv4_addr>|<ipv6_addr>\n --port=<port>\n --maxconn=<max_connections>\n --split-http-req=method|host\n --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --hostdot\t\t; add \".\" after Host: name\n --hosttab\t\t; add tab after Host: name\n --methodspace\t\t; add extra space after method\n --methodeol\t\t; add end-of-line before method\n --unixeol\t\t; replace 0D0A to 0A\n --daemon\t\t; daemonize\n --user=<username>\t; drop root privs\n");
     exit(1);
 }
 
@@ -414,6 +446,9 @@ void parse_params(int argc, char *argv[])
         {"split-http-req",required_argument,0,0},// optidx=10
         {"split-pos",required_argument,0,0},// optidx=11
         {"methodspace",no_argument,0,0},// optidx=12
+        {"methodeol",no_argument,0,0},// optidx=13
+        {"hosttab",no_argument,0,0},// optidx=14
+        {"unixeol",no_argument,0,0},// optidx=15
         {NULL,0,NULL,0}
     };
     while ((v=getopt_long_only(argc,argv,"",long_options,&option_index))!=-1)
@@ -499,6 +534,15 @@ void parse_params(int argc, char *argv[])
 	    break;
 	case 12: /* methodspace */
 	    params.methodspace = true;
+	    break;
+	case 13: /* methodeol */
+	    params.methodeol = true;
+	    break;
+	case 14: /* hosttab */
+	    params.hosttab = true;
+	    break;
+	case 15: /* unixeol */
+	    params.unixeol = true;
 	    break;
 	}
     }
