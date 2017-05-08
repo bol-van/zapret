@@ -77,7 +77,6 @@ void close_tcp_conn(tproxy_conn_t *conn, struct tailhead *conn_list,
 }
 
 static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
-static const char *http_split_host[] = { "\r\nHost: ",NULL };
 
 #define RD_BLOCK_SIZE 8192
 
@@ -109,17 +108,18 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 	{
 		if (bOutgoing)
 		{
-			char buf[RD_BLOCK_SIZE + 4], *p, *pp, *phost = NULL;
-			ssize_t l, method_len=0, split_pos = 0, method_split_pos = 0, host_split_pos = 0, split_array_pos_offset = 1, pos;
-			const char **split_array = NULL, **split_item, **method;
-			bool bIsHttp;
+			char buf[RD_BLOCK_SIZE + 4];
 
 			rd = recv(fd_in, buf, RD_BLOCK_SIZE, MSG_DONTWAIT);
 			if (rd > 0)
 			{
+				char *p, *pp, *pHost=NULL;
+				ssize_t method_len=0, split_pos=0, pos;
+				const char **method;
+				bool bIsHttp=false;
+
 				bs = rd;
 
-				bIsHttp = false;
 				for (method = http_methods; *method; method++)
 				{
 					method_len = strlen(*method);
@@ -136,7 +136,6 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 
 					if (params.unixeol)
 					{
-						printf("Replacing 0D0A to 0A\n");
 						p = pp = buf;
 						while (p = find_bin(p, buf + bs - p, "\r\n", 2))
 						{
@@ -163,23 +162,29 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 						*p = ' '; // insert extra space
 						bs++; // block will grow by 1 byte
 					}
-					if (params.hostdot || params.hosttab)
+
+					// search for Host only if required (save some CPU)
+					if (params.hostdot || params.hosttab || params.hostcase || params.split_http_req==split_host)
 					{
-						if (phost = find_bin(buf, bs, params.unixeol ? "\nHost: " : "\r\nHost: ", params.unixeol ? 7 : 8))
+						// we need Host: location
+						pHost=find_bin(buf, bs, "\nHost: ", 7);
+						if (pHost) pHost++;
+					}
+
+					if (pHost && params.hostdot || params.hosttab)
+					{
+						p = pHost + 6;
+						while (p < (buf + bs) && *p != '\r' && *p != '\n') p++;
+						if (p < (buf + bs))
 						{
-							host_split_pos = phost - buf + 7;
-							p = phost + 8;
-							while (p < (buf + bs) && *p != '\r' && *p != '\n') p++;
-							if (p < (buf + bs))
-							{
-								pos = p - buf;
-								printf("Adding %s to host name at pos %zd\n", params.hostdot ? "dot" : "tab", pos);
-								memmove(p + 1, p, bs - pos);
-								*p = params.hostdot ? '.' : '\t'; // insert dot or tab
-								bs++; // block will grow by 1 byte
-							}
+							pos = p - buf;
+							printf("Adding %s to host name at pos %zd\n", params.hostdot ? "dot" : "tab", pos);
+							memmove(p + 1, p, bs - pos);
+							*p = params.hostdot ? '.' : '\t'; // insert dot or tab
+							bs++; // block will grow by 1 byte
 						}
 					}
+
 					if (params.split_pos)
 					{
 						split_pos = params.split_pos < bs ? params.split_pos : 0;
@@ -192,36 +197,21 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 							split_pos = method_len - 1;
 							break;
 						case split_host:
-							if (host_split_pos)
-								split_pos = host_split_pos;
-							else
-								split_array = http_split_host;
+							if (pHost)
+								split_pos = pHost + 6 - buf;
 							break;
 						}
 					}
-					if (split_array)
-					{
-						// we havent found split post yet. need to search.
-						for (split_item = split_array; *split_item; split_item++)
-						{
-							l = strlen(*split_item);
-							if (p = find_bin(buf, bs, *split_item, l))
-							{
-								split_pos = p - buf;
-								printf("Found split item '%s' at pos %zd. Split offset is -%zd.\n", *split_item, split_pos, split_array_pos_offset);
-								split_pos += l - split_array_pos_offset;
-								break;
-							}
-						}
-					}
+
 					if (params.hostcase)
 					{
-						if (phost || (phost = find_bin(buf, bs, params.unixeol ? "\nHost: " : "\r\nHost: ", params.unixeol ? 7 : 8)))
+						if (pHost)
 						{
-							printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], phost - buf + 2);
-							memcpy(phost + 2, params.hostspell, 4);
+							printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - buf);
+							memcpy(pHost, params.hostspell, 4);
 						}
 					}
+
 					if (params.methodeol)
 					{
 						printf("Adding EOL before method\n");
