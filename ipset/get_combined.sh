@@ -36,7 +36,7 @@ curl --fail --max-time 120 --max-filesize 10485760 -k -L "$ZURL_AZ" | cut_local 
   exit 2
  fi
  # do not include hosts banned by ip
- grep -vFf $ZIPLIST_IPBAN $ZAZ >$ZIPLIST
+ grep -xvFf $ZIPLIST_IPBAN $ZAZ >$ZIPLIST
  rm -f $ZAZ
  "$EXEDIR/create_ipset.sh"
 }
