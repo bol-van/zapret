@@ -6,36 +6,37 @@ EXEDIR=$(dirname $SCRIPT)
 
 . "$EXEDIR/def.sh"
 
-ZREESTR=/tmp/reestr.txt
-ZANTIZAPRET=/tmp/antizapret.txt
-ZURL_REESTR=http://reestr.rublacklist.net/api/ips
-ZURL_ANTIZAPRET=http://antizapret.prostovpn.org/iplist.txt
+ZREESTR=$TMPDIR/reestr.txt
+ZURL_REESTR=http://reestr.rublacklist.net/api/current
+ZAZ=$TMPDIR/zapret-ip.txt
+ZURL_AZ=http://antizapret.prostovpn.org/iplist.txt
 
 getuser
 
-curl --fail --max-time 300 --max-filesize 41943040 "$ZURL_REESTR" |
-  grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' |
-  grep -vE '^192\.168\.[0-9]+\.[0-9]+$' |
-  grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' |
-  grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' |
-  sort -u >$ZREESTR
+# assume all https banned by ip
+curl --fail --max-time 300 --max-filesize 41943040 "$ZURL_REESTR" -o $ZREESTR
 dlsize=$(wc -c "$ZREESTR" | cut -f 1 -d ' ')
-if test $dlsize -lt 10240; then
+if test $dlsize -lt 1048576; then
  echo reestr ip list is too small. can be bad.
  exit 2
 fi
-curl --fail --max-time 300 --max-filesize 33554432 -k -L "$ZURL_ANTIZAPRET" |
- grep -vE '^192\.168\.[0-9]+\.[0-9]+$' |
- grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' |
- grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' >$ZANTIZAPRET
-dlsize=$(wc -c "$ZANTIZAPRET" | cut -f 1 -d ' ')
-if test $dlsize -lt 10240; then
- echo antizapret ip list is too small. can be bad.
- exit 2
-fi
+sed -i 's/\\n/\r\n/g' $ZREESTR
+grep "https://" $ZREESTR |
+ grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' |
+ cut_local |
+ sort -u >$ZIPLIST_IPBAN
 
-grep -vFf $ZREESTR $ZANTIZAPRET >$ZIPLIST
-mv -f $ZREESTR $ZIPLIST_IPBAN
-rm -f $ZANTIZAPRET 
+rm -f $ZREESTR
 
-"$EXEDIR/create_ipset.sh"
+curl --fail --max-time 120 --max-filesize 10485760 -k -L "$ZURL_AZ" | cut_local >$ZAZ &&
+{
+ dlsize=$(wc -c "$ZAZ" | cut -f 1 -d ' ')
+ if test $dlsize -lt 204800; then
+  echo antizapret list file is too small. can be bad.
+  exit 2
+ fi
+ # do not include hosts banned by ip
+ grep -vFf $ZIPLIST_IPBAN $ZAZ >$ZIPLIST
+ rm -f $ZAZ
+ "$EXEDIR/create_ipset.sh"
+}

@@ -1,3 +1,4 @@
+TMPDIR=/tmp
 ZIPSET=zapret
 ZIPLIST=$EXEDIR/zapret-ip.txt
 ZIPLIST_EXCLUDE=$EXEDIR/zapret-ip-exclude.txt
@@ -17,4 +18,11 @@ getuser()
  [ -f $ZUSERLIST_IPBAN ] && {
   dig A +short +time=8 +tries=2 -f $ZUSERLIST_IPBAN | grep -E '^[^;].*[^.]$' | grep -vE '^192\.168\.[0-9]+\.[0-9]+$' | grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u >$ZIPLIST_USER_IPBAN
  }
+}
+
+cut_local()
+{
+  grep -vE '^192\.168\.[0-9]+\.[0-9]+$' |
+  grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' |
+  grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$'
 }

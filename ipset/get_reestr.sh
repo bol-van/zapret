@@ -6,9 +6,9 @@ EXEDIR=$(dirname $SCRIPT)
 
 . "$EXEDIR/def.sh"
 
-ZREESTR=/tmp/zapret.txt
-ZDIG=/tmp/zapret-dig.txt
-ZIPLISTTMP=/tmp/zapret-ip.txt
+ZREESTR=$TMPDIR/zapret.txt
+ZDIG=$TMPDIR/zapret-dig.txt
+ZIPLISTTMP=$TMPDIR/zapret-ip.txt
 ZURL=http://reestr.rublacklist.net/api/current
 
 getuser
