@@ -235,6 +235,9 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 				else
 				{
 					printf("Data block does not look like http request start\n");
+
+					// this is the only parameter applicable to non-http block (may be https ?)
+					if (params.split_pos<bs) split_pos = params.split_pos;
 				}
 
 				if (split_pos)

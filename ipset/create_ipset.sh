@@ -20,6 +20,7 @@ do
   fi
  }
 done
+return 0
 }
 
 create_ipset $ZIPSET $ZIPLIST $ZIPLIST_USER
