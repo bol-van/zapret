@@ -86,7 +86,8 @@ ISP support : mns.ru changed split pos to 3 (got redirect page with HEAD req : c
 v17
 
 ISP support : athome moved from nfqws to tpws because of instability and http request hangs
-
-v17
-
 tpws : added options unixeol,methodeol,hosttab
+
+v18
+
+tpws,nfqws : added hostnospace option
