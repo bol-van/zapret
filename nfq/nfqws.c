@@ -249,6 +249,7 @@ struct cbdata_s
 	int qnum;
 	bool hostcase;
 	char hostspell[4];
+	bool removespace;
 };
 
 // ret: false - not modified, true - modified
@@ -257,7 +258,7 @@ bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata
 	struct iphdr *iphdr = NULL;
 	struct ip6_hdr *ip6hdr = NULL;
 	struct tcphdr *tcphdr = NULL;
-	unsigned char *p;
+	unsigned char *p, *uap;
 	int len_tcp;
 	bool bRet = false;
 	uint8_t proto;
@@ -290,11 +291,29 @@ bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata
 			tcp_rewrite_winsize(tcphdr,(uint16_t)cbdata->wsize);
 			bRet = true;
 		}
-		if (cbdata->hostcase && (p = find_bin(data,len,"\r\nHost: ",8)))
+		p = find_bin(data,len,"\r\nHost: ",8);
+		if (cbdata->hostcase && p)
 		{
 			printf("modifying Host: => %c%c%c%c:\n",cbdata->hostspell[0],cbdata->hostspell[1],cbdata->hostspell[2],cbdata->hostspell[3]);
 			memcpy(p+2,cbdata->hostspell,4);
 			bRet = true;
+		}
+		if (cbdata->removespace && p && (uap = find_bin(data,len,"\r\nUser-Agent: ",14)))
+		{
+			uap = find_bin(uap+1,len-(uap-data)-1,"\r\n",2);
+			if (uap) {
+				if (uap > p)
+				{
+					memmove(p+7,p+8,uap-p-8);
+					*(char*)(p+(uap-p)-1) = ' ';
+				}
+				else
+				{
+					memmove(uap+1,uap,p-uap+7);
+					*(char*)(uap) = ' ';
+				}
+				bRet = true;
+			}
 		}
 		if (bRet)
 		{
@@ -350,7 +369,7 @@ bool droproot(uid_t uid, gid_t gid)
 
 void exithelp()
 {
-	printf(" --qnum=<nfqueue_number>\n --wsize=<window_size>\t; set window size. 0 = do not modify\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --daemon\t\t; daemonize\n");
+	printf(" --qnum=<nfqueue_number>\n --wsize=<window_size>\t; set window size. 0 = do not modify\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --removespace\t\t; remove space between Host header and its value\n --daemon\t\t; daemonize\n");
 	exit(1);
 }
 
@@ -377,7 +396,8 @@ int main(int argc, char **argv)
     	    {"wsize",required_argument,0,0},	// optidx=2
     	    {"hostcase",no_argument,0,0},	// optidx=3
     	    {"hostspell",required_argument,0,0}, // optidx=4
-    	    {"user",required_argument,0,0},	// optidx=5
+    	    {"removespace",no_argument,0,0}, // optidx=5
+    	    {"user",required_argument,0,0},	// optidx=6
     	    {NULL,0,NULL,0}
 	};
 	if (argc<2) exithelp();
@@ -417,7 +437,10 @@ int main(int argc, char **argv)
 		    cbdata.hostcase = true;
 		    memcpy(cbdata.hostspell,optarg,4);
 		    break;
-		case 5: /* user */
+		case 5: /* hostcase */
+		    cbdata.removespace = true;
+		    break;
+		case 6: /* user */
 	    	{
 	    		struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
