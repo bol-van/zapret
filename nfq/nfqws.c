@@ -247,7 +247,7 @@ struct cbdata_s
 {
 	int wsize;
 	int qnum;
-	bool hostcase;
+	bool hostcase,hostnospace;
 	char hostspell[4];
 };
 
@@ -257,7 +257,7 @@ bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata
 	struct iphdr *iphdr = NULL;
 	struct ip6_hdr *ip6hdr = NULL;
 	struct tcphdr *tcphdr = NULL;
-	unsigned char *p;
+	unsigned char *phost,*pua;
 	int len_tcp;
 	bool bRet = false;
 	uint8_t proto;
@@ -290,11 +290,29 @@ bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata
 			tcp_rewrite_winsize(tcphdr,(uint16_t)cbdata->wsize);
 			bRet = true;
 		}
-		if (cbdata->hostcase && (p = find_bin(data,len,"\r\nHost: ",8)))
+		if ((cbdata->hostcase || cbdata->hostnospace) && (phost = find_bin(data,len,"\r\nHost: ",8)))
 		{
-			printf("modifying Host: => %c%c%c%c:\n",cbdata->hostspell[0],cbdata->hostspell[1],cbdata->hostspell[2],cbdata->hostspell[3]);
-			memcpy(p+2,cbdata->hostspell,4);
-			bRet = true;
+			if (cbdata->hostcase)
+			{
+				printf("modifying Host: => %c%c%c%c:\n",cbdata->hostspell[0],cbdata->hostspell[1],cbdata->hostspell[2],cbdata->hostspell[3]);
+				memcpy(phost+2,cbdata->hostspell,4);
+				bRet = true;
+			}
+			if (cbdata->hostnospace && (pua = find_bin(data,len,"\r\nUser-Agent: ",14)) && (pua = find_bin(pua+1,len-(pua-data)-1,"\r\n",2)))
+			{
+				printf("removing space after Host: and adding it to User-Agent:\n");
+				if (pua > phost)
+				{
+					memmove(phost+7,phost+8,pua-phost-8);
+					phost[pua-phost-1] = ' ';
+				}
+				else
+				{
+					memmove(pua+1,pua,phost-pua+7);
+					*pua = ' ';
+				}
+				bRet = true;
+			}
 		}
 		if (bRet)
 		{
@@ -350,7 +368,14 @@ bool droproot(uid_t uid, gid_t gid)
 
 void exithelp()
 {
-	printf(" --qnum=<nfqueue_number>\n --wsize=<window_size>\t; set window size. 0 = do not modify\n --hostcase\t\t; change Host: => host:\n --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n --daemon\t\t; daemonize\n");
+	printf(
+          " --qnum=<nfqueue_number>\n"
+          " --wsize=<window_size>\t; set window size. 0 = do not modify\n"
+          " --hostcase\t\t; change Host: => host:\n"
+          " --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+          " --hostnospace\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
+          " --daemon\t\t; daemonize\n"
+        );
 	exit(1);
 }
 
@@ -377,7 +402,8 @@ int main(int argc, char **argv)
     	    {"wsize",required_argument,0,0},	// optidx=2
     	    {"hostcase",no_argument,0,0},	// optidx=3
     	    {"hostspell",required_argument,0,0}, // optidx=4
-    	    {"user",required_argument,0,0},	// optidx=5
+    	    {"hostnospace",no_argument,0,0},	// optidx=5
+    	    {"user",required_argument,0,0},	// optidx=6
     	    {NULL,0,NULL,0}
 	};
 	if (argc<2) exithelp();
@@ -417,7 +443,10 @@ int main(int argc, char **argv)
 		    cbdata.hostcase = true;
 		    memcpy(cbdata.hostspell,optarg,4);
 		    break;
-		case 5: /* user */
+		case 5: /* hostnospace */
+		    cbdata.hostnospace = true;
+		    break;
+		case 6: /* user */
 	    	{
 	    		struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
