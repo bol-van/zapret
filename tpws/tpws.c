@@ -323,6 +323,7 @@ int event_loop(int listen_fd) {
 
 	while (1) {
 		if ((num_events = epoll_wait(efd, events, MAX_EPOLL_EVENTS, -1)) == -1) {
+			if (errno==EINTR) continue; // system call was interrupted
 			perror("epoll_wait");
 			retval = -1;
 			break;
