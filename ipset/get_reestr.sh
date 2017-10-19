@@ -9,11 +9,11 @@ EXEDIR=$(dirname $SCRIPT)
 ZREESTR=$TMPDIR/zapret.txt
 ZDIG=$TMPDIR/zapret-dig.txt
 ZIPLISTTMP=$TMPDIR/zapret-ip.txt
-ZURL=http://reestr.rublacklist.net/api/current
+ZURL=https://reestr.rublacklist.net/api/current
 
 getuser
 
-curl --fail --max-time 300 --max-filesize 41943040 "$ZURL" >$ZREESTR && {
+curl -k --fail --max-time 300 --max-filesize 41943040 "$ZURL" >$ZREESTR && {
  dlsize=$(wc -c "$ZREESTR" | cut -f 1 -d ' ')
  if test $dlsize -lt 204800; then
   echo list file is too small. can be bad.

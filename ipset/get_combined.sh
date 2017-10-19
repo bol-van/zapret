@@ -7,14 +7,14 @@ EXEDIR=$(dirname $SCRIPT)
 . "$EXEDIR/def.sh"
 
 ZREESTR=$TMPDIR/reestr.txt
-ZURL_REESTR=http://reestr.rublacklist.net/api/current
+ZURL_REESTR=https://reestr.rublacklist.net/api/current
 ZAZ=$TMPDIR/zapret-ip.txt
 ZURL_AZ=http://antizapret.prostovpn.org/iplist.txt
 
 getuser
 
 # assume all https banned by ip
-curl --fail --max-time 300 --max-filesize 41943040 "$ZURL_REESTR" -o $ZREESTR
+curl -k --fail --max-time 300 --max-filesize 41943040 "$ZURL_REESTR" -o $ZREESTR
 dlsize=$(wc -c "$ZREESTR" | cut -f 1 -d ' ')
 if test $dlsize -lt 1048576; then
  echo reestr ip list is too small. can be bad.
