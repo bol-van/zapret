@@ -13,6 +13,7 @@ for ext_iface in $wan_iface; do
 
 done
 
-sysctl -w net.ipv4.conf.br-lan.route_localnet=1
+network_get_device DEVICE lan
+sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
 iptables -t nat -C prerouting_lan_rule -p tcp --dport 80 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT ||
  iptables -t nat -I prerouting_lan_rule -p tcp --dport 80 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
