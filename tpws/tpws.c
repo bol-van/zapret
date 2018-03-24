@@ -701,6 +701,12 @@ int main(int argc, char *argv[]) {
 		close(listen_fd);
 		exit(EXIT_FAILURE);
 	}
+	if (setsockopt(listen_fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) == -1)
+	{
+		perror("setsockopt (SO_KEEPALIVE): ");
+		close(listen_fd);
+		exit(EXIT_FAILURE);
+	}
 
 	//Mark that this socket can be used for transparent proxying
 	//This allows the socket to accept connections for non-local IPs

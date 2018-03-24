@@ -73,6 +73,7 @@ int check_local_ip(const struct sockaddr *saddr)
 //Returns 0 if something fails, >0 on success (socket fd).
 static int connect_remote(struct sockaddr_storage *remote_addr){
     int remote_fd = 0, yes = 1;
+    
 
     //Use NONBLOCK to avoid slow connects affecting the performance of other
     //connections
@@ -87,7 +88,12 @@ static int connect_remote(struct sockaddr_storage *remote_addr){
         close(remote_fd);
         return 0;
     }
-
+    if(setsockopt(remote_fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) < 0){
+        perror("setsockopt (SO_KEEPALIVE, connect_remote): ");
+        close(remote_fd);
+        return 0;
+    }
+    
     if(connect(remote_fd, (struct sockaddr*) remote_addr, 
             remote_addr->ss_family == AF_INET ? sizeof(struct sockaddr_in) :
             sizeof(struct sockaddr_in6)) < 0){
