@@ -8,20 +8,20 @@ EXEDIR=$(dirname $SCRIPT)
 
 create_ipset()
 {
-ipset flush $1 2>/dev/null || ipset create $1 hash:ip maxelem 262144
-for f in "$2" "$3"
+ipset flush $2 2>/dev/null || ipset create $2 $1 maxelem 262144
+for f in "$3" "$4"
 do
  [ -f "$f" ] && {
-  echo Adding to ipset $1 : $f
+  echo Adding to ipset $2 \($1\) : $f
   if [ -f "$ZIPLIST_EXCLUDE" ] ; then
-   grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | sed -nre "s/^.*$/add $1 &/p" | ipset -! restore
+   grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | sed -nre "s/^.*$/add $2 &/p" | ipset -! restore
   else
-   sort -u "$f" | sed -nre "s/^.*$/add $1 &/p" | ipset -! restore
+   sort -u "$f" | sed -nre "s/^.*$/add $2 &/p" | ipset -! restore
   fi
  }
 done
 return 0
 }
 
-create_ipset $ZIPSET $ZIPLIST $ZIPLIST_USER
-create_ipset $ZIPSET_IPBAN $ZIPLIST_IPBAN $ZIPLIST_USER_IPBAN
+create_ipset hash:ip $ZIPSET $ZIPLIST $ZIPLIST_USER
+create_ipset hash:net $ZIPSET_IPBAN $ZIPLIST_IPBAN $ZIPLIST_USER_IPBAN

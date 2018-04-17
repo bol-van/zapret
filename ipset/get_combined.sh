@@ -21,8 +21,9 @@ if test $dlsize -lt 1048576; then
  exit 2
 fi
 sed -i 's/\\n/\r\n/g' $ZREESTR
-grep "https://" $ZREESTR |
- grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' |
+# find entries with https or without domain name - they should be banned by IP
+(grep "https://" $ZREESTR ; grep -vE ";[a-z|*|_|0-9|\-]+\.[a-z|*|_|0-9|\-]+" $ZREESTR ) |
+ grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]+)?' |
  cut_local |
  sort -u >$ZIPLIST_IPBAN
 
