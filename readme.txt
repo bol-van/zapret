@@ -1,4 +1,4 @@
-﻿zapret v.18
+﻿zapret v.17
 
 Для чего это надо
 -----------------
@@ -100,7 +100,6 @@ nfqws
  --qnum=200		; номер очереди
  --wsize=4		; менять tcp window size на указанный размер
  --hostcase		; менять регистр заголовка "Host:" по умолчанию на "host:".
- --hostnospace		; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
  --hostspell=HoST	; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
 Параметры манипуляции могут сочетаться в любых комбинациях.
 
@@ -118,7 +117,6 @@ tpws - это transparent proxy.
  --hostspell=HoST	; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
  --hostdot		; добавление точки после имени хоста : "Host: kinozal.tv."
  --hosttab		; добавление табуляции после имени хоста : "Host: kinozal.tv\t"
- --hostnospace		; убрать пробел после "Host:"
  --methodspace		; добавить пробел после метода : "GET /" => "GET  /"
  --methodeol		; добавить перевод строки перед методом  : "GET /" => "\r\nGET  /"
  --unixeol		; конвертировать 0D0A в 0A и использовать везде 0A
@@ -265,7 +263,7 @@ apt-get --no-install-recommends install lsb-core
 
 install : /usr/lib/lsb/install_initd zapret
 remove : /usr/lib/lsb/remove_initd zapret
-start : sytemctl start zapret
+start : systemctl start zapret
 stop : systemctl stop zapret
 status, output messages : systemctl status zapret
 
