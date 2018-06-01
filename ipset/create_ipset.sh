@@ -14,9 +14,9 @@ do
  [ -f "$f" ] && {
   echo Adding to ipset $2 \($1\) : $f
   if [ -f "$ZIPLIST_EXCLUDE" ] ; then
-   grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | sed -nre "s/^.*$/add $2 &/p" | ipset -! restore
+   grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
   else
-   sort -u "$f" | sed -nre "s/^.*$/add $2 &/p" | ipset -! restore
+   sort -u "$f" | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
   fi
  }
 done
