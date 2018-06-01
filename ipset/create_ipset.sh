@@ -23,5 +23,5 @@ done
 return 0
 }
 
-create_ipset hash:ip $ZIPSET $ZIPLIST $ZIPLIST_USER
+create_ipset hash:net $ZIPSET $ZIPLIST $ZIPLIST_USER
 create_ipset hash:net $ZIPSET_IPBAN $ZIPLIST_IPBAN $ZIPLIST_USER_IPBAN
