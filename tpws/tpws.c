@@ -20,6 +20,7 @@
 #include <netinet/tcp.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <signal.h>
 
 #include "tpws.h"
 #include "tpws_conn.h"
@@ -69,6 +70,7 @@ struct params_s
 	enum splithttpreq split_http_req;
 	int split_pos;
 	int maxconn;
+	char hostfile[256];
 	cptr *hostlist;
 };
 
@@ -84,6 +86,29 @@ unsigned char *find_bin(void *data, ssize_t len, const void *blk, ssize_t blk_le
 		len--;
 	}
 	return NULL;
+}
+
+bool bHup = false;
+void onhup(int sig)
+{
+ printf("HUP received !\n");
+ if (params.hostlist)
+  printf("Will reload hostlist on next request\n");
+ bHup = true;
+}
+// should be called in normal execution
+void dohup()
+{
+ if (bHup)
+ {
+  if (params.hostlist)
+  {
+   CharTreeDestroy(params.hostlist);
+   if (!LoadHostList(&params.hostlist, params.hostfile))
+	exit(1);
+  }
+  bHup = false;
+ }
 }
 
 ssize_t send_with_flush(int sockfd, const void *buf, size_t len, int flags)
@@ -117,6 +142,8 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 	int fd_in, fd_out;
 	bool bOutgoing;
 	ssize_t rd = 0, wr = 0, bs;
+
+	dohup();
 
 	//Easy way to determin which socket is ready for reading
 	//TODO: Optimize. This one allows me quick lookup for conn, but
@@ -168,31 +195,26 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 				{
 					printf("Data block looks like http request start : %s\n", *method);
 
-					if (params.hostlist)
+					if (params.hostlist && (p = find_bin(buf, bs, "\nHost: ", 7)))
 					{
-						pHost = find_bin(buf, bs, "\nHost: ", 7);
-						if (pHost)
+						bool bInHostList = false;
+						p  += 7;
+						while (p < (buf + bs) && (*p == ' ' || *p == '\t')) p++;
+						pp = p;
+						while (pp < (buf + bs) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
+						memcpy(Host, p, pp - p);
+						Host[pp - p] = '\0';
+						p = Host;
+						printf("Requested Host is : %s\n", Host);
+						while (p)
 						{
-							bool bInHostList = false;
-							p = pHost + 7;
-							while (p < (buf + bs) && (*p == ' ' || *p == '\t')) p++;
-							pp = p;
-							while (pp < (buf + bs) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
-							memcpy(Host, p, pp - p);
-							Host[pp - p] = '\0';
-							p = Host;
-							printf("Requested Host is : %s\n", Host);
-							while (p)
-							{
-								bInHostList = CharTreeCheckStrLower(params.hostlist, p);
-								printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
-								if (bInHostList) break;
-								p = strchr(p, '.');
-								if (p) p++;
-							}
-							bBypass = !bInHostList;
+							bInHostList = CharTreeCheckStrLower(params.hostlist, p);
+							printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
+							if (bInHostList) break;
+							p = strchr(p, '.');
+							if (p) p++;
 						}
-
+						bBypass = !bInHostList;
 					}
 					if (!bBypass)
 					{
@@ -212,7 +234,6 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 								}
 								pp = p;
 							}
-							pHost = NULL;
 						}
 
 						if (params.methodspace)
@@ -224,7 +245,6 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 							memmove(p + 1, p, bs - pos);
 							*p = ' '; // insert extra space
 							bs++; // block will grow by 1 byte
-							pHost = NULL;
 						}
 
 						// search for Host only if required (save some CPU)
@@ -655,6 +675,8 @@ void parse_params(int argc, char *argv[])
 		case 17: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit(1);
+			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
+			params.hostfile[sizeof(params.hostfile)-1]='\0';
 			break;
 		}
 	}
@@ -817,6 +839,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	fprintf(stderr, "Will listen to port %d\n", params.port);
+
+	signal(SIGHUP, onhup); 
 
 	retval = event_loop(listen_fd);
 	close(listen_fd);
