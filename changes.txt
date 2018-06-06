@@ -91,3 +91,7 @@ tpws : added options unixeol,methodeol,hosttab
 v18
 
 tpws,nfqws : added hostnospace option
+
+v19
+
+tpws : added hostlist option

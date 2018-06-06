@@ -23,6 +23,37 @@
 
 #include "tpws.h"
 #include "tpws_conn.h"
+#include "chartree.h"
+
+bool LoadHostList(cptr **hostlist, char *filename)
+{
+	char *p, s[256];
+	FILE *F = fopen(filename, "rt");
+	int ct = 0;
+
+	*hostlist = NULL;
+	if (!F)
+	{
+		fprintf(stderr, "Could not open %s\n", filename);
+		return false;
+	}
+	while (fgets(s, 256, F))
+	{
+		for (p = s + strlen(s) - 1; p >= s && (*p == '\r' || *p == '\n'); p--) *p = 0;
+		if (!CharTreeAddStrLower(hostlist, s))
+		{
+			CharTreeDestroy(*hostlist);
+			*hostlist = NULL;
+			fprintf(stderr, "Not enough memory to store host list\n", filename);
+			fclose(F);
+			return false;
+		}
+		ct++;
+	}
+	fclose(F);
+	printf("Loaded %d hosts from %s\n", ct, filename);
+	return true;
+}
 
 enum splithttpreq { split_none = 0, split_method, split_host };
 
@@ -38,6 +69,7 @@ struct params_s
 	enum splithttpreq split_http_req;
 	int split_pos;
 	int maxconn;
+	cptr *hostlist;
 };
 
 struct params_s params;
@@ -113,11 +145,12 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 			rd = recv(fd_in, buf, RD_BLOCK_SIZE, MSG_DONTWAIT);
 			if (rd > 0)
 			{
-				char *p, *pp, *pHost=NULL;
-				ssize_t method_len=0, split_pos=0, pos;
+				char *p, *pp, *pHost = NULL;
+				ssize_t method_len = 0, split_pos = 0, pos;
 				const char **method;
-				bool bIsHttp=false;
-				char bRemovedHostSpace=0;
+				bool bIsHttp = false, bBypass = false;
+				char bRemovedHostSpace = 0;
+				char Host[128];
 
 				bs = rd;
 
@@ -127,7 +160,7 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 					if (method_len <= bs && !memcmp(buf, *method, method_len))
 					{
 						bIsHttp = true;
-						method_len-=2; // "GET /" => "GET"
+						method_len -= 2; // "GET /" => "GET"
 						break;
 					}
 				}
@@ -135,121 +168,153 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 				{
 					printf("Data block looks like http request start : %s\n", *method);
 
-					if (params.unixeol)
+					if (params.hostlist)
 					{
-						p = pp = buf;
-						while (p = find_bin(p, buf + bs - p, "\r\n", 2))
+						pHost = find_bin(buf, bs, "\nHost: ", 7);
+						if (pHost)
 						{
-							*p = '\n'; p++;
-							memmove(p, p + 1, buf + bs - p - 1);
-							bs--;
-							if (pp == (p - 1))
+							bool bInHostList = false;
+							p = pHost + 7;
+							while (p < (buf + bs) && (*p == ' ' || *p == '\t')) p++;
+							pp = p;
+							while (pp < (buf + bs) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
+							memcpy(Host, p, pp - p);
+							Host[pp - p] = '\0';
+							p = Host;
+							printf("Requested Host is : %s\n", Host);
+							while (p)
 							{
-								// probably end of http headers
-								printf("Found double EOL at pos %zd. Stop replacing.\n", pp - buf);
+								bInHostList = CharTreeCheckStrLower(params.hostlist, p);
+								printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
+								if (bInHostList) break;
+								p = strchr(p, '.');
+								if (p) p++;
+							}
+							bBypass = !bInHostList;
+						}
+
+					}
+					if (!bBypass)
+					{
+						if (params.unixeol)
+						{
+							p = pp = buf;
+							while (p = find_bin(p, buf + bs - p, "\r\n", 2))
+							{
+								*p = '\n'; p++;
+								memmove(p, p + 1, buf + bs - p - 1);
+								bs--;
+								if (pp == (p - 1))
+								{
+									// probably end of http headers
+									printf("Found double EOL at pos %zd. Stop replacing.\n", pp - buf);
+									break;
+								}
+								pp = p;
+							}
+							pHost = NULL;
+						}
+
+						if (params.methodspace)
+						{
+							// we only work with data blocks looking as HTTP query, so method is at the beginning
+							printf("Adding extra space after method\n");
+							p = buf + method_len + 1;
+							pos = method_len + 1;
+							memmove(p + 1, p, bs - pos);
+							*p = ' '; // insert extra space
+							bs++; // block will grow by 1 byte
+							pHost = NULL;
+						}
+
+						// search for Host only if required (save some CPU)
+						if (params.hostdot || params.hosttab || params.hostcase || params.hostnospace || params.split_http_req == split_host)
+						{
+							// we need Host: location
+							pHost = find_bin(buf, bs, "\nHost: ", 7);
+							if (pHost) pHost++;
+						}
+
+						if (pHost && params.hostdot || params.hosttab)
+						{
+							p = pHost + 6;
+							while (p < (buf + bs) && *p != '\r' && *p != '\n') p++;
+							if (p < (buf + bs))
+							{
+								pos = p - buf;
+								printf("Adding %s to host name at pos %zd\n", params.hostdot ? "dot" : "tab", pos);
+								memmove(p + 1, p, bs - pos);
+								*p = params.hostdot ? '.' : '\t'; // insert dot or tab
+								bs++; // block will grow by 1 byte
+							}
+						}
+
+						if (pHost && params.hostnospace && pHost[5] == ' ')
+						{
+							p = pHost + 6;
+							pos = p - buf;
+							printf("Removing space before host name at pos %zd\n", pos);
+							memmove(p - 1, p, bs - pos);
+							bs--; // block will shrink by 1 byte
+							bRemovedHostSpace = 1;
+						}
+
+						if (!params.split_pos)
+						{
+							switch (params.split_http_req)
+							{
+							case split_method:
+								split_pos = method_len - 1;
+								break;
+							case split_host:
+								if (pHost)
+									split_pos = pHost + 6 - bRemovedHostSpace - buf;
 								break;
 							}
-							pp = p;
 						}
-					}
 
-					if (params.methodspace)
-					{
-						// we only work with data blocks looking as HTTP query, so method is at the beginning
-						printf("Adding extra space after method\n");
-						p = buf + method_len + 1;
-						pos = method_len + 1;
-						memmove(p + 1, p, bs - pos);
-						*p = ' '; // insert extra space
-						bs++; // block will grow by 1 byte
-					}
-
-					// search for Host only if required (save some CPU)
-					if (params.hostdot || params.hosttab || params.hostcase || params.hostnospace || params.split_http_req==split_host)
-					{
-						// we need Host: location
-						pHost=find_bin(buf, bs, "\nHost: ", 7);
-						if (pHost) pHost++;
-					}
-
-					if (pHost && params.hostdot || params.hosttab)
-					{
-						p = pHost + 6;
-						while (p < (buf + bs) && *p != '\r' && *p != '\n') p++;
-						if (p < (buf + bs))
+						if (params.hostcase)
 						{
-							pos = p - buf;
-							printf("Adding %s to host name at pos %zd\n", params.hostdot ? "dot" : "tab", pos);
-							memmove(p + 1, p, bs - pos);
-							*p = params.hostdot ? '.' : '\t'; // insert dot or tab
-							bs++; // block will grow by 1 byte
+							if (pHost)
+							{
+								printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - buf);
+								memcpy(pHost, params.hostspell, 4);
+							}
 						}
-					}
 
-					if (pHost && params.hostnospace && pHost[5]==' ')
-					{
-						p = pHost + 6;
-						pos = p - buf;
-						printf("Removing space before host name at pos %zd\n", pos);
-						memmove(p - 1, p, bs - pos);
-                                                bs--; // block will shrink by 1 byte
-                                                bRemovedHostSpace=1;
-					}
-
-					if (params.split_pos)
-					{
-						split_pos = params.split_pos < bs ? params.split_pos : 0;
+						if (params.methodeol)
+						{
+							printf("Adding EOL before method\n");
+							if (params.unixeol)
+							{
+								memmove(buf + 1, buf, bs);
+								bs++;;
+								buf[0] = '\n';
+								if (split_pos) split_pos++;
+							}
+							else
+							{
+								memmove(buf + 2, buf, bs);
+								bs += 2;
+								buf[0] = '\r';
+								buf[1] = '\n';
+								if (split_pos) split_pos += 2;
+							}
+						}
 					}
 					else
 					{
-						switch (params.split_http_req)
-						{
-						case split_method:
-							split_pos = method_len - 1;
-							break;
-						case split_host:
-							if (pHost)
-								split_pos = pHost + 6 - bRemovedHostSpace - buf;
-							break;
-						}
-					}
-
-					if (params.hostcase)
-					{
-						if (pHost)
-						{
-							printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - buf);
-							memcpy(pHost, params.hostspell, 4);
-						}
-					}
-
-					if (params.methodeol)
-					{
-						printf("Adding EOL before method\n");
-						if (params.unixeol)
-						{
-							memmove(buf + 1, buf, bs);
-							bs++;;
-							buf[0] = '\n';
-							if (split_pos) split_pos++;
-						}
-						else
-						{
-							memmove(buf + 2, buf, bs);
-							bs += 2;
-							buf[0] = '\r';
-							buf[1] = '\n';
-							if (split_pos) split_pos += 2;
-						}
+						printf("Not acting on this request\n");
 					}
 				}
 				else
 				{
 					printf("Data block does not look like http request start\n");
 
-					// this is the only parameter applicable to non-http block (may be https ?)
-					if (params.split_pos<bs) split_pos = params.split_pos;
 				}
+
+				// this is the only parameter applicable to non-http block (may be https ?)
+				if (params.split_pos && params.split_pos < bs) split_pos = params.split_pos;
 
 				if (split_pos)
 				{
@@ -334,7 +399,7 @@ int event_loop(int listen_fd) {
 
 	while (1) {
 		if ((num_events = epoll_wait(efd, events, MAX_EPOLL_EVENTS, -1)) == -1) {
-			if (errno==EINTR) continue; // system call was interrupted
+			if (errno == EINTR) continue; // system call was interrupted
 			perror("epoll_wait");
 			retval = -1;
 			break;
@@ -441,21 +506,23 @@ int8_t block_sigpipe() {
 void exithelp()
 {
 	printf(
-          " --bind-addr=<ipv4_addr>|<ipv6_addr>\n"
-          " --port=<port>\n --maxconn=<max_connections>\n"
-          " --split-http-req=method|host\n"
-          " --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n"
-          " --hostcase\t\t; change Host: => host:\n"
-          " --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-          " --hostdot\t\t; add \".\" after Host: name\n"
-          " --hosttab\t\t; add tab after Host: name\n"
-          " --hostnospace\t\t; remove space after Host:\n"
-          " --methodspace\t\t; add extra space after method\n"
-          " --methodeol\t\t; add end-of-line before method\n"
-          " --unixeol\t\t; replace 0D0A to 0A\n"
-          " --daemon\t\t; daemonize\n"
-          " --user=<username>\t; drop root privs\n"
-        );
+		" --bind-addr=<ipv4_addr>|<ipv6_addr>\n"
+		" --port=<port>\n"
+		" --maxconn=<max_connections>\n"
+		" --hostlist=<filename>\t; only act on host in the list (one host per line, subdomains auto apply)\n"
+		" --split-http-req=method|host\n"
+		" --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n"
+		" --hostcase\t\t; change Host: => host:\n"
+		" --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+		" --hostdot\t\t; add \".\" after Host: name\n"
+		" --hosttab\t\t; add tab after Host: name\n"
+		" --hostnospace\t\t; remove space after Host:\n"
+		" --methodspace\t\t; add extra space after method\n"
+		" --methodeol\t\t; add end-of-line before method\n"
+		" --unixeol\t\t; replace 0D0A to 0A\n"
+		" --daemon\t\t; daemonize\n"
+		" --user=<username>\t; drop root privs\n"
+	);
 	exit(1);
 }
 
@@ -486,6 +553,7 @@ void parse_params(int argc, char *argv[])
 		{ "methodeol",no_argument,0,0 },// optidx=14
 		{ "hosttab",no_argument,0,0 },// optidx=15
 		{ "unixeol",no_argument,0,0 },// optidx=16
+		{ "hostlist",required_argument,0,0 },// optidx=17
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -583,6 +651,10 @@ void parse_params(int argc, char *argv[])
 			break;
 		case 16: /* unixeol */
 			params.unixeol = true;
+			break;
+		case 17: /* hostlist */
+			if (!LoadHostList(&params.hostlist, optarg))
+				exit(1);
 			break;
 		}
 	}
@@ -748,6 +820,8 @@ int main(int argc, char *argv[]) {
 
 	retval = event_loop(listen_fd);
 	close(listen_fd);
+
+	if (params.hostlist) CharTreeDestroy(params.hostlist);
 
 	fprintf(stderr, "Will exit\n");
 
