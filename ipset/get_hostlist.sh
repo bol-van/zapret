@@ -22,3 +22,6 @@ if test $dlsize -lt 204800; then
 fi
 (cut -s -f2 -d';' $ZREESTR | grep -a . | sed -re 's/^\*\.(.+)$/\1/' | awk '{ print tolower($0) }' ; cat $ZUSERLIST ) | sort -u >$ZHOSTLIST
 rm -f $ZREESTR
+
+# force tpws to reload if its running
+killall -HUP tpws 2>/dev/null
