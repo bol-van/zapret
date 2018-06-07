@@ -45,7 +45,7 @@ bool LoadHostList(cptr **hostlist, char *filename)
 		{
 			CharTreeDestroy(*hostlist);
 			*hostlist = NULL;
-			fprintf(stderr, "Not enough memory to store host list\n", filename);
+			fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
 			fclose(F);
 			return false;
 		}
@@ -137,13 +137,23 @@ static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT
 
 #define RD_BLOCK_SIZE 8192
 
+// pHost points to "Host: ..."
+bool find_host(char **pHost,char *buf,ssize_t bs)
+{
+ if (!*pHost)
+ {
+  *pHost = find_bin(buf, bs, "\nHost: ", 7);
+  if (*pHost) (*pHost)++;
+  printf("Found Host: at pos %zd\n",*pHost - buf);
+ }
+ return !!*pHost;
+}
+
 bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 	int numbytes;
 	int fd_in, fd_out;
 	bool bOutgoing;
 	ssize_t rd = 0, wr = 0, bs;
-
-	dohup();
 
 	//Easy way to determin which socket is ready for reading
 	//TODO: Optimize. This one allows me quick lookup for conn, but
@@ -195,20 +205,22 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 				{
 					printf("Data block looks like http request start : %s\n", *method);
 
-					if (params.hostlist && (p = find_bin(buf, bs, "\nHost: ", 7)))
+					// cpu saving : we search host only if and when required. we do not research host every time we need its position
+					if (params.hostlist && find_host(&pHost,buf,bs))
 					{
 						bool bInHostList = false;
-						p  += 7;
+						p = pHost + 6;
 						while (p < (buf + bs) && (*p == ' ' || *p == '\t')) p++;
 						pp = p;
 						while (pp < (buf + bs) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
 						memcpy(Host, p, pp - p);
 						Host[pp - p] = '\0';
-						p = Host;
 						printf("Requested Host is : %s\n", Host);
+						for(p = Host; *p; p++) *p=tolower(*p);
+						p = Host;
 						while (p)
 						{
-							bInHostList = CharTreeCheckStrLower(params.hostlist, p);
+							bInHostList = CharTreeCheckStr(params.hostlist, p);
 							printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
 							if (bInHostList) break;
 							p = strchr(p, '.');
@@ -234,6 +246,7 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 								}
 								pp = p;
 							}
+							pHost = NULL; // invalidate
 						}
 
 						if (params.methodspace)
@@ -245,17 +258,10 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 							memmove(p + 1, p, bs - pos);
 							*p = ' '; // insert extra space
 							bs++; // block will grow by 1 byte
+							if (pHost) pHost++; // Host: position will move by 1 byte
 						}
 
-						// search for Host only if required (save some CPU)
-						if (params.hostdot || params.hosttab || params.hostcase || params.hostnospace || params.split_http_req == split_host)
-						{
-							// we need Host: location
-							pHost = find_bin(buf, bs, "\nHost: ", 7);
-							if (pHost) pHost++;
-						}
-
-						if (pHost && params.hostdot || params.hosttab)
+						if ((params.hostdot || params.hosttab) && find_host(&pHost,buf,bs))
 						{
 							p = pHost + 6;
 							while (p < (buf + bs) && *p != '\r' && *p != '\n') p++;
@@ -269,7 +275,7 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 							}
 						}
 
-						if (pHost && params.hostnospace && pHost[5] == ' ')
+						if (params.hostnospace && pHost[5] == ' ' && find_host(&pHost,buf,bs))
 						{
 							p = pHost + 6;
 							pos = p - buf;
@@ -287,19 +293,16 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 								split_pos = method_len - 1;
 								break;
 							case split_host:
-								if (pHost)
+								if (find_host(&pHost,buf,bs))
 									split_pos = pHost + 6 - bRemovedHostSpace - buf;
 								break;
 							}
 						}
 
-						if (params.hostcase)
+						if (params.hostcase && find_host(&pHost,buf,bs))
 						{
-							if (pHost)
-							{
-								printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - buf);
-								memcpy(pHost, params.hostspell, 4);
-							}
+							printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - buf);
+							memcpy(pHost, params.hostspell, 4);
 						}
 
 						if (params.methodeol)
@@ -321,6 +324,8 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 								if (split_pos) split_pos += 2;
 							}
 						}
+
+						if (params.split_pos && params.split_pos < bs) split_pos = params.split_pos;
 					}
 					else
 					{
@@ -330,11 +335,9 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 				else
 				{
 					printf("Data block does not look like http request start\n");
-
-				}
-
-				// this is the only parameter applicable to non-http block (may be https ?)
-				if (params.split_pos && params.split_pos < bs) split_pos = params.split_pos;
+					// this is the only parameter applicable to non-http block (may be https ?)
+					if (params.split_pos && params.split_pos < bs) split_pos = params.split_pos;
+        			}
 
 				if (split_pos)
 				{
@@ -424,6 +427,8 @@ int event_loop(int listen_fd) {
 			retval = -1;
 			break;
 		}
+
+		dohup();
 
 		for (i = 0; i < num_events; i++) {
 			if (events[i].data.ptr == NULL) {
