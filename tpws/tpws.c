@@ -275,7 +275,7 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 							}
 						}
 
-						if (params.hostnospace && pHost[5] == ' ' && find_host(&pHost,buf,bs))
+						if (params.hostnospace && find_host(&pHost,buf,bs) && pHost[5] == ' ')
 						{
 							p = pHost + 6;
 							pos = p - buf;
