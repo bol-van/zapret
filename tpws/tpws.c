@@ -41,7 +41,8 @@ bool LoadHostList(cptr **hostlist, char *filename)
 	while (fgets(s, 256, F))
 	{
 		for (p = s + strlen(s) - 1; p >= s && (*p == '\r' || *p == '\n'); p--) *p = 0;
-		if (!CharTreeAddStrLower(hostlist, s))
+		for (p = s; *p; p++) *p=tolower(*p);
+		if (!CharTreeAddStr(hostlist, s))
 		{
 			CharTreeDestroy(*hostlist);
 			*hostlist = NULL;

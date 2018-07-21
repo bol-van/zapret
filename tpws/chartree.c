@@ -2,14 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-static char *DupLower(const char *s)
-{
- char *sp,*sl = strdup(s);
- if (!sl) return false;
- for(sp=sl;*sp;sp++) *sp=tolower(*sp);
- return sl;
-}
-
 static cptr *CharTreeInit(char c)
 {
  cptr *p;
@@ -19,11 +11,13 @@ static cptr *CharTreeInit(char c)
 }
 void CharTreeDestroy(cptr *p)
 {
- if (p)
+ cptr *p2;
+ while (p)
  {
    CharTreeDestroy(p->leaf);
-   CharTreeDestroy(p->next);
-   free(p);
+   p2 = p;
+   p = p->next;
+   free(p2);
  }
 }
 static cptr *CharTreeFindChar(cptr *p,char c)
@@ -60,6 +54,14 @@ bool CharTreeCheckStr(cptr *p,const char *s)
  if (!p) return false;
  if (!*s) return true;
  return CharTreeCheckStr(p->leaf,s+1);
+}
+
+static char *DupLower(const char *s)
+{
+ char *sp,*sl = strdup(s);
+ if (!sl) return false;
+ for(sp=sl;*sp;sp++) *sp=tolower(*sp);
+ return sl;
 }
 bool CharTreeAddStrLower(cptr **pp,const char *s)
 {
