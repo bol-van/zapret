@@ -24,9 +24,9 @@
 
 #include "tpws.h"
 #include "tpws_conn.h"
-#include "chartree.h"
+#include "strpool.h"
 
-bool LoadHostList(cptr **hostlist, char *filename)
+bool LoadHostList(strpool **hostlist, char *filename)
 {
 	char *p, s[256];
 	FILE *F = fopen(filename, "rt");
@@ -42,9 +42,9 @@ bool LoadHostList(cptr **hostlist, char *filename)
 	{
 		for (p = s + strlen(s) - 1; p >= s && (*p == '\r' || *p == '\n'); p--) *p = 0;
 		for (p = s; *p; p++) *p=tolower(*p);
-		if (!CharTreeAddStr(hostlist, s))
+		if (!StrPoolAddStr(hostlist, s))
 		{
-			CharTreeDestroy(*hostlist);
+			StrPoolDestroy(hostlist);
 			*hostlist = NULL;
 			fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
 			fclose(F);
@@ -72,7 +72,7 @@ struct params_s
 	int split_pos;
 	int maxconn;
 	char hostfile[256];
-	cptr *hostlist;
+	strpool *hostlist;
 };
 
 struct params_s params;
@@ -104,7 +104,7 @@ void dohup()
  {
   if (params.hostlist)
   {
-   CharTreeDestroy(params.hostlist);
+   StrPoolDestroy(&params.hostlist);
    if (!LoadHostList(&params.hostlist, params.hostfile))
 	exit(1);
   }
@@ -221,7 +221,7 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 						p = Host;
 						while (p)
 						{
-							bInHostList = CharTreeCheckStr(params.hostlist, p);
+							bInHostList = StrPoolCheckStr(params.hostlist, p);
 							printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
 							if (bInHostList) break;
 							p = strchr(p, '.');
@@ -851,7 +851,7 @@ int main(int argc, char *argv[]) {
 	retval = event_loop(listen_fd);
 	close(listen_fd);
 
-	if (params.hostlist) CharTreeDestroy(params.hostlist);
+	if (params.hostlist) StrPoolDestroy(&params.hostlist);
 
 	fprintf(stderr, "Will exit\n");
 
