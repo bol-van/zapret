@@ -154,7 +154,7 @@ sknt.ru : проверена работа с tpws с параметром "--spl
   ТКТ был куплен ростелекомом, используется фильтрация ростелекома.
   Поскольку DPI не отбрасывает входящую сессию, а только всовывает свой пакет, который приходит раньше ответа от настоящего сервера,
   блокировки так же обходятся без применения "тяжелой артиллерии" следующим правилом :
-  iptables -t raw -I PREROUTING -p tcp --sport 80 -m string --hex-string "|0D0A|Location: http://95.167.13.50" --algo bm -j DROP --from 40 --to 200
+  iptables -t raw -I PREROUTING -p tcp --sport 80 -m string --hex-string "|0D0A|Location: http://warning.rt.ru" --algo bm -j DROP --from 40 --to 200
 
 tiera : Требуется сплит http запросов в течение всей сессии.
 
