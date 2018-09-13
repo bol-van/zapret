@@ -1,12 +1,12 @@
-CC = gcc
-CFLAGS = -s
+CC ?= gcc
+CFLAGS += -s
 LIBS = 
 SRC_FILES = *.c
 
 all: tpws
 
 tpws: $(SRC_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f tpws *.o
