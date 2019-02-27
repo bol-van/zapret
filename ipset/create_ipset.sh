@@ -8,7 +8,7 @@ EXEDIR=$(dirname $SCRIPT)
 
 create_ipset()
 {
-ipset flush $2 2>/dev/null || ipset create $2 $1 maxelem 262144
+ipset flush $2 2>/dev/null || ipset create $2 $1 maxelem 524288
 for f in "$3" "$4"
 do
  [ -f "$f" ] && {
