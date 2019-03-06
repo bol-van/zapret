@@ -3,12 +3,13 @@
 
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
+IPSET_OPT="hashsize 131072 maxelem 524288"
 
 . "$EXEDIR/def.sh"
 
 create_ipset()
 {
-ipset flush $2 2>/dev/null || ipset create $2 $1 maxelem 524288
+ipset flush $2 2>/dev/null || ipset create $2 $1 $IPSET_OPT
 for f in "$3" "$4"
 do
  [ -f "$f" ] && {
