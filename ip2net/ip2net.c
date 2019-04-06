@@ -6,7 +6,10 @@
 #include "qsort.h"
 
 #define ALLOC_STEP 16384
-#define PCTMULT 3/4
+
+// minimum subnet fill percent is  PCTMULT/PCTDIV  (for example 3/4)
+#define PCTMULT	3
+#define PCTDIV	4
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -64,10 +67,10 @@ int main()
     mask = mask_from_bitcount(zct);
     ip_start = iplist[pos] & mask;
     subnet_ct = ~mask+1;
-    if (iplist[pos]>(ip_start+subnet_ct*PCTMULT)) continue;
+    if (iplist[pos]>(ip_start+subnet_ct*(PCTDIV-PCTMULT)/PCTDIV)) continue;
     ip_end = ip_start | ~mask;
     for(p=pos, ip_ct=0 ; p<ipct && iplist[p]<=ip_end; p++) ip_ct++;
-    if (ip_ct>=(subnet_ct*PCTMULT))
+    if (ip_ct>=(subnet_ct*PCTMULT/PCTDIV))
     {
     	subnet_ok=1;
     	pos_end = p;
