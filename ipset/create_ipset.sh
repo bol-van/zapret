@@ -4,20 +4,36 @@
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
 IPSET_OPT="hashsize 131072 maxelem 524288"
+IP2NET=$EXEDIR/../ip2net/ip2net
 
 . "$EXEDIR/def.sh"
 
 create_ipset()
 {
-ipset flush $2 2>/dev/null || ipset create $2 $1 $IPSET_OPT
+local IPSTYPE
+if [ -x $IP2NET ]; then
+ IPSTYPE=hash:net
+else
+ IPSTYPE=$1
+fi
+ipset flush $2 2>/dev/null || ipset create $2 $IPSTYPE $IPSET_OPT
 for f in "$3" "$4"
 do
  [ -f "$f" ] && {
-  echo Adding to ipset $2 \($1\) : $f
-  if [ -f "$ZIPLIST_EXCLUDE" ] ; then
-   grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+  if [ -x $IP2NET ]; then
+   echo Adding to ipset $2 \($IPSTYPE , ip2net\) : $f
+   if [ -f "$ZIPLIST_EXCLUDE" ] ; then
+    grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | $IP2NET | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+   else
+    sort -u "$f" | $IP2NET | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+   fi
   else
-   sort -u "$f" | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+   echo Adding to ipset $2 \($IPSTYPE\) : $f
+   if [ -f "$ZIPLIST_EXCLUDE" ] ; then
+    grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+   else
+    sort -u "$f" | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+   fi
   fi
  }
 done
