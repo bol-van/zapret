@@ -1,5 +1,5 @@
 CC ?= gcc
-CFLAGS += -s
+CFLAGS += -s -O3
 LIBS = 
 SRC_FILES = *.c
 
