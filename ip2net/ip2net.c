@@ -1,5 +1,7 @@
-// group ip list from stdout into subnets
-// ip list must be pre-uniqued
+// group ipv4 list from stdout into subnets
+// each line must contain either ipv4 or ipv4/bitcount
+// valid ipv4/bitcount are passed through without modification
+// ipv4 are groupped into subnets
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,41 +31,68 @@ uint mask_from_bitcount(uint zct)
  return ~((1<<zct)-1);
 }
 
+// make presorted array unique. return number of unique items.
+// 1,1,2,3,3,0,0,0 (ct=8) => 1,2,3,0 (ct=4)
+uint unique_uint(uint *pu,uint ct)
+{
+ uint i,j,u;
+ for(i=j=0 ; j<ct ; i++)
+ {
+  u = pu[j++];
+  for(; j<ct && pu[j]==u ; j++);
+  pu[i] = u;
+ }
+ return i;
+}
+
 int main()
 {
  uint u1,u2,u3,u4,ip;
  uint ipct=0,iplist_size=0,*iplist=NULL,*iplist_new;
  uint pos=0,p;
  uint i,zct,subnet_ct,end_ip;
- 
- while (!feof(stdin))
-  if (scanf("%u.%u.%u.%u",&u1,&u2,&u3,&u4)==4 && !(u1 & 0xFFFFFF00) && !(u2 & 0xFFFFFF00) && !(u3 & 0xFFFFFF00) && !(u4 & 0xFFFFFF00))
+ char str[256];
+
+ while (fgets(str,sizeof(str),stdin))
+ {
+  if ((i=sscanf(str,"%u.%u.%u.%u/%u",&u1,&u2,&u3,&u4,&zct))>=4 && !(u1 & 0xFFFFFF00) && !(u2 & 0xFFFFFF00) && !(u3 & 0xFFFFFF00) && !(u4 & 0xFFFFFF00))
   {
-   ip = u1<<24 | u2<<16 | u3<<8 | u4;
-   if (ipct>=iplist_size)
+   if (i==5 && zct!=32)
    {
-     iplist_size += ALLOC_STEP;
-     iplist_new = (uint*)(iplist ? realloc(iplist,sizeof(*iplist)*iplist_size) : malloc(sizeof(*iplist)*iplist_size));
-     if (!iplist_new)
-     {
-       free(iplist);
-       fprintf(stderr,"out of memory\n");
-       return 100;
-     }
-     iplist = iplist_new;
+    // we have subnet x.x.x.x/y
+    // output it as is if valid, ignore otherwise
+    if (zct<32)
+     printf("%u.%u.%u.%u/%u\n",u1,u2,u3,u4,zct);
    }
-   iplist[ipct++]= ip;
-  }
-
-  gnu_quicksort(iplist,ipct,sizeof(*iplist),ucmp,NULL);
-
-  while(pos<ipct)
-  {
-   uchar subnet_ok=0;
-   uint mask,ip_start,ip_end,ip_ct,subnet_ct,pos_end;
-
-   for(zct=10, pos_end=pos+1 ; zct>=2 ; zct--)
+   else
    {
+    ip = u1<<24 | u2<<16 | u3<<8 | u4;
+    if (ipct>=iplist_size)
+    {
+      iplist_size += ALLOC_STEP;
+      iplist_new = (uint*)(iplist ? realloc(iplist,sizeof(*iplist)*iplist_size) : malloc(sizeof(*iplist)*iplist_size));
+      if (!iplist_new)
+      {
+        free(iplist);
+        fprintf(stderr,"out of memory\n");
+        return 100;
+      }
+      iplist = iplist_new;
+    }
+    iplist[ipct++]= ip;
+   }
+  }
+ }
+
+ gnu_quicksort(iplist,ipct,sizeof(*iplist),ucmp,NULL);
+ ipct = unique_uint(iplist,ipct);
+
+ while(pos<ipct)
+ {
+  uchar subnet_ok=0;
+  uint mask,ip_start,ip_end,ip_ct,subnet_ct,pos_end;
+  for(zct=10, pos_end=pos+1 ; zct>=2 ; zct--)
+  {
     mask = mask_from_bitcount(zct);
     ip_start = iplist[pos] & mask;
     subnet_ct = ~mask+1;
@@ -76,21 +105,21 @@ int main()
     	pos_end = p;
     	break;
     }
-   }
-   if (!subnet_ok) zct=0,ip_start=iplist[pos];
+  }
+  if (!subnet_ok) zct=0,ip_start=iplist[pos];
 
-   u1 = ip_start>>24;
-   u2 = (ip_start>>16) & 0xFF;
-   u3 = (ip_start>>8) & 0xFF;
-   u4 = ip_start & 0xFF;
-   if (zct)
+  u1 = ip_start>>24;
+  u2 = (ip_start>>16) & 0xFF;
+  u3 = (ip_start>>8) & 0xFF;
+  u4 = ip_start & 0xFF;
+  if (zct)
     printf("%u.%u.%u.%u/%u\n",u1,u2,u3,u4,32-zct);
-   else
+  else
     printf("%u.%u.%u.%u\n",u1,u2,u3,u4);
 
-   pos = pos_end;
-  }
+  pos = pos_end;
+ }
 
-  free(iplist);
-  return 0;
+ free(iplist);
+ return 0;
 }

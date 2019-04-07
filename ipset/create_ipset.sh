@@ -23,9 +23,9 @@ do
   if [ -x $IP2NET ]; then
    echo Adding to ipset $2 \($IPSTYPE , ip2net\) : $f
    if [ -f "$ZIPLIST_EXCLUDE" ] ; then
-    grep -vxFf $ZIPLIST_EXCLUDE "$f" | sort -u | $IP2NET | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+    grep -vxFf $ZIPLIST_EXCLUDE "$f" | $IP2NET | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
    else
-    sort -u "$f" | $IP2NET | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
+    $IP2NET <"$f" | sed -nre "s/^.+$/add $2 &/p" | ipset -! restore
    fi
   else
    echo Adding to ipset $2 \($IPSTYPE\) : $f
