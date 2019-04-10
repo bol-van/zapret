@@ -12,6 +12,10 @@
 // minimum subnet fill percent is  PCTMULT/PCTDIV  (for example 3/4)
 #define PCTMULT	3
 #define PCTDIV	4
+// subnet search range in "zero bit count"
+// means search start from /(32-ZCT_MAX) to /(32-ZCT_MIN)
+#define ZCT_MAX 10
+#define ZCT_MIN 2
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -33,7 +37,7 @@ uint mask_from_bitcount(uint zct)
 
 // make presorted array unique. return number of unique items.
 // 1,1,2,3,3,0,0,0 (ct=8) => 1,2,3,0 (ct=4)
-uint unique_uint(uint *pu,uint ct)
+uint unique(uint *pu,uint ct)
 {
  uint i,j,u;
  for(i=j=0 ; j<ct ; i++)
@@ -85,37 +89,36 @@ int main()
  }
 
  gnu_quicksort(iplist,ipct,sizeof(*iplist),ucmp,NULL);
- ipct = unique_uint(iplist,ipct);
+ ipct = unique(iplist,ipct);
 
  while(pos<ipct)
  {
-  uchar subnet_ok=0;
   uint mask,ip_start,ip_end,ip_ct,subnet_ct,pos_end;
-  for(zct=10, pos_end=pos+1 ; zct>=2 ; zct--)
+ 
+  // find largest possible network with enough ip coverage
+  for(zct=ZCT_MAX ; zct>=ZCT_MIN ; zct--)
   {
     mask = mask_from_bitcount(zct);
     ip_start = iplist[pos] & mask;
     subnet_ct = ~mask+1;
-    if (iplist[pos]>(ip_start+subnet_ct*(PCTDIV-PCTMULT)/PCTDIV)) continue;
+    if (iplist[pos]>(ip_start+subnet_ct*(PCTDIV-PCTMULT)/PCTDIV))
+	continue; // ip is higher than (1-PCT). definitely coverage is not enough. skip searching
     ip_end = ip_start | ~mask;
-    for(p=pos, ip_ct=0 ; p<ipct && iplist[p]<=ip_end; p++) ip_ct++;
+    for(p=pos, ip_ct=0 ; p<ipct && iplist[p]<=ip_end; p++) ip_ct++; // count ips within subnet range
     if (ip_ct>=(subnet_ct*PCTMULT/PCTDIV))
     {
-    	subnet_ok=1;
-    	pos_end = p;
-    	break;
+	// network found
+	pos_end = p;
+        break;
     }
   }
-  if (!subnet_ok) zct=0,ip_start=iplist[pos];
+  if (zct<ZCT_MIN) zct=0, ip_start=iplist[pos], pos_end=pos+1; // network not found, use single ip
 
   u1 = ip_start>>24;
   u2 = (ip_start>>16) & 0xFF;
   u3 = (ip_start>>8) & 0xFF;
   u4 = ip_start & 0xFF;
-  if (zct)
-    printf("%u.%u.%u.%u/%u\n",u1,u2,u3,u4,32-zct);
-  else
-    printf("%u.%u.%u.%u\n",u1,u2,u3,u4);
+  printf(zct ? "%u.%u.%u.%u/%u\n" : "%u.%u.%u.%u\n", u1, u2, u3, u4, 32-zct);
 
   pos = pos_end;
  }
