@@ -348,5 +348,6 @@ opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptable
 
 Как правило трюки с DPI не помогают для обхода блокировки https.
 Приходится перенаправлять трафик через сторонний хост.
-Предлагается использовать прозрачный редирект через socks5 посредством iptables+redsocks, либо iptables+iproute+openvpn.
+Предлагается использовать прозрачный редирект через socks5 посредством iptables+redsocks, либо iptables+iproute+vpn.
 Настройка варианта с redsocks на openwrt описана в https.txt.
+Настройка варианта с iproute+wireguard - в wireguard_iproute_openwrt.txt.
