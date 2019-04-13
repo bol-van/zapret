@@ -1,0 +1,227 @@
+Есть возможность поднять свой VPN сервер ? Не хотим использовать redsocks ?
+Хотим завертывать на VPN только часть трафика ?
+Например, из ipset-ов zapret только порт tcp:443, из ipban - весь трафик, не только tcp ?
+Да, с VPN такое возможно.
+Опишу понятийно как настраивается policy based routing в openwrt на примере wireguard.
+Вместо wireguard можно использовать vpn. Но wireguard прекрасен сразу несколькими вещами.
+Главная из которых - в разы большая скорость, даже немного превышающая ipsec.
+Ведь openvpn основан на tun, а tun - всегда в разы медленнее решения в kernel mode,
+и если для PC оно может быть не так актуально, для soho роутеров - более чем.
+Wireguard может дать 50 mbps там, где openvpn еле тащит 10.
+Другая важная особенность - затрудненное обнаружение протокола системами DPI.
+
+Понятийно необходимо выполнить следующие шаги :
+1) Поднять vpn сервер.
+2) Настроить vpn клиент. Результат этого шага - получение поднятого интерфейса vpn.
+Будть то wireguard, openvpn или любой другой тип vpn.
+3) Создать такую схему маршрутизации, при которой пакеты, помечаемые особым mark,
+попадают на vpn, а остальные идут обычным способом.
+4) Создать правила, выставляющие mark для всего трафика, который необходимо рулить на vpn.
+Критерии могут быть любые, ограниченные лишь возможностями iptables и вашим воображением.
+
+Будем считать наш vpn сервер находится на ip 91.15.68.202.
+Вешать его будем на udp порт 12345. На этот же порт будем вешать и клиентов.
+Сервер работает под debian 9. Клиент работает под openwrt.
+Для vpn отведем подсеть 192.168.254.0/24.
+
+--- Поднятие сервера ---
+
+На сервере должны быть установлены заголовки ядра (linux-headers-...) и компилятор gcc.
+Качаем последний tar.xz с wireguard отсюда : https://git.zx2c4.com/WireGuard/
+
+# tar xf WireGuard*.tar.xz
+# cd WireGuard-*/src
+# make
+# strip --strip-debug wireguard.ko
+# sudo make install
+
+wireguard основан на понятии криптороутинга. Каждый пир (сервер - тоже пир)
+имеет пару открытый/закрытый ключ. Закрытый ключ остается у пира,
+открытый прописывается у его партнера. Каждый пир авторизует другого
+по знанию приватного ключа, соответствующего прописанному у него публичному ключу.
+Протокол построен таким образом, что на все неправильные udp пакеты не следует ответа.
+Не знаешь приватный ключ ? Не смог послать правильный запрос ? Долбись сколько влезет,
+я тебе ничего не отвечу. Это защищает от активного пробинга со стороны DPI и просто
+экономит ресурсы.
+Значит первым делом нужно создать 2 пары ключей : для сервера и для клиента.
+wg genkey генерит приватный ключ, wg pubkey получает из него публичный ключ.
+
+# wg genkey
+oAUkmhoREtFQ5D5yZmeHEgYaSWCcLYlKe2jBP7EAGV0=
+# echo oAUkmhoREtFQ5D5yZmeHEgYaSWCcLYlKe2jBP7EAGV0= | wg pubkey
+bCdDaPYSTBZVO1HTmKD+Tztuf3PbOWGDWfz7Lb1E6C4=
+# wg genkey
+OKXX0TSlyjJmGt3/yHlHxi0AqjJ0vh+Msne3qEHk0VM=
+# echo OKXX0TSlyjJmGt3/yHlHxi0AqjJ0vh+Msne3qEHk0VM= | wg pubkey
+EELdA2XzjcKxtriOCPBXMOgxlkgpbRdIyjtc3aIpkxg=
+
+Пишем конфиг
+--/etc/wireguard/wgvps.conf-------------------
+[Interface]
+PrivateKey = OKXX0TSlyjJmGt3/yHlHxi0AqjJ0vh+Msne3qEHk0VM=
+ListenPort = 12345
+
+[Peer]
+#Endpoint =
+PublicKey = bCdDaPYSTBZVO1HTmKD+Tztuf3PbOWGDWfz7Lb1E6C4=
+AllowedIPs = 192.168.254.3
+PersistentKeepalive=20
+----------------------------------------------
+
+Wireguard - минималистичный vpn. В нем нет никаких средств для автоконфигурации ip.
+Все придется прописывать руками.
+В wgvps.conf должны быть перечислены все пиры с их публичными ключами,
+а так же прописаны допустимые для них ip адреса.
+Назначим нашему клиенту 192.168.254.3. Сервер будет иметь ip 192.168.254.1.
+Endpoint обязательно должен быть прописан только на одном пире.
+В схеме клиент/сервер у сервера можно не прописывать endpoint-ы пиров, что позволит
+менять ip и быть за nat. Endpoint пира настраивается динамически после успешной фазы
+проверки ключа.
+
+Интерфейс конфигурится стандартно для дебианоподобных систем :
+
+--/etc/network/interfaces.d/wgvps-------------
+auto wgvps
+iface wgvps inet static
+        address 192.168.254.1
+        netmask 255.255.255.0
+        pre-up ip link add $IFACE type wireguard
+        pre-up wg setconf $IFACE /etc/wireguard/$IFACE.conf
+        post-down ip link del $IFACE
+----------------------------------------------
+ 
+Поднятие через ifup wgvps, опускание через ifdown wgvps.
+Чтобы посмотреть текущие настройки wireguard, запустите 'wg' без параметров.
+
+
+--- Поднятие клиента ---
+
+# opkg update
+# opkg install wireguard
+
+Добавляем записи в конфиги.
+
+--/etc/config/network--------------------------
+config interface 'wgvps'
+	option proto 'wireguard'
+	option auto '1'
+	option private_key 'oAUkmhoREtFQ5D5yZmeHEgYaSWCcLYlKe2jBP7EAGV0='
+	option listen_port '12345'
+	option metric '9'
+	option mtu '1420'
+
+config wireguard_wgvps
+	option public_key 'EELdA2XzjcKxtriOCPBXMOgxlkgpbRdIyjtc3aIpkxg=
+	list allowed_ips '0.0.0.0/0'
+	option endpoint_host '91.15.68.202'
+	option endpoint_port '12345'
+	option route_allowed_ips '0'
+	option persistent_keepalive '20'
+
+config interface 'wgvps_ip'
+	option proto 'static'
+	option ifname '@wgvps'
+	list ipaddr '192.168.254.3/24'
+
+config route
+	option interface 'wgvps'
+	option target '0.0.0.0/0'
+	option table '100'
+	
+config rule
+	option mark '0x800/0x800'
+	option priority '100'
+	option lookup '100'
+------------------------------------------------
+
+--/etc/config/firewall--------------------------
+config zone
+	option name 'tunvps'
+	option output 'ACCEPT'
+	option input 'REJECT'
+	option masq '1'
+	option mtu_fix '1'
+	option forward 'REJECT'
+	option network 'wgvps wgvps_ip'
+
+config forwarding
+	option dest 'tunvps'
+	option src 'lan'
+
+config rule
+	option name 'Allow-ICMP-tunvps'
+	option src 'tunvps'
+	option proto 'icmp'
+	option target 'ACCEPT'
+	
+config rule
+	option target 'ACCEPT'
+	option src 'wan'
+	option proto 'udp'
+	option family 'ipv4'
+	option src_port '12345'
+	option src_ip '91.15.68.202'
+	option name 'WG-VPS'
+------------------------------------------------
+
+Что тут было сделано :
+*) Настроен интерфейс wireguard. Указан собственный приватный ключ.
+*) Настроен пир-партнер с указанием его публичнго ключа и endpoint (ip:port нашего сервера)
+   такая настройка заставит периодически долбиться на сервер по указанному ip
+   route_allowed_ip '0'  запрещает автоматическое создание маршрута
+   allowed_ips '0.0.0.0/0' разрешает пакеты с любым адресом источника.
+    ведь мы собираемся подключаться к любым ip в инете
+   persistent_keepalive '20'  помогает исключить дропание mapping на nat-е, если мы сидим за ним,
+    да и вообще полезная вещь, чтобы не было подвисших пиров
+*) Статическая конфигурация ip интерфейса wgvps.
+*) Маршрут default route на wgvps в отдельной таблице маршрутизации с номером 100. Аналог команды ip route add .. table 100
+*) Правило использовать таблицу 100 при выставлении в mark бита 0x800. Аналог команды ip rule.
+*) Отдельная зона фаервола для VPN - 'tunvps'. В принципе ее можно не создавать, можете приписать интерфейс к зоне wan.
+   Но в случае с отдельной зоной можно настроить особые правила на подключения с vpn сервера в сторону клиента.
+*) Разрешение форвардинга между локалкой за роутером и wgvps.
+*) Разрешение принимать icmp от vpn сервера, включая пинги. ICMP жизненно важны для правильного функционирования ip сети !
+*) И обязательно проткнуть дырку в фаерволе, чтобы принимать пакеты wireguard со стороны инетовского ip vpn сервера.
+   
+# fw3 restart
+# ifup wgvps
+# ifconfig wgvps
+# ping 192.168.254.1
+
+Если все хорошо, должны ходить пинги.
+С сервера не помешает :
+# ping 192.168.254.3
+
+
+--- Маркировка трафика ---
+
+Завернем на vpn все из ipset zapret на tcp:443 и все из ipban.
+OUTPUT относится к исходящим с роутера пакетам, PREROUTING - ко всем остальным.
+Если с роутера ничего заруливать не надо, можно опустить все до команд с PREROUTING.
+
+--/etc/firewall.user----------------------------
+. /lib/functions/network.sh
+
+network_find_wan wan_iface
+
+for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    
+    iptables -t mangle -C OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
+     iptables -t mangle -I OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+    iptables -t mangle -C OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
+     iptables -t mangle -I OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+done
+
+iptables -t mangle -C PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
+ iptables -t mangle -I PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+iptables -t mangle -C PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
+ iptables -t mangle -I PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+------------------------------------------------
+
+# fw3 restart
+
+
+--- А если не заработало ? ---
+
+Мануал пишется не как копипастная инструкция, а как помощь уже соображающему.
+В руки вам ifconfig, ip, iptables, tcpdump, ping. В умелых руках творят чудеса.
