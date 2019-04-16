@@ -1,5 +1,5 @@
 CC ?= gcc
-CFLAGS ?= -s
+CFLAGS ?= -s -O3
 LIBS = -lnetfilter_queue -lnfnetlink
 SRC_FILES = *.c
 
