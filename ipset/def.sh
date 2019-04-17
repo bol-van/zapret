@@ -23,19 +23,19 @@ digger()
  fi
 }
 
-getuser()
-{
- for f in $ZUSERLIST $ZUSERLIST_IPBAN
- do
-  [ -f $f ] && {
-   digger $f | grep -E '^[^;].*[^.]$' | grep -vE '^192\.168\.[0-9]+.[0-9]+$' | grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u >$ZIPLIST_USER
-  }
- done
-}
-
 cut_local()
 {
   grep -vE '^192\.168\.[0-9]+\.[0-9]+$' |
   grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' |
   grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$'
+}
+
+getuser()
+{
+ [ -f $ZUSERLIST ] && {
+  digger $ZUSERLIST | cut_local | sort -u >$ZIPLIST_USER
+ }
+ [ -f $ZUSERLIST_IPBAN ] && {
+  digger $ZUSERLIST_IPBAN | cut_local | sort -u >$ZIPLIST_USER_IPBAN
+ }
 }
