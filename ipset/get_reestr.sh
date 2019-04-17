@@ -30,7 +30,7 @@ echo preparing dig list ..
 cut -f2 -d';' $ZREESTR  | grep -avE '^$|\*|:' >$ZDIG
 rm -f $ZREESTR
 echo digging started ...
-digger $ZDIG | grep -E '^[^;].*[^\.]$' | grep -vE '^192\.168\.[0-9]+\.[0-9]+$' | grep -vE '^127\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$' >$ZIPLISTTMP || {
+digger $ZDIG | grep -E '^[^;].*[^\.]$' | cut_local >$ZIPLISTTMP || {
  rm -f $ZDIG
  exit 1
 }
