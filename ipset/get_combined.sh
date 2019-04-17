@@ -15,7 +15,7 @@ ZURL_AZ=http://antizapret.prostovpn.org/iplist.txt
 getuser
 
 # assume all https banned by ip
-curl -k --fail --max-time 300 --max-filesize 41943040 "$ZURL_REESTR" -o $ZREESTR ||
+curl -k --fail --max-time 300 --max-filesize 62914560 "$ZURL_REESTR" -o $ZREESTR ||
 {
  echo reestr list download failed
  exit 2
@@ -34,7 +34,7 @@ fi
  
 rm -f $ZREESTR
 
-curl --fail --max-time 120 --max-filesize 10485760 -k -L "$ZURL_AZ" | cut_local >$ZAZ ||
+curl --fail --max-time 150 --max-filesize 20971520 -k -L "$ZURL_AZ" | cut_local >$ZAZ ||
 {
  echo antizapret list download failed
  exit 2
