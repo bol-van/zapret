@@ -14,7 +14,7 @@ ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
 getuser
 
-curl -k --fail --max-time 300 --max-filesize 41943040 "$ZURL" >$ZREESTR ||
+curl -k --fail --max-time 300 --max-filesize 62914560 "$ZURL" >$ZREESTR ||
 {
  echo reestr list download failed   
  exit 2
