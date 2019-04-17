@@ -12,18 +12,6 @@ ZIPLISTTMP=$TMPDIR/zapret-ip.txt
 #ZURL=https://reestr.rublacklist.net/api/current
 ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
-MDIG=$EXEDIR/../mdig/mdig
-MDIG_THREADS=30
-
-digger()
-{
- if [ -x $MDIG ]; then
-  $MDIG --family=4 --threads=$MDIG_THREADS <$1
- else
-  dig A +short +time=8 +tries=2 -f $1
- fi
-}
-
 getuser
 
 curl -k --fail --max-time 300 --max-filesize 41943040 "$ZURL" >$ZREESTR ||

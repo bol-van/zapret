@@ -36,6 +36,7 @@ How to compile native programs for use in openwrt
 6) make package/tpws/compile
    make package/nfqws/compile
    make package/ip2net/compile
+   make package/mdig/compile
 
 7) find bin -name tpws*.ipk
    #take your tpws*.ipk , nfqws*.ipk , ip2net*.ipk from there
