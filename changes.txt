@@ -99,3 +99,6 @@ tpws : added hostlist option
 v20
 
 added ip2net. ip2net groups ips from iplist into subnets and reduces ipset size twice
+
+v21
+added mdig. get_reestr.sh is *real* again
