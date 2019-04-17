@@ -87,7 +87,7 @@ static void interlocked_fprintf(FILE *stream, const char * format, ...)
 #define ELOG(format, ...) interlocked_fprintf(stderr,  "[%d] " format "\n", tid, ##__VA_ARGS__)
 #define VLOG(format, ...) {if (glob.verbose) ELOG(format, ##__VA_ARGS__);}
 
-static void print_addrinfo(struct addrinfo *ai, char family)
+static void print_addrinfo(struct addrinfo *ai)
 {
 	char str[64];
 	while (ai)
@@ -136,7 +136,7 @@ static void *t_resolver(void *arg)
 				}
 				else
 				{
-					print_addrinfo(result, glob.family);
+					print_addrinfo(result);
 					freeaddrinfo(result);
 				}
 				break;
