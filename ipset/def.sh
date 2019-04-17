@@ -19,7 +19,7 @@ digger()
  if [ -x $MDIG ]; then
   $MDIG --family=4 --threads=$MDIG_THREADS <$1
  else
-  dig A +short +time=8 +tries=2 -f $1
+  dig A +short +time=8 +tries=2 -f $1 | grep -E '^[^;].*[^\.]$'
  fi
 }
 
