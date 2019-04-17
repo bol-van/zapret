@@ -416,7 +416,7 @@ int main(int argc, char **argv)
 		    cbdata.qnum=atoi(optarg);
 		    if (cbdata.qnum<0 || cbdata.qnum>65535)
 		    {
-			fprintf(stdout,"bad qnum\n");
+			fprintf(stderr,"bad qnum\n");
 			exit(1);
 		    }
 		    break;
@@ -427,7 +427,7 @@ int main(int argc, char **argv)
 		    cbdata.wsize=atoi(optarg);
 		    if (cbdata.wsize<0 || cbdata.wsize>65535)
 		    {
-			fprintf(stdout,"bad wsize\n");
+			fprintf(stderr,"bad wsize\n");
 			exit(1);
 		    }
 		    break;
@@ -437,7 +437,7 @@ int main(int argc, char **argv)
 		case 4: /* hostspell */
 		    if (strlen(optarg)!=4)
 		    {
-			fprintf(stdout,"hostspell must be exactly 4 chars long\n");
+			fprintf(stderr,"hostspell must be exactly 4 chars long\n");
 			exit(1);
 		    }
 		    cbdata.hostcase = true;

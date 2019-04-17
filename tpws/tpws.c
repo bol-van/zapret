@@ -633,7 +633,7 @@ void parse_params(int argc, char *argv[])
 		case 8: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
-				fprintf(stdout, "hostspell must be exactly 4 chars long\n");
+				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
 				exit(1);
 			}
 			params.hostcase = true;
