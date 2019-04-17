@@ -120,7 +120,6 @@ static void *t_resolver(void *arg)
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = (glob.family == FAMILY4) ? AF_INET : (glob.family == FAMILY6) ? AF_INET6 : AF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE;
 
 	while (interlocked_get_dom(dom, sizeof(dom)))
 	{
