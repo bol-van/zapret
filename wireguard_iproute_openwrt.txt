@@ -315,13 +315,13 @@ config rule
 # fw3 restart
 
 --/etc/network/interfaces.d/wgvps-------------
-	post-up iptables -t nat -A PREROUTING -i eth0 -p tcp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
+	post-up iptables -t nat -A PREROUTING -i eth0 -p tcp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
 	post-up iptables -t nat -A POSTROUTING -o wgvps -d 192.168.2.2 -p tcp -m multiport --dports 5001,5201 -j MASQUERADE
-	post-up iptables -t nat -A PREROUTING -i eth0 -p udp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
+	post-up iptables -t nat -A PREROUTING -i eth0 -p udp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
 	post-up iptables -t nat -A POSTROUTING -o wgvps -d 192.168.2.2 -p udp -m multiport --dports 5001,5201 -j MASQUERADE
-	post-down iptables -t nat -D PREROUTING -i eth0 -p tcp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
+	post-down iptables -t nat -D PREROUTING -i eth0 -p tcp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
 	post-down iptables -t nat -D POSTROUTING -o wgvps -d 192.168.2.2 -p tcp -m multiport --dports 5001,5201 -j MASQUERADE
-	post-down iptables -t nat -D PREROUTING -i eth0 -p udp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
+	post-down iptables -t nat -D PREROUTING -i eth0 -p udp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
 	post-down iptables -t nat -D POSTROUTING -o wgvps -d 192.168.2.2 -p udp -m multiport --dports 5001,5201 -j MASQUERADE
 ----------------------------------------------
 
