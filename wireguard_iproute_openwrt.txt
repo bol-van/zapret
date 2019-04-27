@@ -297,14 +297,14 @@ config rule
 
 Можно поступить так : посмотрите порт в настройках torrent клиента, убедитесь, что не поставлено "случайный порт",
 добавьте на роутер правило маркировки по порту источника.
-Но мне предпочтительно иное решение. На windows есть замечательная возможность в
+Но мне предпочтительно иное решение. На windows есть замечательная возможность
 прописать правило установки поля качества обслуживания в заголовках ip пакетов в зависимости от процесса-источника.
 Для windows 7/2008R2 необходимо будет установить ключик реестра и перезагрузить комп :
 # reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\services\Tcpip\QoS /v "Do not use NLA" /t REG_SZ /d "1"
 Редактировать политику можно в : gpedit.msc -> Computer Configuration -> Windows Settings -> Policy-based QoS
 На win 10 ключик реестра больше не работает, правила qos в gpedit применяются только для профиля домена.
 Необходимо пользоваться командой powershell New-NetQosPolicy. Гуглите хелп по ней. Пример :
-# powershell New-NetQosPolicy -Name "FTP" -AppPathNameMatchCondition "qbittorrent.exe" -DSCPAction 1
+# powershell New-NetQosPolicy -Name "torrent" -AppPathNameMatchCondition "qbittorrent.exe" -DSCPAction 1
 Однозначно требуется проверка в wireshark или netmon успешности установки поля dscp. Если там по-прежнему 0x00,
 значит что-то не сработало. 0x04 означает DSCP=1 (dscp находится в старших 6 битах).
 
