@@ -280,6 +280,23 @@ AllowedIPs = 192.168.254.3, 192.168.2.0/24
 Всем клиентам придется назначать различные диапазоны адресов в lan и индивидуально прописывать AllowedIPs
 для каждого peer.
 
+# ifdown wgvps ; ifup wgvps
+
+На клиенте разрешим форвард icmp, чтобы работал пинг и корректно определялось mtu.
+
+--/etc/config/firewall--------------------------
+config rule
+	option name 'Allow-ICMP-tunvps'
+	option src 'tunvps'
+	option dest 'lan'
+	option proto 'icmp'
+	option target 'ACCEPT'
+------------------------------------------------
+
+# fw3 restart
+
+Сейчас уже можно с vpn сервера пингануть ip адрес внутри локалки клиента. Пинги должны ходить.
+
 Отсутствие двойного NAT значительно облегчает проброс портов с внешнего IP vpn сервера в локалку какого-либо клиента.
 Для этого надо выполнить 2 действия : добавить разрешение в фаервол на клиенте и сделать dnat на сервере.
 Пример форварда портов 5001 и 5201 на 192.168.2.2 :
@@ -299,11 +316,18 @@ config rule
 --/etc/network/interfaces.d/wgvps-------------
 	post-up iptables -t nat -A PREROUTING -i eth0 -p tcp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
 	post-up iptables -t nat -A POSTROUTING -o wgvps -d 192.168.2.2 -p tcp -m multiport --dports 5001,5201 -j MASQUERADE
+	post-up iptables -t nat -A PREROUTING -i eth0 -p udp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
+	post-up iptables -t nat -A POSTROUTING -o wgvps -d 192.168.2.2 -p udp -m multiport --dports 5001,5201 -j MASQUERADE
 	post-down iptables -t nat -D PREROUTING -i eth0 -p tcp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
 	post-down iptables -t nat -D POSTROUTING -o wgvps -d 192.168.2.2 -p tcp -m multiport --dports 5001,5201 -j MASQUERADE
+	post-down iptables -t nat -D PREROUTING -i eth0 -p udp -m multiport --ports 5001,5201 -j DNAT --to-destination 192.168.2.2
+	post-down iptables -t nat -D POSTROUTING -o wgvps -d 192.168.2.2 -p udp -m multiport --dports 5001,5201 -j MASQUERADE
 ----------------------------------------------
 
-Аналогично можно поступить и с udp. Проброс tcp и udp порта необходим для полноценной работы bittorrent клиента, чтобы работали входящие.
+# ifdown wgvps ; ifup wgvps
+
+Пример приведен для iperf и iperf3, чтобы показать как пробрасывать несколько портов tcp+udp с минимальным количеством команд.
+Проброс tcp и udp порта так же необходим для полноценной работы bittorrent клиента, чтобы работали входящие.
 
 --- Как мне отправлять на vpn весь трафик с bittorrent ? ---
 
