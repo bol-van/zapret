@@ -308,6 +308,7 @@ config rule
         option dest 'lan'
         option proto 'tcp udp'
         option dest_port '5001 5201'
+        option dest_ip '192.168.2.2'
         option name 'IPERF'
 ------------------------------------------------
 
