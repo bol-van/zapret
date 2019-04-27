@@ -316,7 +316,7 @@ config rule
 	option src 'lan'
 	option proto 'all'
 	option extra '-m dscp --dscp 1'
-	option name 'shape-dscp-1'
+	option name 'route-dscp-1'
 	option set_mark '0x0800/0x0800'
 ------------------------------------------------
 
