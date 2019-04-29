@@ -87,6 +87,7 @@ Index: WireGuard-0.0.20190123/src/noise.c
 +	gtrash = gtrash*1103515243 + 12345;
 +    else
 +	// first value is true random
++	get_random_bytes_wait(&gtrash, sizeof(gtrash));
 +    }
 +    return gtrash;
 +}
