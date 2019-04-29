@@ -138,10 +138,7 @@ __le32 gen_trash(void)
 Получим следующие файлы :
 
 openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/bin/targets/ar71xx/generic/packages/kmod-wireguard_4.9.152+0.0.20190123-1_mips_24kc.ipk
-
 openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/bin/packages/mips_24kc/base/wireguard-tools_0.0.20190123-1_mips_24kc.ipk
-
-
 
 Но это будет оригинальный wireguard. Нам нужен патченый.
 Установим quilt и mc для нормального редактора вместо vim :
@@ -150,7 +147,6 @@ openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/bin/packages/mips
 # sudo apt-get install quilt mc
 
 # make package/wireguard/clean
-
 # make package/wireguard/prepare V=s QUILT=1
 
 
@@ -186,6 +182,25 @@ openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/build_dir/target-
 Получим :
 openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/feeds/base/package/network/services/wireguard/patches/010-wg-mod.patch
 При последующей очистке и пересборке он будет автоматом применяться.
+
+
+АЛЬТЕРНАТИВА : можно не возиться с quilt.
+сделайте
+# make package/wireguard/clean
+# make package/wireguard/prepare
+и напрямую модифицируйте или копируйте файлы в 
+ openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/build_dir/target-mips_24kc_musl/linux-ar71xx_generic/WireGuard-0.0.20190123/src
+затем
+# make package/wireguard/compile
+
+Если нужно поменять версию wireguard, то идите в
+openwrt-sdk-18.06.2-ar71xx-generic_gcc-7.3.0_musl.Linux-x86_64/feeds/base/package/network/services/wireguard/Makefile
+поменяйте там версию в PKG_VERSION на последнюю из : https://git.zx2c4.com/WireGuard
+скачайте tar.xz с этой версией , вычислите его sha256sum, впишите в PKG_HASH
+
+1 раз где-нибудь пропатчите файлы последней версии wireguard в текстовом редакторе, скопируйте в build_dir,
+сделайте версию для openwrt. эти же файлы скопируйте на ваш сервер с десктопным linux, сделайте там make / make install
+
 
 Полученные ipk копируем на роутер в /tmp, устанавливаем через
 # cd /tmp
