@@ -72,15 +72,10 @@ __le32 gtrash = 0;
 __le32 gen_trash(void)
 {
 	if (gtrash)
-	{
 		gtrash = gtrash*1103515243 + 12345;
-	}
 	else
-	{
 		// first value is true random
-		wait_for_random_bytes();
 		get_random_bytes_wait(&gtrash, sizeof(gtrash));
-	}
 	return gtrash;
 }
 --------------------------------------
@@ -212,6 +207,7 @@ make clean оттуда все снесет, включая ваши модиф�
 # opkg update
 # opkg install .... <зависимости>
 # opkg install *.ipk
+
 # rmmod wireguard
 # kmodloader
 # dmesg | tail
