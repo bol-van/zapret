@@ -265,7 +265,7 @@ tpws должен запускаться без фильтрации по ipset.
  /opt/zapret/ipset/get_antizapret.sh
 ИЛИ
  /opt/zapret/ipset/get_user.sh
-Вручную первый рвз получить список доменов (только для hostlist)
+Вручную первый раз получить список доменов (только для hostlist)
  /opt/zapret/ipset/get_hostlist.sh
 
 Зашедулить задание обновления листа (кроме hostlist) :
@@ -358,7 +358,7 @@ ipset можно выкинуть, если не будем пользовать
  /opt/zapret/ipset/get_antizapret.sh
 ИЛИ
  /opt/zapret/ipset/get_user.sh
-Вручную первый рвз получить список доменов (только для hostlist)
+Вручную первый раз получить список доменов (только для hostlist)
  /opt/zapret/ipset/get_hostlist.sh
 
 Зашедулить задание обновления листа (кроме hostlist) :
