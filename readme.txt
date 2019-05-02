@@ -243,21 +243,31 @@ tpws должен запускаться без фильтрации по ipset.
 Установить пакеты :
  apt-get update
  apt-get install ipset curl lsb-core dnsutils git
+
 Скопировать директорию zapret в /opt или скачать через git :
  cd /opt
  git clone https://github.com/bol-van/zapret
-Запустить /opt/zapret/install_bin.sh. Он сам определит рабочую архитектуру и настроит все бинарики.
+
+Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
+ /opt/zapret/install_bin.sh
 АЛЬТЕРНАТИВА : зайти в tpws,nfq,ip2net,mdig, в каждом выполнить make. Получите динамические бинарики под вашу ось.
+
 Скопировать скрипт запуска :
  cp /opt/zapret/init.d/debian7/zapret /etc/init.d
+
 В /etc/init.d/zapret выбрать пераметр "ISP". В зависимости от него будут применены нужные правила.
 Там же выбрать параметр SLAVE_ETH, соответствующий названию внутреннего сетевого интерфейса.
+
 Зарегистрировать init скрипт в systemd :
  /usr/lib/lsb/install_initd zapret
-Вручную первый раз получить новый список ip адресов :
+
+Вручную первый раз получить новый список ip адресов (кроме hostlist) :
  /opt/zapret/ipset/get_antizapret.sh
 ИЛИ
  /opt/zapret/ipset/get_user.sh
+Вручную первый рвз получить список доменов (только для hostlist)
+ /opt/zapret/ipset/get_hostlist.sh
+
 Зашедулить задание обновления листа (кроме hostlist) :
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_antizapret.sh"
@@ -267,7 +277,9 @@ tpws должен запускаться без фильтрации по ipset.
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_hostlist.sh"
 Это значит в 12:00 каждые 2 дня обновлять список.
+
 Запустить службу : systemctl start zapret
+
 Попробовать зайти куда-нибудь : http://ej.ru, http://kinozal.tv, http://grani.ru.
 Если не работает, то остановить службу zapret, добавить правило в iptables вручную,
 запустить nfqws или tpws в терминале под рутом с нужными параметрами.
@@ -333,14 +345,22 @@ ipset можно выкинуть, если не будем пользовать
 Скорее всего найдется рабочий вариант. Если нет - вам придется собирать самостоятельно.
 
 Скопировать директорию "zapret" в /opt на роутер.
-Запустить /opt/zapret/install_bin.sh. Он сам определит рабочую архитектуру и настроит все бинарики.
-Скопировать /opt/zapret/init.d/zapret в /etc/init.d.
+
+Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
+ /opt/zapret/install_bin.sh
+
+Скопировать скрипт запуска :
+ cp /opt/zapret/init.d/openwrt/zapret /etc/init.d
+
 В /etc/init.d/zapret выбрать пераметр "ISP". В зависимости от него будут применены нужные правила.
-/etc/init.d/zapret enable
-/etc/init.d/zapret start
-В зависимости от вашего провайдера внести нужные записи в /etc/firewall.user.
-/etc/init.d/firewall restart
-Посмотреть через iptables -L или через luci вкладку "firewall" появились ли нужные правила.
+
+Вручную первый раз получить новый список ip адресов (кроме hostlist) :
+ /opt/zapret/ipset/get_antizapret.sh
+ИЛИ
+ /opt/zapret/ipset/get_user.sh
+Вручную первый рвз получить список доменов (только для hostlist)
+ /opt/zapret/ipset/get_hostlist.sh
+
 Зашедулить задание обновления листа (кроме hostlist) :
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_antizapret.sh"
@@ -349,6 +369,14 @@ ipset можно выкинуть, если не будем пользовать
 Зашедулить задание обновления листа (только для hostlist):
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_hostlist.sh"
+
+Включить автозапуск службы и запустить ее :
+ /etc/init.d/zapret enable
+ /etc/init.d/zapret start
+
+В зависимости от вашего провайдера внести нужные записи в /etc/firewall.user.
+ fw3 restart
+Посмотреть через iptables -nL или через luci вкладку "firewall" появились ли нужные правила.
 
 ЭКОНОМИЯ МЕСТА : если его мало, то можно оставить в директории zapret лишь подкаталог ipset.
 Далее нужно создать подкаталоги с реально используемыми бинариками (ip2net, mdig, tpws, nfq)
