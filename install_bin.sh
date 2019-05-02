@@ -19,7 +19,7 @@ ccp()
  #cp -f "$BINDIR/$1" "$EXEDIR/$2" && echo copying : "$BINDIR/$1" =\> "$EXEDIR/$2"
 }
 
-for arch in aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb x86_64 x86
+for arch in aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc x86_64 x86
 do
  if check_dir $arch; then
   echo $arch is OK
