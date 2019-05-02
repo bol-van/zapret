@@ -14,7 +14,7 @@ check_dir()
 ccp()
 {
  local F=$(basename $1)
- [ -f "$2/$F" ] && rm -f "$2/$F"
+ [ -f "$EXEDIR/$2/$F" ] && rm -f "$EXEDIR/$2/$F"
  ln -fs "../$BINS/$1" "$EXEDIR/$2" && echo linking : "../$BINS/$1" =\> "$EXEDIR/$2"
  #cp -f "$BINDIR/$1" "$EXEDIR/$2" && echo copying : "$BINDIR/$1" =\> "$EXEDIR/$2"
 }
