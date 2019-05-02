@@ -18,6 +18,9 @@ ISP=mns
 #ISP=tiera
 #ISP=athome
 
+# Its possible not to use ipset. Use hostlist with tpws instead.
+#ISP=hostlist
+
 # If ISP is unlisted then uncomment "custom"
 # Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
 #ISP=custom
@@ -26,20 +29,30 @@ ISP=mns
 SLAVE_ETH=eth0
 
 
-IPSET_CR=/opt/zapret/ipset/create_ipset.sh
+ZAPRET_BASE=/opt/zapret
+
+IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 NAME=zapret
 DESC=anti-zapret
 
 QNUM=200
 TPPORT=1188
 ROUTE_TABLE_NUM=100
-NFQWS=/opt/zapret/nfq/nfqws
-TPWS=/opt/zapret/tpws/tpws
+NFQWS=$ZAPRET_BASE/nfq/nfqws
+TPWS=$ZAPRET_BASE/tpws/tpws
 TPWS_USER=tpws
+TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt
 
 PIDFILE=/var/run/$NAME.pid
 
 set -e
+
+
+prepare_tpws()
+{
+	adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
+	sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+}
 
 case "$1" in
   start)
@@ -48,6 +61,15 @@ case "$1" in
 
 	echo "Adding iptables rule"
 	case "${ISP}" in
+	    hostlist)
+		prepare_tpws
+		iptables -t nat -C PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -j DNAT --to 127.0.0.1:$TPPORT
+		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -j DNAT --to 127.0.0.1:$TPPORT
+		DAEMON=$TPWS
+		DAEMON_OPTS="--port=$TPPORT --hostlist=$TPWS_HOSTLIST --hostcase --split-http-req=method --user=$TPWS_USER --bind-addr=127.0.0.1"
+		;;
 	    mns)
 		iptables -t raw -C PREROUTING -p tcp --sport 80 --tcp-flags SYN,ACK SYN,ACK -m set --match-set zapret src -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null ||
 		 iptables -t raw -I PREROUTING -p tcp --sport 80 --tcp-flags SYN,ACK SYN,ACK -m set --match-set zapret src -j NFQUEUE --queue-num $QNUM --queue-bypass
@@ -67,8 +89,7 @@ case "$1" in
 		DAEMON_OPTS="--qnum=$QNUM --hostspell=HOST"
 		;;
 	    domru)
-		adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
-		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+		prepare_tpws
 		iptables -t nat -C PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
@@ -82,8 +103,7 @@ case "$1" in
 		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=host --user=$TPWS_USER --bind-addr=127.0.0.1"
 		;;
 	    tiera)
-		adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
-		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+		prepare_tpws
 		iptables -t nat -C PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
@@ -92,8 +112,7 @@ case "$1" in
 		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --user=$TPWS_USER --bind-addr=127.0.0.1"
 		;;
 	    athome)
-		adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
-		sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+		prepare_tpws
 		iptables -t nat -C PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 		 iptables -t nat -I PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT
 		iptables -t nat -C OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
@@ -122,6 +141,11 @@ case "$1" in
 	echo "Deleting iptables rule"
 
 	case "${ISP}" in
+	    hostlist)
+		iptables -t nat -D PREROUTING -p tcp --dport 80 -i $SLAVE_ETH -j DNAT --to 127.0.0.1:$TPPORT
+		iptables -t nat -D OUTPUT -p tcp --dport 80 -m owner ! --uid-owner $TPWS_USER -j DNAT --to 127.0.0.1:$TPPORT
+		DAEMON=$TPWS
+		;;
 	    mns|rt)
 		iptables -t raw -D PREROUTING -p tcp --sport 80 --tcp-flags SYN,ACK SYN,ACK -m set --match-set zapret src -j NFQUEUE --queue-num $QNUM --queue-bypass
 		DAEMON=$NFQWS

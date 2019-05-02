@@ -9,6 +9,9 @@ ISP=mns
 #ISP=tiera
 #ISP=athome
 
+# Its possible not to use ipset. Use hostlist with tpws instead.
+#ISP=hostlist
+
 # If ISP is unlisted then uncomment "custom"
 # Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
 #ISP=custom
@@ -19,13 +22,17 @@ START=18
 
 # !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user
 
+
+ZAPRET_BASE=/opt/zapret
+
 QNUM=200
 TPPORT=1188
 ROUTE_TABLE_NUM=100
-NFQWS=/opt/zapret/nfq/nfqws
-TPWS=/opt/zapret/tpws/tpws
-IPSET_CR=/opt/zapret/ipset/create_ipset.sh
+NFQWS=$ZAPRET_BASE/nfq/nfqws
+TPWS=$ZAPRET_BASE/tpws/tpws
+IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 TPWS_USER=daemon
+TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt
 
 
 # must execute /etc/firewall.user on every firewall reload
@@ -49,6 +56,10 @@ set_firewall_user_reload() {
 
 get_daemon() {
 	case "${ISP}" in
+	    hostlist)
+		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=method --hostlist=$TPWS_HOSTLIST --bind-addr=127.0.0.1 --user=$TPWS_USER"
+		DAEMON=$TPWS
+		;;
 	    mns)
 		DAEMON_OPTS="--qnum=$QNUM --wsize=3"
 		DAEMON=$NFQWS
