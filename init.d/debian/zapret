@@ -39,8 +39,9 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
 # Find out what works for you and modify "# PLACEHOLDER" parts of this script
 #MODE=custom
 
-# CHOSE NETWORK INTERFACE BEHIND NAT (LAN)
-SLAVE_ETH=eth0
+# router only: CHOSE NETWORK INTERFACE BEHIND NAT (LAN)
+# or leave it commented if its not router
+#SLAVE_ETH=eth0
 
 # --- REVIEW CONFIG HERE ---
 
@@ -74,7 +75,7 @@ prepare_tpws()
 	adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
 	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
 	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
-	sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+	for iface in /proc/sys/net/ipv4/conf/*; do sysctl -qw net.ipv4.conf.$(basename $iface).route_localnet=1; done
 }
 
 fw_tpws_add()
@@ -82,17 +83,22 @@ fw_tpws_add()
 	# $1 - iptable filter
 	prepare_tpws
 	echo "Adding iptables rule for tpws : $1"
-	iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
-	 iptables -t nat -I PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+	[ -n "$SLAVE_ETH" ] && {
+		iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+		 iptables -t nat -I PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+   }
 	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 	 iptables -t nat -I OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+
 }
 fw_tpws_del()
 {
 	# $1 - iptable filter
 	echo "Deleting iptables rule for tpws : $1"
-	iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null &&
-	 iptables -t nat -D PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+	[ -n "$SLAVE_ETH" ] && {
+		iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null &&
+		 iptables -t nat -D PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+	}
 	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null &&
 	 iptables -t nat -D OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
 	true
@@ -200,16 +206,12 @@ case "$1" in
 
   stop)
 	case "${MODE}" in
-	    tpws_hostlist)
+	    tpws_hostlist|tpws_all)
 		fw_tpws_del "--dport 80"
 		stop_daemon 1 $TPWS
 		;;
 	    tpws_ipset)
 		fw_tpws_del "--dport 80 -m set --match-set zapret dst"
-		stop_daemon 1 $TPWS
-		;;
-	    tpws_all)
-		fw_tpws_del "--dport 80"
 		stop_daemon 1 $TPWS
 		;;
 	    nfqws_ipset)

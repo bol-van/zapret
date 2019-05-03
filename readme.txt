@@ -241,7 +241,8 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
  cp /opt/zapret/init.d/debian/zapret /etc/init.d
 
 В /etc/init.d/zapret настроить параметры согласно разделу "Выбор режима в init скрипте".
-Там же выбрать параметр SLAVE_ETH, соответствующий названию внутреннего сетевого интерфейса.
+Если ваша система - роутер, то раскомментировать параметр SLAVE_ETH и вписать в него
+название внутреннего сетевого интерфейса (LAN).
 
 Зарегистрировать init скрипт в systemd :
  /usr/lib/lsb/install_initd zapret
