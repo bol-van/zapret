@@ -40,8 +40,8 @@ script_mode=Y
 	cmp -s $INIT_SCRIPT $INIT_SCRIPT_SRC ||
 	{
 		echo $INIT_SCRIPT already exists and differs from $INIT_SCRIPT_SRC
-	   echo Y = remove it
-	   echo L = leave it
+		echo Y = remove it
+		echo L = leave it
 		read script_mode
 	}
 	if [ "$script_mode" = "Y" ] || [ "$script_mode" = "y" ]; then

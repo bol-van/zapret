@@ -56,9 +56,9 @@ script_mode=Y
 	cmp -s $INIT_SCRIPT $INIT_SCRIPT_SRC ||
 	{
 		echo $INIT_SCRIPT already exists and differs from $INIT_SCRIPT_SRC
-	   echo Y = overwrite with new version 
-	   echo N = exit
-	   echo L = leave current version and continue
+		echo Y = overwrite with new version 
+		echo N = exit
+		echo L = leave current version and continue
 		read script_mode
 		case "${script_mode}" in
 			Y|y|L|l)
