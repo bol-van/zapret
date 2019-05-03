@@ -58,7 +58,7 @@ if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
 	grep "$GET_IPLIST_PREFIX" $CRONTMP
 	grep -v "$GET_IPLIST_PREFIX" $CRONTMP >$CRONTMP.2
 	crontab $CRONTMP.2
-	rm -f $CRONTMP 2
+	rm -f $CRONTMP.2
 fi
 rm -f $CRONTMP
 
