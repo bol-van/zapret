@@ -65,6 +65,7 @@ script_mode=Y
 				;;
 			*)
 				echo aborted
+				exit 1
 				;;
 		esac
 	}
