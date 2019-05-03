@@ -1,0 +1,21 @@
+TPPORT=1188
+TPWS_USER=daemon
+IPT_FILTER="-p tcp --dport 80"
+
+. /lib/functions/network.sh
+
+network_find_wan wan_iface
+
+for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    # DNAT for local traffic
+
+    iptables -t nat -C OUTPUT -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER -j DNAT --to 127.0.0.1:$TPPORT ||
+     iptables -t nat -I OUTPUT -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER -j DNAT --to 127.0.0.1:$TPPORT
+
+done
+
+network_get_device DEVICE lan
+sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+iptables -t nat -C prerouting_lan_rule $IPT_FILTER -j DNAT --to 127.0.0.1:$TPPORT ||
+ iptables -t nat -I prerouting_lan_rule $IPT_FILTER -j DNAT --to 127.0.0.1:$TPPORT

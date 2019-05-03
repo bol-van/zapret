@@ -101,4 +101,14 @@ v20
 added ip2net. ip2net groups ips from iplist into subnets and reduces ipset size twice
 
 v21
+
 added mdig. get_reestr.sh is *real* again
+
+v22
+
+total review of init script logic
+dropped support of older debian 7 and ubuntu 12/14 systems
+install_bin.sh : auto binaries preparation
+docs: readme review. some new topics added, others deleted
+docs: VPN setup with policy based routing using wireguard
+docs: wireguard modding guide

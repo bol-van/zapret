@@ -1,0 +1,9 @@
+QNUM=200
+IPT_FILTER_PRE="-p tcp --sport 80"
+IPT_FILTER_POST="-p tcp --dport 80"
+
+iptables -t raw -C PREROUTING $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass ||
+ iptables -t raw -I PREROUTING $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
+
+iptables -t mangle -C POSTROUTING $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass ||
+ iptables -t mangle -I POSTROUTING $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass

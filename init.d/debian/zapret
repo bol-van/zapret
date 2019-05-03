@@ -1,0 +1,242 @@
+#!/bin/sh
+# For systemd :
+#  install : /usr/lib/lsb/install_initd zapret
+#  remove : /usr/lib/lsb/remove_initd zapret
+### BEGIN INIT INFO
+# Provides:		zapret
+# Required-Start:	$local_fs $network
+# Required-Stop:	$local_fs $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+### END INIT INFO
+
+
+# +++ REVIEW CONFIG HERE +++
+
+# CHOOSE OPERATION MODE
+# leave only one MODE=  uncommented
+
+# using nfqws with ipset
+#MODE=nfqws_ipset
+# using nfqws for all
+#MODE=nfqws_all
+# CHOOSE NFQWS DAEMON OPTIONS. run "nfq/nfqws --help" for option list
+NFQWS_OPT="--wsize=3 --hostspell=HOST"
+
+# using tpws with ipset
+MODE=tpws_ipset
+# using tpws for all
+#MODE=tpws_all
+# using tpws with hostlist
+#MODE=tpws_hostlist
+# CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
+TPWS_OPT="--hostspell=HOST --split-http-req=method"
+
+# only fill ipset, do not run daemons
+#MODE=ipset
+
+# Custom mode
+# Find out what works for you and modify "# PLACEHOLDER" parts of this script
+#MODE=custom
+
+# CHOSE NETWORK INTERFACE BEHIND NAT (LAN)
+SLAVE_ETH=eth0
+
+# --- REVIEW CONFIG HERE ---
+
+
+
+NAME=zapret
+DESC=anti-zapret
+PIDDIR=/var/run
+
+ZAPRET_BASE=/opt/zapret
+IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
+
+QNUM=200
+NFQWS=$ZAPRET_BASE/nfq/nfqws
+NFQWS_OPT_BASE="--qnum=$QNUM"
+
+TPPORT=1188
+TPWS=$ZAPRET_BASE/tpws/tpws
+TPWS_USER=tpws
+TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt
+TPWS_OPT_BASE="--port=$TPPORT --user=$TPWS_USER --bind-addr=127.0.0.1"
+
+# exit script on any error
+set -e
+
+prepare_tpws()
+{
+	# $TPWS_USER is required to prevent redirection of the traffic originating from TPWS itself
+	# otherwise infinite loop will occur
+	# also its good idea not to run tpws as root
+	adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
+	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
+	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
+	sysctl -w net.ipv4.conf.$SLAVE_ETH.route_localnet=1
+}
+
+fw_tpws_add()
+{
+	# $1 - iptable filter
+	prepare_tpws
+	echo "Adding iptables rule for tpws : $1"
+	iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+	 iptables -t nat -I PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
+	 iptables -t nat -I OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+}
+fw_tpws_del()
+{
+	# $1 - iptable filter
+	echo "Deleting iptables rule for tpws : $1"
+	iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null &&
+	 iptables -t nat -D PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null &&
+	 iptables -t nat -D OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
+	true
+}
+fw_nfqws_add_pre()
+{
+	# $1 - iptable filter
+	echo "Adding iptables rule for nfqws prerouting : $1"
+	iptables -t raw -C PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null ||
+	 iptables -t raw -I PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+}
+fw_nfqws_del_pre()
+{
+	# $1 - iptable filter
+	echo "Deleting iptables rule for nfqws prerouting : $1"
+	iptables -t raw -C PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null &&
+	 iptables -t raw -D PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	true
+}
+fw_nfqws_add_post()
+{
+	# $1 - iptable filter
+	echo "Adding iptables rule for nfqws postrouting : $1"
+	iptables -t mangle -C POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null ||
+	 iptables -t mangle -I POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+}
+fw_nfqws_del_post()
+{
+	# $1 - iptable filter
+	echo "Deleting iptables rule for nfqws postrouting : $1"
+	iptables -t mangle -C POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null &&
+	 iptables -t mangle -D POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	true
+}
+
+run_daemon()
+{
+	# $1 - daemon string id or number. can use 1,2,3,...
+	# $2 - daemon
+	# $3 - daemon args
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	echo "Starting daemon $1: $2 $3"
+	start-stop-daemon --start --quiet --pidfile $PIDDIR/$DAEMONBASE$1.pid --background --make-pidfile \
+		--exec $2 -- $3
+}
+stop_daemon()
+{
+	# $1 - daemon string id or number. can use 1,2,3,...
+	# $2 - daemon
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	echo "Stopping daemon $1: $2"
+	start-stop-daemon --oknodo --stop --quiet --pidfile $PIDDIR/$DAEMONBASE$1.pid \
+		--exec $2
+}
+
+
+create_ipset()
+{
+	echo "Creating ipset"
+	($IPSET_CR)
+}
+
+case "$1" in
+  start)
+	case "${MODE}" in
+	    tpws_hostlist)
+		fw_tpws_add "--dport 80"
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT --hostlist=$TPWS_HOSTLIST"
+		;;
+	    tpws_ipset)
+		create_ipset
+		fw_tpws_add "--dport 80 -m set --match-set zapret dst"
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
+		;;
+	    tpws_all)
+		fw_tpws_add "--dport 80"
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
+		;;
+	    nfqws_ipset)
+		create_ipset
+		fw_nfqws_add_pre "--sport 80 -m set --match-set zapret src"
+		fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst"
+		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+		;;
+	    nfqws_all)
+		fw_nfqws_add_pre "--sport 80"
+		fw_nfqws_add_post "--dport 80"
+		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+		;;
+	    ipset)
+		create_ipset
+		;;
+	    custom)
+		# PLACEHOLDER
+		echo !!! NEED ATTENTION !!!
+		echo Configure iptables for required actions
+		echo Start daemon\(s\)
+		echo Study how other sections work
+		run_daemon 1 /bin/sleep 20
+		;;
+	esac
+	;;
+
+  stop)
+	case "${MODE}" in
+	    tpws_hostlist)
+		fw_tpws_del "--dport 80"
+		stop_daemon 1 $TPWS
+		;;
+	    tpws_ipset)
+		fw_tpws_del "--dport 80 -m set --match-set zapret dst"
+		stop_daemon 1 $TPWS
+		;;
+	    tpws_all)
+		fw_tpws_del "--dport 80"
+		stop_daemon 1 $TPWS
+		;;
+	    nfqws_ipset)
+		fw_nfqws_del_pre "--sport 80 -m set --match-set zapret src"
+		fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst"
+		stop_daemon 1 $NFQWS
+		;;
+	    nfqws_all)
+		fw_nfqws_del_pre "--sport 80"
+		fw_nfqws_del_post "--dport 80"
+		stop_daemon 1 $NFQWS
+		;;
+	    custom)
+		# PLACEHOLDER
+		echo !!! NEED ATTENTION !!!
+		echo Clear firewall rules here. Remove iptables changes made previously.
+		echo Stop daemon\(s\) previously started.
+		echo Study how other sections work.
+		;;
+	esac
+	;;
+
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

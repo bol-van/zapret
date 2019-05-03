@@ -1,38 +1,57 @@
 #!/bin/sh /etc/rc.common
 # Copyright (C) 2006-2011 OpenWrt.org
 
-# CHOOSE ISP HERE. UNCOMMENT ONLY ONE LINE.
-ISP=mns
-#ISP=rt
-#ISP=beeline
-#ISP=domru
-#ISP=tiera
-#ISP=athome
-
-# Its possible not to use ipset. Use hostlist with tpws instead.
-#ISP=hostlist
-
-# If ISP is unlisted then uncomment "custom"
-# Find out what works for your ISP and modify "# PLACEHOLDER" parts of this script
-#ISP=custom
-
 USE_PROCD=1
 # start betfore firewall - we need ipset populated
 START=18
 
+
+# +++ REVIEW CONFIG HERE +++
+
+# CHOOSE OPERATION MODE
+# leave only one MODE=  uncommented
+
+# using nfqws with ipset
+#MODE=nfqws_ipset
+# using nfqws for all
+#MODE=nfqws_all
+# CHOOSE NFQWS DAEMON OPTIONS. run "nfq/nfqws --help" for option list
+NFQWS_OPT="--wsize=3 --hostspell=HOST"
+
+# using tpws with ipset
+MODE=tpws_ipset
+# using tpws for all
+#MODE=tpws_all
+# using tpws with hostlist
+#MODE=tpws_hostlist
+# CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
+TPWS_OPT="--hostspell=HOST --split-http-req=method"
+
+# only fill ipset, do not run daemons
+#MODE=ipset
+
+# Custom mode
+# Find out what works for you and modify "# PLACEHOLDER" parts of this script
+#MODE=custom
+
+# --- REVIEW CONFIG HERE ---
+
 # !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user
 
 
+PIDDIR=/var/run
 ZAPRET_BASE=/opt/zapret
+IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 
 QNUM=200
-TPPORT=1188
-ROUTE_TABLE_NUM=100
 NFQWS=$ZAPRET_BASE/nfq/nfqws
+NFQWS_OPT_BASE="--qnum=$QNUM"
+
+TPPORT=1188
 TPWS=$ZAPRET_BASE/tpws/tpws
-IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 TPWS_USER=daemon
 TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt
+TPWS_OPT_BASE="--port=$TPPORT --user=$TPWS_USER --bind-addr=127.0.0.1"
 
 
 # must execute /etc/firewall.user on every firewall reload
@@ -54,57 +73,56 @@ set_firewall_user_reload() {
 	done
 }
 
-get_daemon() {
-	case "${ISP}" in
-	    hostlist)
-		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=method --hostlist=$TPWS_HOSTLIST --bind-addr=127.0.0.1 --user=$TPWS_USER"
-		DAEMON=$TPWS
-		;;
-	    mns)
-		DAEMON_OPTS="--qnum=$QNUM --wsize=3"
-		DAEMON=$NFQWS
-		;;
-	    rt)
-		DAEMON_OPTS="--qnum=$QNUM --wsize=20"
-		DAEMON=$NFQWS
-		;;
-	    beeline)
-		DAEMON_OPTS="--qnum=$QNUM --hostspell=HOST"
-		DAEMON=$NFQWS
-		;;
-	    domru)
-		DAEMON_OPTS="--port=$TPPORT --hostcase --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
-		DAEMON=$TPWS
-		;;
-	    tiera)
-		DAEMON_OPTS="--port=$TPPORT --split-http-req=host --bind-addr=127.0.0.1 --user=$TPWS_USER"
-		DAEMON=$TPWS
-		;;
-	    athome)
-		DAEMON_OPTS="--port=$TPPORT --split-http-req=method --bind-addr=127.0.0.1 --user=$TPWS_USER"
-		DAEMON=$TPWS
-		;;
-	    custom)
-		# PLACEHOLDER
-		echo !!! NEED ATTENTION !!!
-		echo Select which daemon and what options work for you
-		DAEMON_OPTS=20
-		DAEMON=/bin/sleep
-		;;
-	esac
+run_daemon()
+{
+	# $1 - daemon string id or number. can use 1,2,3,...
+	# $2 - daemon
+	# $3 - daemon args
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	echo "Starting daemon $1: $2 $3"
+	procd_open_instance
+	procd_set_param command $2 $3
+	procd_set_param pidfile $PIDDIR/$DAEMONBASE$1.pid
+	procd_close_instance
+}
+
+create_ipset()
+{
+	echo "Creating ipset"
+	($IPSET_CR)
 }
 
 
 start_service() {
 	set_firewall_user_reload
-	echo "Creating ipset"
-	($IPSET_CR)
 
-	get_daemon
-	[ -n "$DAEMON" ] && {
-	    echo "Starting $DAEMON"
-	    procd_open_instance
-	    procd_set_param command $DAEMON $DAEMON_OPTS
-	    procd_close_instance
-	}
+	case "${MODE}" in
+	    tpws_hostlist)
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT --hostlist=$TPWS_HOSTLIST"
+		;;
+	    tpws_ipset)
+		create_ipset
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
+		;;
+	    tpws_all)
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
+		;;
+	    nfqws_ipset)
+		create_ipset
+		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+		;;
+	    nfqws_all)
+		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+		;;
+	    ipset)
+		create_ipset
+		;;
+	    custom)
+		# PLACEHOLDER
+		echo !!! NEED ATTENTION !!!
+		echo Start daemon\(s\)
+		echo Study how other sections work
+		;;
+	esac
 }
