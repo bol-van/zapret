@@ -305,7 +305,7 @@ status, output messages : systemctl status zapret
 
 # su
 # /opt/zapret/uninstall_debian_easy.sh
-# sudo rm -r /opt/zapret
+# rm -r /opt/zapret
 
 Скрипты простой установки могут быть удобны и для нечайников для первоначальной установки,
 после которой можно поправить настройки вручную. Так устанавливать быстрее.
