@@ -28,6 +28,7 @@ SYSTEMCTL=$(which systemctl)
 
 echo \* stopping service and unregistering init script with LSB ...
 
+"$SYSTEMCTL" disable zapret
 "$SYSTEMCTL" stop zapret
 [ -f "$INIT_SCRIPT" ] && "$LSB_REMOVE" $INIT_SCRIPT
 
@@ -62,5 +63,8 @@ if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
 fi
 rm -f $CRONTMP
 
-exit 0
+echo \* systemd cleanup ...
 
+"$SYSTEMCTL" daemon-reload
+
+exit 0
