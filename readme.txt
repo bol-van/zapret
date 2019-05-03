@@ -293,16 +293,17 @@ status, output messages : systemctl status zapret
 Пользуешься ubuntu или debian ? Тогда этот вариант для тебя.
 Есть шансы, что оно заработает с минимумом усилий. Запусти терминал и в нем вбивай команды :
 
-# sudo apt-get update
-# sudo apt-get install git
+# su
+<введи пароль рута>
+# apt-get update
+# apt-get install git
 # cd /opt
-# sudo git clone https://github.com/bol-van/zapret
+# git clone https://github.com/bol-van/zapret
 # zapret/install_debian_easy.sh
-
-sudo попросит пароль текущего юзера для получения рута
 
 Надоело ?
 
+# su
 # /opt/zapret/uninstall_debian_easy.sh
 # sudo rm -r /opt/zapret
 
