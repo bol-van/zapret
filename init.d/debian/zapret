@@ -86,7 +86,7 @@ fw_tpws_add()
 	[ -n "$SLAVE_ETH" ] && {
 		iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 		 iptables -t nat -I PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
-   }
+ 	}
 	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
 	 iptables -t nat -I OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT
 
