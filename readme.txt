@@ -245,7 +245,7 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
 название внутреннего сетевого интерфейса (LAN).
 
 Зарегистрировать init скрипт в systemd :
- /usr/lib/lsb/install_initd zapret
+ /usr/lib/lsb/install_initd /etc/init.d/zapret
 
 Вручную первый раз получить новый список ip адресов (кроме hostlist) :
  /opt/zapret/ipset/get_antizapret.sh
@@ -285,6 +285,29 @@ start : sytemctl start zapret
 stop : systemctl stop zapret
 status, output messages : systemctl status zapret
 После изменения /etc/init.d/zapret : systemctl daemon-reload
+
+Пример установки на debian 8,9 ubuntu 16,18 для чайников
+--------------------------------------------------------
+
+Ты простой юзер ? Не хочешь ни во что вникать, а хочешь нажать и чтобы сразу заработало ?
+Пользуешься ubuntu или debian ? Тогда этот вариант для тебя.
+Есть шансы, что оно заработает с минимумом усилий. Запусти терминал и в нем вбивай команды :
+
+# sudo apt-get update
+# sudo apt-get install git
+# cd /opt
+# sudo git clone https://github.com/bol-van/zapret
+# zapret/install_debian_easy.sh
+
+sudo попросит пароль текущего юзера для получения рута
+
+Надоело ?
+
+# /opt/zapret/uninstall_debian_easy.sh
+# sudo rm -r /opt/zapret
+
+Скрипты простой установки могут быть удобны и для нечайников для первоначальной установки,
+после которой можно поправить настройки вручную. Так устанавливать быстрее.
 
 Другие linux системы
 --------------------
