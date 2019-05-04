@@ -323,16 +323,25 @@ status, output messages : systemctl status zapret
 # apt-get install git
 # cd /opt
 # git clone https://github.com/bol-van/zapret
-# zapret/install_debian_easy.sh
+# zapret/install_easy.sh
 
 Надоело ?
 
-# su
-# /opt/zapret/uninstall_debian_easy.sh
+# /opt/zapret/uninstall_easy.sh
 # rm -r /opt/zapret
 
 Скрипты простой установки могут быть удобны и для нечайников для первоначальной установки,
 после которой можно поправить настройки вручную. Так устанавливать быстрее.
+
+Эти скрипты будут работать и на других системах на базе systemd при условии, что
+уже есть следующие программы :
+
+/usr/lib/lsb/install_initd
+/usr/lib/lsb/remove_initd
+ipset
+curl
+
+Их можно установить вручную при помощи менеджера пакетов вашей ОС.
 
 Другие linux системы
 --------------------

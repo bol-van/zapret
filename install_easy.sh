@@ -1,11 +1,15 @@
 #!/bin/sh
 
-# automated script for easy installing zapret on debian or ubuntu based system
-# system must use apt as package manager and systemd
+# automated script for easy installing zapret on systemd based system
+# all required tools must be already present or system must use apt as package manager
+# if its not apt based system then manually install ipset, curl, lsb-core
 
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-	exec sudo $0
+   which sudo >/dev/null && exec sudo $0
+   which su >/dev/null && exec su -c $0
+	echo su or sudo not found
+	exit 2
 }
 
 SCRIPT=$(readlink -f $0)
@@ -19,27 +23,34 @@ GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 
 echo \* checking system ...
 
-APTGET=$(which apt-get)
 SYSTEMCTL=$(which systemctl)
-[ ! -x "$APTGET" ] || [ ! -x "$SYSTEMCTL" ] && {
-	echo not debian-like system
+[ ! -x "$SYSTEMCTL" ] && {
+	echo not systemd based system
 	exit 5
 }
 
+echo \* checking prerequisites ...
 
-echo \* installing prerequisites ...
+if [ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] || ! which ipset >/dev/null || ! which curl >/dev/null ; then
+	echo \* installing prerequisites ...
 
-"$APTGET" update
-"$APTGET" install -y --no-install-recommends ipset curl lsb-core dnsutils || {
-	echo could not install prerequisites
-	exit 6
-}
-
-[ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] && {
-	echo lsb install scripts not found
-	exit 7
-}
-
+	APTGET=$(which apt-get)
+	[ ! -x "$APTGET" ] && {
+		echo not apt based system
+		exit 5
+	}
+	"$APTGET" update
+	"$APTGET" install -y --no-install-recommends ipset curl lsb-core dnsutils || {
+		echo could not install prerequisites
+		exit 6
+	}
+	[ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] && {
+		echo lsb install scripts not found
+		exit 7
+	}
+else
+	echo everything is present
+fi
 
 echo \* installing binaries ...
 
@@ -56,16 +67,15 @@ script_mode=Y
 	cmp -s $INIT_SCRIPT $INIT_SCRIPT_SRC ||
 	{
 		echo $INIT_SCRIPT already exists and differs from $INIT_SCRIPT_SRC
-		echo Y = overwrite with new version 
-		echo N = exit
-		echo L = leave current version and continue
+	   echo Y = overwrite with new version 
+	   echo N = exit
+	   echo L = leave current version and continue
 		read script_mode
 		case "${script_mode}" in
 			Y|y|L|l)
 				;;
 			*)
 				echo aborted
-				exit 1
 				;;
 		esac
 	}

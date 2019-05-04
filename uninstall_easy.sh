@@ -1,11 +1,13 @@
 #!/bin/sh
 
-# automated script for easy installing zapret on debian or ubuntu based system
-# system must use apt as package manager and systemd
+# automated script for easy uninstalling zapret on systemd based system
 
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-	exec sudo $0
+   which sudo >/dev/null && exec sudo $0
+   which su >/dev/null && exec su -c $0
+	echo su or sudo not found
+	exit 2
 }
 
 SCRIPT=$(readlink -f $0)
@@ -18,17 +20,14 @@ GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 
 echo \* checking system ...
 
-APTGET=$(which apt-get)
 SYSTEMCTL=$(which systemctl)
-[ ! -x "$APTGET" ] || [ ! -x "$SYSTEMCTL" ] && {
-	echo not debian-like system
+[ ! -x "$SYSTEMCTL" ] && {
+	echo not systemd based system
 	exit 5
 }
 
-
 echo \* stopping service and unregistering init script with LSB ...
 
-"$SYSTEMCTL" disable zapret
 "$SYSTEMCTL" stop zapret
 [ -f "$INIT_SCRIPT" ] && "$LSB_REMOVE" $INIT_SCRIPT
 
@@ -49,7 +48,6 @@ script_mode=Y
 	fi
 }
 
-
 echo \* removing crontab entry ...
 
 CRONTMP=/tmp/cron.tmp
@@ -62,9 +60,5 @@ if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
 	rm -f $CRONTMP.2
 fi
 rm -f $CRONTMP
-
-echo \* systemd cleanup ...
-
-"$SYSTEMCTL" daemon-reload
 
 exit 0
