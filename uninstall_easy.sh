@@ -28,6 +28,7 @@ SYSTEMCTL=$(which systemctl)
 
 echo \* stopping service and unregistering init script with LSB ...
 
+"$SYSTEMCTL" disable zapret
 "$SYSTEMCTL" stop zapret
 [ -f "$INIT_SCRIPT" ] && "$LSB_REMOVE" $INIT_SCRIPT
 
@@ -47,6 +48,10 @@ script_mode=Y
 		rm -vf $INIT_SCRIPT
 	fi
 }
+
+echo \* systemd cleanup ...
+
+"$SYSTEMCTL" daemon-reload
 
 echo \* removing crontab entry ...
 

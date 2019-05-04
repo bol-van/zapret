@@ -14,12 +14,14 @@
 
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
+ZAPRET_BASE=/opt/zapret
 LSB_INSTALL=/usr/lib/lsb/install_initd
 LSB_REMOVE=/usr/lib/lsb/remove_initd
 INIT_SCRIPT_SRC=$EXEDIR/init.d/debian/zapret
 INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST=$EXEDIR/ipset/get_antizapret.sh
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
+
 
 echo \* checking system ...
 
@@ -28,6 +30,37 @@ SYSTEMCTL=$(which systemctl)
 	echo not systemd based system
 	exit 5
 }
+
+
+echo \* checking location ...
+
+[ "$EXEDIR" != "$ZAPRET_BASE" ] && {
+	echo easy install is supported only from default location : $ZAPRET_BASE
+	echo currenlty its run from $EXEDIR
+	echo -n "do you want the installer to copy it for you (Y/N) ? "
+	read A
+	if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+		if [ -d "$ZAPRET_BASE" ]; then
+			echo installer found existing $ZAPRET_BASE
+			echo -n "do you want to delete all files there and copy this version (Y/N) ? "
+			read A
+			if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+				rm -r "$ZAPRET_BASE"
+			else
+				echo refused to overwrite $ZAPRET_BASE. exiting
+				exit 3
+			fi
+		fi
+		cp -R $EXEDIR $ZAPRET_BASE
+		echo relaunching itself from $ZAPRET_BASE
+		exec $ZAPRET_BASE/$(basename $0)
+	else
+		echo copying aborted. exiting
+		exit 3
+	fi
+}
+echo running from $EXEDIR
+
 
 echo \* checking prerequisites ...
 
@@ -76,6 +109,7 @@ script_mode=Y
 				;;
 			*)
 				echo aborted
+				exit 3
 				;;
 		esac
 	}
