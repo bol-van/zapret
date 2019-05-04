@@ -222,8 +222,13 @@ custom - нужно самому запрограммировать запуск
 NFQWS_OPT="--wsize=3 --hostspell=HOST"
 TPWS_OPT="--hostspell=HOST --split-http-req=method"
 
-Пример установки на debian 8,9 ubuntu 16,18
+Пример установки на debian-подобную систему
 -------------------------------------------
+
+На debian основано большое количество дистрибутивов linux, включая ubuntu.
+Здесь рассматриваются прежде всего Debian 8+ и Ubuntu 16+.
+Но с большой вероятностью может сработать и на производных от них.
+Главное условие - наличие systemd, apt и нескольких стандартных пакетов в репозитории.
 
 Установить пакеты :
  apt-get update
@@ -247,22 +252,33 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
 Зарегистрировать init скрипт в systemd :
  /usr/lib/lsb/install_initd /etc/init.d/zapret
 
-Вручную первый раз получить новый список ip адресов (кроме hostlist) :
- /opt/zapret/ipset/get_antizapret.sh
-ИЛИ
- /opt/zapret/ipset/get_user.sh
-Вручную первый раз получить список доменов (только для hostlist)
- /opt/zapret/ipset/get_hostlist.sh
+В зависимости от выбранного в init скрипте MODE :
 
-Зашедулить задание обновления листа (кроме hostlist) :
+MODE содержит "ipset" :
+Выбрать каким скриптом из перечисленных будем получать список ip заблокированных адресов :
+ /opt/zapret/ipset/get_user.sh
+ /opt/zapret/ipset/get_antizapret.sh
+ /opt/zapret/ipset/get_combined.sh
+ /opt/zapret/ipset/get_reestr.sh
+Выполнить этот скрипт первый раз вручную для начального заполнения списка.
+Зашедулить задание обновления листа :
  crontab -e
+ Создать строчку  "0 12 * * */2 <выбранный скрипт>"
+Например :
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_antizapret.sh"
-ИЛИ
- Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_user.sh"
-Зашедулить задание обновления листа (только для hostlist):
+
+MODE содержит "hostlist" :
+Выполнить :
+ /opt/zapret/ipset/get_hostlist.sh
+Зашедулить задание обновления листа :
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_hostlist.sh"
-Это значит в 12:00 каждые 2 дня обновлять список.
+
+MODE=custom
+Сами должны знать что делать
+
+Иные MODE :
+Ничего делать не нужно
 
 Запустить службу : systemctl start zapret
 
@@ -286,7 +302,7 @@ stop : systemctl stop zapret
 status, output messages : systemctl status zapret
 После изменения /etc/init.d/zapret : systemctl daemon-reload
 
-Пример установки на debian 8,9 ubuntu 16,18 для чайников
+Пример установки на debian-подобную систему для чайников
 --------------------------------------------------------
 
 Ты простой юзер ? Не хочешь ни во что вникать, а хочешь нажать и чтобы сразу заработало ?
@@ -364,21 +380,33 @@ ipset можно выкинуть, если не будем пользовать
 
 В /etc/init.d/zapret настроить параметры согласно разделу "Выбор режима в init скрипте".
 
-Вручную первый раз получить новый список ip адресов (кроме hostlist) :
- /opt/zapret/ipset/get_antizapret.sh
-ИЛИ
- /opt/zapret/ipset/get_user.sh
-Вручную первый раз получить список доменов (только для hostlist)
- /opt/zapret/ipset/get_hostlist.sh
+В зависимости от выбранного в init скрипте MODE :
 
-Зашедулить задание обновления листа (кроме hostlist) :
+MODE содержит "ipset" :
+Выбрать каким скриптом из перечисленных будем получать список ip заблокированных адресов :
+ /opt/zapret/ipset/get_user.sh
+ /opt/zapret/ipset/get_antizapret.sh
+ /opt/zapret/ipset/get_combined.sh
+ /opt/zapret/ipset/get_reestr.sh
+Выполнить этот скрипт первый раз вручную для начального заполнения списка.
+Зашедулить задание обновления листа :
  crontab -e
+ Создать строчку  "0 12 * * */2 <выбранный скрипт>"
+Например :
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_antizapret.sh"
-ИЛИ
- Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_user.sh"
-Зашедулить задание обновления листа (только для hostlist):
+
+MODE содержит "hostlist" :
+Выполнить :
+ /opt/zapret/ipset/get_hostlist.sh
+Зашедулить задание обновления листа :
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_hostlist.sh"
+
+MODE=custom
+Сами должны знать что делать
+
+Иные MODE :
+Ничего делать не нужно
 
 Включить автозапуск службы и запустить ее :
  /etc/init.d/zapret enable
