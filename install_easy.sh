@@ -126,4 +126,8 @@ systemctl start zapret || {
 	exit 30
 }
 
+echo
+echo finished. press any key to continue.
+read A
+
 exit 0

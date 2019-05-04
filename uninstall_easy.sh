@@ -61,4 +61,8 @@ if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
 fi
 rm -f $CRONTMP
 
+echo
+echo finished. press any key to continue.
+read A
+
 exit 0
