@@ -255,6 +255,9 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
 В зависимости от выбранного в init скрипте MODE :
 
 MODE содержит "ipset" :
+Удалить старые ip листы, если они были созданы ранее :
+ rm /opt/zapret/ipset/zapret-ip.txt /opt/zapret/ipset/zapret-ip-user.txt /opt/zapret/ipset/zapret-ip-ipban.txt /opt/zapret/ipset/zapret-ip-user-ipban.txt
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
 Выбрать каким скриптом из перечисленных будем получать список ip заблокированных адресов :
  /opt/zapret/ipset/get_user.sh
  /opt/zapret/ipset/get_antizapret.sh
@@ -268,11 +271,16 @@ MODE содержит "ipset" :
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_antizapret.sh"
 
 MODE содержит "hostlist" :
+Удалить список доменов РКН, если он уже есть :
+ rm /opt/zapret/ipset/zapret-hosts.txt
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены
+ЕСЛИ вы хотите использовать список заблокированных доменов РКН:
 Выполнить :
  /opt/zapret/ipset/get_hostlist.sh
 Зашедулить задание обновления листа :
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_hostlist.sh"
+ИНАЧЕ будет использоваться только zapret-hosts-user.txt
 
 MODE=custom
 Сами должны знать что делать
@@ -383,6 +391,9 @@ ipset можно выкинуть, если не будем пользовать
 В зависимости от выбранного в init скрипте MODE :
 
 MODE содержит "ipset" :
+Удалить старые ip листы, если они были созданы ранее :
+ rm /opt/zapret/ipset/zapret-ip.txt /opt/zapret/ipset/zapret-ip-user.txt /opt/zapret/ipset/zapret-ip-ipban.txt /opt/zapret/ipset/zapret-ip-user-ipban.txt
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
 Выбрать каким скриптом из перечисленных будем получать список ip заблокированных адресов :
  /opt/zapret/ipset/get_user.sh
  /opt/zapret/ipset/get_antizapret.sh
@@ -396,11 +407,16 @@ MODE содержит "ipset" :
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_antizapret.sh"
 
 MODE содержит "hostlist" :
+Удалить список доменов РКН, если он уже есть :
+ rm /opt/zapret/ipset/zapret-hosts.txt
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены
+ЕСЛИ вы хотите использовать список заблокированных доменов РКН:
 Выполнить :
  /opt/zapret/ipset/get_hostlist.sh
 Зашедулить задание обновления листа :
  crontab -e
  Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_hostlist.sh"
+ИНАЧЕ будет использоваться только zapret-hosts-user.txt
 
 MODE=custom
 Сами должны знать что делать
