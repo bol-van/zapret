@@ -4,8 +4,8 @@
 
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-   which sudo >/dev/null && exec sudo $0
-   which su >/dev/null && exec su -c $0
+	which sudo >/dev/null && exec sudo $0
+	which su >/dev/null && exec su -c $0
 	echo su or sudo not found
 	exit 2
 }
