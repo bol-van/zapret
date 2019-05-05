@@ -72,7 +72,7 @@ prepare_tpws()
 	# $TPWS_USER is required to prevent redirection of the traffic originating from TPWS itself
 	# otherwise infinite loop will occur
 	# also its good idea not to run tpws as root
-	adduser --disabled-login --no-create-home --system --quiet $TPWS_USER
+	id -u $TPWS_USER >/dev/null 2>/dev/null || adduser --no-create-home --system --shell /bin/false $TPWS_USER
 	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
 	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
 	for iface in /proc/sys/net/ipv4/conf/*; do sysctl -qw net.ipv4.conf.$(basename $iface).route_localnet=1; done
@@ -134,6 +134,10 @@ fw_nfqws_del_post()
 	true
 }
 
+exists()
+{
+	which $1 >/dev/null 2>/dev/null
+}
 run_daemon()
 {
 	# $1 - daemon string id or number. can use 1,2,3,...
@@ -141,9 +145,22 @@ run_daemon()
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 	local DAEMONBASE=$(basename $2)
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
-	start-stop-daemon --start --quiet --pidfile $PIDDIR/$DAEMONBASE$1.pid --background --make-pidfile \
-		--exec $2 -- $3
+	if exists start-stop-daemon ; then
+		start-stop-daemon --start --quiet --pidfile "$PIDFILE" --background --make-pidfile \
+			--exec "$2" -- $3
+	elif exists daemonize ; then
+		daemonize -p "$PIDFILE" "$2" $3
+	else
+		nohup "$2" $3 >/dev/null 2>/dev/null &
+		PID=$(jobs -p %1)
+		if [ -n "$PID" ]; then
+			echo $PID >$PIDFILE
+		else
+			echo could not start daemon $1 : $2 $3
+		fi
+	fi
 }
 stop_daemon()
 {
@@ -151,9 +168,20 @@ stop_daemon()
 	# $2 - daemon
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 	local DAEMONBASE=$(basename $2)
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
-	start-stop-daemon --oknodo --stop --quiet --pidfile $PIDDIR/$DAEMONBASE$1.pid \
-		--exec $2
+	if exists start-stop-daemon ; then
+		start-stop-daemon --oknodo --stop --quiet --pidfile "$PIDFILE" \
+			--exec "$2"
+	else
+		if [ -f "$PIDFILE" ]; then
+			read PID <"$PIDFILE"
+			kill $PID
+		else
+			echo no pidfile : $PIDFILE
+			false
+		fi
+	fi
 }
 
 

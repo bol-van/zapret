@@ -2,12 +2,21 @@
 
 # automated script for easy installing zapret on systemd based system
 # all required tools must be already present or system must use apt as package manager
-# if its not apt based system then manually install ipset, curl, lsb-core
+# if its not apt or yum based system then manually install ipset, curl, lsb-core
+
+exists()
+{
+	which $1 >/dev/null 2>/dev/null
+}
+whichq()
+{
+	which $1 2>/dev/null
+}
 
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-	which sudo >/dev/null && exec sudo $0
-	which su >/dev/null && exec su -c $0
+	exists sudo && exec sudo $0
+	exists su && exec su -c $0
 	echo su or sudo not found
 	exit 2
 }
@@ -22,7 +31,6 @@ INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST=$EXEDIR/ipset/get_antizapret.sh
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 
-
 exitp()
 {
 	echo
@@ -34,7 +42,7 @@ exitp()
 
 echo \* checking system ...
 
-SYSTEMCTL=$(which systemctl)
+SYSTEMCTL=$(whichq systemctl)
 [ ! -x "$SYSTEMCTL" ] && {
 	echo not systemd based system
 	exitp 5
@@ -73,25 +81,33 @@ echo running from $EXEDIR
 
 echo \* checking prerequisites ...
 
-if [ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] || ! which ipset >/dev/null || ! which curl >/dev/null ; then
+if [ -x "$LSB_INSTALL" ] && [ -x "$LSB_REMOVE" ] && exists ipset && exists curl ; then
+	echo everything is present
+else
 	echo \* installing prerequisites ...
 
-	APTGET=$(which apt-get)
-	[ ! -x "$APTGET" ] && {
-		echo not apt based system
+	APTGET=$(whichq apt-get)
+	YUM=$(whichq yum)
+	if [ -x "$APTGET" ] ; then
+		"$APTGET" update
+		"$APTGET" install -y --no-install-recommends ipset curl lsb-core dnsutils || {
+			echo could not install prerequisites
+			exitp 6
+		}
+	elif [ -x "$YUM" ] ; then
+		"$YUM" -y install curl ipset redhat-lsb-core daemonize || {
+			echo could not install prerequisites
+			exitp 6
+		}
+	else
+		echo supported package manager not found
+		echo you must manually install : ipset curl lsb-core
 		exitp 5
-	}
-	"$APTGET" update
-	"$APTGET" install -y --no-install-recommends ipset curl lsb-core dnsutils || {
-		echo could not install prerequisites
-		exitp 6
-	}
+	fi
 	[ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] && {
 		echo lsb install scripts not found
 		exitp 7
 	}
-else
-	echo everything is present
 fi
 
 echo \* installing binaries ...

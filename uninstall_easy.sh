@@ -2,10 +2,15 @@
 
 # automated script for easy uninstalling zapret on systemd based system
 
+exists()
+{
+	which $1 >/dev/null 2>/dev/null
+}
+
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-	which sudo >/dev/null && exec sudo $0
-	which su >/dev/null && exec su -c $0
+	exists sudo && exec sudo $0
+	exists su && exec su -c $0
 	echo su or sudo not found
 	exit 2
 }
