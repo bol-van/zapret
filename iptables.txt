@@ -31,3 +31,28 @@ For DNAT :
 sysctl -w net.ipv4.conf.eth1.route_localnet=1
 iptables -t nat -I PREROUTING -p tcp --dport 80 -j DNAT --to 127.0.0.1:1188
 iptables -t nat -I OUTPUT -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.1:1188
+
+
+Reset all iptable rules :
+
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+iptables -t mangle -F
+iptables -t mangle -X
+iptables -t raw -F
+iptables -t raw -X
+
+Reset iptable policies :
+
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -t mangle -P POSTROUTING ACCEPT
+iptables -t mangle -P PREROUTING ACCEPT
+iptables -t mangle -P INPUT ACCEPT
+iptables -t mangle -P FORWARD ACCEPT
+iptables -t mangle -P OUTPUT ACCEPT
+iptables -t raw -P PREROUTING ACCEPT
+iptables -t raw -P OUTPUT ACCEPT
