@@ -177,6 +177,7 @@ stop_daemon()
 		if [ -f "$PIDFILE" ]; then
 			read PID <"$PIDFILE"
 			kill $PID
+			rm -f "$PIDFILE"
 		else
 			echo no pidfile : $PIDFILE
 			false
