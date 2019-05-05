@@ -2,7 +2,7 @@
 
 # automated script for easy installing zapret on systemd based system
 # all required tools must be already present or system must use apt as package manager
-# if its not apt or yum based system then manually install ipset, curl, lsb-core
+# if its not apt or yum based system then manually install ipset, curl
 
 exists()
 {
@@ -24,12 +24,11 @@ whichq()
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
 ZAPRET_BASE=/opt/zapret
-LSB_INSTALL=/usr/lib/lsb/install_initd
-LSB_REMOVE=/usr/lib/lsb/remove_initd
 INIT_SCRIPT_SRC=$EXEDIR/init.d/debian/zapret
 INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST=$EXEDIR/ipset/get_antizapret.sh
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
+SYSTEMD_SYSV_GENERATOR=/lib/systemd/system-generators/systemd-sysv-generator
 
 exitp()
 {
@@ -43,8 +42,13 @@ exitp()
 echo \* checking system ...
 
 SYSTEMCTL=$(whichq systemctl)
-[ ! -x "$SYSTEMCTL" ] && {
+[ -x "$SYSTEMCTL" ] || {
 	echo not systemd based system
+	exitp 5
+}
+[ -x "$SYSTEMD_SYSV_GENERATOR" ] || {
+	echo systemd is present but it does not support sysvinit compatibility
+	echo $SYSTEMD_SYSV_GENERATOR is required
 	exitp 5
 }
 
@@ -81,33 +85,36 @@ echo running from $EXEDIR
 
 echo \* checking prerequisites ...
 
-if [ -x "$LSB_INSTALL" ] && [ -x "$LSB_REMOVE" ] && exists ipset && exists curl ; then
+if exists ipset && exists curl ; then
 	echo everything is present
 else
 	echo \* installing prerequisites ...
 
 	APTGET=$(whichq apt-get)
 	YUM=$(whichq yum)
+	PACMAN=$(whichq pacman)
 	if [ -x "$APTGET" ] ; then
 		"$APTGET" update
-		"$APTGET" install -y --no-install-recommends ipset curl lsb-core dnsutils || {
+		"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
 			echo could not install prerequisites
 			exitp 6
 		}
 	elif [ -x "$YUM" ] ; then
-		"$YUM" -y install curl ipset redhat-lsb-core daemonize || {
+		"$YUM" -y install curl ipset daemonize || {
+			echo could not install prerequisites
+			exitp 6
+		}
+	elif [ -x "$PACMAN" ] ; then
+		"$PACMAN" -Syy
+		"$PACMAN" --noconfirm -S ipset curl || {
 			echo could not install prerequisites
 			exitp 6
 		}
 	else
 		echo supported package manager not found
-		echo you must manually install : ipset curl lsb-core
+		echo you must manually install : ipset curl
 		exitp 5
 	fi
-	[ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] && {
-		echo lsb install scripts not found
-		exitp 7
-	}
 fi
 
 echo \* installing binaries ...
@@ -148,9 +155,8 @@ fi
 
 echo \* registering init script ...
 
-"$LSB_REMOVE" $INIT_SCRIPT
-"$LSB_INSTALL" $INIT_SCRIPT || {
-	echo could not register $INIT_SCRIPT with LSB
+"$SYSTEMCTL" enable zapret || {
+	echo could not register $INIT_SCRIPT with systemd
 	exitp 20
 }
 

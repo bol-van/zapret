@@ -138,9 +138,10 @@ exists()
 {
 	which $1 >/dev/null 2>/dev/null
 }
+JOBCT=1
 run_daemon()
 {
-	# $1 - daemon string id or number. can use 1,2,3,...
+	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
@@ -154,9 +155,10 @@ run_daemon()
 		daemonize -p "$PIDFILE" "$2" $3
 	else
 		nohup "$2" $3 >/dev/null 2>/dev/null &
-		PID=$(jobs -p %1)
+		PID=$(jobs -p %$JOBCT)
 		if [ -n "$PID" ]; then
 			echo $PID >$PIDFILE
+			let JOBCT=$JOBCT+1
 		else
 			echo could not start daemon $1 : $2 $3
 		fi
@@ -164,7 +166,7 @@ run_daemon()
 }
 stop_daemon()
 {
-	# $1 - daemon string id or number. can use 1,2,3,...
+	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 	local DAEMONBASE=$(basename $2)

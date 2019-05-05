@@ -17,8 +17,6 @@ exists()
 
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
-LSB_INSTALL=/usr/lib/lsb/install_initd
-LSB_REMOVE=/usr/lib/lsb/remove_initd
 INIT_SCRIPT_SRC=$EXEDIR/init.d/debian/zapret
 INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
@@ -36,16 +34,16 @@ exitp()
 echo \* checking system ...
 
 SYSTEMCTL=$(which systemctl)
-[ ! -x "$SYSTEMCTL" ] && {
+[ -x "$SYSTEMCTL" ] || {
 	echo not systemd based system
 	exitp 5
 }
 
-echo \* stopping service and unregistering init script with LSB ...
+
+echo \* stopping service and unregistering init script
 
 "$SYSTEMCTL" disable zapret
 "$SYSTEMCTL" stop zapret
-[ -f "$INIT_SCRIPT" ] && "$LSB_REMOVE" $INIT_SCRIPT
 
 echo \* removing init script ...
 

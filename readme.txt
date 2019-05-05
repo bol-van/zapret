@@ -232,7 +232,7 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
 
 Установить пакеты :
  apt-get update
- apt-get install ipset curl lsb-core dnsutils git
+ apt-get install ipset curl dnsutils git
 
 Скопировать директорию zapret в /opt или скачать через git :
  cd /opt
@@ -249,8 +249,11 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method"
 Если ваша система - роутер, то раскомментировать параметр SLAVE_ETH и вписать в него
 название внутреннего сетевого интерфейса (LAN).
 
-Зарегистрировать init скрипт в systemd :
- /usr/lib/lsb/install_initd /etc/init.d/zapret
+Принять изменения скрипта в systemd :
+ systemctl daemon-reload
+
+Включить автозапуск службы :
+ systemctl enable zapret
 
 В зависимости от выбранного в init скрипте MODE :
 
@@ -288,7 +291,8 @@ MODE=custom
 Иные MODE :
 Ничего делать не нужно
 
-Запустить службу : systemctl start zapret
+Запустить службу :
+ systemctl start zapret
 
 Попробовать зайти куда-нибудь : http://ej.ru, http://kinozal.tv, http://grani.ru.
 Если не работает, то остановить службу zapret, добавить правило в iptables вручную,
@@ -303,12 +307,13 @@ MODE=custom
 
 Шпаргалка по управлению службой :
 
-install : /usr/lib/lsb/install_initd zapret
-remove : /usr/lib/lsb/remove_initd zapret
+enable auto start : systemctl enable zapret
+disable auto start : systemctl disable zapret
 start : sytemctl start zapret
 stop : systemctl stop zapret
 status, output messages : systemctl status zapret
 После изменения /etc/init.d/zapret : systemctl daemon-reload
+delete service : systemctl disable zapret ; systemctl stop zapret ; rm /etc/init.d/zapret
 
 Centos 7+, Fedora
 -----------------
@@ -317,7 +322,7 @@ Centos с 7 версии и более-менее новые федоры пос
 В качестве пакетного менеджера используется yum.
 
 Установить пакеты :
- yum install -y curl ipset redhat-lsb-core daemonize
+ yum install -y curl ipset daemonize
 
 Далее все аналогично debian.
 Инит скрипт init.d/debian/zapret адаптирован под условия новых centos и fedora.
@@ -348,8 +353,6 @@ Centos с 7 версии и более-менее новые федоры пос
 Эти скрипты будут работать и на других системах на базе systemd при условии, что
 уже есть следующие программы :
 
-/usr/lib/lsb/install_initd
-/usr/lib/lsb/remove_initd
 ipset
 curl
 
