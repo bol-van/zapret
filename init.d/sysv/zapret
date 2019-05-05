@@ -72,21 +72,9 @@ exists()
 	which $1 >/dev/null 2>/dev/null
 }
 
-prepare_tpws()
-{
-	# $TPWS_USER is required to prevent redirection of the traffic originating from TPWS itself
-	# otherwise infinite loop will occur
-	# also its good idea not to run tpws as root
-	id -u $TPWS_USER >/dev/null 2>/dev/null || useradd --no-create-home --system --shell /bin/false $TPWS_USER
-	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
-	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
-	for iface in /proc/sys/net/ipv4/conf/*; do sysctl -qw net.ipv4.conf.$(basename $iface).route_localnet=1; done
-}
-
 fw_tpws_add()
 {
 	# $1 - iptable filter
-	prepare_tpws
 	echo "Adding iptables rule for tpws : $1"
 	[ -n "$SLAVE_ETH" ] && {
 		iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$TPPORT 2>/dev/null ||
@@ -188,26 +176,40 @@ stop_daemon()
 	fi
 }
 
+prepare_tpws()
+{
+	# $TPWS_USER is required to prevent redirection of the traffic originating from TPWS itself
+	# otherwise infinite loop will occur
+	# also its good idea not to run tpws as root
+	id -u $TPWS_USER >/dev/null 2>/dev/null || useradd --no-create-home --system --shell /bin/false $TPWS_USER
+	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
+	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
+	for iface in /proc/sys/net/ipv4/conf/*; do sysctl -qw net.ipv4.conf.$(basename $iface).route_localnet=1; done
+}
+
 
 create_ipset()
 {
 	echo "Creating ipset"
-	($IPSET_CR)
+	"$IPSET_CR"
 }
 
 case "$1" in
   start)
 	case "${MODE}" in
 	    tpws_hostlist)
+	    	prepare_tpws
 		fw_tpws_add "--dport 80"
 		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT --hostlist=$TPWS_HOSTLIST"
 		;;
 	    tpws_ipset)
 		create_ipset
+	    	prepare_tpws
 		fw_tpws_add "--dport 80 -m set --match-set zapret dst"
 		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
 		;;
 	    tpws_all)
+	    	prepare_tpws
 		fw_tpws_add "--dport 80"
 		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
 		;;
