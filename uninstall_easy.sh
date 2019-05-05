@@ -18,12 +18,22 @@ INIT_SCRIPT_SRC=$EXEDIR/init.d/debian/zapret
 INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 
+
+exitp()
+{
+	echo
+	echo press enter to continue
+	read A
+	exit $1
+}
+
+
 echo \* checking system ...
 
 SYSTEMCTL=$(which systemctl)
 [ ! -x "$SYSTEMCTL" ] && {
 	echo not systemd based system
-	exit 5
+	exitp 5
 }
 
 echo \* stopping service and unregistering init script with LSB ...
@@ -66,8 +76,4 @@ if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
 fi
 rm -f $CRONTMP
 
-echo
-echo finished. press any key to continue.
-read A
-
-exit 0
+exitp 0

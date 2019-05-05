@@ -23,12 +23,21 @@ GET_IPLIST=$EXEDIR/ipset/get_antizapret.sh
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 
 
+exitp()
+{
+	echo
+	echo press enter to continue
+	read A
+	exit $1
+}
+
+
 echo \* checking system ...
 
 SYSTEMCTL=$(which systemctl)
 [ ! -x "$SYSTEMCTL" ] && {
 	echo not systemd based system
-	exit 5
+	exitp 5
 }
 
 
@@ -48,7 +57,7 @@ echo \* checking location ...
 				rm -r "$ZAPRET_BASE"
 			else
 				echo refused to overwrite $ZAPRET_BASE. exiting
-				exit 3
+				exitp 3
 			fi
 		fi
 		cp -R $EXEDIR $ZAPRET_BASE
@@ -56,7 +65,7 @@ echo \* checking location ...
 		exec $ZAPRET_BASE/$(basename $0)
 	else
 		echo copying aborted. exiting
-		exit 3
+		exitp 3
 	fi
 }
 echo running from $EXEDIR
@@ -70,16 +79,16 @@ if [ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] || ! which ipset >/dev/null
 	APTGET=$(which apt-get)
 	[ ! -x "$APTGET" ] && {
 		echo not apt based system
-		exit 5
+		exitp 5
 	}
 	"$APTGET" update
 	"$APTGET" install -y --no-install-recommends ipset curl lsb-core dnsutils || {
 		echo could not install prerequisites
-		exit 6
+		exitp 6
 	}
 	[ ! -x "$LSB_INSTALL" ] || [ ! -x "$LSB_REMOVE" ] && {
 		echo lsb install scripts not found
-		exit 7
+		exitp 7
 	}
 else
 	echo everything is present
@@ -109,7 +118,7 @@ script_mode=Y
 				;;
 			*)
 				echo aborted
-				exit 3
+				exitp 3
 				;;
 		esac
 	}
@@ -126,7 +135,7 @@ echo \* registering init script ...
 "$LSB_REMOVE" $INIT_SCRIPT
 "$LSB_INSTALL" $INIT_SCRIPT || {
 	echo could not register $INIT_SCRIPT with LSB
-	exit 20
+	exitp 20
 }
 
 
@@ -134,7 +143,7 @@ echo \* downloading blocked ip list ...
 
 "$GET_IPLIST" || {
 	echo could not download ip list
-	exit 25
+	exitp 25
 }
 
 
@@ -157,11 +166,7 @@ echo \* starting zapret service ...
 
 systemctl start zapret || {
 	echo could not start zapret service
-	exit 30
+	exitp 30
 }
 
-echo
-echo finished. press any key to continue.
-read A
-
-exit 0
+exitp 0
