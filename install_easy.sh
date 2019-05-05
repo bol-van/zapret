@@ -155,6 +155,7 @@ fi
 
 echo \* registering init script ...
 
+"$SYSTEMCTL" daemon-reload
 "$SYSTEMCTL" enable zapret || {
 	echo could not register $INIT_SCRIPT with systemd
 	exitp 20
