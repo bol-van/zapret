@@ -362,6 +362,8 @@ OpenSUSE
 Эти скрипты будут работать и на других системах на базе systemd при условии, что
 systemd собран с поддержкой sysvinit и имеется следующий файл :
 /lib/systemd/system-generators/systemd-sysv-generator
+ИЛИ
+/usr/lib/systemd/system-generators/systemd-sysv-generator
 К сожалению, некоторые дистрибутивы имеют systemd без sysvinit support (arch linux).
 А так же есть необходимые программы :
 ipset
