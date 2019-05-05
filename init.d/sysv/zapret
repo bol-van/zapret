@@ -67,12 +67,17 @@ TPWS_OPT_BASE="--port=$TPPORT --user=$TPWS_USER --bind-addr=127.0.0.1"
 # exit script on any error
 set -e
 
+exists()
+{
+	which $1 >/dev/null 2>/dev/null
+}
+
 prepare_tpws()
 {
 	# $TPWS_USER is required to prevent redirection of the traffic originating from TPWS itself
 	# otherwise infinite loop will occur
 	# also its good idea not to run tpws as root
-	id -u $TPWS_USER >/dev/null 2>/dev/null || adduser --no-create-home --system --shell /bin/false $TPWS_USER
+	id -u $TPWS_USER >/dev/null 2>/dev/null || useradd --no-create-home --system --shell /bin/false $TPWS_USER
 	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
 	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
 	for iface in /proc/sys/net/ipv4/conf/*; do sysctl -qw net.ipv4.conf.$(basename $iface).route_localnet=1; done
@@ -134,10 +139,6 @@ fw_nfqws_del_post()
 	true
 }
 
-exists()
-{
-	which $1 >/dev/null 2>/dev/null
-}
 JOBCT=1
 run_daemon()
 {

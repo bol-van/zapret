@@ -24,11 +24,12 @@ whichq()
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
 ZAPRET_BASE=/opt/zapret
-INIT_SCRIPT_SRC=$EXEDIR/init.d/debian/zapret
+INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
 INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST=$EXEDIR/ipset/get_antizapret.sh
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 SYSTEMD_SYSV_GENERATOR=/lib/systemd/system-generators/systemd-sysv-generator
+SYSTEMD_SYSV_GENERATOR2=/usr$SYSTEMD_SYSV_GENERATOR
 
 exitp()
 {
@@ -46,7 +47,7 @@ SYSTEMCTL=$(whichq systemctl)
 	echo not systemd based system
 	exitp 5
 }
-[ -x "$SYSTEMD_SYSV_GENERATOR" ] || {
+[ -x "$SYSTEMD_SYSV_GENERATOR" ] || [ -x "$SYSTEMD_SYSV_GENERATOR2" ] || {
 	echo systemd is present but it does not support sysvinit compatibility
 	echo $SYSTEMD_SYSV_GENERATOR is required
 	exitp 5
@@ -93,6 +94,7 @@ else
 	APTGET=$(whichq apt-get)
 	YUM=$(whichq yum)
 	PACMAN=$(whichq pacman)
+	ZYPPER=$(whichq zypper)
 	if [ -x "$APTGET" ] ; then
 		"$APTGET" update
 		"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
@@ -107,6 +109,11 @@ else
 	elif [ -x "$PACMAN" ] ; then
 		"$PACMAN" -Syy
 		"$PACMAN" --noconfirm -S ipset curl || {
+			echo could not install prerequisites
+			exitp 6
+		}
+	elif [ -x "$ZYPPER" ] ; then
+		"$ZYPPER" --non-interactive install ipset curl || {
 			echo could not install prerequisites
 			exitp 6
 		}

@@ -17,7 +17,7 @@ exists()
 
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
-INIT_SCRIPT_SRC=$EXEDIR/init.d/debian/zapret
+INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
 INIT_SCRIPT=/etc/init.d/zapret
 GET_IPLIST_PREFIX=$EXEDIR/ipset/get_
 
