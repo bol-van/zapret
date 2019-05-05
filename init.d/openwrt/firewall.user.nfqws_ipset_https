@@ -1,0 +1,9 @@
+QNUM=200
+IPT_FILTER_PRE="-p tcp -m multiport --sports 80,443 -m set --match-set zapret src"
+IPT_FILTER_POST="-p tcp --dport 80 -m set --match-set zapret dst"
+
+iptables -t raw -C PREROUTING $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass ||
+ iptables -t raw -I PREROUTING $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
+
+iptables -t mangle -C POSTROUTING $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass ||
+ iptables -t mangle -I POSTROUTING $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass

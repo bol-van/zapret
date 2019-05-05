@@ -1,6 +1,8 @@
 TPPORT_HTTP=1188
+TPPORT_HTTPS=1189
 TPWS_USER=daemon
-IPT_FILTER_HTTP="-p tcp --dport 80"
+IPT_FILTER_HTTP="-p tcp --dport 80 -m set --match-set zapret dst"
+IPT_FILTER_HTTPS="-p tcp --dport 443 -m set --match-set zapret dst"
 
 . /lib/functions/network.sh
 
@@ -12,6 +14,8 @@ for ext_iface in $wan_iface; do
 
     iptables -t nat -C OUTPUT -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP ||
      iptables -t nat -I OUTPUT -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+    iptables -t nat -C OUTPUT -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS ||
+     iptables -t nat -I OUTPUT -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
 
 done
 
@@ -19,3 +23,5 @@ network_get_device DEVICE lan
 sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
 iptables -t nat -C prerouting_lan_rule $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP ||
  iptables -t nat -I prerouting_lan_rule $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+iptables -t nat -C prerouting_lan_rule $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS ||
+ iptables -t nat -I prerouting_lan_rule $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS

@@ -13,19 +13,24 @@ START=18
 
 # using nfqws with ipset
 #MODE=nfqws_ipset
+#MODE=nfqws_ipset_https
 # using nfqws for all
 #MODE=nfqws_all
+#MODE=nfqws_all_https
 # CHOOSE NFQWS DAEMON OPTIONS. run "nfq/nfqws --help" for option list
 NFQWS_OPT="--wsize=3 --hostspell=HOST"
 
 # using tpws with ipset
-MODE=tpws_ipset
+#MODE=tpws_ipset
+MODE=tpws_ipset_https
 # using tpws for all
 #MODE=tpws_all
+#MODE=tpws_all_https
 # using tpws with hostlist
 #MODE=tpws_hostlist
 # CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
-TPWS_OPT="--hostspell=HOST --split-http-req=method"
+TPWS_OPT_HTTP="--hostspell=HOST --split-http-req=method"
+TPWS_OPT_HTTPS="--split-pos=3"
 
 # only fill ipset, do not run daemons
 #MODE=ipset
@@ -47,11 +52,14 @@ QNUM=200
 NFQWS=$ZAPRET_BASE/nfq/nfqws
 NFQWS_OPT_BASE="--qnum=$QNUM"
 
-TPPORT=1188
+TPPORT_HTTP=1188
+TPPORT_HTTPS=1189
 TPWS=$ZAPRET_BASE/tpws/tpws
 TPWS_USER=daemon
 TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt
-TPWS_OPT_BASE="--port=$TPPORT --user=$TPWS_USER --bind-addr=127.0.0.1"
+TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
+TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP $TPWS_OPT_BASE"
+TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS $TPWS_OPT_BASE"
 
 
 # must execute /etc/firewall.user on every firewall reload
@@ -99,20 +107,22 @@ start_service() {
 
 	case "${MODE}" in
 	    tpws_hostlist)
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT --hostlist=$TPWS_HOSTLIST"
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
 		;;
-	    tpws_ipset)
+	    tpws_ipset|tpws_all)
 		create_ipset
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 		;;
-	    tpws_all)
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE $TPWS_OPT"
+	    tpws_ipset_https|tpws_all_https)
+		create_ipset
+		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+		run_daemon 2 $TPWS "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
 		;;
-	    nfqws_ipset)
+	    nfqws_ipset|nfqws_ipset_https)
 		create_ipset
 		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
 		;;
-	    nfqws_all)
+	    nfqws_all|nfqws_all_https)
 		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
 		;;
 	    ipset)
