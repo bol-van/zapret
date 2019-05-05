@@ -322,7 +322,7 @@ Centos с 7 версии и более-менее новые федоры пос
 В качестве пакетного менеджера используется yum.
 
 Установить пакеты :
- yum install -y curl ipset daemonize
+ yum install -y curl ipset dnsutils git daemonize
 
 Далее все аналогично debian.
 Инит скрипт init.d/debian/zapret адаптирован под условия новых centos и fedora.
