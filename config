@@ -1,0 +1,27 @@
+# this file is included from init scripts
+# change values here
+
+# CHOOSE OPERATION MODE
+# use nfqws : nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https
+# use tpws : tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist
+# no daemon, just ipset : ipset
+# custom mode : custom . should modify init script and add your own code
+MODE=tpws_ipset_https
+
+# CHOOSE NFQWS DAEMON OPTIONS. run "nfq/nfqws --help" for option list
+NFQWS_OPT="--wsize=3 --hostspell=HOST"
+
+# CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
+TPWS_OPT_HTTP="--hostspell=HOST --split-http-req=method"
+TPWS_OPT_HTTPS="--split-pos=3"
+
+# for routers based on desktop linux only. has not effect in openwrt.
+# CHOSE NETWORK INTERFACE BEHIND NAT (LAN)
+# or leave it commented if its not router
+#SLAVE_ETH=eth0
+
+
+# for install_easy select which init script will be used to get ip or host list
+# possible value : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
+# comment if not required
+GETLIST="get_antizapret.sh"

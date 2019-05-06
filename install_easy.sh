@@ -5,11 +5,15 @@
 SCRIPT=$(readlink -f $0)
 EXEDIR=$(dirname $SCRIPT)
 ZAPRET_BASE=/opt/zapret
+ZAPRET_CONFIG=$EXEDIR/config
+
+. "$ZAPRET_CONFIG"
+
 SYSTEMD_SYSV_GENERATOR=/lib/systemd/system-generators/systemd-sysv-generator
 SYSTEMD_SYSV_GENERATOR2=/usr$SYSTEMD_SYSV_GENERATOR
 
-GET_IPLIST=$EXEDIR/ipset/get_antizapret.sh
-GET_IPLIST_PREFIX=/ipset/get_
+[ -n "$GETLIST" ] && GET_LIST="$EXEDIR/ipset/$GETLIST"
+GET_LIST_PREFIX=/ipset/get_
 
 exists()
 {
@@ -46,6 +50,7 @@ md5file()
 	md5sum "$1" | cut -f1 -d ' '
 }
 
+
 check_system()
 {
 	echo \* checking system ...
@@ -69,12 +74,53 @@ check_system()
 	echo system is based on $SYSTEM
 }
 
+call_install_bin()
+{
+	"$EXEDIR/install_bin.sh" $1 || {
+		echo binaries compatible with your system not found
+		exitp 8
+	}
+}
+
+install_binaries()
+{
+	echo \* installing binaries ...
+
+	call_install_bin
+}
+
+get_bin_arch()
+{
+	call_install_bin getarch
+}
+
+
+copy_all()
+{
+	cp -R "$1" "$2"
+}
+copy_minimal()
+{
+	local ARCH=$(get_bin_arch)
+	local BINDIR="$1/binaries/$ARCH"
+	
+	[ -d "$2" ] || mkdir -p "$2"
+	
+	mkdir "$2/tpws" "$2/nfq" "$2/ip2net" "$2/mdig" "$2/binaries" "$2/binaries/$ARCH"
+	cp -R "$1/ipset" "$2"
+	cp -R "$1/init.d" "$2"
+	cp "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$2"
+	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
+}
+
 check_location()
 {
+	# $1 - copy function
+
 	echo \* checking location ...
 
 	# use inodes in case something is linked
-	[ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_BASE") ] || {
+	[ -d "$ZAPRET_BASE" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_BASE") ] || {
 		echo easy install is supported only from default location : $ZAPRET_BASE
 		echo currenlty its run from $EXEDIR
 		echo -n "do you want the installer to copy it for you (Y/N) ? "
@@ -91,7 +137,7 @@ check_location()
 					exitp 3
 				fi
 			fi
-			cp -R $EXEDIR $ZAPRET_BASE
+			$1 "$EXEDIR" "$ZAPRET_BASE"
 			echo relaunching itself from $ZAPRET_BASE
 			exec $ZAPRET_BASE/$(basename $0)
 		else
@@ -102,28 +148,24 @@ check_location()
 	echo running from $EXEDIR
 }
 
+
 crontab_add()
 {
-	echo \* adding crontab entry ...
+	[ -x "$GET_LIST" ] &&	{
+		echo \* adding crontab entry ...
 
-	CRONTMP=/tmp/cron.tmp
-	crontab -l >$CRONTMP
-	if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
-		echo some entries already exist in crontab. check if this is corrent :
-		grep "$GET_IPLIST_PREFIX" $CRONTMP
-	else
-		echo "0 12 * * */2 $GET_IPLIST" >>$CRONTMP
-		crontab $CRONTMP
-	fi
+		CRONTMP=/tmp/cron.tmp
+		crontab -l >$CRONTMP
+		if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
+			echo some entries already exist in crontab. check if this is corrent :
+			grep "$GET_LIST_PREFIX" $CRONTMP
+		else
+			echo "0 12 * * */2 $GET_LIST" >>$CRONTMP
+			crontab $CRONTMP
+		fi
 
-	rm -f $CRONTMP
-}
-
-install_binaries()
-{
-	echo \* installing binaries ...
-
-	"$EXEDIR/install_bin.sh"
+		rm -f $CRONTMP
+	}
 }
 
 check_preprequisites_linux()
@@ -213,13 +255,18 @@ register_sysv_init_systemd()
 	}
 }
 
-download_ip_list()
+download_list()
 {
-	echo \* downloading blocked ip list ...
+	[ -x "$GET_LIST" ] &&	{
+		echo \* downloading blocked ip/host list ...
 
-	"$GET_IPLIST" || {
-		echo could not download ip list
-		exitp 25
+		rm -f "$EXEDIR/ipset/zapret-ip.txt" "$EXEDIR/ipset/zapret-ip-user.txt" \
+			"$EXEDIR/ipset/zapret-ip-ipban.txt" "$EXEDIR/ipset/zapret-ip-user-ipban.txt" \
+			"$EXEDIR/ipset/zapret-hosts.txt"
+		"$GET_LIST" || {
+			echo could not download ip list
+			exitp 25
+		}
 	}
 }
 
@@ -238,11 +285,12 @@ install_systemd()
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
 	INIT_SCRIPT=/etc/init.d/zapret
 
+	check_location copy_all
 	check_preprequisites_linux
 	install_binaries
 	install_sysv_init
 	register_sysv_init_systemd
-	download_ip_list
+	download_list
 	crontab_add
 	service_start_systemd
 }
@@ -345,9 +393,8 @@ install_openwrt_firewall()
 {
 	echo \* installing firewall script ...
 	
-	local MODE=$(sed -nre 's/^MODE=([^[:space:]]+)/\1/p' "$INIT_SCRIPT" | tail -n 1)
 	[ -n "MODE" ] || {
-		echo could not get MODE from $INIT_SCRIPT
+		echo should specify MODE in $ZAPRET_CONFIG
 		exitp 7
 	}
 	
@@ -399,11 +446,12 @@ install_openwrt()
 	FW_SCRIPT_SRC_DIR=$EXEDIR/init.d/openwrt/firewall.zapret
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	
+	check_location copy_minimal
 	check_preprequisites_openwrt
 	install_binaries
 	install_sysv_init
 	register_sysv_init
-	download_ip_list
+	download_list
 	crontab_add
 	service_start_sysv
 	install_openwrt_firewall
@@ -413,7 +461,6 @@ install_openwrt()
 
 
 check_system
-check_location
 
 case $SYSTEM in
 	systemd)

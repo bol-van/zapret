@@ -1,51 +1,16 @@
 #!/bin/sh /etc/rc.common
-# Copyright (C) 2006-2011 OpenWrt.org
 
 USE_PROCD=1
 # start betfore firewall - we need ipset populated
 START=18
 
+ZAPRET_BASE=/opt/zapret
+# SHOULD EDIT config
+. "$ZAPRET_BASE/config"
 
-# +++ REVIEW CONFIG HERE +++
-
-# CHOOSE OPERATION MODE
-# leave only one MODE=  uncommented
-
-# using nfqws with ipset
-#MODE=nfqws_ipset
-#MODE=nfqws_ipset_https
-# using nfqws for all
-#MODE=nfqws_all
-#MODE=nfqws_all_https
-# CHOOSE NFQWS DAEMON OPTIONS. run "nfq/nfqws --help" for option list
-NFQWS_OPT="--wsize=3 --hostspell=HOST"
-
-# using tpws with ipset
-#MODE=tpws_ipset
-MODE=tpws_ipset_https
-# using tpws for all
-#MODE=tpws_all
-#MODE=tpws_all_https
-# using tpws with hostlist
-#MODE=tpws_hostlist
-# CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
-TPWS_OPT_HTTP="--hostspell=HOST --split-http-req=method"
-TPWS_OPT_HTTPS="--split-pos=3"
-
-# only fill ipset, do not run daemons
-#MODE=ipset
-
-# Custom mode
-# Find out what works for you and modify "# PLACEHOLDER" parts of this script
-#MODE=custom
-
-# --- REVIEW CONFIG HERE ---
-
-# !!!!! in openwrt you need to add firewall rules manually to /etc/firewall.user
-
+# !!!!! in openwrt firewall rules are configured separately
 
 PIDDIR=/var/run
-ZAPRET_BASE=/opt/zapret
 IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 
 QNUM=200
