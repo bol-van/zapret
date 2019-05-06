@@ -527,6 +527,9 @@ init.d/openwrt
 ipset/*
 binaries/<ваша архитектура>/{tpws,nfqws,ip2net,mdig}
 
+Чтобы сменить MODE, перед установкой можно отредактировать /opt/zapret/init.d/openwrt/zapret, изменить MODE там
+и согласиться на перезапись init скрипта. По умолчанию используется MODE=tpws_ipset_https.
+
 Другие прошивки
 ---------------
 
