@@ -112,3 +112,9 @@ install_bin.sh : auto binaries preparation
 docs: readme review. some new topics added, others deleted
 docs: VPN setup with policy based routing using wireguard
 docs: wireguard modding guide
+
+v23
+
+major init system rewrite
+openwrt : separate firewall include /etc/firewall.zapret
+install_easy.sh : easy setup on openwrt, debian, ubuntu, centos, fedora, opensuse

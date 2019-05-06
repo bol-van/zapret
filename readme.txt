@@ -1,4 +1,4 @@
-﻿zapret v.22
+﻿zapret v.23
 
 Для чего это надо
 -----------------
@@ -470,10 +470,18 @@ MODE=custom
  /etc/init.d/zapret enable
  /etc/init.d/zapret start
 
-В зависимости от выбранного режима внести нужные записи в /etc/firewall.user.
-Базовые варианты лежат в /opt/zapret/init.d/openwrt/firewall.user.*.
-Если у вас еще нет firewall.user или он пуст, можно скопировать файл.
-В противном случае добавьте записи или интегрируйте с уже имеющимся кодом.
+В зависимости от выбранного в инит скрипте MODE скопировать нужный файл настроек фаервола :
+ cp /opt/zapret/init.d/openwrt/firewall.zapret.$MODE /etc/firewall.zapret
+Например :
+ cp /opt/zapret/init.d/openwrt/firewall.zapret.tpws_ipset_https /etc/firewall.zapret
+Проверить была ли создана ранее запись о firewall include :
+ uci show firewall | grep firewall.zapret
+Если ничего не вывело, значит добавить :
+ uci add firewall include
+ uci set firewall.@include[-1].path="/etc/firewall.zapret"
+ uci set firewall.@include[-1].reload="1"
+ uci commit firewall
+Перезапустить фаервол :
  fw3 restart
 Посмотреть через iptables -nL или через luci вкладку "firewall" появились ли нужные правила.
 
