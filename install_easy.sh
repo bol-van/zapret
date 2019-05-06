@@ -109,7 +109,7 @@ copy_minimal()
 	mkdir "$2/tpws" "$2/nfq" "$2/ip2net" "$2/mdig" "$2/binaries" "$2/binaries/$ARCH"
 	cp -R "$1/ipset" "$2"
 	cp -R "$1/init.d" "$2"
-	cp "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$2"
+	cp "$1/config" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$2"
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
 
