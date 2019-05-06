@@ -62,25 +62,6 @@ TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP $TPWS_OPT_BASE"
 TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS $TPWS_OPT_BASE"
 
 
-# must execute /etc/firewall.user on every firewall reload
-set_firewall_user_reload() {
-	i=0
-	while true
-	do
-	 path=$(uci -q get firewall.@include[$i].path)
-	 [ -n "$path" ] || break
-	 [ "$path" == "/etc/firewall.user" ] && {
-	   reload=$(uci -q get firewall.@include[$i].reload)
-	   [ "$reload" = "1" ] || {
-	     echo Setting 'reload' call option to /etc/firewall.user
-	     uci set firewall.@include[$i].reload=1
-	     uci commit firewall
-	   }
-	 }
-	 i=$((i+1))
-	done
-}
-
 run_daemon()
 {
 	# $1 - daemon string id or number. can use 1,2,3,...
@@ -103,8 +84,6 @@ create_ipset()
 
 
 start_service() {
-	set_firewall_user_reload
-
 	case "${MODE}" in
 	    tpws_hostlist)
 		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
