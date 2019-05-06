@@ -39,4 +39,4 @@ How to compile native programs for use in openwrt
    make package/mdig/compile
 
 7) find bin -name tpws*.ipk
-   #take your tpws*.ipk , nfqws*.ipk , ip2net*.ipk from there
+   #take your tpws*.ipk , nfqws*.ipk , ip2net*.ipk, mdig*.ipk from there
