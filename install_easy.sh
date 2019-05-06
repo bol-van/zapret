@@ -255,6 +255,15 @@ register_sysv_init_systemd()
 	}
 }
 
+service_stop_systemd()
+{
+	echo \* stopping service and unregistering init script
+
+	"$SYSTEMCTL" disable zapret
+	"$SYSTEMCTL" stop zapret
+}
+
+
 download_list()
 {
 	[ -x "$GET_LIST" ] &&	{
@@ -287,6 +296,7 @@ install_systemd()
 
 	check_location copy_all
 	check_preprequisites_linux
+	service_stop_systemd	
 	install_binaries
 	install_sysv_init
 	register_sysv_init_systemd

@@ -22,7 +22,7 @@ ccp()
 
 ARCHLIST="aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc x86_64 x86"
 
-if [ "$1" == "getarch" ]; then
+if [ "$1" = "getarch" ]; then
 	for arch in $ARCHLIST
 	do
 		if check_dir $arch; then
