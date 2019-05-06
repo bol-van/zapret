@@ -403,10 +403,10 @@ install_openwrt()
 	check_preprequisites_openwrt
 	install_sysv_init
 	register_sysv_init
-	install_openwrt_firewall
 	download_ip_list
 	crontab_add
 	service_start_sysv
+	install_openwrt_firewall
 	restart_openwrt_firewall
 }
 
