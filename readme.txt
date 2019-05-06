@@ -518,7 +518,6 @@ install_bin.sh
 init.d/openwrt
 ipset/*
 binaries/<ваша архитектура>/{tpws,nfqws,ip2net,mdig}
-пустые директории : tpws,nfq,ip2net,mdig
 
 Другие прошивки
 ---------------
