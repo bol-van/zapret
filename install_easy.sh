@@ -284,7 +284,6 @@ check_preprequisites_openwrt()
 		
 		opkg update
 		if check_package_exists_openwrt kmod-ipt-raw ; then PKGS="$PKGS kmod-ipt-raw" ; fi
-		check_package_exists_openwrt kmod-ipt-raw && echo fuck $PKGS
 		opkg install $PKGS || {
 			echo could not install prerequisites
 			exitp 6
@@ -401,6 +400,7 @@ install_openwrt()
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	
 	check_preprequisites_openwrt
+	install_binaries
 	install_sysv_init
 	register_sysv_init
 	download_ip_list
