@@ -12,7 +12,7 @@ ZAPRET_CONFIG=$EXEDIR/config
 SYSTEMD_SYSV_GENERATOR=/lib/systemd/system-generators/systemd-sysv-generator
 SYSTEMD_SYSV_GENERATOR2=/usr$SYSTEMD_SYSV_GENERATOR
 
-[ -n "$GETLIST" ] && GET_LIST="$EXEDIR/ipset/$GETLIST"
+GET_LIST="$EXEDIR/ipset/get_config.sh"
 GET_LIST_PREFIX=/ipset/get_
 
 exists()
