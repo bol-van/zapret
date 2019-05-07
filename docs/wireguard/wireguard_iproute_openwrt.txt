@@ -233,24 +233,23 @@ OUTPUT относится к исходящим с роутера пакетам
 Если с самого роутера ничего заруливать не надо, можно опустить все до команд с PREROUTING.
 
 --/etc/firewall.user----------------------------
-. /lib/functions/network.sh
+ipt()
+{
+	iptables -C $@ 2>/dev/null || iptables -I $@
+}
 
+. /lib/functions/network.sh
 network_find_wan wan_iface
 
 for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    
-    iptables -t mangle -C OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
-     iptables -t mangle -I OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-    iptables -t mangle -C OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
-     iptables -t mangle -I OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+	network_get_device DEVICE $ext_iface
+
+	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
 done
 
-iptables -t mangle -C PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
- iptables -t mangle -I PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-iptables -t mangle -C PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
- iptables -t mangle -I PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
- 
+ipt PREROUTING -t mangle -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+ipt PREROUTING -t mangle -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
 ------------------------------------------------
 
 # fw3 restart
@@ -305,32 +304,27 @@ config rule
 Если вам не актуальны исходящие с самого роутера, то можно ничего не менять.
 
 --/etc/firewall.user----------------------------
-. /lib/functions/network.sh
+ipt()
+{
+	iptables -C $@ 2>/dev/null || iptables -I $@
+}
 
+. /lib/functions/network.sh
 network_find_wan wan_iface
 
 for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    
-    iptables -t mangle -C OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
-     iptables -t mangle -I OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-    iptables -t mangle -C OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
-     iptables -t mangle -I OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
-     
-    iptables -t mangle -C OUTPUT -o $DEVICE -j MARK --set-mark 0x1000/0x1000 ||
-     iptables -t mangle -I OUTPUT -o $DEVICE -j MARK --set-mark 0x1000/0x1000
-     
+	network_get_device DEVICE $ext_iface
+
+	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -j MARK --set-mark 0x1000/0x1000
 done
 
-# do masquerade for OUTPUT to ensure correct outgoing address
-iptables -t nat -C postrouting_tunvps_rule -m mark --mark 0x1000/0x1000 -j MASQUERADE ||
- iptables -t nat -A postrouting_tunvps_rule -m mark --mark 0x1000/0x1000 -j MASQUERADE
+ipt PREROUTING -t mangle -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+ipt PREROUTING -t mangle -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
 
-iptables -t mangle -C PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
- iptables -t mangle -I PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-iptables -t mangle -C PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
- iptables -t mangle -I PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
- 
+# do masquerade for OUTPUT to ensure correct outgoing address
+ipt postrouting_tunvps_rule -t nat -m mark --mark 0x1000/0x1000 -j MASQUERADE
 ------------------------------------------------
 
 

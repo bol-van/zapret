@@ -7,7 +7,7 @@ Tor поддерживает "из коробки" режим transparent proxy.
 2) Сделать так, чтобы все время при загрузке системы на некотором порту возникал socks.
 3) Установить transparent соксификатор. Redsocks прекрасно подошел на эту роль.
 4) Завернуть через iptables трафик с порта назначения 443 и на ip адреса из ipset 'zapret' на соксификатор
-Буду рассматривать систему на базе openwrt dedicated driver, где уже установлена система обхода dpi "zapret".
+Буду рассматривать систему на базе openwrt, где уже установлена система обхода dpi "zapret".
 По крайней мере нужно иметь заполненный ipset 'zapret', устанавливать tpws или nfqws не обязательно.
 Более того, если они на вашей системе не срабатывают, то можно соксифицировать не только https, но и http.
 
@@ -18,14 +18,15 @@ Tor поддерживает "из коробки" режим transparent proxy.
 После установки пакетов расслабим неоправданно жестокие права : chmod 755 /etc/ssh.
 Следует создать пользователя, под которым будем крутить ssh client. Допустим, это будет 'proxy'.
 Сначала установить пакет shadow-useradd.
-Код:
+------------------
 useradd -d /home/proxy proxy
 mkdir -p /home/proxy
 chown proxy:proxy /home/proxy
+------------------
 Openssh ловит разные глюки, если у него нет доступа к /dev/tty.
 Добавим в /etc/rc.local строчку : "chmod 666 /dev/tty"
 Сгенерируем для него ключ RSA для доступа к ssh серверу.
-Код:
+------------------
 su proxy
 cd
 mkdir -m 700 .ssh
@@ -33,6 +34,7 @@ cd .ssh
 ssh-keygen
 ls
 exit
+------------------
 Должны получиться файлы id_rsa и id_rsa.pub.
 Строчку из id_rsa.pub следует добавить на ssh сервер в файл $HOME/.ssh/authorized_keys.
 Более подробно о доступе к ssh через авторизацию по ключам : https://beget.com/ru/articles/ssh_by_key
@@ -41,10 +43,8 @@ exit
 Сделайте это под пользователем "proxy", поскольку при первом подключении ssh спросит о правильности hostkey.
 Соединение может отвалиться в любой момент, поэтому нужно зациклить запуск ssh.
 Для этого лучший вариант - использовать procd - упрощенная замена systemd на openwrt версий BB и выше.
-/etc/init.d/socks_vps :
-Код:
+--- /etc/init.d/socks_vps ---
 #!/bin/sh /etc/rc.common
-# Copyright (C) 2006-2011 OpenWrt.org
 START=50
 STOP=50
 USE_PROCD=1
@@ -57,6 +57,7 @@ start_service() {
     procd_set_param command $COMMAND
     procd_close_instance
 }
+-----------------------------
 Этому файлу нужно дать права : chmod +x /etc/init.d/socks_vps
 Запуск : /etc/init.d/socks_vps start
 Останов : /etc/init.d/socks_vps stop
@@ -77,24 +78,34 @@ start_service() {
 
 * Завертывание соединений через iptables
 
-/etc/firewall.user
-Код:
+--- /etc/firewall.user-----
 SOXIFIER_PORT=1099
+
+ipt()
+{
+	iptables -C $@ 2>/dev/null || iptables -I $@
+}
+
 . /lib/functions/network.sh
 network_find_wan wan_iface
+
 for ext_iface in $wan_iface; do
     network_get_device ext_device $ext_iface
-    iptables -t nat -C OUTPUT -p tcp --dport 443 -o $ext_device -m set --match-set zapret dst -j REDIRECT --to-port $SOXIFIER_PORT ||
-     iptables -t nat -I OUTPUT -p tcp --dport 443 -o $ext_device -m set --match-set zapret dst -j REDIRECT --to-port $SOXIFIER_PORT
+    ipt OUTPUT -t nat -o $ext_device -p tcp --dport 443 -m set --match-set zapret dst -j REDIRECT --to-port $SOXIFIER_PORT
 done
-sysctl -w net.ipv4.conf.br-lan.route_localnet=1
-iptables -t nat -C prerouting_lan_rule -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$SOXIFIER_PORT ||
-iptables -t nat -I prerouting_lan_rule -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$SOXIFIER_PORT
-Внести параметр "reload" а /etc/config/firewall в указанное место :
-Код:
+
+network_get_device DEVICE lan
+sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+ipt prerouting_lan_rule -t nat -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$SOXIFIER_PORT
+----------------------------
+
+Внести параметр "reload" в указанное место :
+--- /etc/config/firewall ---
 config include
         option path '/etc/firewall.user'
         option reload '1'
+----------------------------
+
 Перезапуск : /etc/init.d/firewall restart
 Все, теперь можно проверять :
 /etc/init.d/redsocks stop
@@ -108,8 +119,8 @@ curl https://btc-e.com
 * Автозапуск redsocks
 
 Я сделал для себя небольшой скриптик, вешающийся на события поднятия и опускания интерфейсов.
-/etc/hotplug.d/iface/99-exec-on-updown
-Код:
+
+--- /etc/hotplug.d/iface/99-exec-on-updown ---
 #!/bin/sh
 if [ "$ACTION" = ifup ]; then
 cmd=$(uci get network.$INTERFACE.exec_on_up)
@@ -119,13 +130,16 @@ if [ "$ACTION" = ifdown ]; then
 cmd=$(uci get network.$INTERFACE.exec_on_down)
 [ -n "$cmd" ] && $cmd
 fi
-Теперь можно в описания интерфейсов в /etc/config/nework внести в соответствующий раздел :
-Код:
+----------------------------------------------
+
+Теперь можно в описания интерфейсов внести в соответствующий раздел :
+--- /etc/config/nework ---
 config interface 'wan'
         ........
         option exec_on_up '/etc/init.d/redsocks start'
-Теперь reboot. Заходим снова, смотрим, что есть redsocks, есть ssh, опять проверяем curl https://btc-e.com.
-Пробуем зайти на https://btc-e.com с компа внутри локалки.
+--------------------------
+reboot. Заходим снова, смотрим, что есть redsocks, есть ssh, опять проверяем curl -4 https://rutracker.org.
+Пробуем зайти на https://rutracker.org с компа внутри локалки.
 
 * Если у вас нет своего сервера
 
@@ -137,16 +151,20 @@ config interface 'wan'
 * Как изменится вышеописанная процедура
 
 Убираем все, что связано с ssh. Это нам не потребуется.
-В /etc/redsocks.conf меняем :
-Код:
+
+В конфиге redsocks меняем :
+--- /etc/redsocks.conf ----
 ip = 127.0.0.1;
 port = 1098;
 type = socks5;
+---------------------------
 на :
-Код:
+--- /etc/redsocks.conf ----
 ip = proxy.antizapret.prostovpn.org;
 port = 3128;
 type = http-connect;
+---------------------------
+
 В отличие от SSH, TLS хэндшейк теперь пойдет в открытую, то есть DPI его могут высечь из proxy протокола и проверить поле SNI (Server Name Indication).
 Так же могут поступить чуть проще : анализировать IP назначения в методе "CONNECT".
 Однако, практически это вряд ли будут делать. Если и будут, то немногие.

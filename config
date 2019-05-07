@@ -22,6 +22,6 @@ TPWS_OPT_HTTPS="--split-pos=3"
 
 
 # select which init script will be used to get ip or host list
-# possible value : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
+# possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
 # comment if not required
 GETLIST="get_antizapret.sh"
