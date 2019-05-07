@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # For systemd :
 #  install : /usr/lib/lsb/install_initd zapret
 #  remove : /usr/lib/lsb/remove_initd zapret
