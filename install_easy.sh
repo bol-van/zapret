@@ -395,7 +395,7 @@ check_kmod()
 }
 check_package_exists_openwrt()
 {
-	[ -n "opkg list $1" ]
+	[ -n "$(opkg list $1)" ]
 }
 check_package_openwrt()
 {
