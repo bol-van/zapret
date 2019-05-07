@@ -349,8 +349,8 @@ download_list()
 		echo \* downloading blocked ip/host list ...
 
 		# can be txt or txt.gz
-		rm -f "$EXEDIR/ipset/zapret-ip.txt*" "$EXEDIR/ipset/zapret-ip-user.txt*" \
-			"$EXEDIR/ipset/zapret-ip-ipban.txt*" "$EXEDIR/ipset/zapret-ip-user-ipban.txt*"
+		rm -f "$EXEDIR/ipset/zapret-ip.txt"* "$EXEDIR/ipset/zapret-ip-user.txt"* \
+			"$EXEDIR/ipset/zapret-ip-ipban.txt"* "$EXEDIR/ipset/zapret-ip-user-ipban.txt"*
 		"$GET_LIST" || {
 			echo could not download ip list
 			exitp 25
