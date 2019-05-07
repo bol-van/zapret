@@ -81,6 +81,10 @@ call_install_bin()
 		exitp 8
 	}
 }
+get_bin_arch()
+{
+	call_install_bin getarch
+}
 
 install_binaries()
 {
@@ -89,11 +93,68 @@ install_binaries()
 	call_install_bin
 }
 
-get_bin_arch()
+ask_list()
 {
-	call_install_bin getarch
+	# $1 - mode var
+	# $2 - space separated value list
+	eval M_DEFAULT="\$$1"
+	M=""
+	
+	n=1
+	for m in $2; do
+		echo $n : $m
+		n=`expr $n + 1`
+	done
+	echo -n "your choice (default : $M_DEFAULT) : "
+	read m
+	[ -n "$m" ] && M=$(echo $2 | cut -d ' ' -f$m 2>/dev/null)
+	[ -z "$M" ] && M=$M_DEFAULT
+	echo selected : $M
+	eval $1=$M
+	[ "$M" != "$M_DEFAULT" ]
 }
 
+write_config_var()
+{
+	# $1 - mode var
+	eval M="\$$1"
+	
+	if [ -n "$M" ]; then
+		sed -ri "s/^#?$1=.*$/$1=$M/" $EXEDIR/config
+	else
+		# write with comment at the beginning
+		sed -ri "s/^#?$1=.*$/#$1=$M/" $EXEDIR/config
+	fi
+}
+select_mode()
+{
+	echo select MODE :
+	ask_list MODE "tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https ipset" && write_config_var MODE
+}
+select_getlist()
+{
+	if [ "${MODE%hostlist*}" != "$MODE" ] || [ "${MODE%ipset*}" != "$MODE" ]; then
+		echo -n "do you want to auto download ip/host list (Y/N) ? "
+		read A
+		if [ "$A" != 'N' ] && [ "$A" != 'n' ]; then
+			if [ "${MODE%hostlist*}" != "$MODE" ] ; then
+				GETLISTS="get_hostlist.sh"
+			else
+				GETLISTS="get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh"
+			fi
+			ask_list GETLIST "$GETLISTS" && write_config_var GETLIST
+			return
+		fi
+	fi
+	GETLIST=""
+	write_config_var GETLIST
+}
+
+ask_config()
+{
+	select_mode
+	select_getlist
+}
 
 copy_all()
 {
@@ -295,8 +356,9 @@ install_systemd()
 
 	check_location copy_all
 	check_preprequisites_linux
-	service_stop_systemd	
+	service_stop_systemd
 	install_binaries
+	ask_config
 	install_sysv_init
 	register_sysv_init_systemd
 	download_list
@@ -355,14 +417,14 @@ openwrt_fw_section_find()
 	i=0
 	while true
 	do
-	 path=$(uci -q get firewall.@include[$i].path)
-	 [ -n "$path" ] || break
-	 [ "$path" == "$OPENWRT_FW_INCLUDE" ] && {
-	 	echo $i
-	 	true
-	 	return
-	 }
-	 let i=i+1
+		path=$(uci -q get firewall.@include[$i].path)
+		[ -n "$path" ] || break
+		[ "$path" == "$OPENWRT_FW_INCLUDE" ] && {
+	 		echo $i
+		 	true
+	 		return
+		}
+		i=`expr $i + 1`
 	done
 	false
 	return
@@ -458,6 +520,7 @@ install_openwrt()
 	check_location copy_minimal
 	check_preprequisites_openwrt
 	install_binaries
+	ask_config
 	install_sysv_init
 	register_sysv_init
 	download_list

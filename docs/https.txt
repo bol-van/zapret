@@ -78,7 +78,7 @@ start_service() {
 
 * Завертывание соединений через iptables
 
---- /etc/firewall.user-----
+--- /etc/firewall.user -----
 SOXIFIER_PORT=1099
 
 ipt()

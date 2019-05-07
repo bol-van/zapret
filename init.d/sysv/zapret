@@ -118,7 +118,7 @@ run_daemon()
 		PID=$(jobs -p %$JOBCT)
 		if [ -n "$PID" ]; then
 			echo $PID >$PIDFILE
-			let JOBCT=$JOBCT+1
+			JOBCT=`expr $JOBCT + 1`
 		else
 			echo could not start daemon $1 : $2 $3
 		fi
