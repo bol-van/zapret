@@ -62,7 +62,7 @@ start_service() {
 Запуск : /etc/init.d/socks_vps start
 Останов : /etc/init.d/socks_vps stop
 Включить автозагрузку : /etc/init.d/socks_vps enable
-Проверка : curl --socks5 127.0.0.1:1098 https://btc-e.com
+Проверка : curl -4 --socks5 127.0.0.1:1098 https://rutracker.org
 
 * Организовать прозрачную соксификацию
 
@@ -109,11 +109,11 @@ config include
 Перезапуск : /etc/init.d/firewall restart
 Все, теперь можно проверять :
 /etc/init.d/redsocks stop
-curl https://btc-e.com
-# должно обломаться с надписью "Connection refused". если не обламывается - значит ip адрес btc-e.com не в ipset,
+curl -4 https://rutracker.org
+# должно обломаться с надписью "Connection refused". если не обламывается - значит ip адрес rutracker.org не в ipset,
 # либо не сработали правила фаервола. например, из-за не установленных модулей ipt
 /etc/init.d/redsocks start
-curl https://btc-e.com
+curl -4 https://rutracker.org
 # должно выдать страницу
 
 * Автозапуск redsocks
