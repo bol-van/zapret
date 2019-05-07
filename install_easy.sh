@@ -413,6 +413,7 @@ check_preprequisites_openwrt()
 	echo \* checking prerequisites ...
 	
 	local PKGS="iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl"
+	local UPD=0
 	
 	# in recent lede/openwrt iptable_raw in separate package
 	if check_kmod iptable_raw && check_packages_openwrt $PKGS ; then
@@ -421,12 +422,25 @@ check_preprequisites_openwrt()
 		echo \* installing prerequisites ...
 		
 		opkg update
+		UPD=1
 		if check_package_exists_openwrt kmod-ipt-raw ; then PKGS="$PKGS kmod-ipt-raw" ; fi
 		opkg install $PKGS || {
 			echo could not install prerequisites
 			exitp 6
 		}
 	fi
+	
+	[ -x "/usr/bin/grep" ] || {
+		echo your system uses default busybox grep. its damn infinite slow with -f option
+		echo get_combined.sh will be severely impacted
+		echo installer can install gnu grep but it requires about 0.5 Mb space
+		echo -n "do you want to install gnu grep (Y/N) ? "
+		read A
+		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+			[ "$UPD" = "0" ] && opkg update
+			opkg install grep
+		fi
+	}
 }
 
 openwrt_fw_section_find()
