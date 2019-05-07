@@ -93,12 +93,27 @@ install_binaries()
 	call_install_bin
 }
 
+find_str_in_list()
+{
+	[ -n "$1" ] && {
+		for v in $2; do
+			[ "$v" = "$1" ] && return
+		done
+	}
+	false
+}
+
 ask_list()
 {
 	# $1 - mode var
 	# $2 - space separated value list
+	# $3 - (optional) default value
+	local M_DEFAULT
 	eval M_DEFAULT="\$$1"
-	M=""
+	local M_ALL=$M_DEFAULT
+	local M=""
+	
+	[ -n "$3" ] && find_str_in_list "$M_DEFAULT" "$2" || M_DEFAULT="$3"
 	
 	n=1
 	for m in $2; do
@@ -108,10 +123,11 @@ ask_list()
 	echo -n "your choice (default : $M_DEFAULT) : "
 	read m
 	[ -n "$m" ] && M=$(echo $2 | cut -d ' ' -f$m 2>/dev/null)
-	[ -z "$M" ] && M=$M_DEFAULT
+	[ -z "$M" ] && M="$M_DEFAULT"
 	echo selected : $M
-	eval $1=$M
-	[ "$M" != "$M_DEFAULT" ]
+	eval $1="$M"
+	
+	[ "$M" != "$M_OLD" ]
 }
 
 write_config_var()
@@ -123,13 +139,13 @@ write_config_var()
 		sed -ri "s/^#?$1=.*$/$1=$M/" $EXEDIR/config
 	else
 		# write with comment at the beginning
-		sed -ri "s/^#?$1=.*$/#$1=$M/" $EXEDIR/config
+		sed -ri "s/^#?$1=.*$/#$1=/" $EXEDIR/config
 	fi
 }
 select_mode()
 {
 	echo select MODE :
-	ask_list MODE "tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https ipset" && write_config_var MODE
+	ask_list MODE "tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https ipset" tpws_ipset_https && write_config_var MODE
 }
 select_getlist()
 {
@@ -139,10 +155,12 @@ select_getlist()
 		if [ "$A" != 'N' ] && [ "$A" != 'n' ]; then
 			if [ "${MODE%hostlist*}" != "$MODE" ] ; then
 				GETLISTS="get_hostlist.sh"
+				GETLIST_DEF="get_hostlist.sh"
 			else
 				GETLISTS="get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh"
+				GETLIST_DEF="get_antizapret.sh"
 			fi
-			ask_list GETLIST "$GETLISTS" && write_config_var GETLIST
+			ask_list GETLIST "$GETLISTS" "$GETLIST_DEF" && write_config_var GETLIST
 			return
 		fi
 	fi
