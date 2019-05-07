@@ -12,13 +12,14 @@ ZIPLISTTMP=$TMPDIR/zapret-ip.txt
 
 getuser
 
-curl --fail --max-time 150 --max-filesize 20971520 -k -L "$ZURL" | cut_local >$ZIPLISTTMP &&
+curl --fail --max-time 150 --max-filesize 20971520 -k -L "$ZURL" | cut_local >"$ZIPLISTTMP" &&
 {
  dlsize=$(wc -c "$ZIPLISTTMP" | cut -f 1 -d ' ')
  if test $dlsize -lt 204800; then
   echo list file is too small. can be bad.
   exit 2
  fi
- mv -f $ZIPLISTTMP $ZIPLIST
+ cat "$ZIPLISTTMP" | zz "$ZIPLIST"
+ rm -f "$ZIPLISTTMP" "$ZIPLIST"
  "$EXEDIR/create_ipset.sh"
 }

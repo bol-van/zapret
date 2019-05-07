@@ -14,12 +14,29 @@ ZUSERLIST_IPBAN=$EXEDIR/zapret-hosts-user-ipban.txt
 MDIG=$EXEDIR/../mdig/mdig
 MDIG_THREADS=30
 
+zzexist()
+{
+ [ -f "$1.gz" ] || [ -f "$1" ]
+}
+zzcat()
+{
+ if [ -f "$1.gz" ]; then
+ 	gunzip -c "$1"
+ else
+ 	cat "$1"
+ fi
+}
+zz()
+{
+ gzip -c >"$1.gz"
+}
+
 digger()
 {
- if [ -x $MDIG ]; then
-  $MDIG --family=4 --threads=$MDIG_THREADS <$1
+ if [ -x "$MDIG" ]; then
+  zzcat "$1" | "$MDIG" --family=4 --threads=$MDIG_THREADS
  else
-  dig A +short +time=8 +tries=2 -f $1 | grep -E '^[^;].*[^\.]$'
+  zzcat "$1" | dig A +short +time=8 +tries=2 -f - | grep -E '^[^;].*[^\.]$'
  fi
 }
 
@@ -30,12 +47,14 @@ cut_local()
   grep -vE '^10\.[0-9]+\.[0-9]+\.[0-9]+$'
 }
 
+
 getuser()
 {
- [ -f $ZUSERLIST ] && {
-  digger $ZUSERLIST | cut_local | sort -u >$ZIPLIST_USER
+ [ -f "$ZUSERLIST" ] && {
+  digger "$ZUSERLIST" | cut_local | sort -u > "$ZIPLIST_USER"
  }
- [ -f $ZUSERLIST_IPBAN ] && {
-  digger $ZUSERLIST_IPBAN | cut_local | sort -u >$ZIPLIST_USER_IPBAN
+ [ -f "$ZUSERLIST_IPBAN" ] && {
+  digger "$ZUSERLIST_IPBAN" | cut_local | sort -u > "$ZIPLIST_USER_IPBAN"
  }
 }
+

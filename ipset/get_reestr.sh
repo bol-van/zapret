@@ -14,7 +14,7 @@ ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
 getuser
 
-curl -k --fail --max-time 300 --max-filesize 62914560 "$ZURL" >$ZREESTR ||
+curl -k --fail --max-time 300 --max-filesize 62914560 "$ZURL" >"$ZREESTR" ||
 {
  echo reestr list download failed   
  exit 2
@@ -27,15 +27,14 @@ fi
 echo preparing dig list ..
 #sed -i 's/\\n/\r\n/g' $ZREESTR
 #sed -nre 's/^[^;]*;([^;|\\]{4,250})\;.*$/\1/p' $ZREESTR | sort | uniq >$ZDIG
-cut -f2 -d';' $ZREESTR  | grep -avE '^$|\*|:' >$ZDIG
-rm -f $ZREESTR
+cut -f2 -d ';' "$ZREESTR"  | grep -avE '^$|\*|:' >"$ZDIG"
+rm -f "$ZREESTR"
 echo digging started ...
-digger $ZDIG | cut_local >$ZIPLISTTMP || {
- rm -f $ZDIG
+digger "$ZDIG" | cut_local >"$ZIPLISTTMP" || {
+ rm -f "$ZDIG"
  exit 1
 }
-rm -f $ZDIG $ZIPLIST
-sort -u $ZIPLISTTMP >$ZIPLIST
-rm -f $ZIPLISTTMP
+rm -f "$ZDIG"
+sort -u "$ZIPLISTTMP" | zz "$ZIPLIST"
+rm -f "$ZIPLISTTMP"
 "$EXEDIR/create_ipset.sh"
-

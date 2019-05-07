@@ -161,6 +161,9 @@ get_reestr.sh может использовать мультипоточный �
 5) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
 Если переменная не определена, то никаких действий не выполняется.
 
+Листы zapret-ip.txt и zapret-ipban.txt сохраняются в сжатом виде в файлы .gz.
+Это позволяет снизить их размер во много раз и сэкономить место на роутере.
+
 На роутерах не рекомендуется вызывать эти скрипты чаще раза за 2 суток, поскольку сохранение идет
 либо во внутреннюю флэш память роутера, либо в случае extroot - на флэшку.
 В обоих случаях слишком частая запись может убить флэшку, но если это произойдет с внутренней
@@ -270,7 +273,7 @@ TPWS_OPT_HTTPS="--split-pos=3"
  systemctl enable zapret
 
 Удалить старые листы, если они были созданы ранее :
- rm /opt/zapret/ipset/zapret-ip.txt /opt/zapret/ipset/zapret-ip-user.txt /opt/zapret/ipset/zapret-ip-ipban.txt /opt/zapret/ipset/zapret-ip-user-ipban.txt /opt/zapret/ipset/zapret-hosts.txt
+ rm /opt/zapret/ipset/zapret-ip.txt* /opt/zapret/ipset/zapret-ip-user.txt* /opt/zapret/ipset/zapret-ip-ipban.txt* /opt/zapret/ipset/zapret-ip-user-ipban.txt* /opt/zapret/ipset/zapret-hosts.txt
 По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
 Выполнить скрипт обновления листа :
  /opt/zapret/ipset/get_config.sh
@@ -418,7 +421,7 @@ ipset можно выкинуть, если не будем пользовать
 Настроить параметры согласно разделу "Выбор параметров".
 
 Удалить старые листы, если они были созданы ранее :
- rm /opt/zapret/ipset/zapret-ip.txt /opt/zapret/ipset/zapret-ip-user.txt /opt/zapret/ipset/zapret-ip-ipban.txt /opt/zapret/ipset/zapret-ip-user-ipban.txt /opt/zapret/ipset/zapret-hosts.txt
+ rm /opt/zapret/ipset/zapret-ip.txt* /opt/zapret/ipset/zapret-ip-user.txt* /opt/zapret/ipset/zapret-ip-ipban.txt* /opt/zapret/ipset/zapret-ip-user-ipban.txt* /opt/zapret/ipset/zapret-hosts.txt
 По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
 Выполнить скрипт обновления листа :
  /opt/zapret/ipset/get_config.sh
