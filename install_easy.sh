@@ -201,7 +201,7 @@ check_location()
 	# use inodes in case something is linked
 	[ -d "$ZAPRET_BASE" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_BASE") ] || {
 		echo easy install is supported only from default location : $ZAPRET_BASE
-		echo currenlty its run from $EXEDIR
+		echo currently its run from $EXEDIR
 		echo -n "do you want the installer to copy it for you (Y/N) ? "
 		read A
 		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
