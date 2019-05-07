@@ -21,7 +21,7 @@ zzexist()
 zzcat()
 {
  if [ -f "$1.gz" ]; then
- 	gunzip -c "$1"
+ 	gunzip -c "$1.gz"
  else
  	cat "$1"
  fi
