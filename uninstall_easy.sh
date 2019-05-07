@@ -135,7 +135,7 @@ openwrt_fw_section_find()
 		 	true
 	 		return
 		}
-		i=`expr $i + 1`
+		i=$(($i+1))
 	done
 	false
 	return

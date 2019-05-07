@@ -103,7 +103,7 @@ ask_list()
 	n=1
 	for m in $2; do
 		echo $n : $m
-		n=`expr $n + 1`
+		n=$(($n+1))
 	done
 	echo -n "your choice (default : $M_DEFAULT) : "
 	read m
@@ -424,7 +424,7 @@ openwrt_fw_section_find()
 		 	true
 	 		return
 		}
-		i=`expr $i + 1`
+		i=$(($i+1))
 	done
 	false
 	return
