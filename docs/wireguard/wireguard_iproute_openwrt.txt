@@ -230,7 +230,7 @@ config rule
 
 Завернем на vpn все из ipset zapret на tcp:443 и все из ipban.
 OUTPUT относится к исходящим с роутера пакетам, PREROUTING - ко всем остальным.
-Если с роутера ничего заруливать не надо, можно опустить все до команд с PREROUTING.
+Если с самого роутера ничего заруливать не надо, можно опустить все до команд с PREROUTING.
 
 --/etc/firewall.user----------------------------
 . /lib/functions/network.sh
@@ -250,6 +250,7 @@ iptables -t mangle -C PREROUTING -p tcp --dport 443 -m set --match-set zapret ds
  iptables -t mangle -I PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
 iptables -t mangle -C PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
  iptables -t mangle -I PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+ 
 ------------------------------------------------
 
 # fw3 restart
@@ -292,6 +293,46 @@ config rule
 	option proto 'icmp'
 	option target 'ACCEPT'
 ------------------------------------------------
+
+Существует еще один неочевидный нюанс, касаемый пакетов с самого роутера (цепочка OUTPUT).
+Адрес источника выбирается по особому алгоритму, если программа явно его не задала, еще до этапа iptables.
+Он берется с интерфейса, куда бы пошел пакет при нормальном раскладе.
+Обратная маршрутизация с VPN станет невозможной, да и wireguard такие пакеты порежет, поскольку они не вписываются в AllowedIPs.
+Никаким мистическим образом автоматом source address не поменяется.
+В прошлом варианте настройки проблема решалось через маскарад. Сейчас же маскарада нет.
+Потому все же придется его делать в случае, когда пакет изначально направился бы через wan,
+а мы его завертываем на VPN. Помечаем такие пакеты марком 0x1000.
+Если вам не актуальны исходящие с самого роутера, то можно ничего не менять.
+
+--/etc/firewall.user----------------------------
+. /lib/functions/network.sh
+
+network_find_wan wan_iface
+
+for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    
+    iptables -t mangle -C OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
+     iptables -t mangle -I OUTPUT -p tcp --dport 443 -o $DEVICE -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+    iptables -t mangle -C OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
+     iptables -t mangle -I OUTPUT -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+     
+    iptables -t mangle -C OUTPUT -o $DEVICE -j MARK --set-mark 0x1000/0x1000 ||
+     iptables -t mangle -I OUTPUT -o $DEVICE -j MARK --set-mark 0x1000/0x1000
+     
+done
+
+# do masquerade for OUTPUT to ensure correct outgoing address
+iptables -t nat -C postrouting_tunvps_rule -m mark --mark 0x1000/0x1000 -j MASQUERADE ||
+ iptables -t nat -A postrouting_tunvps_rule -m mark --mark 0x1000/0x1000 -j MASQUERADE
+
+iptables -t mangle -C PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800 ||
+ iptables -t mangle -I PREROUTING -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
+iptables -t mangle -C PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800 ||
+ iptables -t mangle -I PREROUTING -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+ 
+------------------------------------------------
+
 
 # fw3 restart
 
