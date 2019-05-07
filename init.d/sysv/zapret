@@ -41,17 +41,24 @@ exists()
 	which $1 >/dev/null 2>/dev/null
 }
 
+ipt()
+{
+	iptables -C $@ 2>/dev/null || iptables -I $@
+}
+ipt_del()
+{
+	iptables -C $@ 2>/dev/null && iptables -D $@
+}
+
 fw_tpws_add()
 {
 	# $1 - iptable filter
 	# $2 - tpws port
 	echo "Adding iptables rule for tpws : $1"
 	[ -n "$SLAVE_ETH" ] && {
-		iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2 2>/dev/null ||
-		 iptables -t nat -I PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
+		ipt PREROUTING -t nat -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
  	}
-	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2 2>/dev/null ||
-	 iptables -t nat -I OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
+	ipt OUTPUT -t nat -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
 
 }
 fw_tpws_del()
@@ -60,41 +67,35 @@ fw_tpws_del()
 	# $2 - tpws port
 	echo "Deleting iptables rule for tpws : $1"
 	[ -n "$SLAVE_ETH" ] && {
-		iptables -t nat -C PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2 2>/dev/null &&
-		 iptables -t nat -D PREROUTING -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
+		ipt PREROUTING -t nat -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
 	}
-	iptables -t nat -C OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2 2>/dev/null &&
-	 iptables -t nat -D OUTPUT -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
+	ipt_del OUTPUT -t nat -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
 	true
 }
 fw_nfqws_add_pre()
 {
 	# $1 - iptable filter
 	echo "Adding iptables rule for nfqws prerouting : $1"
-	iptables -t raw -C PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null ||
-	 iptables -t raw -I PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	ipt PREROUTING -t raw -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 }
 fw_nfqws_del_pre()
 {
 	# $1 - iptable filter
 	echo "Deleting iptables rule for nfqws prerouting : $1"
-	iptables -t raw -C PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null &&
-	 iptables -t raw -D PREROUTING -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	ipt_del PREROUTING -t raw -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	true
 }
 fw_nfqws_add_post()
 {
 	# $1 - iptable filter
 	echo "Adding iptables rule for nfqws postrouting : $1"
-	iptables -t mangle -C POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null ||
-	 iptables -t mangle -I POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	ipt POSTROUTING -t mangle -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 }
 fw_nfqws_del_post()
 {
 	# $1 - iptable filter
 	echo "Deleting iptables rule for nfqws postrouting : $1"
-	iptables -t mangle -C POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null &&
-	 iptables -t mangle -D POSTROUTING -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	ipt_del POSTROUTING -t mangle -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	true
 }
 
