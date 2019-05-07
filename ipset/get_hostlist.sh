@@ -25,3 +25,5 @@ rm -f $ZREESTR
 
 # force tpws to reload if its running
 killall -HUP tpws 2>/dev/null
+
+exit 0
