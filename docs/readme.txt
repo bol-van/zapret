@@ -338,9 +338,6 @@ git и curl по умолчанию могут присутствовать, ips
 
  emerge ipset
 
-Копируем init скрипт :
- cp /opt/zapret/init.d/sysv/init.d /etc/init.d
-
 Настраиваем все как в debian, но опуская все, касаемое systemd.
 
 Шпаргалка по управлению службой :
