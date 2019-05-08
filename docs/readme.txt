@@ -279,7 +279,7 @@ TPWS_OPT_HTTPS="--split-pos=3"
  /opt/zapret/ipset/get_config.sh
 Зашедулить задание обновления листа :
  crontab -e
- Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_config.sh"
+ Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
 
 Запустить службу :
  systemctl start zapret
@@ -429,7 +429,7 @@ grep от busybox катастрофически медленный с опци�
  /opt/zapret/ipset/get_config.sh
 Зашедулить задание обновления листа :
  crontab -e
- Создать строчку  "0 12 * * */2 /opt/zapret/ipset/get_config.sh"
+ Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
 
 Включить автозапуск службы и запустить ее :
  /etc/init.d/zapret enable

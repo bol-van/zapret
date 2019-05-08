@@ -50,6 +50,19 @@ md5file()
 	md5sum "$1" | cut -f1 -d ' '
 }
 
+random()
+{
+	# $1 - min, $2 - max
+	local r rs
+	if [ -c /dev/urandom ]; then
+		read rs </dev/urandom
+	else
+		rs="$RANDOM$RANDOM$(date)"
+	fi
+	# shells use signed int64
+	r=1$(echo $rs | md5sum | sed 's/[^0-9]//g' | head -c 17)
+	echo $(( ($r % ($2-$1+1)) + $1 ))
+}
 
 check_system()
 {
@@ -230,6 +243,8 @@ check_location()
 
 crontab_add()
 {
+	# $1 - hour min
+	# $2 - hour max
 	[ -x "$GET_LIST" ] &&	{
 		echo \* adding crontab entry ...
 
@@ -239,7 +254,7 @@ crontab_add()
 			echo some entries already exist in crontab. check if this is corrent :
 			grep "$GET_LIST_PREFIX" $CRONTMP
 		else
-			echo "0 12 * * */2 $GET_LIST" >>$CRONTMP
+			echo "$(random 0 59) $(random $1 $2) */2 * * $GET_LIST" >>$CRONTMP
 			crontab $CRONTMP
 		fi
 
@@ -381,7 +396,8 @@ install_systemd()
 	install_sysv_init
 	register_sysv_init_systemd
 	download_list
-	crontab_add
+	# desktop system : likely it will be up at daytime
+	crontab_add 9 21
 	service_start_systemd
 }
 
@@ -557,7 +573,8 @@ install_openwrt()
 	install_sysv_init
 	register_sysv_init
 	download_list
-	crontab_add
+	# router system : works 24/7. night is the best time
+	crontab_add 0 6
 	service_start_sysv
 	install_openwrt_firewall
 	restart_openwrt_firewall
