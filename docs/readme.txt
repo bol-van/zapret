@@ -431,6 +431,7 @@ ipset можно выкинуть, если не будем пользовать
  mkdir /opt
  cd /opt
  unzip /tmp/zapret-master.zip
+ mv zapret-master zapret
  rm /tmp/zapret-master.zip
 
 Если места совсем мало :
