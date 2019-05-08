@@ -1,8 +1,8 @@
 #!/bin/sh
 # run script specified in config
 
-SCRIPT=$(readlink -f $0)
-EXEDIR=$(dirname $SCRIPT)
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
 
 . "$EXEDIR/../config"
 

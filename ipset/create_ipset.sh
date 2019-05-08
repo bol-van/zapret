@@ -1,8 +1,8 @@
 #!/bin/sh
 # create ipset from resolved ip's
 
-SCRIPT=$(readlink -f $0)
-EXEDIR=$(dirname $SCRIPT)
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
 IPSET_OPT="hashsize 131072 maxelem 524288"
 IP2NET=$EXEDIR/../ip2net/ip2net
 

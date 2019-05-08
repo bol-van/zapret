@@ -1,7 +1,7 @@
 #!/bin/sh
 
-SCRIPT=$(readlink -f $0)
-EXEDIR=$(dirname $SCRIPT)
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
 BINS=binaries
 BINDIR=$EXEDIR/$BINS
 

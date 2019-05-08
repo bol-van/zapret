@@ -2,8 +2,8 @@
 
 # automated script for easy uninstalling zapret
 
-SCRIPT=$(readlink -f $0)
-EXEDIR=$(dirname $SCRIPT)
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
 GET_IPLIST_PREFIX=/ipset/get_
 
 exists()
@@ -25,8 +25,8 @@ exitp()
 
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-	exists sudo && exec sudo $0
-	exists su && exec su -c $0
+	exists sudo && exec sudo "$0"
+	exists su && exec su -c "$0"
 	echo su or sudo not found
 	exitp 2
 }

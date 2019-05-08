@@ -2,8 +2,8 @@
 
 # automated script for easy installing zapret
 
-SCRIPT=$(readlink -f $0)
-EXEDIR=$(dirname $SCRIPT)
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
 ZAPRET_BASE=/opt/zapret
 ZAPRET_CONFIG=$EXEDIR/config
 
@@ -34,8 +34,8 @@ exitp()
 
 [ $(id -u) -ne "0" ] && {
 	echo root is required
-	exists sudo && exec sudo $0
-	exists su && exec su -c $0
+	exists sudo && exec sudo "$0"
+	exists su && exec su -c "$0"
 	echo su or sudo not found
 	exitp 2
 }
@@ -146,6 +146,7 @@ ask_list()
 write_config_var()
 {
 	# $1 - mode var
+	local M
 	eval M="\$$1"
 	
 	if [ -n "$M" ]; then

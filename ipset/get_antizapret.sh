@@ -1,8 +1,8 @@
 #!/bin/sh
 # get ip list from antizapret.prostovpn.org
 
-SCRIPT=$(readlink -f $0)
-EXEDIR=$(dirname $SCRIPT)
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
 
 . "$EXEDIR/def.sh"
 
