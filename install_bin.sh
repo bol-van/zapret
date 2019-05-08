@@ -27,8 +27,7 @@ if [ "$1" = "getarch" ]; then
 	do
 		if check_dir $arch; then
 	 		echo $arch
-	 		true
-	 		return
+	 		exit 0
 	 	fi
 	done
 else
@@ -41,8 +40,7 @@ else
 			ccp $arch/mdig mdig
 			ccp $arch/nfqws nfq
 			ccp $arch/tpws tpws
-	 		true
-	 		return
+	 		exit 0
 		else
 			echo $arch is NOT OK
 		fi
