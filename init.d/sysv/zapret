@@ -33,9 +33,6 @@ TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
 TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP $TPWS_OPT_BASE"
 TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS $TPWS_OPT_BASE"
 
-# exit script on any error
-set -e
-
 exists()
 {
 	which $1 >/dev/null 2>/dev/null
@@ -110,8 +107,7 @@ run_daemon()
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
 	if exists start-stop-daemon ; then
-		start-stop-daemon --start --quiet --pidfile "$PIDFILE" --background --make-pidfile \
-			--exec "$2" -- $3
+		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3 || true
 	elif exists daemonize ; then
 		daemonize -p "$PIDFILE" "$2" $3
 	else
@@ -134,8 +130,7 @@ stop_daemon()
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
 	if exists start-stop-daemon ; then
-		start-stop-daemon --oknodo --stop --quiet --pidfile "$PIDFILE" \
-			--exec "$2"
+		start-stop-daemon --stop --pidfile "$PIDFILE" --exec "$2" || true
 	else
 		if [ -f "$PIDFILE" ]; then
 			read PID <"$PIDFILE"
