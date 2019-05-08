@@ -24,20 +24,20 @@ whichq()
 	which $1 2>/dev/null
 }
 
-[ $(id -u) -ne "0" ] && {
-	echo root is required
-	exists sudo && exec sudo $0
-	exists su && exec su -c $0
-	echo su or sudo not found
-	exit 2
-}
-
 exitp()
 {
 	echo
 	echo press enter to continue
 	read A
 	exit $1
+}
+
+[ $(id -u) -ne "0" ] && {
+	echo root is required
+	exists sudo && exec sudo $0
+	exists su && exec su -c $0
+	echo su or sudo not found
+	exitp 2
 }
 
 get_dir_inode()
