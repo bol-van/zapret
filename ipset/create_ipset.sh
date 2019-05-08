@@ -12,7 +12,7 @@ IP2NET=$EXEDIR/../ip2net/ip2net
 create_ipset()
 {
 local IPSTYPE
-if [ -x $IP2NET ]; then
+if [ -x "$IP2NET" ]; then
  IPSTYPE=hash:net
 else
  IPSTYPE=$1

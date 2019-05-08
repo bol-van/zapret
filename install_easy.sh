@@ -42,7 +42,7 @@ exitp()
 
 get_dir_inode()
 {
-	ls -id "$1" | cut -f1 -d ' '
+	ls -id "$1" | awk '{print $1}'
 }
 
 md5file()
@@ -150,10 +150,10 @@ write_config_var()
 	eval M="\$$1"
 	
 	if [ -n "$M" ]; then
-		sed -ri "s/^#?$1=.*$/$1=$M/" $EXEDIR/config
+		sed -ri "s/^#?$1=.*$/$1=$M/" "$EXEDIR/config"
 	else
 		# write with comment at the beginning
-		sed -ri "s/^#?$1=.*$/#$1=/" $EXEDIR/config
+		sed -ri "s/^#?$1=.*$/#$1=/" "$EXEDIR/config"
 	fi
 }
 select_mode()
@@ -335,7 +335,7 @@ install_sysv_init()
 
 	if [ "$script_mode" = "Y" ] || [ "$script_mode" = "y" ]; then
 		echo "copying : $INIT_SCRIPT_SRC => $INIT_SCRIPT"
-		cp -f $INIT_SCRIPT_SRC $INIT_SCRIPT
+		cp -f "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
 	fi
 }
 
