@@ -384,25 +384,48 @@ curl
 Именно так решается вопрос в случае с openwrt, поскольку там своя система управления фаерволом.
 При повторном применении правил она могла бы поломать настройки iptables, сделанные скриптом из init.d.
 
-Что делать с openwrt/LEDE
--------------------------
+openwrt/LEDE
+------------
+
+Сначала пару слов о том, как переписать zapret на роутер.
+
+Если места достаточно, самый простой способ :
+ opkg update
+ opkg install git-http
+ mkdir /opt
+ cd /opt
+ git clone https://github.com/bol-van/zapret
+
+Если места немного :
+ opkg update
+ opkg install openssh-sftp-server unzip
+ ifconfig br-lan
+Скачать на комп с github zip архив кнопкой "Clone or download"->Download ZIP
+Скопировать средствами sftp zip архив на роутер в /tmp.
+ mkdir /opt
+ cd /opt
+ unzip /tmp/zapret-master.zip
+ rm /tmp/zapret-master.zip
+
+Не стоит работать с распакованной версией zapret на windows. Потеряются ссылки и chmod.
 
 Установить дополнительные пакеты :
 opkg update
-opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl grep
-(для новых LEDE) opkg install kmod-ipt-raw
+opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl
+(для новых LEDE и openwrt) opkg install kmod-ipt-raw
+(опционально) opkg install grep
 (опционально) opkg install bind-tools
 
 ЭКОНОМИЯ МЕСТА :
 
 bind-tools содержит dig (ресолвер dns от bind). он достаточно емкий по занимаемому месту, но mdig его
 полностью заменяет. при наличии mdig bind-tools не нужны.
+grep от busybox катастрофически медленный с опцией -f. она применяется в get_combined.sh. если вы не собираетесь
+пользоваться этим скриптом, gnu grep можно не устанавливать
 iptables-mod-nfqueue можно выкинуть, если не будем пользоваться nfqws
 curl можно выкинуть, если для получения ip листа будет использоваться только get_user.sh
 ipset можно выкинуть, если не будем пользоваться ipset-тами, а будем, например, использовать tpws
 со списком доменов.
-grep от busybox катастрофически медленный с опцией -f. она применяется в get_combined.sh. если вы не собираетесь
-пользоваться этим скриптом, gnu grep можно не устанавливать
 
 Самая главная трудность - скомпилировать программы на C. Это можно сделать на linux x64 при помощи SDK, который
 можно скачать с официального сайта openwrt или LEDE. Но процесс кросс компиляции - это всегда сложности.
@@ -474,30 +497,23 @@ tpws без ipset использует всего лишь DNAT, который 
 Простая установка на openwrt
 ----------------------------
 
-Работает только если у вас на роутере достаточно много места.
-Схема примерно такая же, как и на десктопе. Помещаем на роутер /opt/zapret, запускаем install_easy.sh
+Работает только если у вас на роутере достаточно места.
 
-Если места достаточно, можно прямо на роутер установить git и скачать с github :
+Копируем zapret на роутер в /tmp.
 
-opkg update
-opkg install git-http
-mkdir /opt
-cd /opt
-git clone https://github.com/bol-van/zapret
+Запускаем установщик :
+ /tmp/zapret_install_easy.sh
+Он скопирует в /opt/zapret только необходимый минимум файлов :
+ config
+ install_easy.sh
+ uninstall_easy.sh
+ install_bin.sh
+ init.d/openwrt/*
+ ipset/*
+ binaries/<ваша архитектура>/{tpws,nfqws,ip2net,mdig}
 
-Для экономии места перед запуском инсталятора читаем комментарии предыдущего раздела.
-Простому инсталятору требуется следующий минимум :
-
-config
-install_easy.sh
-uninstall_easy.sh
-install_bin.sh
-init.d/openwrt
-ipset/*
-binaries/<ваша архитектура>/{tpws,nfqws,ip2net,mdig}
-
-Если вы закачаете zapret не в /opt/zapret, а, например, в /tmp, и запустите install_easy.sh оттуда,
-то инсталятор сам скопирует только необходимый минимум в /opt/zapret.
+После успешной установки можно удалить zapret из tmp для освобождения RAM :
+ rm -r /tmp/zapret
 
 Для более гибкой настройки перед запуском инсталятора следует выполнить раздел "Выбор параметров".
 
