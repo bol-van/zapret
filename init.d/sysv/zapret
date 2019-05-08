@@ -109,7 +109,7 @@ run_daemon()
 	if exists start-stop-daemon ; then
 		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3 || true
 	else
-		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" $(basename "$2") >/dev/null; then
+		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
 			echo already running
 		else
 			nohup "$2" $3 >/dev/null 2>/dev/null &
