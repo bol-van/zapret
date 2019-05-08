@@ -108,16 +108,18 @@ run_daemon()
 	echo "Starting daemon $1: $2 $3"
 	if exists start-stop-daemon ; then
 		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3 || true
-	elif exists daemonize ; then
-		daemonize -p "$PIDFILE" "$2" $3
 	else
-		nohup "$2" $3 >/dev/null 2>/dev/null &
-		PID=$(jobs -p %$JOBCT)
-		if [ -n "$PID" ]; then
-			echo $PID >$PIDFILE
-			JOBCT=$(($JOBCT+1))
+		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" $(basename "$2") >/dev/null; then
+			echo already running
 		else
-			echo could not start daemon $1 : $2 $3
+			nohup "$2" $3 >/dev/null 2>/dev/null &
+			PID=$(jobs -p %$JOBCT)
+			if [ -n "$PID" ]; then
+				echo $PID >$PIDFILE
+				JOBCT=$(($JOBCT+1))
+			else
+				echo could not start daemon $1 : $2 $3
+			fi
 		fi
 	fi
 }

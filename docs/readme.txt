@@ -312,7 +312,7 @@ Centos с 7 версии и более-менее новые федоры пос
 В качестве пакетного менеджера используется yum.
 
 Установить пакеты :
- yum install -y curl ipset dnsutils git daemonize
+ yum install -y curl ipset dnsutils git
 
 Далее все аналогично debian.
 
