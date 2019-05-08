@@ -387,28 +387,6 @@ curl
 openwrt/LEDE
 ------------
 
-Сначала пару слов о том, как переписать zapret на роутер.
-
-Если места достаточно, самый простой способ :
- opkg update
- opkg install git-http
- mkdir /opt
- cd /opt
- git clone https://github.com/bol-van/zapret
-
-Если места немного :
- opkg update
- opkg install openssh-sftp-server unzip
- ifconfig br-lan
-Скачать на комп с github zip архив кнопкой "Clone or download"->Download ZIP
-Скопировать средствами sftp zip архив на роутер в /tmp.
- mkdir /opt
- cd /opt
- unzip /tmp/zapret-master.zip
- rm /tmp/zapret-master.zip
-
-Не стоит работать с распакованной версией zapret на windows. Потеряются ссылки и chmod.
-
 Установить дополнительные пакеты :
 opkg update
 opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl
@@ -436,6 +414,31 @@ ipset можно выкинуть, если не будем пользовать
 Скорее всего найдется рабочий вариант. Если нет - вам придется собирать самостоятельно.
 
 Скопировать директорию "zapret" в /opt на роутер.
+
+Если места достаточно, самый простой способ :
+ opkg update
+ opkg install git-http
+ mkdir /opt
+ cd /opt
+ git clone https://github.com/bol-van/zapret
+
+Если места немного :
+ opkg update
+ opkg install openssh-sftp-server unzip
+ ifconfig br-lan
+Скачать на комп с github zip архив кнопкой "Clone or download"->Download ZIP
+Скопировать средствами sftp zip архив на роутер в /tmp.
+ mkdir /opt
+ cd /opt
+ unzip /tmp/zapret-master.zip
+ rm /tmp/zapret-master.zip
+
+Если места совсем мало :
+На linux системе скачать и распаковать zapret. Оставить необходимый минимум файлов.
+Запаковать в архив tar.gz. Выложить его на http (не https) сервер в инете или локалке.
+Скачать архив через wget на роутер, распаковать в /opt.
+
+Не стоит работать с распакованной версией zapret на windows. Потеряются ссылки и chmod.
 
 Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
  /opt/zapret/install_bin.sh
