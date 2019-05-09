@@ -283,7 +283,7 @@ check_preprequisites_linux()
 					exitp 6
 				}
 			elif [ -x "$YUM" ] ; then
-			"$YUM" -y install curl ipset daemonize || {
+			"$YUM" -y install curl ipset || {
 				echo could not install prerequisites
 				exitp 6
 			}
@@ -366,7 +366,8 @@ download_list()
 
 		# can be txt or txt.gz
 		rm -f "$EXEDIR/ipset/zapret-ip.txt"* "$EXEDIR/ipset/zapret-ip-user.txt"* \
-			"$EXEDIR/ipset/zapret-ip-ipban.txt"* "$EXEDIR/ipset/zapret-ip-user-ipban.txt"*
+			"$EXEDIR/ipset/zapret-ip-ipban.txt"* "$EXEDIR/ipset/zapret-ip-user-ipban.txt"* \
+			"$EXEDIR/ipset/zapret-hosts.txt"*
 		"$GET_LIST" || {
 			echo could not download ip list
 			exitp 25

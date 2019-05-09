@@ -12,6 +12,7 @@ define Package/tpws
 	CATEGORY:=Network
 	TITLE:=tpws
 	SUBMENU:=Zapret
+ 	DEPENDS:=+zlib
 endef
 
 define Build/Prepare

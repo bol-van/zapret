@@ -20,7 +20,7 @@ if test $dlsize -lt 204800; then
  echo list file is too small. can be bad.
  exit 2
 fi
-(cut -s -f2 -d';' "$ZREESTR" | grep -a . | sed -re 's/^\*\.(.+)$/\1/' | awk '{ print tolower($0) }' ; cat "$ZUSERLIST" ) | sort -u >"$ZHOSTLIST"
+(cut -s -f2 -d';' "$ZREESTR" | grep -a . | sed -re 's/^\*\.(.+)$/\1/' | awk '{ print tolower($0) }' ; cat "$ZUSERLIST" ) | sort -u | zz "$ZHOSTLIST"
 rm -f "$ZREESTR"
 
 # force tpws to reload if its running

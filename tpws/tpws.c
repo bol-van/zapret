@@ -24,38 +24,7 @@
 
 #include "tpws.h"
 #include "tpws_conn.h"
-#include "strpool.h"
-
-bool LoadHostList(strpool **hostlist, char *filename)
-{
-	char *p, s[256];
-	FILE *F = fopen(filename, "rt");
-	int ct = 0;
-
-	*hostlist = NULL;
-	if (!F)
-	{
-		fprintf(stderr, "Could not open %s\n", filename);
-		return false;
-	}
-	while (fgets(s, 256, F))
-	{
-		for (p = s + strlen(s) - 1; p >= s && (*p == '\r' || *p == '\n'); p--) *p = 0;
-		for (p = s; *p; p++) *p=tolower(*p);
-		if (!StrPoolAddStr(hostlist, s))
-		{
-			StrPoolDestroy(hostlist);
-			*hostlist = NULL;
-			fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
-			fclose(F);
-			return false;
-		}
-		ct++;
-	}
-	fclose(F);
-	printf("Loaded %d hosts from %s\n", ct, filename);
-	return true;
-}
+#include "hostlist.h"
 
 enum splithttpreq { split_none = 0, split_method, split_host };
 
@@ -72,6 +41,7 @@ struct params_s
 	int split_pos;
 	int maxconn;
 	char hostfile[256];
+	char pidfile[256];
 	strpool *hostlist;
 };
 
@@ -104,7 +74,6 @@ void dohup()
  {
   if (params.hostlist)
   {
-   StrPoolDestroy(&params.hostlist);
    if (!LoadHostList(&params.hostlist, params.hostfile))
 	exit(1);
   }
@@ -547,11 +516,29 @@ void exithelp()
 		" --methodeol\t\t; add end-of-line before method\n"
 		" --unixeol\t\t; replace 0D0A to 0A\n"
 		" --daemon\t\t; daemonize\n"
+		" --pidfile=<filename>\t; write pid to file\n"
 		" --user=<username>\t; drop root privs\n"
 	);
 	exit(1);
 }
-
+void cleanup_params()
+{
+	if (params.hostlist)
+	{
+		StrPoolDestroy(&params.hostlist);
+		params.hostlist = NULL;
+	}
+}
+void exithelp_clean()
+{
+	cleanup_params();
+	exithelp();
+}
+void exit_clean(int code)
+{
+	cleanup_params();
+	exit(code);
+}
 void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
@@ -580,16 +567,17 @@ void parse_params(int argc, char *argv[])
 		{ "hosttab",no_argument,0,0 },// optidx=15
 		{ "unixeol",no_argument,0,0 },// optidx=16
 		{ "hostlist",required_argument,0,0 },// optidx=17
+		{ "pidfile",required_argument,0,0 },// optidx=18
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
-		if (v) exithelp();
+		if (v) exithelp_clean();
 		switch (option_index)
 		{
 		case 0:
 		case 1:
-			exithelp();
+			exithelp_clean();
 			break;
 		case 2: /* bind-addr */
 			strncpy(params.bindaddr, optarg, sizeof(params.bindaddr));
@@ -600,7 +588,7 @@ void parse_params(int argc, char *argv[])
 			if (i <= 0 || i > 65535)
 			{
 				fprintf(stderr, "bad port number\n");
-				exit(1);
+				exit_clean(1);
 			}
 			params.port = (uint16_t)i;
 			break;
@@ -613,7 +601,7 @@ void parse_params(int argc, char *argv[])
 			if (!pwd)
 			{
 				fprintf(stderr, "non-existent username supplied\n");
-				exit(1);
+				exit_clean(1);
 			}
 			params.uid = pwd->pw_uid;
 			params.gid = pwd->pw_gid;
@@ -624,7 +612,7 @@ void parse_params(int argc, char *argv[])
 			if (params.maxconn <= 0)
 			{
 				fprintf(stderr, "bad maxconn\n");
-				exit(1);
+				exit_clean(1);
 			}
 			break;
 		case 7: /* hostcase */
@@ -634,7 +622,7 @@ void parse_params(int argc, char *argv[])
 			if (strlen(optarg) != 4)
 			{
 				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
-				exit(1);
+				exit_clean(1);
 			}
 			params.hostcase = true;
 			memcpy(params.hostspell, optarg, 4);
@@ -653,7 +641,7 @@ void parse_params(int argc, char *argv[])
 			else
 			{
 				fprintf(stderr, "Invalid argument for split-http-req\n");
-				exit(1);
+				exit_clean(1);
 			}
 			break;
 		case 12: /* split-pos */
@@ -663,7 +651,7 @@ void parse_params(int argc, char *argv[])
 			else
 			{
 				fprintf(stderr, "Invalid argument for split-pos\n");
-				exit(1);
+				exit_clean(1);
 			}
 			break;
 		case 13: /* methodspace */
@@ -680,16 +668,20 @@ void parse_params(int argc, char *argv[])
 			break;
 		case 17: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
-				exit(1);
+				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
 			params.hostfile[sizeof(params.hostfile)-1]='\0';
+			break;
+		case 18: /* pidfile */
+			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
+			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
 		}
 	}
 	if (!params.port)
 	{
 		fprintf(stderr, "Need port number\n");
-		exit(1);
+		exit_clean(1);
 	}
 }
 
@@ -740,8 +732,18 @@ bool droproot()
 	return true;
 }
 
+bool writepid(const char *filename)
+{
+	FILE *F;
+	if (!(F=fopen(filename,"w")))
+		return false;
+	fprintf(F,"%d",getpid());
+	fclose(F);
+	return true;
+}
+
 int main(int argc, char *argv[]) {
-	int listen_fd = 0;
+	int listen_fd = -1;
 	int yes = 1, retval = 0;
 	int r;
 	struct sockaddr_storage salisten;
@@ -769,7 +771,7 @@ int main(int argc, char *argv[]) {
 		else
 		{
 			printf("bad bind addr\n");
-			exit(1);
+			goto exiterr;
 		}
 	}
 	else
@@ -783,29 +785,32 @@ int main(int argc, char *argv[]) {
 
 	if (params.daemon) daemonize();
 
+	if (*params.pidfile && !writepid(params.pidfile))
+	{
+		fprintf(stderr,"could not write pidfile\n");
+		goto exiterr;
+	}
+
 	if ((listen_fd = socket(salisten.ss_family, SOCK_STREAM, 0)) == -1) {
 		perror("socket: ");
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	if ((salisten.ss_family == AF_INET6) && setsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &ipv6_only, sizeof(ipv6_only)) == -1)
 	{
 		perror("setsockopt (IPV6_ONLY): ");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
 	{
 		perror("setsockopt (SO_REUSEADDR): ");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 	if (setsockopt(listen_fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) == -1)
 	{
 		perror("setsockopt (SO_KEEPALIVE): ");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	//Mark that this socket can be used for transparent proxying
@@ -813,26 +818,22 @@ int main(int argc, char *argv[]) {
 	if (setsockopt(listen_fd, SOL_IP, IP_TRANSPARENT, &yes, sizeof(yes)) == -1)
 	{
 		perror("setsockopt (IP_TRANSPARENT): ");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	if (!droproot())
 	{
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	if (bind(listen_fd, (struct sockaddr *)&salisten, salisten_len) == -1) {
 		perror("bind: ");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	if (listen(listen_fd, BACKLOG) == -1) {
 		perror("listen: ");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	//splice() causes the process to receive the SIGPIPE-signal if one part (for
@@ -840,8 +841,7 @@ int main(int argc, char *argv[]) {
 	//fail and return -1, so blocking SIGPIPE.
 	if (block_sigpipe() == -1) {
 		fprintf(stderr, "Could not block SIGPIPE signal\n");
-		close(listen_fd);
-		exit(EXIT_FAILURE);
+		goto exiterr;
 	}
 
 	fprintf(stderr, "Will listen to port %d\n", params.port);
@@ -849,14 +849,16 @@ int main(int argc, char *argv[]) {
 	signal(SIGHUP, onhup); 
 
 	retval = event_loop(listen_fd);
+	
 	close(listen_fd);
-
-	if (params.hostlist) StrPoolDestroy(&params.hostlist);
+	cleanup_params();
 
 	fprintf(stderr, "Will exit\n");
 
-	if (retval < 0)
-		exit(EXIT_FAILURE);
-	else
-		exit(EXIT_SUCCESS);
+	return retval < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+	
+exiterr:
+	if (listen_fd!=-1) close(listen_fd);
+	cleanup_params();
+	return EXIT_FAILURE;
 }

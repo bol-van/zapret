@@ -366,6 +366,46 @@ bool droproot(uid_t uid, gid_t gid)
    return true;
 }
 
+void daemonize()
+{
+	int pid;
+
+	pid = fork();
+	if (pid == -1)
+	{
+		perror("fork: ");
+		exit(2);
+	}
+	else if (pid != 0)
+		exit(0);
+
+	if (setsid() == -1)
+		exit(2);
+	if (chdir("/") == -1)
+		exit(2);
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+	/* redirect fd's 0,1,2 to /dev/null */
+	open("/dev/null", O_RDWR);
+	/* stdin */
+	dup(0);
+	/* stdout */
+	dup(0);
+	/* stderror */
+}
+
+bool writepid(const char *filename)
+{
+	FILE *F;
+	if (!(F=fopen(filename,"w")))
+		return false;
+	fprintf(F,"%d",getpid());
+	fclose(F);
+	return true;
+}
+
+
 void exithelp()
 {
 	printf(
@@ -375,6 +415,7 @@ void exithelp()
           " --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
           " --hostnospace\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
           " --daemon\t\t; daemonize\n"
+	  " --pidfile=<filename>\t; write pid to file\n"
         );
 	exit(1);
 }
@@ -392,10 +433,12 @@ int main(int argc, char **argv)
 	bool daemon=false;
 	uid_t uid=0;
 	gid_t gid;
+	char pidfile[256];
 
 	memset(&cbdata,0,sizeof(cbdata));
 	memcpy(cbdata.hostspell,"host",4); // default hostspell
-	
+	*pidfile = 0;
+
 	const struct option long_options[] = {
     	    {"qnum",required_argument,0,0},	// optidx=0
     	    {"daemon",no_argument,0,0},		// optidx=1
@@ -404,6 +447,7 @@ int main(int argc, char **argv)
     	    {"hostspell",required_argument,0,0}, // optidx=4
     	    {"hostnospace",no_argument,0,0},	// optidx=5
     	    {"user",required_argument,0,0},	// optidx=6
+    	    {"pidfile",required_argument,0,0},	// optidx=7
     	    {NULL,0,NULL,0}
 	};
 	if (argc<2) exithelp();
@@ -458,64 +502,55 @@ int main(int argc, char **argv)
 			gid = pwd->pw_gid;
 			break;
 	    	}
+		case 7: /* pidfile */
+		    strncpy(pidfile,optarg,sizeof(pidfile));
+		    pidfile[sizeof(pidfile)-1]='\0';
+		    break;
 	    }
 	}
 
-	if (daemon)
+	
+	if (daemon) daemonize();
+	
+	h = NULL;
+	qh = NULL;
+	
+	if (*pidfile && !writepid(pidfile))
 	{
-	    int pid;
-	    
-            pid = fork();
-            if (pid == -1)
-                return -1;
-            else if (pid != 0)
-        	return 0;
-            if (setsid() == -1)
-                return -1;  
-            if (chdir ("/") == -1)  
-                return -1;
-	    close(STDIN_FILENO);
-	    close(STDOUT_FILENO);
-	    close(STDERR_FILENO);                
-	    /* redirect fd's 0,1,2 to /dev/null */  
-            open ("/dev/null", O_RDWR);  
-            /* stdin */
-            dup(0);  
-            /* stdout */
-            dup(0);  
-            /* stderror */
+		fprintf(stderr,"could not write pidfile\n");
+		goto exiterr;
 	}
 	
 	printf("opening library handle\n");
 	h = nfq_open();
 	if (!h) {
 		fprintf(stderr, "error during nfq_open()\n");
-		exit(1);
+		goto exiterr;
 	}
 
 	printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
 		fprintf(stderr, "error during nfq_unbind_pf()\n");
-		exit(1);
+		goto exiterr;
 	}
 
 	printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(h, AF_INET) < 0) {
 		fprintf(stderr, "error during nfq_bind_pf()\n");
-		exit(1);
+		goto exiterr;
 	}
 
 	printf("binding this socket to queue '%u'\n", cbdata.qnum);
 	qh = nfq_create_queue(h, cbdata.qnum, &cb, &cbdata);
 	if (!qh) {
 		fprintf(stderr, "error during nfq_create_queue()\n");
-		exit(1);
+		goto exiterr;
 	}
 
 	printf("setting copy_packet mode\n");
 	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		fprintf(stderr, "can't set packet_copy mode\n");
-		exit(1);
+		goto exiterr;
 	}
 
 	fd = nfq_fd(h);
@@ -542,5 +577,10 @@ int main(int argc, char **argv)
 	printf("closing library handle\n");
 	nfq_close(h);
 
-	exit(0);
+	return 0;
+	
+exiterr:
+	if (qh) nfq_destroy_queue(qh);
+	if (h) nfq_close(h);
+	return 1;
 }

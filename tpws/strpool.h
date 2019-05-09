@@ -15,4 +15,5 @@ typedef struct strpool {
 
 void StrPoolDestroy(strpool **p);
 bool StrPoolAddStr(strpool **pp,const char *s);
+bool StrPoolAddStrLen(strpool **pp,const char *s,size_t slen);
 bool StrPoolCheckStr(strpool *p,const char *s);
