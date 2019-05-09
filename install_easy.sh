@@ -263,7 +263,7 @@ crontab_add()
 	}
 }
 
-check_preprequisites_linux()
+check_prerequisites_linux()
 {
 	echo \* checking prerequisites ...
 
@@ -276,13 +276,13 @@ check_preprequisites_linux()
 		YUM=$(whichq yum)
 		PACMAN=$(whichq pacman)
 		ZYPPER=$(whichq zypper)
-			if [ -x "$APTGET" ] ; then
-				"$APTGET" update
-				"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
-					echo could not install prerequisites
-					exitp 6
-				}
-			elif [ -x "$YUM" ] ; then
+		if [ -x "$APTGET" ] ; then
+			"$APTGET" update
+			"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$YUM" ] ; then
 			"$YUM" -y install curl ipset || {
 				echo could not install prerequisites
 				exitp 6
@@ -391,7 +391,7 @@ install_systemd()
 	INIT_SCRIPT=/etc/init.d/zapret
 
 	check_location copy_all
-	check_preprequisites_linux
+	check_prerequisites_linux
 	service_stop_systemd
 	install_binaries
 	ask_config
@@ -426,7 +426,7 @@ check_packages_openwrt()
 	done
 }
 
-check_preprequisites_openwrt()
+check_prerequisites_openwrt()
 {
 	echo \* checking prerequisites ...
 	
@@ -569,7 +569,7 @@ install_openwrt()
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	
 	check_location copy_minimal
-	check_preprequisites_openwrt
+	check_prerequisites_openwrt
 	install_binaries
 	ask_config
 	install_sysv_init
