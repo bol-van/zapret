@@ -73,3 +73,9 @@ zerr:
  }
  return r;
 }
+
+bool is_gzip(FILE* F)
+{
+ unsigned char magic[2];
+ return !fseek(F,0,SEEK_SET) && fread(magic, 1, 2, F)==2 && magic[0]==0x1F && magic[1]==0x8B;
+}

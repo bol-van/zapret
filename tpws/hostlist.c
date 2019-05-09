@@ -28,6 +28,7 @@ bool LoadHostList(strpool **hostlist, char *filename)
 	size_t zsize;
 	int ct = 0;
 	FILE *F;
+	int r;
 	
 	if (*hostlist)
 	{
@@ -40,10 +41,10 @@ bool LoadHostList(strpool **hostlist, char *filename)
 		fprintf(stderr, "Could not open %s\n", filename);
 		return false;
 	}
-	if (z_readfile(F,&zbuf,&zsize)==Z_OK)
+	if ((r=z_readfile(F,&zbuf,&zsize))==Z_OK)
 	{
 	
-		printf("libz compression detected. uncompressed size : %zu\n", zsize);
+		printf("zlib compression detected. uncompressed size : %zu\n", zsize);
 		fclose(F);
 		
 		p = zbuf;
@@ -60,10 +61,22 @@ bool LoadHostList(strpool **hostlist, char *filename)
 		}
 		free(zbuf);
 	}
+	else if (r!=Z_DATA_ERROR)
+	{
+		fprintf(stderr, "zlib decompression failed : result %d\n",r);
+		return false;
+	}
 	else
 	{
+		if (is_gzip(F))
+		{
+			fprintf(stderr, "hostlist is gzip but is broken : %s\n",filename);
+			return false;
+		}
+		
 		fseek(F,0,SEEK_SET);
-
+		printf("loading plain text list\n",r);
+		
 		while (fgets(s, 256, F))
 		{
 			p = s;
