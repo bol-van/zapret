@@ -117,6 +117,7 @@ run_daemon()
 				echo $PID >$PIDFILE
 			else
 				echo could not start daemon $1 : $2 $3
+				false
 			fi
 		fi
 	fi
@@ -130,7 +131,7 @@ stop_daemon()
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
 	if exists start-stop-daemon ; then
-		start-stop-daemon --stop --pidfile "$PIDFILE" --exec "$2" || true
+		start-stop-daemon --stop --pidfile "$PIDFILE" --exec "$2"
 	else
 		if [ -f "$PIDFILE" ]; then
 			read PID <"$PIDFILE"
@@ -138,7 +139,6 @@ stop_daemon()
 			rm -f "$PIDFILE"
 		else
 			echo no pidfile : $PIDFILE
-			false
 		fi
 	fi
 }
