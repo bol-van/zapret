@@ -6,5 +6,5 @@ EXEDIR=$(dirname "$SCRIPT")
 
 . "$EXEDIR/../config"
 
-[ -z "$GETLIST" ] && return
+[ -z "$GETLIST" ] && exit 0
 [ -x "$EXEDIR/$GETLIST" ] && "$EXEDIR/$GETLIST"
