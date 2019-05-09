@@ -446,9 +446,18 @@ ipset можно выкинуть, если не будем пользовать
  rm /tmp/zapret-master.zip
 
 Если места совсем мало :
+ opkg update
+ opkg install netcat
+ cd /tmp
+ netcat -l -p 1111 >zapret.tar.gz
 На linux системе скачать и распаковать zapret. Оставить необходимый минимум файлов.
-Запаковать в архив tar.gz. Выложить его на http (не https) сервер в инете или локалке.
-Скачать архив через wget на роутер, распаковать в /opt.
+Запаковать в архив zapret.tar.gz.
+ md5sum zapret.tar.gz
+ netcat <router_ip> 1111 <zapret.tar.gz
+ <ctrl+c>
+На роутере
+ md5sum zapret.tar.gz
+Проверить соответствие hash.
 
 Не стоит работать с распакованной версией zapret на windows. Потеряются ссылки и chmod.
 
