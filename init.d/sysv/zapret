@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # For systemd :
 #  install : /usr/lib/lsb/install_initd zapret
 #  remove : /usr/lib/lsb/remove_initd zapret
@@ -96,7 +96,6 @@ fw_nfqws_del_post()
 	true
 }
 
-JOBCT=1
 run_daemon()
 {
 	# $1 - daemon number : 1,2,3,...
@@ -107,16 +106,15 @@ run_daemon()
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
 	if exists start-stop-daemon ; then
-		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3 || true
+		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3
 	else
 		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
 			echo already running
 		else
-			nohup "$2" $3 >/dev/null 2>/dev/null &
-			PID=$(jobs -p %$JOBCT)
+			"$2" $3 >/dev/null 2>/dev/null &
+			PID=$!
 			if [ -n "$PID" ]; then
 				echo $PID >$PIDFILE
-				JOBCT=$(($JOBCT+1))
 			else
 				echo could not start daemon $1 : $2 $3
 			fi
