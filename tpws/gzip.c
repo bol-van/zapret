@@ -39,7 +39,6 @@ int z_readfile(FILE *F,char **buf,size_t *size)
      {
        bufsize += BUFCHUNK;
        newbuf = *buf ? realloc(*buf,bufsize) : malloc(bufsize);
-       if (newbuf==*buf)
        if (!newbuf)
        {
          r = Z_MEM_ERROR;
