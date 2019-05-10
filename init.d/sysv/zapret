@@ -1,7 +1,4 @@
 #!/bin/sh
-# For systemd :
-#  install : /usr/lib/lsb/install_initd zapret
-#  remove : /usr/lib/lsb/remove_initd zapret
 ### BEGIN INIT INFO
 # Provides:		zapret
 # Required-Start:	$local_fs $network
@@ -70,7 +67,6 @@ fw_tpws_del()
 		ipt PREROUTING -t nat -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
 	}
 	ipt_del OUTPUT -t nat -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
-	true
 }
 fw_nfqws_add_pre()
 {
@@ -83,7 +79,6 @@ fw_nfqws_del_pre()
 	# $1 - iptable filter
 	echo "Deleting iptables rule for nfqws prerouting : $1"
 	ipt_del PREROUTING -t raw -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
-	true
 }
 fw_nfqws_add_post()
 {
@@ -96,7 +91,6 @@ fw_nfqws_del_post()
 	# $1 - iptable filter
 	echo "Deleting iptables rule for nfqws postrouting : $1"
 	ipt_del POSTROUTING -t mangle -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
-	true
 }
 
 run_daemon()
