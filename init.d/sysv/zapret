@@ -41,11 +41,13 @@ exists()
 
 ipt()
 {
-	iptables -C $@ 2>/dev/null || iptables -I $@
+	if [ "$INIT_APPLY_FW" = "1" ]; then
+		iptables -C $@ 2>/dev/null || iptables -I $@
+	fi
 }
 ipt_del()
 {
-	iptables -C $@ 2>/dev/null && iptables -D $@
+	[ "$INIT_APPLY_FW" = "1" ] && iptables -C $@ 2>/dev/null && iptables -D $@
 }
 
 fw_tpws_add()
