@@ -41,40 +41,37 @@ bool LoadHostList(strpool **hostlist, char *filename)
 		fprintf(stderr, "Could not open %s\n", filename);
 		return false;
 	}
-	if ((r=z_readfile(F,&zbuf,&zsize))==Z_OK)
+
+	if (is_gzip(F))
 	{
-	
-		printf("zlib compression detected. uncompressed size : %zu\n", zsize);
+		r = z_readfile(F,&zbuf,&zsize);
 		fclose(F);
-		
-		p = zbuf;
-		e = zbuf + zsize;
-		while(p<e)
+		if (r==Z_OK)
 		{
-			if (!addpool(hostlist,&p,e))
+			printf("zlib compression detected. uncompressed size : %zu\n", zsize);
+			
+			p = zbuf;
+			e = zbuf + zsize;
+			while(p<e)
 			{
-				fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
-				free(zbuf);
-				return false;
+				if (!addpool(hostlist,&p,e))
+				{
+					fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
+					free(zbuf);
+					return false;
+				}
+				ct++;
 			}
-			ct++;
+			free(zbuf);
 		}
-		free(zbuf);
-	}
-	else if (r!=Z_DATA_ERROR)
-	{
-		fprintf(stderr, "zlib decompression failed : result %d\n",r);
-		return false;
+		else
+		{
+			fprintf(stderr, "zlib decompression failed : result %d\n",r);
+			return false;
+		}
 	}
 	else
 	{
-		if (is_gzip(F))
-		{
-			fprintf(stderr, "hostlist is gzip but is broken : %s\n",filename);
-			return false;
-		}
-		
-		fseek(F,0,SEEK_SET);
 		printf("loading plain text list\n",r);
 		
 		while (fgets(s, 256, F))
@@ -90,6 +87,7 @@ bool LoadHostList(strpool **hostlist, char *filename)
 		}
 		fclose(F);
 	}
+
 	printf("Loaded %d hosts from %s\n", ct, filename);
 	return true;
 }
