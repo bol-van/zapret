@@ -422,6 +422,7 @@ openwrt/LEDE
 opkg update
 opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl
 (для новых LEDE и openwrt) opkg install kmod-ipt-raw
+(опционально) opkg install gzip
 (опционально) opkg install grep
 (опционально) opkg install bind-tools
 
@@ -429,6 +430,7 @@ opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptable
 
 bind-tools содержит dig (ресолвер dns от bind). он достаточно емкий по занимаемому месту, но mdig его
 полностью заменяет. при наличии mdig bind-tools не нужны.
+gzip от busybox в разы медленней полноценного варианта. gzip используется скриптами получения листов.
 grep от busybox катастрофически медленный с опцией -f. она применяется в get_combined.sh. если вы не собираетесь
 пользоваться этим скриптом, gnu grep можно не устанавливать
 iptables-mod-nfqueue можно выкинуть, если не будем пользоваться nfqws

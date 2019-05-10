@@ -448,6 +448,20 @@ check_prerequisites_openwrt()
 		}
 	fi
 	
+	[ -x "/usr/bin/gzip" ] || {
+		echo your system uses default busybox gzip. its several times slower than gnu gzip.
+		echo ip/host list scripts will run much faster with gnu gzip
+		echo installer can install gnu gzip but it requires about 100 Kb space
+		echo -n "do you want to install gnu gzip (Y/N) ? "
+		read A
+		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install gzip
+		fi
+	}
 	[ -x "/usr/bin/grep" ] || {
 		echo your system uses default busybox grep. its damn infinite slow with -f option
 		echo get_combined.sh will be severely impacted
@@ -455,7 +469,10 @@ check_prerequisites_openwrt()
 		echo -n "do you want to install gnu grep (Y/N) ? "
 		read A
 		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
-			[ "$UPD" = "0" ] && opkg update
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
 			opkg install grep
 		fi
 	}
