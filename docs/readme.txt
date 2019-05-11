@@ -322,8 +322,7 @@ disable auto start : systemctl disable zapret
 start : sytemctl start zapret
 stop : systemctl stop zapret
 status, output messages : systemctl status zapret
-После изменения /etc/init.d/zapret : systemctl daemon-reload
-delete service : systemctl disable zapret ; systemctl stop zapret ; rm /etc/init.d/zapret
+delete service : systemctl disable zapret ; rm /lib/systemd/system/zapret.service
 
 Centos 7+, Fedora
 -----------------
