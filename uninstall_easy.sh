@@ -162,7 +162,7 @@ service_remove_sysv()
 		"$INIT_SCRIPT" disable
 		"$INIT_SCRIPT" stop
 	}
-	[ -f "$INIT_SCRIPT" ] && rm -f "$INIT_SCRIPT"
+	rm -f "$INIT_SCRIPT"
 }
 
 remove_openwrt()

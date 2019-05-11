@@ -507,6 +507,7 @@ install_openwrt_firewall()
 	[ -f "$FW_SCRIPT_SRC" ] || {
 		echo firewall script $FW_SCRIPT_SRC not found. removing firewall include
 		openwrt_fw_section_del
+		rm -f "$OPENWRT_FW_INCLUDE"
 		return
 	}
 	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
