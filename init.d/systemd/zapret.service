@@ -9,7 +9,7 @@ TimeoutSec=30sec
 IgnoreSIGPIPE=no
 KillMode=process
 GuessMainPID=no
-RemainAfterExit=yes
+RemainAfterExit=no
 ExecStart=/opt/zapret/init.d/sysv/zapret start
 ExecStop=/opt/zapret/init.d/sysv/zapret stop
 
