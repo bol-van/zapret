@@ -309,7 +309,7 @@ service_install_systemd()
 {
 	echo \* installing zapret service
 
-	[ -f "$INIT_SCRIPT" ] && rm -f "$INIT_SCRIPT"
+	rm -f "$INIT_SCRIPT"
 	ln -fs "$EXEDIR/init.d/systemd/zapret.service" "$SYSTEMD_SYSTEM_DIR"
 	"$SYSTEMCTL" daemon-reload
 	"$SYSTEMCTL" enable zapret || {
