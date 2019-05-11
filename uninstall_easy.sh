@@ -60,6 +60,8 @@ check_system()
 
 crontab_del()
 {
+	exists crontab || return
+
 	echo \* removing crontab entry
 
 	CRONTMP=/tmp/cron.tmp
@@ -92,6 +94,18 @@ service_remove_systemd()
 	"$SYSTEMCTL" daemon-reload
 }
 
+timer_remove_systemd()
+{
+	echo \* removing zapret-list-update timer
+
+	"$SYSTEMCTL" daemon-reload
+	"$SYSTEMCTL" disable zapret-list-update.timer
+	"$SYSTEMCTL" stop zapret-list-update.timer
+	rm -f "$SYSTEMD_SYSTEM_DIR/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR/zapret-list-update.timer"
+	"$SYSTEMCTL" daemon-reload
+}
+
+
 
 remove_systemd()
 {
@@ -100,7 +114,8 @@ remove_systemd()
 	
 	service_stop_systemd
 	service_remove_systemd
-	crontab_del
+	timer_remove_systemd
+   crontab_del
 }
 
 

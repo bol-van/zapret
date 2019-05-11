@@ -1,0 +1,11 @@
+[Unit]
+Description=zapret ip/host list update timer
+
+[Timer]
+OnCalendar=*-*-* 00:00:00
+RandomizedDelaySec=86400
+Persistent=true
+Unit=zapret-list-update.service
+
+[Install]
+WantedBy=timers.target

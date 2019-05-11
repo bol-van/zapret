@@ -227,6 +227,8 @@ check_location()
 					exitp 3
 				fi
 			fi
+			local B=$(dirname "$ZAPRET_BASE")
+			[ -d "$B" ] || mkdir -p "$B"
 			$1 "$EXEDIR" "$ZAPRET_BASE"
 			echo relaunching itself from $ZAPRET_BASE
 			exec $ZAPRET_BASE/$(basename $0)
@@ -239,33 +241,11 @@ check_location()
 }
 
 
-crontab_add()
-{
-	# $1 - hour min
-	# $2 - hour max
-	[ -x "$GET_LIST" ] &&	{
-		echo \* adding crontab entry
-
-		CRONTMP=/tmp/cron.tmp
-		crontab -l >$CRONTMP
-		if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
-			echo some entries already exist in crontab. check if this is corrent :
-			grep "$GET_LIST_PREFIX" $CRONTMP
-		else
-			echo "$(random 0 59) $(random $1 $2) */2 * * $GET_LIST" >>$CRONTMP
-			crontab $CRONTMP
-		fi
-
-		rm -f $CRONTMP
-	}
-}
-
 check_prerequisites_linux()
 {
 	echo \* checking prerequisites
 
-	# arch linux can miss cron
-	if exists ipset && exists curl && exists crontab ; then
+	if exists ipset && exists curl ; then
 		echo everything is present
 	else
 		echo \* installing prerequisites
@@ -274,25 +254,31 @@ check_prerequisites_linux()
 		YUM=$(whichq yum)
 		PACMAN=$(whichq pacman)
 		ZYPPER=$(whichq zypper)
+		EOPKG=$(whichq eopkg)
 		if [ -x "$APTGET" ] ; then
 			"$APTGET" update
-			"$APTGET" install -y --no-install-recommends ipset curl dnsutils cron || {
+			"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		elif [ -x "$YUM" ] ; then
-			"$YUM" -y install curl ipset cronie || {
+			"$YUM" -y install curl ipset || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		elif [ -x "$PACMAN" ] ; then
 			"$PACMAN" -Syy
-			"$PACMAN" --noconfirm -S ipset curl cronie || {
+			"$PACMAN" --noconfirm -S ipset curl || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		elif [ -x "$ZYPPER" ] ; then
-			"$ZYPPER" --non-interactive install ipset curl cron || {
+			"$ZYPPER" --non-interactive install ipset curl || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$EOPKG" ] ; then
+			"$EOPKG" -y install ipset curl || {
 				echo could not install prerequisites
 				exitp 6
 			}
@@ -331,8 +317,27 @@ service_start_systemd()
 {
 	echo \* starting zapret service
 
-	systemctl start zapret || {
+	"$SYSTEMCTL" start zapret || {
 		echo could not start zapret service
+		exitp 30
+	}
+}
+
+timer_install_systemd()
+{
+	echo \* installing zapret-list-update timer
+
+	"$SYSTEMCTL" disable zapret-list-update.timer
+	"$SYSTEMCTL" stop zapret-list-update.timer
+	ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR"
+	ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.timer" "$SYSTEMD_SYSTEM_DIR"
+	"$SYSTEMCTL" daemon-reload
+	"$SYSTEMCTL" enable zapret-list-update.timer || {
+		echo could not enable zapret-list-update.timer
+		exitp 20
+	}
+	"$SYSTEMCTL" start zapret-list-update.timer || {
+		echo could not start zapret-list-update.timer
 		exitp 30
 	}
 }
@@ -353,6 +358,42 @@ download_list()
 	}
 }
 
+crontab_del_quiet()
+{
+	exists crontab || return
+
+	CRONTMP=/tmp/cron.tmp
+	crontab -l >$CRONTMP
+	if grep -q "$GET_IPLIST_PREFIX" $CRONTMP; then
+		grep -v "$GET_IPLIST_PREFIX" $CRONTMP >$CRONTMP.2
+		crontab $CRONTMP.2
+		rm -f $CRONTMP.2
+	fi
+	rm -f $CRONTMP
+}
+
+crontab_add()
+{
+	# $1 - hour min
+	# $2 - hour max
+	[ -x "$GET_LIST" ] &&	{
+		echo \* adding crontab entry
+
+		CRONTMP=/tmp/cron.tmp
+		crontab -l >$CRONTMP
+		if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
+			echo some entries already exist in crontab. check if this is corrent :
+			grep "$GET_LIST_PREFIX" $CRONTMP
+		else
+			echo "$(random 0 59) $(random $1 $2) */2 * * $GET_LIST" >>$CRONTMP
+			crontab $CRONTMP
+		fi
+
+		rm -f $CRONTMP
+	}
+}
+
+
 install_systemd()
 {
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
@@ -364,11 +405,12 @@ install_systemd()
 	ask_config
 	service_install_systemd
 	download_list
-	# desktop system : likely it will be up at daytime
-	crontab_add 9 21
+	# in case its left from old version of zapret
+	crontab_del_quiet
+	# now we use systemd timers
+	timer_install_systemd
 	service_start_systemd
 }
-
 
 
 

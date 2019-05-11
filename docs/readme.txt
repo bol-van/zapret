@@ -246,7 +246,8 @@ TPWS_OPT_HTTP="--hostspell=HOST --split-http-req=method"
 TPWS_OPT_HTTPS="--split-pos=3"
 
 Параметр GETLIST указывает инсталятору install_easy.sh какой скрипт дергать
-для обновления списка заблокированных ip или хостов.Он же вносится в crontab.
+для обновления списка заблокированных ip или хостов.
+Он же вызывается через get_config.sh из запланированных заданий (crontab или systemd timer).
 Поместите сюда название скрипта, который будете использовать для обновления листов.
 Если не нужно, то параметр следует закомментировать.
 
@@ -286,20 +287,23 @@ TPWS_OPT_HTTPS="--split-pos=3"
 Создать ссылку на service unit в systemd :
  ln -fs /opt/zapret/init.d/systemd/zapret.service /lib/systemd/system
 
+Удалить старые листы, если они были созданы ранее :
+ rm /opt/zapret/ipset/zapret-ip.txt* /opt/zapret/ipset/zapret-ip-user.txt* /opt/zapret/ipset/zapret-ip-ipban.txt* /opt/zapret/ipset/zapret-ip-user-ipban.txt* /opt/zapret/ipset/zapret-hosts.txt*
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
+Выполнить скрипт обновления листа :
+ /opt/zapret/ipset/get_config.sh
+Настроить таймер systemd для обновления листа :
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.service /lib/systemd/system
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.timer /lib/systemd/system
+
 Принять изменения в systemd :
  systemctl daemon-reload
 
 Включить автозапуск службы :
  systemctl enable zapret
 
-Удалить старые листы, если они были созданы ранее :
- rm /opt/zapret/ipset/zapret-ip.txt* /opt/zapret/ipset/zapret-ip-user.txt* /opt/zapret/ipset/zapret-ip-ipban.txt* /opt/zapret/ipset/zapret-ip-user-ipban.txt* /opt/zapret/ipset/zapret-hosts.txt*
-По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
-Выполнить скрипт обновления листа :
- /opt/zapret/ipset/get_config.sh
-Зашедулить задание обновления листа :
- crontab -e
- Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
+Включить таймер обновления листа :
+ systemctl enable zapret-list-update.timer
 
 Запустить службу :
  systemctl start zapret
@@ -315,14 +319,16 @@ TPWS_OPT_HTTPS="--split-pos=3"
 Попробуйте снять дамп в wireshark или "tcpdump -vvv -X host <ip>", посмотрите действительно ли первый
 сегмент TCP уходит коротким и меняется ли регистр "Host:".
 
-Шпаргалка по управлению службой :
+Шпаргалка по управлению службой и таймером :
 
 enable auto start : systemctl enable zapret
 disable auto start : systemctl disable zapret
 start : sytemctl start zapret
 stop : systemctl stop zapret
 status, output messages : systemctl status zapret
+timer info : systemctl list-timer
 delete service : systemctl disable zapret ; rm /lib/systemd/system/zapret.service
+delete timer : systemctl disable zapret-list-update.timer ; rm /lib/systemd/system/zapret-list-update.*
 
 Centos 7+, Fedora
 -----------------
@@ -345,18 +351,20 @@ OpenSUSE
 
 Далее все аналогично debian, кроме расположения systemd.
 В opensuse он находится не в /lib/systemd, а в /usr/lib/systemd.
-Правильная команда будет :
+Правильные команды будут :
 
  ln -fs /opt/zapret/init.d/systemd/zapret.service /usr/lib/systemd/system
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.service /usr/lib/systemd/system
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.timer /usr/lib/systemd/system
 
 Arch linux
 ----------
 
-Построен на базе systemd. По умолчанию отсутствует cron.
+Построен на базе systemd.
 
 Установить пакеты :
  pacman -Syy
- pacman --noconfirm -S ipset curl cronie
+ pacman --noconfirm -S ipset curl
 
 Далее все аналогично debian.
 
@@ -372,12 +380,29 @@ git и curl по умолчанию могут присутствовать, ips
 
  emerge ipset
 
-Подключаем init скрипт :
+Настроить параметры согласно разделу "Выбор параметров".
+
+Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
+ /opt/zapret/install_bin.sh
+АЛЬТЕРНАТИВА : зайти в tpws,nfq,ip2net,mdig, в каждом выполнить make. Получите динамические бинарики под вашу ось.
+
+Удалить старые листы, если они были созданы ранее :
+ rm /opt/zapret/ipset/zapret-ip.txt* /opt/zapret/ipset/zapret-ip-user.txt* /opt/zapret/ipset/zapret-ip-ipban.txt* /opt/zapret/ipset/zapret-ip-user-ipban.txt* /opt/zapret/ipset/zapret-hosts.txt*
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
+Выполнить скрипт обновления листа :
+ /opt/zapret/ipset/get_config.sh
+Зашедулить обновление листа :
+ crontab -e
+ Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
+
+Подключить init скрипт :
 
  ln -fs /opt/zapret/init.d/sysv/zapret /etc/init.d
  rc-update add zapret
 
-Далее все как в debian, исключая все, касаемое systemd.
+Запустить службу :
+
+ rc-service zapret start
 
 Шпаргалка по управлению службой :
 
@@ -416,7 +441,7 @@ stop : rc-service zapret stop
 
 Если система на базе systemd, но используется не поддерживаемый инсталятором менеджер пакетов
 или названия пакетов не соответствуют прописанным в инсталятор, пакеты нужно установить вручную.
-Требуется : ipset curl cron
+Требуется : ipset curl
 
 Фаерволлы
 ---------
@@ -508,7 +533,7 @@ ipset можно выкинуть, если не будем пользовать
 По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
 Выполнить скрипт обновления листа :
  /opt/zapret/ipset/get_config.sh
-Зашедулить задание обновления листа :
+Зашедулить обновление листа :
  crontab -e
  Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
 
