@@ -5,6 +5,8 @@
 SCRIPT=$(readlink -f "$0")
 EXEDIR=$(dirname "$SCRIPT")
 GET_IPLIST_PREFIX=/ipset/get_
+SYSTEMD_SYSTEM_DIR=/lib/systemd/system
+[ -d "$SYSTEMD_SYSTEM_DIR" ] || SYSTEMD_SYSTEM_DIR=/usr/lib/systemd/system
 
 exists()
 {
@@ -39,7 +41,7 @@ md5file()
 
 check_system()
 {
-	echo \* checking system ...
+	echo \* checking system
 
 	SYSTEM=""
 	SYSTEMCTL=$(whichq systemctl)
@@ -56,44 +58,9 @@ check_system()
 }
 
 
-service_stop_systemd()
-{
-	echo \* stopping service and unregistering init script
-
-	"$SYSTEMCTL" disable zapret
-	"$SYSTEMCTL" stop zapret
-}
-
-remove_sysv_init()
-{
-	echo \* removing init script ...
-
-	script_mode=Y
-	[ -f "$INIT_SCRIPT" ] &&
-	{
-		[ $(md5file "$INIT_SCRIPT") = $(md5file "$INIT_SCRIPT_SRC") ] ||
-		{
-			echo $INIT_SCRIPT already exists and differs from $INIT_SCRIPT_SRC
-			echo Y = remove it
-			echo L = leave it
-			read script_mode
-		}
-		if [ "$script_mode" = "Y" ] || [ "$script_mode" = "y" ]; then
-			rm -vf $INIT_SCRIPT
-		fi
-	}
-}
-
-cleanup_systemd()
-{
-	echo \* systemd cleanup ...
-
-	"$SYSTEMCTL" daemon-reload
-}
-
 crontab_del()
 {
-	echo \* removing crontab entry ...
+	echo \* removing crontab entry
 
 	CRONTMP=/tmp/cron.tmp
 	crontab -l >$CRONTMP
@@ -108,16 +75,36 @@ crontab_del()
 }
 
 
+service_stop_systemd()
+{
+	echo \* stopping zapret service
+
+	"$SYSTEMCTL" daemon-reload
+	"$SYSTEMCTL" disable zapret
+	"$SYSTEMCTL" stop zapret
+}
+
+service_remove_systemd()
+{
+	echo \* removing zapret service
+
+	rm -f "$SYSTEMD_SYSTEM_DIR/zapret.service"
+	"$SYSTEMCTL" daemon-reload
+}
+
+
 remove_systemd()
 {
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
 	INIT_SCRIPT=/etc/init.d/zapret
 	
 	service_stop_systemd
-	remove_sysv_init
-	cleanup_systemd
+	service_remove_systemd
 	crontab_del
 }
+
+
+
 
 
 
@@ -150,7 +137,7 @@ openwrt_fw_section_del()
 
 remove_openwrt_firewall()
 {
-	echo \* removing firewall script ...
+	echo \* removing firewall script
 	
 	openwrt_fw_section_del
 	[ -f "$OPENWRT_FW_INCLUDE" ] && rm -f "$OPENWRT_FW_INCLUDE"
@@ -158,7 +145,7 @@ remove_openwrt_firewall()
 
 restart_openwrt_firewall()
 {
-	echo \* restarting firewall ...
+	echo \* restarting firewall
 
 	fw3 -q restart || {
 		echo could not restart firewall
@@ -169,7 +156,7 @@ restart_openwrt_firewall()
 
 service_remove_sysv()
 {
-	echo \* removing zapret service ...
+	echo \* removing zapret service
 
 	[ -x "$INIT_SCRIPT" ] && {
 		"$INIT_SCRIPT" disable

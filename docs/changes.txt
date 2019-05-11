@@ -118,3 +118,13 @@ v23
 major init system rewrite
 openwrt : separate firewall include /etc/firewall.zapret
 install_easy.sh : easy setup on openwrt, debian, ubuntu, centos, fedora, opensuse
+
+v24
+
+separate config from init scripts
+gzip support in ipset/*.sh and tpws
+
+v25
+
+init : move to native systemd units
+use links to units, init scripts and firewall includes, no more copying

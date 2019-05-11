@@ -9,11 +9,12 @@ ZAPRET_CONFIG=$EXEDIR/config
 
 . "$ZAPRET_CONFIG"
 
-SYSTEMD_SYSV_GENERATOR=/lib/systemd/system-generators/systemd-sysv-generator
-SYSTEMD_SYSV_GENERATOR2=/usr$SYSTEMD_SYSV_GENERATOR
-
 GET_LIST="$EXEDIR/ipset/get_config.sh"
 GET_LIST_PREFIX=/ipset/get_
+INIT_SCRIPT=/etc/init.d/zapret
+
+SYSTEMD_SYSTEM_DIR=/lib/systemd/system
+[ -d "$SYSTEMD_SYSTEM_DIR" ] || SYSTEMD_SYSTEM_DIR=/usr/lib/systemd/system
 
 exists()
 {
@@ -66,17 +67,12 @@ random()
 
 check_system()
 {
-	echo \* checking system ...
+	echo \* checking system
 
 	SYSTEM=""
 	SYSTEMCTL=$(whichq systemctl)
 
 	if [ -x "$SYSTEMCTL" ] ; then
-		[ -x "$SYSTEMD_SYSV_GENERATOR" ] || [ -x "$SYSTEMD_SYSV_GENERATOR2" ] || {
-			echo systemd is present but it does not support sysvinit compatibility
-			echo $SYSTEMD_SYSV_GENERATOR is required
-			exitp 5
-		}
 		SYSTEM=systemd
 	elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
 		SYSTEM=openwrt
@@ -101,7 +97,7 @@ get_bin_arch()
 
 install_binaries()
 {
-	echo \* installing binaries ...
+	echo \* installing binaries
 
 	call_install_bin
 }
@@ -168,13 +164,14 @@ select_getlist()
 		read A
 		if [ "$A" != 'N' ] && [ "$A" != 'n' ]; then
 			if [ "${MODE%hostlist*}" != "$MODE" ] ; then
-				GETLISTS="get_hostlist.sh"
-				GETLIST_DEF="get_hostlist.sh"
+				local GL_OLD=$GETLIST
+				GETLIST="get_hostlist.sh"
+				[ "$GL_OLD" != "$GET_LIST" ] && write_config_var GETLIST
 			else
 				GETLISTS="get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh"
 				GETLIST_DEF="get_antizapret.sh"
+				ask_list GETLIST "$GETLISTS" "$GETLIST_DEF" && write_config_var GETLIST
 			fi
-			ask_list GETLIST "$GETLISTS" "$GETLIST_DEF" && write_config_var GETLIST
 			return
 		fi
 	fi
@@ -210,7 +207,7 @@ check_location()
 {
 	# $1 - copy function
 
-	echo \* checking location ...
+	echo \* checking location
 
 	# use inodes in case something is linked
 	[ -d "$ZAPRET_BASE" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_BASE") ] || {
@@ -247,7 +244,7 @@ crontab_add()
 	# $1 - hour min
 	# $2 - hour max
 	[ -x "$GET_LIST" ] &&	{
-		echo \* adding crontab entry ...
+		echo \* adding crontab entry
 
 		CRONTMP=/tmp/cron.tmp
 		crontab -l >$CRONTMP
@@ -265,12 +262,13 @@ crontab_add()
 
 check_prerequisites_linux()
 {
-	echo \* checking prerequisites ...
+	echo \* checking prerequisites
 
-	if exists ipset && exists curl ; then
+	# arch linux can miss cron
+	if exists ipset && exists curl && exists crontab ; then
 		echo everything is present
 	else
-		echo \* installing prerequisites ...
+		echo \* installing prerequisites
 
 		APTGET=$(whichq apt-get)
 		YUM=$(whichq yum)
@@ -278,23 +276,23 @@ check_prerequisites_linux()
 		ZYPPER=$(whichq zypper)
 		if [ -x "$APTGET" ] ; then
 			"$APTGET" update
-			"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
+			"$APTGET" install -y --no-install-recommends ipset curl dnsutils cron || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		elif [ -x "$YUM" ] ; then
-			"$YUM" -y install curl ipset || {
+			"$YUM" -y install curl ipset cronie || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		elif [ -x "$PACMAN" ] ; then
 			"$PACMAN" -Syy
-			"$PACMAN" --noconfirm -S ipset curl || {
+			"$PACMAN" --noconfirm -S ipset curl cronie || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		elif [ -x "$ZYPPER" ] ; then
-			"$ZYPPER" --non-interactive install ipset curl || {
+			"$ZYPPER" --non-interactive install ipset curl cron || {
 				echo could not install prerequisites
 				exitp 6
 			}
@@ -306,63 +304,43 @@ check_prerequisites_linux()
 	fi
 }
 
-install_sysv_init()
+
+service_install_systemd()
 {
-	echo \* installing init script ...
+	echo \* installing zapret service
 
-	[ -x "$INIT_SCRIPT" ] && "$INIT_SCRIPT" stop
-
-	script_mode=Y
-	[ -f "$INIT_SCRIPT" ] &&
-	{
-		[ $(md5file "$INIT_SCRIPT") = $(md5file "$INIT_SCRIPT_SRC") ] ||
-		{
-			echo $INIT_SCRIPT already exists and differs from $INIT_SCRIPT_SRC
-			echo Y = overwrite with new version 
-			echo N = exit
-			echo L = leave current version and continue
-			read script_mode
-			case "${script_mode}" in
-				Y|y|L|l)
-					;;
-				*)
-					echo aborted
-					exitp 3
-					;;
-			esac
-		}
-	}
-
-	if [ "$script_mode" = "Y" ] || [ "$script_mode" = "y" ]; then
-		echo "copying : $INIT_SCRIPT_SRC => $INIT_SCRIPT"
-		cp -f "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
-	fi
-}
-
-register_sysv_init_systemd()
-{
-	echo \* registering init script ...
-
+	[ -f "$INIT_SCRIPT" ] && rm -f "$INIT_SCRIPT"
+	ln -fs "$EXEDIR/init.d/systemd/zapret.service" "$SYSTEMD_SYSTEM_DIR"
 	"$SYSTEMCTL" daemon-reload
 	"$SYSTEMCTL" enable zapret || {
-		echo could not register $INIT_SCRIPT with systemd
+		echo could not enable systemd service
 		exitp 20
 	}
 }
 
 service_stop_systemd()
 {
-	echo \* stopping service and unregistering init script
+	echo \* stopping zapret service
 
+	"$SYSTEMCTL" daemon-reload
 	"$SYSTEMCTL" disable zapret
 	"$SYSTEMCTL" stop zapret
 }
 
+service_start_systemd()
+{
+	echo \* starting zapret service
+
+	systemctl start zapret || {
+		echo could not start zapret service
+		exitp 30
+	}
+}
 
 download_list()
 {
 	[ -x "$GET_LIST" ] &&	{
-		echo \* downloading blocked ip/host list ...
+		echo \* downloading blocked ip/host list
 
 		# can be txt or txt.gz
 		rm -f "$EXEDIR/ipset/zapret-ip.txt"* "$EXEDIR/ipset/zapret-ip-user.txt"* \
@@ -375,28 +353,16 @@ download_list()
 	}
 }
 
-service_start_systemd()
-{
-	echo \* starting zapret service ...
-
-	systemctl start zapret || {
-		echo could not start zapret service
-		exitp 30
-	}
-}
-
 install_systemd()
 {
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
-	INIT_SCRIPT=/etc/init.d/zapret
 
 	check_location copy_all
 	check_prerequisites_linux
 	service_stop_systemd
 	install_binaries
 	ask_config
-	install_sysv_init
-	register_sysv_init_systemd
+	service_install_systemd
 	download_list
 	# desktop system : likely it will be up at daytime
 	crontab_add 9 21
@@ -428,7 +394,7 @@ check_packages_openwrt()
 
 check_prerequisites_openwrt()
 {
-	echo \* checking prerequisites ...
+	echo \* checking prerequisites
 	
 	local PKGS="iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl"
 	local UPD=0
@@ -437,7 +403,7 @@ check_prerequisites_openwrt()
 	if check_kmod iptable_raw && check_packages_openwrt $PKGS ; then
 		echo everything is present
 	else
-		echo \* installing prerequisites ...
+		echo \* installing prerequisites
 		
 		opkg update
 		UPD=1
@@ -530,7 +496,7 @@ openwrt_fw_section_configure()
 
 install_openwrt_firewall()
 {
-	echo \* installing firewall script ...
+	echo \* installing firewall script
 	
 	[ -n "MODE" ] || {
 		echo should specify MODE in $ZAPRET_CONFIG
@@ -543,15 +509,15 @@ install_openwrt_firewall()
 		openwrt_fw_section_del
 		return
 	}
-	echo "copying : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
-	cp -f "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"
+	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
+	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"
 	
 	openwrt_fw_section_configure
 }
 
 restart_openwrt_firewall()
 {
-	echo \* restarting firewall ...
+	echo \* restarting firewall
 
 	fw3 -q restart || {
 		echo could not restart firewall
@@ -559,16 +525,18 @@ restart_openwrt_firewall()
 	}
 }
 
-register_sysv_init()
+install_sysv_init()
 {
-	echo \* registering init script ...
-	
+	echo \* installing init script
+
+	[ -x "$INIT_SCRIPT" ] && "$INIT_SCRIPT" stop
+	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
 	"$INIT_SCRIPT" enable
 }
 
 service_start_sysv()
 {
-	echo \* starting zapret service ...
+	echo \* starting zapret service
 
 	"$INIT_SCRIPT" start || {
 		echo could not start zapret service
@@ -581,7 +549,6 @@ service_start_sysv()
 install_openwrt()
 {
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/openwrt/zapret
-	INIT_SCRIPT=/etc/init.d/zapret
 	FW_SCRIPT_SRC_DIR=$EXEDIR/init.d/openwrt/firewall.zapret
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	
@@ -590,7 +557,6 @@ install_openwrt()
 	install_binaries
 	ask_config
 	install_sysv_init
-	register_sysv_init
 	download_list
 	# router system : works 24/7. night is the best time
 	crontab_add 0 6

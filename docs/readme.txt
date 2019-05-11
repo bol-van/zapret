@@ -1,4 +1,4 @@
-﻿zapret v.24
+﻿zapret v.25
 
 Для чего это надо
 -----------------
@@ -281,12 +281,12 @@ TPWS_OPT_HTTPS="--split-pos=3"
  /opt/zapret/install_bin.sh
 АЛЬТЕРНАТИВА : зайти в tpws,nfq,ip2net,mdig, в каждом выполнить make. Получите динамические бинарики под вашу ось.
 
-Скопировать скрипт запуска :
- cp /opt/zapret/init.d/sysv/zapret /etc/init.d
-
 Настроить параметры согласно разделу "Выбор параметров".
 
-Принять изменения скрипта в systemd :
+Создать ссылку на service unit в systemd :
+ ln -fs /opt/zapret/init.d/systemd/zapret.service /lib/systemd/system
+
+Принять изменения в systemd :
  systemctl daemon-reload
 
 Включить автозапуск службы :
@@ -342,7 +342,22 @@ OpenSUSE
 Новые OpenSUSE основаны на systemd и менеджере пакетов zypper.
 
 Установить пакеты :
- zypper install curl ipset
+ zypper --non-interactive install curl ipset
+
+Далее все аналогично debian, кроме расположения systemd.
+В opensuse он находится не в /lib/systemd, а в /usr/lib/systemd.
+Правильная команда будет :
+
+ ln -fs /opt/zapret/init.d/systemd/zapret.service /usr/lib/systemd/system
+
+Arch linux
+----------
+
+Построен на базе systemd. По умолчанию отсутствует cron.
+
+Установить пакеты :
+ pacman -Syy
+ pacman --noconfirm -S ipset curl cronie
 
 Далее все аналогично debian.
 
@@ -358,7 +373,12 @@ git и curl по умолчанию могут присутствовать, ips
 
  emerge ipset
 
-Настраиваем все как в debian, но опуская все, касаемое systemd.
+Подключаем init скрипт :
+
+ ln -fs /opt/zapret/init.d/sysv/zapret /etc/init.d
+ rc-update add zapret
+
+Далее все как в debian, исключая все, касаемое systemd.
 
 Шпаргалка по управлению службой :
 
@@ -371,7 +391,7 @@ stop : rc-service zapret stop
 -----------------
 
 Ты простой юзер ? Не хочешь ни во что вникать, а хочешь нажать и чтобы сразу заработало ?
-Пользуешься ubuntu, debian , centos , fedora, opensuse ? Тогда этот вариант для тебя.
+Пользуешься системой на базе systemd ? Тогда этот вариант для тебя.
 Есть шансы, что оно заработает с минимумом усилий. Запусти терминал и в нем вбивай команды :
 
 # su
@@ -395,16 +415,9 @@ stop : rc-service zapret stop
 
 Для более гибкой настройки перед запуском инсталятора следует выполнить раздел "Выбор параметров".
 
-Эти скрипты будут работать и на других системах на базе systemd при условии, что
-systemd собран с поддержкой sysvinit и имеется следующий файл :
-/lib/systemd/system-generators/systemd-sysv-generator
-ИЛИ
-/usr/lib/systemd/system-generators/systemd-sysv-generator
-К сожалению, некоторые дистрибутивы имеют systemd без sysvinit support (arch linux).
-А так же есть необходимые программы :
-ipset
-curl
-Их можно установить вручную при помощи менеджера пакетов вашей ОС.
+Если система на базе systemd, но используется не поддерживаемый инсталятором менеджер пакетов
+или названия пакетов не соответствуют прописанным в инсталятор, пакеты нужно установить вручную.
+Требуется : ipset curl cron
 
 Фаерволлы
 ---------
@@ -486,8 +499,8 @@ ipset можно выкинуть, если не будем пользовать
 Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
  /opt/zapret/install_bin.sh
 
-Скопировать скрипт запуска :
- cp /opt/zapret/init.d/openwrt/zapret /etc/init.d
+Создать ссылку на скрипт запуска :
+ ln -fs /opt/zapret/init.d/openwrt/zapret /etc/init.d
 
 Настроить параметры согласно разделу "Выбор параметров".
 
