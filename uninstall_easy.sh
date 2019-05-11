@@ -140,7 +140,7 @@ remove_openwrt_firewall()
 	echo \* removing firewall script
 	
 	openwrt_fw_section_del
-	[ -f "$OPENWRT_FW_INCLUDE" ] && rm -f "$OPENWRT_FW_INCLUDE"
+	rm -f "$OPENWRT_FW_INCLUDE"
 }
 
 restart_openwrt_firewall()
