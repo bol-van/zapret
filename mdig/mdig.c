@@ -14,7 +14,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define RESOLVER_EAGAIN_ATTEMPTS 3
+#define RESOLVER_EAGAIN_ATTEMPTS 2
 
 void trimstr(char *s)
 {
@@ -61,6 +61,8 @@ static struct
 	char family;
 	int threads;
 	pthread_mutex_t flock;
+	pthread_mutex_t slock; // stats lock
+	int stats_every,stats_ct,stats_ct_ok; // stats
 } glob;
 
 // get next domain. return 0 if failure
@@ -107,11 +109,31 @@ static void print_addrinfo(struct addrinfo *ai)
 	}
 }
 
+void stat_print(int ct, int ct_ok)
+{
+	if (glob.stats_every > 0)
+		interlocked_fprintf(stderr, "mdig stats : domains=%d success=%d error=%d\n", ct, ct_ok, ct-ct_ok);
+}
+
+void stat_plus(char is_ok)
+{
+	int ct,ct_ok;
+	if (glob.stats_every > 0)
+	{
+		pthread_mutex_lock(&glob.slock);
+		ct = ++glob.stats_ct;
+		ct_ok = glob.stats_ct_ok+=!!is_ok;
+		pthread_mutex_unlock(&glob.slock);
+
+		if (!(ct % glob.stats_every)) stat_print(ct,ct_ok);
+	}
+}
+
 static void *t_resolver(void *arg)
 {
 	int tid = (int)(size_t)arg;
 	int i,r;
-	char dom[256];
+	char dom[256],is_ok;
 	struct addrinfo hints;
 	struct addrinfo *result;
 
@@ -126,20 +148,22 @@ static void *t_resolver(void *arg)
 		if (*dom)
 		{
 			VLOG("resolving %s", dom);
+			is_ok=0;
 			for (i = 0; i < RESOLVER_EAGAIN_ATTEMPTS; i++)
 			{
 				if (r = getaddrinfo(dom, NULL, &hints, &result))
 				{
-					ELOG("failed to resolve %s : result %d (%s)", dom, r, eai_str(r));
+					VLOG("failed to resolve %s : result %d (%s)", dom, r, eai_str(r));
 					if (r == EAI_AGAIN) continue; // temporary failure. should retry
 				}
 				else
 				{
 					print_addrinfo(result);
 					freeaddrinfo(result);
+					is_ok=1;
 				}
-				break;
 			}
+			stat_plus(is_ok);
 		}
 	}
 	VLOG("ended");
@@ -151,15 +175,23 @@ static int run_threads()
 	int i, thread;
 	pthread_t *t;
 
+	glob.stats_ct=glob.stats_ct_ok=0;
 	if (pthread_mutex_init(&glob.flock, NULL) != 0)
 	{
 		fprintf(stderr, "mutex init failed\n");
+		return 10;
+	}
+	if (pthread_mutex_init(&glob.slock, NULL) != 0)
+	{
+		fprintf(stderr, "mutex init failed\n");
+		pthread_mutex_destroy(&glob.flock);
 		return 10;
 	}
 	t = (pthread_t*)malloc(sizeof(pthread_t)*glob.threads);
 	if (!t)
 	{
 		fprintf(stderr, "out of memory\n");
+		pthread_mutex_destroy(&glob.slock);
 		pthread_mutex_destroy(&glob.flock);
 		return 11;
 	}
@@ -176,6 +208,8 @@ static int run_threads()
 		pthread_join(t[i], NULL);
 	}
 	free(t);
+	stat_print(glob.stats_ct,glob.stats_ct_ok);
+	pthread_mutex_destroy(&glob.slock);
 	pthread_mutex_destroy(&glob.flock);
 	return thread ? 0 : 12;
 }
@@ -186,6 +220,7 @@ static void exithelp()
 		" --threads=<threads_number>\n"
 		" --family=<4|6|46>\t; ipv4, ipv6, ipv4+ipv6\n"
 		" --verbose\t\t; print query progress to stderr\n"
+		" --stats=N\t\t; print resolve stats to stderr every N domains\n"
 	);
 	exit(1);
 }
@@ -196,12 +231,13 @@ int main(int argc, char **argv)
 	static const struct option long_options[] = {
 			{"threads",required_argument,0,0},	// optidx=0
 			{"family",required_argument,0,0},	// optidx=1
-			{"verbose",no_argument,0,0},	// optidx=2
-			{"help",no_argument,0,0},	// optidx=3
+			{"verbose",no_argument,0,0},		// optidx=2
+			{"stats",required_argument,0,0},	// optidx=3
+			{"help",no_argument,0,0},		// optidx=4
 			{NULL,0,NULL,0}
 	};
 
-	glob.verbose = '\0';
+	memset(&glob, 0, sizeof(glob));
 	glob.family = FAMILY4;
 	glob.threads = 1;
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -233,7 +269,11 @@ int main(int argc, char **argv)
 		case 2: /* verbose */
 			glob.verbose = '\1';
 			break;
-		case 3: /* help */
+			glob.threads = optarg ? atoi(optarg) : 0;
+		case 3: /* stats */
+			glob.stats_every = optarg ? atoi(optarg) : 0;
+			break;
+		case 4: /* help */
 			exithelp();
 			break;
 		}

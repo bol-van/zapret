@@ -12,7 +12,7 @@ ZIPLISTTMP=$TMPDIR/zapret-ip.txt
 
 getuser
 
-curl --fail --max-time 150 --max-filesize 20971520 -k -L "$ZURL" | cut_local >"$ZIPLISTTMP" &&
+curl --fail --max-time 150 --connect-timeout 5 --max-filesize 20971520 -k -L "$ZURL" | cut_local >"$ZIPLISTTMP" &&
 {
  dlsize=$(wc -c "$ZIPLISTTMP" | cut -f 1 -d ' ')
  if test $dlsize -lt 204800; then

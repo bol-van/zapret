@@ -14,7 +14,7 @@ ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
 getuser
 
-curl -k --fail --max-time 300 --max-filesize 62914560 "$ZURL" >"$ZREESTR" ||
+curl -k --fail --max-time 150 --connect-timeout 5 --retry 3 --max-filesize 62914560 "$ZURL" >"$ZREESTR" ||
 {
  echo reestr list download failed   
  exit 2
@@ -29,7 +29,8 @@ echo preparing dig list ..
 #sed -nre 's/^[^;]*;([^;|\\]{4,250})\;.*$/\1/p' $ZREESTR | sort | uniq >$ZDIG
 cut -f2 -d ';' "$ZREESTR"  | grep -avE '^$|\*|:' >"$ZDIG"
 rm -f "$ZREESTR"
-echo digging started ...
+echo digging started. this can take long ...
+echo domains in the list : $(wc -l <"$ZDIG")
 digger "$ZDIG" | cut_local >"$ZIPLISTTMP" || {
  rm -f "$ZDIG"
  exit 1

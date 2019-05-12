@@ -34,7 +34,7 @@ zz()
 digger()
 {
  if [ -x "$MDIG" ]; then
-  zzcat "$1" | "$MDIG" --family=4 --threads=$MDIG_THREADS
+  zzcat "$1" | "$MDIG" --family=4 --threads=$MDIG_THREADS --stats=1000
  else
   zzcat "$1" | dig A +short +time=8 +tries=2 -f - | grep -E '^[^;].*[^\.]$'
  fi
