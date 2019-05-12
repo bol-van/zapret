@@ -30,7 +30,6 @@ echo preparing dig list ..
 cut -f2 -d ';' "$ZREESTR"  | grep -avE '^$|\*|:' >"$ZDIG"
 rm -f "$ZREESTR"
 echo digging started. this can take long ...
-echo domains in the list : $(wc -l <"$ZDIG")
 digger "$ZDIG" | cut_local >"$ZIPLISTTMP" || {
  rm -f "$ZDIG"
  exit 1

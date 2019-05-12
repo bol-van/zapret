@@ -33,6 +33,8 @@ zz()
 
 digger()
 {
+ >&2 echo digging "$1" : hosts=$(wc -l <"$1")
+
  if [ -x "$MDIG" ]; then
   zzcat "$1" | "$MDIG" --family=4 --threads=$MDIG_THREADS --stats=1000
  else
