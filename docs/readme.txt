@@ -492,6 +492,7 @@ openwrt/LEDE
 opkg update
 opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl
 (для новых LEDE и openwrt) opkg install kmod-ipt-raw
+(ipv6) opkg install kmod-ipt-nat6
 (опционально) opkg install gzip
 (опционально) opkg install grep
 (опционально) opkg install bind-tools
