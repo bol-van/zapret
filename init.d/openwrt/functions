@@ -25,7 +25,7 @@ network_find_wan_all()
 }
 network_find_wan6_all()
 {
- __network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 4 2>/dev/null && return
+ __network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 10 2>/dev/null && return
  network_find_wan6 $1
 }
 
