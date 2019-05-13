@@ -1,11 +1,6 @@
-QNUM=200
-IPT_FILTER_PRE="-p tcp --sport 80 -m set --match-set zapret src"
+IPT_FILTER_PRE="-p tcp --tcp-flags SYN,ACK SYN,ACK --sport 80 -m set --match-set zapret src"
 IPT_FILTER_POST="-p tcp --dport 80 -m set --match-set zapret dst"
 
-ipt()
-{
- iptables -C $@ 2>/dev/null || iptables -I $@
-}
+. /opt/zapret/init.d/openwrt/functions
 
-ipt PREROUTING -t raw $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
-ipt POSTROUTING -t mangle $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass
+fw_nfqws

@@ -4,6 +4,8 @@ USE_PROCD=1
 # start betfore firewall - we need ipset populated
 START=18
 
+. /lib/functions/network.sh
+
 ZAPRET_BASE=/opt/zapret
 # SHOULD EDIT config
 . "$ZAPRET_BASE/config"
@@ -17,15 +19,17 @@ QNUM=200
 NFQWS=$ZAPRET_BASE/nfq/nfqws
 NFQWS_OPT_BASE="--qnum=$QNUM"
 
+TPWS_USER=daemon
 TPPORT_HTTP=1188
 TPPORT_HTTPS=1189
 TPWS=$ZAPRET_BASE/tpws/tpws
-TPWS_USER=daemon
 TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt.gz
 [ -f "$TPWS_HOSTLIST" ] || TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts-user.txt
 TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
-TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP $TPWS_OPT_BASE"
-TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS $TPWS_OPT_BASE"
+TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
+TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer"
+TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
+TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
 
 
 run_daemon()
@@ -48,36 +52,54 @@ create_ipset()
 	$IPSET_CR
 }
 
+run_tpws()
+{
+	[ "$DISABLE_IPV4" != "1" ] && run_daemon $1 $TPWS "$TPWS_OPT_BASE $2"
+	[ "$DISABLE_IPV6" != "1" ] && {
+		run_daemon $((60+$1)) $TPWS "$TPWS_OPT_BASE6 $2"
+		network_get_device DEVICE lan
+		[ -n "$DEVICE" ] && run_daemon $((660+$1)) $TPWS "$TPWS_OPT_BASE6_PRE --bind-iface6=$DEVICE $2"
+	}
+}
+stop_tpws()
+{
+	[ "$DISABLE_IPV4" != "1" ] && stop_daemon $1 $TPWS
+	[ "$DISABLE_IPV6" != "1" ] && {
+		stop_daemon $((60+$1)) $TPWS
+		stop_daemon $((660+$1)) $TPWS
+	}
+}
+
 
 start_service() {
 	case "${MODE}" in
 	    tpws_hostlist)
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
-		;;
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
+			;;
 	    tpws_ipset|tpws_all)
-		create_ipset
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-		;;
+			create_ipset
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			;;
 	    tpws_ipset_https|tpws_all_https)
-		create_ipset
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-		run_daemon 2 $TPWS "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-		;;
+			create_ipset
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
+			;;
 	    nfqws_ipset|nfqws_ipset_https)
-		create_ipset
-		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-		;;
+			create_ipset
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
 	    nfqws_all|nfqws_all_https)
-		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-		;;
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
 	    ipset)
-		create_ipset
-		;;
+			create_ipset
+			;;
 	    custom)
-		# PLACEHOLDER
-		echo !!! NEED ATTENTION !!!
-		echo Start daemon\(s\)
-		echo Study how other sections work
-		;;
+			# PLACEHOLDER
+			echo !!! NEED ATTENTION !!!
+			echo Start daemon\(s\)
+			echo Study how other sections work
+			;;
 	esac
 }

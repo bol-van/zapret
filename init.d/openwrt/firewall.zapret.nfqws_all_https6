@@ -3,4 +3,4 @@ IPT_FILTER_POST="-p tcp --dport 80"
 
 . /opt/zapret/init.d/openwrt/functions
 
-fw_nfqws
+fw_nfqws6

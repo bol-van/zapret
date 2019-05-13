@@ -14,6 +14,9 @@ ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
 getuser
 
+# both disabled
+[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && exit 0
+
 curl -k --fail --max-time 150 --connect-timeout 5 --retry 3 --max-filesize 62914560 "$ZURL" >"$ZREESTR" ||
 {
  echo reestr list download failed   
@@ -29,12 +32,24 @@ echo preparing dig list ..
 #sed -nre 's/^[^;]*;([^;|\\]{4,250})\;.*$/\1/p' $ZREESTR | sort | uniq >$ZDIG
 cut -f2 -d ';' "$ZREESTR"  | grep -avE '^$|\*|:' >"$ZDIG"
 rm -f "$ZREESTR"
+
 echo digging started. this can take long ...
-digger "$ZDIG" | cut_local >"$ZIPLISTTMP" || {
- rm -f "$ZDIG"
- exit 1
+
+[ "$DISABLE_IPV4" != "1" ] && {
+ digger "$ZDIG" 4 | cut_local >"$ZIPLISTTMP" || {
+  rm -f "$ZDIG"
+  exit 1
+ }
+ sort -u "$ZIPLISTTMP" | zz "$ZIPLIST"
+ rm -f "$ZIPLISTTMP"
+}
+[ "$DISABLE_IPV6" != "1" ] && {
+ digger "$ZDIG" 6 | cut_local6 >"$ZIPLISTTMP" || {
+  rm -f "$ZDIG"
+  exit 1
+ }
+ sort -u "$ZIPLISTTMP" | zz "$ZIPLIST6"
+ rm -f "$ZIPLISTTMP"
 }
 rm -f "$ZDIG"
-sort -u "$ZIPLISTTMP" | zz "$ZIPLIST"
-rm -f "$ZIPLISTTMP"
 "$EXEDIR/create_ipset.sh"

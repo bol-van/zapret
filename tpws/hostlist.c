@@ -72,7 +72,7 @@ bool LoadHostList(strpool **hostlist, char *filename)
 	}
 	else
 	{
-		printf("loading plain text list\n",r);
+		printf("loading plain text list\n");
 		
 		while (fgets(s, 256, F))
 		{

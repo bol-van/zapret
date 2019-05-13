@@ -1,0 +1,157 @@
+. /lib/functions/network.sh
+
+QNUM=200
+TPPORT_HTTP=1188
+TPPORT_HTTPS=1189
+TPWS_USER=daemon
+
+exists()
+{
+ which $1 >/dev/null 2>/dev/null
+}
+
+# can be multiple ipv6 outgoing interfaces
+# uplink from isp, tunnelbroker, vpn, ...
+# want them all. who knows what's the real one that blocks sites
+# dont want any manual configuration - want to do it automatically
+# standard network_find_wan[6] return only the first
+# we use low level function from network.sh to avoid this limitation
+# it can change theoretically and stop working
+
+network_find_wan_all()
+{
+ __network_ifstatus "$1" "" "[@.route[@.target='0.0.0.0' && !@.table]].interface" "" 10 2>/dev/null && return
+ network_find_wan $1
+}
+network_find_wan6_all()
+{
+ __network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 4 2>/dev/null && return
+ network_find_wan6 $1
+}
+
+ipt()
+{
+ iptables -C $@ 2>/dev/null || iptables -I $@
+}
+ipt6()
+{
+ ip6tables -C $@ 2>/dev/null || ip6tables -I $@
+}
+
+# there's no route_localnet for ipv6
+# the best we can is to route to link local of the incoming interface
+# OUTPUT - can DNAT to ::1
+# PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr
+# not a good idea to expose tpws to the world (bind to ::)
+
+get_ipv6_linklocal()
+{
+ # $1 - interface name. if empty - any interface
+ if exists ip ; then
+    local dev
+    [ -n "$1" ] && dev="dev $1"
+    ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope link.*$/\1/;t;d' | head -n 1
+ else
+    ifconfig $1 | sed -re 's/^.*inet6 addr: ([^ ]*)\/[0-9]* Scope:Link.*$/\1/;t;d' | head -n 1
+ fi
+}
+get_ipv6_global()
+{
+ # $1 - interface name. if empty - any interface
+ if exists ip ; then
+    local dev
+    [ -n "$1" ] && dev="dev $1"
+    ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope global.*$/\1/;t;d' | head -n 1
+ else
+    ifconfig $1 | sed -re 's/^.*inet6 addr: ([^ ]*)\/[0-9]* Scope:Global.*$/\1/;t;d' | head -n 1
+ fi
+}
+
+dnat6_target()
+{
+ # get target ip address for DNAT. prefer link locals
+ # tpws should be as inaccessible from outside as possible
+ [ -n "$DNAT6_TARGET" ] || {
+    local DEVICE
+    network_get_device DEVICE lan
+    DNAT6_TARGET=$(get_ipv6_linklocal $DEVICE)
+    [ -z "$DNAT6_TARGET" ] && DNAT6_TARGET=$(get_ipv6_global $DEVICE)
+ }
+}
+
+
+
+fw_nfqws()
+{
+ local DEVICE wan_iface
+ network_find_wan_all wan_iface
+ for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    ipt POSTROUTING -t mangle -o $DEVICE $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass
+    ipt PREROUTING -t raw -i $DEVICE $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
+ done
+}
+fw_nfqws6()
+{
+ local DEVICE wan_iface
+ network_find_wan6_all wan_iface
+ for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    ipt6 POSTROUTING -t mangle -o $DEVICE $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass
+    ipt6 PREROUTING -t raw -i $DEVICE $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
+ done
+}
+
+fw_tpws()
+{
+ local DEVICE wan_iface
+ network_find_wan_all wan_iface
+ for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+ done
+ network_get_device DEVICE lan
+ sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+ ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+}
+fw_tpws_https()
+{
+ local DEVICE wan_iface
+ network_find_wan_all wan_iface
+ for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
+ done
+ network_get_device DEVICE lan
+ sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+ ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+ ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
+}
+
+fw_tpws6()
+{
+ local DEVICE wan_iface ip6
+ network_find_wan6_all wan_iface
+ for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    ipt6 OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to [::1]:$TPPORT_HTTP
+ done
+ network_get_device DEVICE lan
+ dnat6_target
+ ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
+}
+fw_tpws_https6()
+{
+ local DEVICE wan_iface ip6
+ network_find_wan6_all wan_iface
+ for ext_iface in $wan_iface; do
+    network_get_device DEVICE $ext_iface
+    ipt6 OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to [::1]:$TPPORT_HTTP
+    ipt6 OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to [::1]:$TPPORT_HTTPS
+ done
+ network_get_device DEVICE lan
+ dnat6_target
+ ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
+ ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
+}

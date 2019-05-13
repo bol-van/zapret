@@ -128,3 +128,8 @@ v25
 
 init : move to native systemd units
 use links to units, init scripts and firewall includes, no more copying
+
+v26
+
+ipv6 support
+tpws : advanced bind options

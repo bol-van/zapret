@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <net/if.h>
+#include <ifaddrs.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -30,7 +32,8 @@ enum splithttpreq { split_none = 0, split_method, split_host };
 
 struct params_s
 {
-	char bindaddr[64];
+	char bindaddr[64],bindiface4[16],bindiface6[16];
+	bool bindll,bindll_force;
 	uid_t uid;
 	gid_t gid;
 	uint16_t port;
@@ -502,6 +505,9 @@ void exithelp()
 {
 	printf(
 		" --bind-addr=<ipv4_addr>|<ipv6_addr>\n"
+		" --bind-iface4=<interface_name>\t; bind to the first ipv4 addr of interface\n"
+		" --bind-iface6=<interface_name>\t; bind to the first ipv6 addr of interface\n"
+		" --bind-linklocal=prefer|force\t; prefer or force ipv6 link local\n"
 		" --port=<port>\n"
 		" --maxconn=<max_connections>\n"
 		" --hostlist=<filename>\t; only act on host in the list (one host per line, subdomains auto apply)\n"
@@ -552,22 +558,25 @@ void parse_params(int argc, char *argv[])
 		{ "help",no_argument,0,0 },// optidx=0
 		{ "h",no_argument,0,0 },// optidx=1
 		{ "bind-addr",required_argument,0,0 },// optidx=2
-		{ "port",required_argument,0,0 },// optidx=3
-		{ "daemon",no_argument,0,0 },// optidx=4
-		{ "user",required_argument,0,0 },// optidx=5
-		{ "maxconn",required_argument,0,0 },// optidx=6
-		{ "hostcase",no_argument,0,0 },// optidx=7
-		{ "hostspell",required_argument,0,0 },// optidx=8
-		{ "hostdot",no_argument,0,0 },// optidx=9
-		{ "hostnospace",no_argument,0,0 },// optidx=10
-		{ "split-http-req",required_argument,0,0 },// optidx=11
-		{ "split-pos",required_argument,0,0 },// optidx=12
-		{ "methodspace",no_argument,0,0 },// optidx=13
-		{ "methodeol",no_argument,0,0 },// optidx=14
-		{ "hosttab",no_argument,0,0 },// optidx=15
-		{ "unixeol",no_argument,0,0 },// optidx=16
-		{ "hostlist",required_argument,0,0 },// optidx=17
-		{ "pidfile",required_argument,0,0 },// optidx=18
+		{ "bind-iface4",required_argument,0,0 },// optidx=3
+		{ "bind-iface6",required_argument,0,0 },// optidx=4
+		{ "bind-linklocal",required_argument,0,0 },// optidx=5
+		{ "port",required_argument,0,0 },// optidx=6
+		{ "daemon",no_argument,0,0 },// optidx=7
+		{ "user",required_argument,0,0 },// optidx=8
+		{ "maxconn",required_argument,0,0 },// optidx=9
+		{ "hostcase",no_argument,0,0 },// optidx=10
+		{ "hostspell",required_argument,0,0 },// optidx=11
+		{ "hostdot",no_argument,0,0 },// optidx=12
+		{ "hostnospace",no_argument,0,0 },// optidx=13
+		{ "split-http-req",required_argument,0,0 },// optidx=14
+		{ "split-pos",required_argument,0,0 },// optidx=15
+		{ "methodspace",no_argument,0,0 },// optidx=16
+		{ "methodeol",no_argument,0,0 },// optidx=17
+		{ "hosttab",no_argument,0,0 },// optidx=18
+		{ "unixeol",no_argument,0,0 },// optidx=19
+		{ "hostlist",required_argument,0,0 },// optidx=20
+		{ "pidfile",required_argument,0,0 },// optidx=21
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -583,7 +592,35 @@ void parse_params(int argc, char *argv[])
 			strncpy(params.bindaddr, optarg, sizeof(params.bindaddr));
 			params.bindaddr[sizeof(params.bindaddr) - 1] = 0;
 			break;
-		case 3: /* qnum */
+		case 3: /* bind-iface4 */
+			if (*params.bindiface6)
+			{
+				fprintf(stderr, "can bind only to single ip address\n");
+				exit_clean(1);
+			}
+			strncpy(params.bindiface4, optarg, sizeof(params.bindiface4));
+			params.bindiface4[sizeof(params.bindiface4) - 1] = 0;
+			break;
+		case 4: /* bind-iface6 */
+			if (*params.bindiface4)
+			{
+				fprintf(stderr, "can bind only to single ip address\n");
+				exit_clean(1);
+			}
+			strncpy(params.bindiface6, optarg, sizeof(params.bindiface6));
+			params.bindiface6[sizeof(params.bindiface6) - 1] = 0;
+			break;
+		case 5: /* bind-linklocal */
+			params.bindll = true;
+			if (!strcmp(optarg, "force"))
+				params.bindll_force=true;
+			else if (strcmp(optarg, "prefer"))
+			{
+				fprintf(stderr, "invalid parameter in bind-linklocal : %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
+		case 6: /* port */
 			i = atoi(optarg);
 			if (i <= 0 || i > 65535)
 			{
@@ -592,10 +629,10 @@ void parse_params(int argc, char *argv[])
 			}
 			params.port = (uint16_t)i;
 			break;
-		case 4: /* daemon */
+		case 7: /* daemon */
 			params.daemon = true;
 			break;
-		case 5: /* user */
+		case 8: /* user */
 		{
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
@@ -607,7 +644,7 @@ void parse_params(int argc, char *argv[])
 			params.gid = pwd->pw_gid;
 			break;
 		}
-		case 6: /* maxconn */
+		case 9: /* maxconn */
 			params.maxconn = atoi(optarg);
 			if (params.maxconn <= 0)
 			{
@@ -615,10 +652,10 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 7: /* hostcase */
+		case 10: /* hostcase */
 			params.hostcase = true;
 			break;
-		case 8: /* hostspell */
+		case 11: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
 				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
@@ -627,13 +664,13 @@ void parse_params(int argc, char *argv[])
 			params.hostcase = true;
 			memcpy(params.hostspell, optarg, 4);
 			break;
-		case 9: /* hostdot */
+		case 12: /* hostdot */
 			params.hostdot = true;
 			break;
-		case 10: /* hostnospace */
+		case 13: /* hostnospace */
 			params.hostnospace = true;
 			break;
-		case 11: /* split-http-req */
+		case 14: /* split-http-req */
 			if (!strcmp(optarg, "method"))
 				params.split_http_req = split_method;
 			else if (!strcmp(optarg, "host"))
@@ -644,7 +681,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 12: /* split-pos */
+		case 15: /* split-pos */
 			i = atoi(optarg);
 			if (i)
 				params.split_pos = i;
@@ -654,25 +691,25 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 13: /* methodspace */
+		case 16: /* methodspace */
 			params.methodspace = true;
 			break;
-		case 14: /* methodeol */
+		case 17: /* methodeol */
 			params.methodeol = true;
 			break;
-		case 15: /* hosttab */
+		case 18: /* hosttab */
 			params.hosttab = true;
 			break;
-		case 16: /* unixeol */
+		case 19: /* unixeol */
 			params.unixeol = true;
 			break;
-		case 17: /* hostlist */
+		case 20: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
 			params.hostfile[sizeof(params.hostfile)-1]='\0';
 			break;
-		case 18: /* pidfile */
+		case 21: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
@@ -748,24 +785,37 @@ int main(int argc, char *argv[]) {
 	int r;
 	struct sockaddr_storage salisten;
 	socklen_t salisten_len;
-	int ipv6_only;
+	int ipv6_only=0,if_index6=0;
 
 	parse_params(argc, argv);
 
 	memset(&salisten, 0, sizeof(salisten));
+	if (*params.bindiface4)
+	{
+		if (!if_nametoindex(params.bindiface4))
+		{
+			printf("bad iface %s\n",params.bindiface4);
+			goto exiterr;
+		}
+	}
+	if (*params.bindiface6)
+	{
+		if_index6 = if_nametoindex(params.bindiface6);
+		if (!if_index6)
+		{
+			printf("bad iface %s\n",params.bindiface6);
+			goto exiterr;
+		}
+	}
 	if (*params.bindaddr)
 	{
 		if (inet_pton(AF_INET, params.bindaddr, &((struct sockaddr_in*)&salisten)->sin_addr))
 		{
 			salisten.ss_family = AF_INET;
-			((struct sockaddr_in*)&salisten)->sin_port = htons(params.port);
-			salisten_len = sizeof(struct sockaddr_in);
 		}
 		else if (inet_pton(AF_INET6, params.bindaddr, &((struct sockaddr_in6*)&salisten)->sin6_addr))
 		{
 			salisten.ss_family = AF_INET6;
-			((struct sockaddr_in6*)&salisten)->sin6_port = htons(params.port);
-			salisten_len = sizeof(struct sockaddr_in6);
 			ipv6_only = 1;
 		}
 		else
@@ -776,11 +826,83 @@ int main(int argc, char *argv[]) {
 	}
 	else
 	{
-		salisten.ss_family = AF_INET6;
-		((struct sockaddr_in6*)&salisten)->sin6_port = htons(params.port);
+		if (*params.bindiface4 || *params.bindiface6 || params.bindll)
+		{
+			struct ifaddrs *addrs,*a;
+			bool found=0;
+    
+			if (getifaddrs(&addrs)<0)
+			{
+				printf("getifaddrs failed\n");
+				goto exiterr;
+			}
+
+			for (;;)
+			{
+				a  = addrs;
+				while (a)
+				{
+					if (a->ifa_addr)
+					{
+						if (a->ifa_addr->sa_family==AF_INET &&
+						    *params.bindiface4 && !strcmp(a->ifa_name, params.bindiface4))
+						{
+							salisten.ss_family = AF_INET;
+							memcpy(&((struct sockaddr_in*)&salisten)->sin_addr, &((struct sockaddr_in*)a->ifa_addr)->sin_addr, sizeof(struct in_addr));
+							found=1;
+							break;
+						}
+						// ipv6 links locals are fe80::/10
+						else if (a->ifa_addr->sa_family==AF_INET6
+						          &&
+						         (!*params.bindiface6 && params.bindll ||
+						          *params.bindiface6 && !strcmp(a->ifa_name, params.bindiface6))
+						          &&
+							 (!params.bindll ||
+							  ((struct sockaddr_in6*)a->ifa_addr)->sin6_addr.s6_addr[0]==0xFE &&
+							  (((struct sockaddr_in6*)a->ifa_addr)->sin6_addr.s6_addr[1] & 0xC0)==0x80))
+						{
+							salisten.ss_family = AF_INET6;
+							memcpy(&((struct sockaddr_in6*)&salisten)->sin6_addr, &((struct sockaddr_in6*)a->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
+							if_index6 = if_nametoindex(a->ifa_name);
+							ipv6_only = 1;
+							found=1;
+							break;
+						}
+					}
+					a = a->ifa_next;
+				}
+				if (!found && params.bindll && !params.bindll_force)
+				{
+					params.bindll=false;
+					// give it another try without bindll
+					continue;
+				}
+				break;
+			}
+			freeifaddrs(addrs);
+			if (!found)
+			{
+				printf("suitable ip address not found\n");
+				goto exiterr;
+			}
+		}
+		else
+		{
+			salisten.ss_family = AF_INET6;
+			// leave sin6_addr zero
+		}
+	}
+	if (salisten.ss_family == AF_INET6)
+	{
 		salisten_len = sizeof(struct sockaddr_in6);
-		ipv6_only = 0;
-		// leave sin6_addr zero
+		((struct sockaddr_in6*)&salisten)->sin6_port = htons(params.port);
+		((struct sockaddr_in6*)&salisten)->sin6_scope_id = if_index6;
+	}
+	else
+	{
+		salisten_len = sizeof(struct sockaddr_in);
+		((struct sockaddr_in*)&salisten)->sin_port = htons(params.port);
 	}
 
 	if (params.daemon) daemonize();

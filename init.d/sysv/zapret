@@ -21,15 +21,21 @@ QNUM=200
 NFQWS=$ZAPRET_BASE/nfq/nfqws
 NFQWS_OPT_BASE="--qnum=$QNUM"
 
+TPWS_USER=tpws
 TPPORT_HTTP=1188
 TPPORT_HTTPS=1189
 TPWS=$ZAPRET_BASE/tpws/tpws
-TPWS_USER=tpws
 TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt.gz
 [ -f "$TPWS_HOSTLIST" ] || TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts-user.txt
 TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
-TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP $TPWS_OPT_BASE"
-TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS $TPWS_OPT_BASE"
+TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
+TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer"
+TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
+TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
+
+[ -n "$IFACE_WAN" ] && IPT_OWAN="-o $IFACE_WAN"
+[ -n "$IFACE_WAN" ] && IPT_IWAN="-i $IFACE_WAN"
+[ -n "$IFACE_LAN" ] && IPT_ILAN="-i $IFACE_LAN"
 
 exists()
 {
@@ -38,60 +44,148 @@ exists()
 
 ipt()
 {
-	if [ "$INIT_APPLY_FW" = "1" ]; then
-		iptables -C $@ 2>/dev/null || iptables -I $@
-	fi
+	iptables -C $@ 2>/dev/null || iptables -I $@
 }
 ipt_del()
 {
-	[ "$INIT_APPLY_FW" = "1" ] && iptables -C $@ 2>/dev/null && iptables -D $@
+	iptables -C $@ 2>/dev/null && iptables -D $@
 }
+ipt6()
+{
+	ip6tables -C $@ 2>/dev/null || ip6tables -I $@
+}
+ipt6_del()
+{
+	ip6tables -C $@ 2>/dev/null && ip6tables -D $@
+}
+
+# there's no route_localnet for ipv6
+# the best we can is to route to link local of the incoming interface
+# OUTPUT - can DNAT to ::1
+# PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr
+# not a good idea to expose tpws to the world (bind to ::)
+
+get_ipv6_linklocal()
+{
+	# $1 - interface name. if empty - any interface
+	local dev
+	[ -n "$1" ] && dev="dev $1"
+	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope link.*$/\1/;t;d' | head -n 1
+}
+get_ipv6_global()
+{
+	# $1 - interface name. if empty - any interface
+	local dev
+	[ -n "$1" ] && dev="dev $1"
+	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope global.*$/\1/;t;d' | head -n 1
+}
+dnat6_target()
+{
+	# get target ip address for DNAT. prefer link locals
+	# tpws should be as inaccessible from outside as possible
+	[ -n "$DNAT6_TARGET" ] || {
+		DNAT6_TARGET=$(get_ipv6_linklocal $IFACE_LAN)
+		[ -z "$DNAT6_TARGET" ] && DNAT6_TARGET=$(get_ipv6_global $IFACE_LAN)
+	}
+}
+
 
 fw_tpws_add()
 {
-	# $1 - iptable filter
-	# $2 - tpws port
-	echo "Adding iptables rule for tpws : $1"
-	[ -n "$SLAVE_ETH" ] && {
-		ipt PREROUTING -t nat -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
- 	}
-	ipt OUTPUT -t nat -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
-
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	# $3 - tpws port
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Adding iptables rule for tpws : $1"
+		[ -n "$IFACE_LAN" ] && {
+			ipt PREROUTING -t nat $IPT_ILAN -p tcp $1 -j DNAT --to 127.0.0.1:$3
+	 	}
+		ipt OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$3
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Adding ip6tables rule for tpws : $2"
+		[ -n "$IFACE_LAN" ] && {
+			dnat6_target
+			ipt6 PREROUTING -t nat $IPT_ILAN -p tcp $2 -j DNAT --to [$DNAT6_TARGET]:$3
+	 	}
+		ipt6 OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $2 -j DNAT --to [::1]:$3
+	}
 }
 fw_tpws_del()
 {
-	# $1 - iptable filter
-	# $2 - tpws port
-	echo "Deleting iptables rule for tpws : $1"
-	[ -n "$SLAVE_ETH" ] && {
-		ipt PREROUTING -t nat -i $SLAVE_ETH -p tcp $1 -j DNAT --to 127.0.0.1:$2
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	# $3 - tpws port
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Deleting iptables rule for tpws : $1"
+		[ -n "$IFACE_LAN" ] && {
+			ipt_del PREROUTING -t nat $IPT_ILAN -p tcp $1 -j DNAT --to 127.0.0.1:$3
+		}
+		ipt_del OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$3
 	}
-	ipt_del OUTPUT -t nat -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$2
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Deleting ip6tables rule for tpws : $2"
+		[ -n "$IFACE_LAN" ] && {
+			dnat6_target
+			ipt6_del PREROUTING -t nat $IPT_ILAN -p tcp $2 -j DNAT --to [$DNAT6_TARGET]:$3
+		}
+		ipt6_del OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $2 -j DNAT --to [::1]:$3
+	}
 }
+
 fw_nfqws_add_pre()
 {
-	# $1 - iptable filter
-	echo "Adding iptables rule for nfqws prerouting : $1"
-	ipt PREROUTING -t raw -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Adding iptables rule for nfqws prerouting : $1"
+		ipt PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Adding ip6tables rule for nfqws prerouting : $2"
+		ipt6 PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
 }
 fw_nfqws_del_pre()
 {
-	# $1 - iptable filter
-	echo "Deleting iptables rule for nfqws prerouting : $1"
-	ipt_del PREROUTING -t raw -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Deleting iptables rule for nfqws prerouting : $1"
+		ipt_del PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Deleting ip6tables rule for nfqws prerouting : $2"
+		ipt6_del PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
 }
 fw_nfqws_add_post()
 {
-	# $1 - iptable filter
-	echo "Adding iptables rule for nfqws postrouting : $1"
-	ipt POSTROUTING -t mangle -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Adding iptables rule for nfqws postrouting : $1"
+		ipt POSTROUTING -t mangle $IPT_OWAN -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Adding ip6tables rule for nfqws postrouting : $2"
+		ipt6 POSTROUTING -t mangle $IPT_OWAN -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
 }
 fw_nfqws_del_post()
 {
-	# $1 - iptable filter
-	echo "Deleting iptables rule for nfqws postrouting : $1"
-	ipt_del POSTROUTING -t mangle -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Deleting iptables rule for nfqws postrouting : $1"
+		ipt_del POSTROUTING -t mangle $IPT_OWAN -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Deleting ip6tables rule for nfqws postrouting : $2"
+		ipt6_del POSTROUTING -t mangle $IPT_OWAN -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
 }
+
 
 run_daemon()
 {
@@ -151,6 +245,23 @@ prepare_tpws()
 	for iface in /proc/sys/net/ipv4/conf/*; do sysctl -qw net.ipv4.conf.$(basename $iface).route_localnet=1; done
 }
 
+run_tpws()
+{
+	[ "$DISABLE_IPV4" != "1" ] && run_daemon $1 $TPWS "$TPWS_OPT_BASE $2"
+	[ "$DISABLE_IPV6" != "1" ] && {
+		run_daemon $((60+$1)) $TPWS "$TPWS_OPT_BASE6 $2"
+		[ -n "$IFACE_LAN" ] && run_daemon $((660+$1)) $TPWS "$TPWS_OPT_BASE6_PRE --bind-iface6=$IFACE_LAN $2"
+	}
+}
+stop_tpws()
+{
+	[ "$DISABLE_IPV4" != "1" ] && stop_daemon $1 $TPWS
+	[ "$DISABLE_IPV6" != "1" ] && {
+		stop_daemon $((60+$1)) $TPWS
+		[ -n "$IFACE_LAN" ] && stop_daemon $((660+$1)) $TPWS
+	}
+}
+
 
 create_ipset()
 {
@@ -162,121 +273,121 @@ case "$1" in
   start)
 	case "${MODE}" in
 	    tpws_hostlist)
-	    	prepare_tpws
-		fw_tpws_add "--dport 80" $TPPORT_HTTP
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
-		;;
+			prepare_tpws
+			fw_tpws_add "--dport 80" "--dport 80" $TPPORT_HTTP
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
+			;;
 	    tpws_ipset)
-		create_ipset
-	    	prepare_tpws
-		fw_tpws_add "--dport 80 -m set --match-set zapret dst" $TPPORT_HTTP
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-		;;
+			create_ipset
+			prepare_tpws
+			fw_tpws_add "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			;;
 	    tpws_ipset_https)
-		create_ipset
-	    	prepare_tpws
-		fw_tpws_add "--dport 80 -m set --match-set zapret dst" $TPPORT_HTTP
-		fw_tpws_add "--dport 443 -m set --match-set zapret dst" $TPPORT_HTTPS
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-		run_daemon 2 $TPWS "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-		;;
+			create_ipset
+			prepare_tpws
+			fw_tpws_add "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
+			fw_tpws_add "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
+			;;
 	    tpws_all)
-	    	prepare_tpws
-		fw_tpws_add "--dport 80" $TPPORT_HTTP
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-		;;
+			prepare_tpws
+			fw_tpws_add "--dport 80" "--dport 80" $TPPORT_HTTP
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			;;
 	    tpws_all_https)
-	    	prepare_tpws
-		fw_tpws_add "--dport 80" $TPPORT_HTTP
-		fw_tpws_add "--dport 443" $TPPORT_HTTPS
-		run_daemon 1 $TPWS "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-		run_daemon 2 $TPWS "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-		;;
+			prepare_tpws
+			fw_tpws_add "--dport 80" "--dport 80" $TPPORT_HTTP
+			fw_tpws_add "--dport 443" "--dport 443" $TPPORT_HTTPS
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
+			;;
 	    nfqws_ipset)
-		create_ipset
-		fw_nfqws_add_pre "--sport 80 -m set --match-set zapret src"
-		fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst"
-		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-		;;
+			create_ipset
+			fw_nfqws_add_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src"
+			fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
 	    nfqws_ipset_https)
-		create_ipset
-		fw_nfqws_add_pre "-m multiport --sports 80,443 -m set --match-set zapret src"
-		fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst"
-		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-		;;
+			create_ipset
+			fw_nfqws_add_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src"
+			fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
 	    nfqws_all)
-		fw_nfqws_add_pre "--sport 80"
-		fw_nfqws_add_post "--dport 80"
-		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-		;;
+			fw_nfqws_add_pre "--sport 80" "--sport 80"
+			fw_nfqws_add_post "--dport 80" "--dport 80"
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
 	    nfqws_all_https)
-		fw_nfqws_add_pre "-m multiport --sports 80,443"
-		fw_nfqws_add_post "--dport 80"
-		run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-		;;
+			fw_nfqws_add_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443"
+			fw_nfqws_add_post "--dport 80" "--dport 80"
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
 	    ipset)
-		create_ipset
-		;;
+			create_ipset
+			;;
 	    custom)
-		# PLACEHOLDER
-		echo !!! NEED ATTENTION !!!
-		echo Configure iptables for required actions
-		echo Start daemon\(s\)
-		echo Study how other sections work
-		run_daemon 1 /bin/sleep 20
-		;;
+			# PLACEHOLDER
+			echo !!! NEED ATTENTION !!!
+			echo Configure iptables for required actions
+			echo Start daemon\(s\)
+			echo Study how other sections work
+			run_daemon 1 /bin/sleep 20
+			;;
 	esac
 	;;
 
   stop)
 	case "${MODE}" in
 	    tpws_hostlist|tpws_all)
-		fw_tpws_del "--dport 80" $TPPORT_HTTP
-		stop_daemon 1 $TPWS
-		;;
+			fw_tpws_del "--dport 80" "--dport 80" $TPPORT_HTTP
+			stop_tpws 1
+			;;
 	    tpws_ipset)
-		fw_tpws_del "--dport 80 -m set --match-set zapret dst" $TPPORT_HTTP
-		stop_daemon 1 $TPWS
-		;;
+			fw_tpws_del "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
+			stop_tpws 1
+			;;
 	    tpws_ipset_https)
-		fw_tpws_del "--dport 80 -m set --match-set zapret dst" $TPPORT_HTTP
-		fw_tpws_del "--dport 443 -m set --match-set zapret dst" $TPPORT_HTTPS
-		stop_daemon 1 $TPWS
-		stop_daemon 2 $TPWS
-		;;
+			fw_tpws_del "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
+			fw_tpws_del "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
+			stop_tpws 1
+			stop_tpws 2
+			;;
 	    tpws_all_https)
-		fw_tpws_del "--dport 80" $TPPORT_HTTP
-		fw_tpws_del "--dport 443" $TPPORT_HTTPS
-		stop_daemon 1 $TPWS
-		stop_daemon 2 $TPWS
-		;;
+			fw_tpws_del "--dport 80" "--dport 80" $TPPORT_HTTP
+			fw_tpws_del "--dport 443" "--dport 443" $TPPORT_HTTPS
+			stop_tpws 1
+			stop_tpws 2
+			;;
 	    nfqws_ipset)
-		fw_nfqws_del_pre "--sport 80 -m set --match-set zapret src"
-		fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst"
-		stop_daemon 1 $NFQWS
-		;;
+			fw_nfqws_del_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src"
+			fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			stop_daemon 1 $NFQWS
+			;;
 	    nfqws_ipset_https)
-		fw_nfqws_del_pre "-m multiport --sports 80,443 -m set --match-set zapret src"
-		fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst"
-		stop_daemon 1 $NFQWS
-		;;
+			fw_nfqws_del_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src"
+			fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			stop_daemon 1 $NFQWS
+			;;
 	    nfqws_all)
-		fw_nfqws_del_pre "--sport 80"
-		fw_nfqws_del_post "--dport 80"
-		stop_daemon 1 $NFQWS
-		;;
+			fw_nfqws_del_pre "--sport 80" "--sport 80"
+			fw_nfqws_del_post "--dport 80" "--dport 80"
+			stop_daemon 1 $NFQWS
+			;;
 	    nfqws_all_https)
-		fw_nfqws_del_pre "-m multiport --sports 80,443"
-		fw_nfqws_del_post "--dport 80"
-		stop_daemon 1 $NFQWS
-		;;
+			fw_nfqws_del_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443"
+			fw_nfqws_del_post "--dport 80" "--dport 80"
+			stop_daemon 1 $NFQWS
+			;;
 	    custom)
-		# PLACEHOLDER
-		echo !!! NEED ATTENTION !!!
-		echo Clear firewall rules here. Remove iptables changes made previously.
-		echo Stop daemon\(s\) previously started.
-		echo Study how other sections work.
-		;;
+			# PLACEHOLDER
+			echo !!! NEED ATTENTION !!!
+			echo Clear firewall rules here. Remove iptables changes made previously.
+			echo Stop daemon\(s\) previously started.
+			echo Study how other sections work.
+			;;
 	esac
 	;;
 

@@ -16,14 +16,20 @@ TPWS_OPT_HTTP="--hostspell=HOST --split-http-req=method"
 TPWS_OPT_HTTPS="--split-pos=3"
 
 # for routers based on desktop linux only. has not effect in openwrt.
-# CHOSE NETWORK INTERFACE BEHIND NAT (LAN)
-# or leave it commented if its not router
-#SLAVE_ETH=eth0
+# CHOOSE LAN and WAN NETWORK INTERFACES
+# or leave them commented if its not router
+#IFACE_LAN=eth0
+#IFACE_WAN=eth1
 
 # should init scripts apply firewall rules ?
 # set to 0 if firewall control system is present
 # openwrt uses fw3 firewall , init never touch fw
 INIT_APPLY_FW=1
+
+# do not work with ipv4
+#DISABLE_IPV4=1
+# do not work with ipv6
+DISABLE_IPV6=1
 
 # select which init script will be used to get ip or host list
 # possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh

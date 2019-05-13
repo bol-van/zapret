@@ -1,5 +1,6 @@
 IPT_FILTER_HTTP="-p tcp --dport 80"
+IPT_FILTER_HTTPS="-p tcp --dport 443"
 
 . /opt/zapret/init.d/openwrt/functions
 
-fw_tpws
+fw_tpws_https6

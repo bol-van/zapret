@@ -348,9 +348,7 @@ download_list()
 		echo \* downloading blocked ip/host list
 
 		# can be txt or txt.gz
-		rm -f "$EXEDIR/ipset/zapret-ip.txt"* "$EXEDIR/ipset/zapret-ip-user.txt"* \
-			"$EXEDIR/ipset/zapret-ip-ipban.txt"* "$EXEDIR/ipset/zapret-ip-user-ipban.txt"* \
-			"$EXEDIR/ipset/zapret-hosts.txt"*
+		"$EXEDIR/ipset/clear_lists.sh"
 		"$GET_LIST" || {
 			echo could not download ip list
 			exitp 25
@@ -437,12 +435,13 @@ check_packages_openwrt()
 check_prerequisites_openwrt()
 {
 	echo \* checking prerequisites
-	
+
 	local PKGS="iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl"
+	[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS kmod-ipt-nat6"
 	local UPD=0
 	
 	# in recent lede/openwrt iptable_raw in separate package
-	if check_kmod iptable_raw && check_packages_openwrt $PKGS ; then
+	if ([ "$DISABLE_IPV6" = "1" ] || check_kmod ip6table_nat) && check_kmod iptable_raw && check_packages_openwrt $PKGS ; then
 		echo everything is present
 	else
 		echo \* installing prerequisites
@@ -488,6 +487,7 @@ check_prerequisites_openwrt()
 
 openwrt_fw_section_find()
 {
+	# $1 - fw include postfix
 	# echoes section number
 	
 	i=0
@@ -495,9 +495,8 @@ openwrt_fw_section_find()
 	do
 		path=$(uci -q get firewall.@include[$i].path)
 		[ -n "$path" ] || break
-		[ "$path" == "$OPENWRT_FW_INCLUDE" ] && {
+		[ "$path" == "$OPENWRT_FW_INCLUDE$1" ] && {
 	 		echo $i
-		 	true
 	 		return
 		}
 		i=$(($i+1))
@@ -507,27 +506,30 @@ openwrt_fw_section_find()
 }
 openwrt_fw_section_add()
 {
+	# $1 - fw include postfix
 	# echoes section number
-	
-	openwrt_fw_section_find ||
+
+	openwrt_fw_section_find $1 ||
 	{
 		uci add firewall include >/dev/null || return
 		echo -1
-		true
 	}
 }
 openwrt_fw_section_del()
 {
-	local id=$(openwrt_fw_section_find)
+	# $1 - fw include postfix
+	local id=$(openwrt_fw_section_find $1)
 	[ -n "$id" ] && {
 		uci delete firewall.@include[$id] && uci commit firewall
+		rm -f "$OPENWRT_FW_INCLUDE$1"
 	}
 }
 openwrt_fw_section_configure()
 {
-	local id=$(openwrt_fw_section_add)
+	# $1 - fw include postfix
+	local id=$(openwrt_fw_section_add $1)
 	[ -z "$id" ] ||
-	 ! uci set firewall.@include[$id].path="$OPENWRT_FW_INCLUDE" ||
+	 ! uci set firewall.@include[$id].path="$OPENWRT_FW_INCLUDE$1" ||
 	 ! uci set firewall.@include[$id].reload="1" ||
 	 ! uci commit firewall &&
 	{
@@ -538,24 +540,39 @@ openwrt_fw_section_configure()
 
 install_openwrt_firewall()
 {
-	echo \* installing firewall script
+	# $1 - fw include postfix
+
+	echo \* installing firewall script $1
 	
 	[ -n "MODE" ] || {
 		echo should specify MODE in $ZAPRET_CONFIG
 		exitp 7
 	}
 	
-	local FW_SCRIPT_SRC="$FW_SCRIPT_SRC_DIR.$MODE"
+	local FW_SCRIPT_SRC="$FW_SCRIPT_SRC_DIR.$MODE$1"
 	[ -f "$FW_SCRIPT_SRC" ] || {
 		echo firewall script $FW_SCRIPT_SRC not found. removing firewall include
 		openwrt_fw_section_del
-		rm -f "$OPENWRT_FW_INCLUDE"
 		return
 	}
-	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
-	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"
+	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE$1"
+	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE$1"
 	
-	openwrt_fw_section_configure
+	openwrt_fw_section_configure $1
+}
+
+install_openwrt_firewall_all()
+{
+	if [ "$DISABLE_IPV4" = "1" ] ; then
+		openwrt_fw_section_del
+	else
+		install_openwrt_firewall
+	fi
+	if [ "$DISABLE_IPV6" = "1" ] ; then
+		openwrt_fw_section_del 6
+	else
+		install_openwrt_firewall 6
+	fi
 }
 
 restart_openwrt_firewall()
@@ -566,6 +583,14 @@ restart_openwrt_firewall()
 		echo could not restart firewall
 		exitp 30
 	}
+}
+
+remove_openwrt_firewall()
+{
+	echo \* removing firewall script
+	
+	openwrt_fw_section_del
+	openwrt_fw_section_del 6
 }
 
 install_sysv_init()
@@ -600,11 +625,14 @@ install_openwrt()
 	install_binaries
 	ask_config
 	install_sysv_init
+	# can be previous firewall preventing access
+	remove_openwrt_firewall
+	restart_openwrt_firewall
 	download_list
 	# router system : works 24/7. night is the best time
 	crontab_add 0 6
 	service_start_sysv
-	install_openwrt_firewall
+	install_openwrt_firewall_all
 	restart_openwrt_firewall
 }
 

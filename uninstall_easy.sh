@@ -125,6 +125,7 @@ remove_systemd()
 
 openwrt_fw_section_find()
 {
+	# $1 - fw include postfix
 	# echoes section number
 	
 	i=0
@@ -132,9 +133,8 @@ openwrt_fw_section_find()
 	do
 		path=$(uci -q get firewall.@include[$i].path)
 		[ -n "$path" ] || break
-		[ "$path" == "$OPENWRT_FW_INCLUDE" ] && {
+		[ "$path" == "$OPENWRT_FW_INCLUDE$1" ] && {
 	 		echo $i
-		 	true
 	 		return
 		}
 		i=$(($i+1))
@@ -144,9 +144,12 @@ openwrt_fw_section_find()
 }
 openwrt_fw_section_del()
 {
-	local id=$(openwrt_fw_section_find)
+	# $1 - fw include postfix
+
+	local id=$(openwrt_fw_section_find $1)
 	[ -n "$id" ] && {
 		uci delete firewall.@include[$id] && uci commit firewall
+		rm -f "$OPENWRT_FW_INCLUDE$1"
 	}
 }
 
@@ -155,7 +158,7 @@ remove_openwrt_firewall()
 	echo \* removing firewall script
 	
 	openwrt_fw_section_del
-	rm -f "$OPENWRT_FW_INCLUDE"
+	openwrt_fw_section_del 6
 }
 
 restart_openwrt_firewall()

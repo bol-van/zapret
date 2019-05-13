@@ -1,25 +1,6 @@
-TPPORT_HTTP=1188
-TPPORT_HTTPS=1189
-TPWS_USER=daemon
 IPT_FILTER_HTTP="-p tcp --dport 80"
 IPT_FILTER_HTTPS="-p tcp --dport 443"
 
-ipt()
-{
- iptables -C $@ 2>/dev/null || iptables -I $@
-}
+. /opt/zapret/init.d/openwrt/functions
 
-. /lib/functions/network.sh
-network_find_wan wan_iface
-
-for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-
-    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
-    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
-done
-
-network_get_device DEVICE lan
-sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
-ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
-ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
+fw_tpws_https
