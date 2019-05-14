@@ -312,7 +312,7 @@ IFACE_WAN=eth1
 В своем скрипте необходимо выставить переменную APPLY_FW=1, чтобы принудительно разрешить применение правил iptales
 вне зависимости от параметра INIT_APPLY_FW.
 Пример :
-./opt/zapret/init.d/sysv/functions
+. /opt/zapret/init.d/sysv/functions
 APPLY_FW=1
 fw_tpws_add "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
 
