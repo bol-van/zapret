@@ -178,9 +178,24 @@ select_getlist()
 	GETLIST=""
 	write_config_var GETLIST
 }
+select_ipv6()
+{
+	local T=N
+	[ "$DISABLE_IPV6" != '1' ] && T=Y
+	echo -n "enable ipv6 support (default : $T) (Y/N) ? "
+	read A
+	local old6=$DISABLE_IPV6
+	if [ "$A" = 'Y' ] || [ "$A" = 'y' ]; then
+		DISABLE_IPV6=0
+	elif [ "$A" = 'N' ] || [ "$A" = 'n' ]; then
+		DISABLE_IPV6=1
+	fi
+	[ "$old6" != "$DISABLE_IPV6" ] && write_config_var DISABLE_IPV6
+}
 
 ask_config()
 {
+	select_ipv6
 	select_mode
 	select_getlist
 }
