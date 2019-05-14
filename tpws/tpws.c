@@ -32,8 +32,10 @@ enum splithttpreq { split_none = 0, split_method, split_host };
 
 struct params_s
 {
-	char bindaddr[64],bindiface4[16],bindiface6[16];
+	char bindaddr[64],bindiface[IFNAMSIZ];
+	bool bind_if6;
 	bool bindll,bindll_force;
+	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 	uid_t uid;
 	gid_t gid;
 	uint16_t port;
@@ -501,6 +503,23 @@ int8_t block_sigpipe() {
 	return 0;
 }
 
+
+bool is_interface_online(const char *ifname)
+{
+	struct ifreq ifr;
+	int sock;
+	
+	if ((sock=socket(PF_INET, SOCK_DGRAM, IPPROTO_IP))==-1)
+		return false;
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ] = 0;
+	ioctl(sock, SIOCGIFFLAGS, &ifr);
+	close(sock);
+	return !!(ifr.ifr_flags & IFF_UP);
+}
+
+
 void exithelp()
 {
 	printf(
@@ -508,22 +527,25 @@ void exithelp()
 		" --bind-iface4=<interface_name>\t; bind to the first ipv4 addr of interface\n"
 		" --bind-iface6=<interface_name>\t; bind to the first ipv6 addr of interface\n"
 		" --bind-linklocal=prefer|force\t; prefer or force ipv6 link local\n"
+		" --bind-wait-ifup=<sec>\t\t; wait for interface to appear and up\n"
+		" --bind-wait-ip=<sec>\t\t; after ifup wait for ip address to appear up to N seconds\n"
+		" --bind-wait-ip-linklocal=<sec>\t; accept only link locals first N seconds then any\n"
 		" --port=<port>\n"
 		" --maxconn=<max_connections>\n"
-		" --hostlist=<filename>\t; only act on host in the list (one host per line, subdomains auto apply)\n"
+		" --hostlist=<filename>\t\t; only act on host in the list (one host per line, subdomains auto apply)\n"
 		" --split-http-req=method|host\n"
 		" --split-pos=<numeric_offset>\t; split at specified pos. invalidates split-http-req.\n"
-		" --hostcase\t\t; change Host: => host:\n"
-		" --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-		" --hostdot\t\t; add \".\" after Host: name\n"
-		" --hosttab\t\t; add tab after Host: name\n"
-		" --hostnospace\t\t; remove space after Host:\n"
-		" --methodspace\t\t; add extra space after method\n"
-		" --methodeol\t\t; add end-of-line before method\n"
-		" --unixeol\t\t; replace 0D0A to 0A\n"
-		" --daemon\t\t; daemonize\n"
-		" --pidfile=<filename>\t; write pid to file\n"
-		" --user=<username>\t; drop root privs\n"
+		" --hostcase\t\t\t; change Host: => host:\n"
+		" --hostspell\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+		" --hostdot\t\t\t; add \".\" after Host: name\n"
+		" --hosttab\t\t\t; add tab after Host: name\n"
+		" --hostnospace\t\t\t; remove space after Host:\n"
+		" --methodspace\t\t\t; add extra space after method\n"
+		" --methodeol\t\t\t; add end-of-line before method\n"
+		" --unixeol\t\t\t; replace 0D0A to 0A\n"
+		" --daemon\t\t\t; daemonize\n"
+		" --pidfile=<filename>\t\t; write pid to file\n"
+		" --user=<username>\t\t; drop root privs\n"
 	);
 	exit(1);
 }
@@ -561,22 +583,25 @@ void parse_params(int argc, char *argv[])
 		{ "bind-iface4",required_argument,0,0 },// optidx=3
 		{ "bind-iface6",required_argument,0,0 },// optidx=4
 		{ "bind-linklocal",required_argument,0,0 },// optidx=5
-		{ "port",required_argument,0,0 },// optidx=6
-		{ "daemon",no_argument,0,0 },// optidx=7
-		{ "user",required_argument,0,0 },// optidx=8
-		{ "maxconn",required_argument,0,0 },// optidx=9
-		{ "hostcase",no_argument,0,0 },// optidx=10
-		{ "hostspell",required_argument,0,0 },// optidx=11
-		{ "hostdot",no_argument,0,0 },// optidx=12
-		{ "hostnospace",no_argument,0,0 },// optidx=13
-		{ "split-http-req",required_argument,0,0 },// optidx=14
-		{ "split-pos",required_argument,0,0 },// optidx=15
-		{ "methodspace",no_argument,0,0 },// optidx=16
-		{ "methodeol",no_argument,0,0 },// optidx=17
-		{ "hosttab",no_argument,0,0 },// optidx=18
-		{ "unixeol",no_argument,0,0 },// optidx=19
-		{ "hostlist",required_argument,0,0 },// optidx=20
-		{ "pidfile",required_argument,0,0 },// optidx=21
+		{ "bind-wait-ifup",required_argument,0,0 },// optidx=6
+		{ "bind-wait-ip",required_argument,0,0 },// optidx=7
+		{ "bind-wait-ip-linklocal",required_argument,0,0 },// optidx=8
+		{ "port",required_argument,0,0 },// optidx=9
+		{ "daemon",no_argument,0,0 },// optidx=10
+		{ "user",required_argument,0,0 },// optidx=11
+		{ "maxconn",required_argument,0,0 },// optidx=12
+		{ "hostcase",no_argument,0,0 },// optidx=13
+		{ "hostspell",required_argument,0,0 },// optidx=14
+		{ "hostdot",no_argument,0,0 },// optidx=15
+		{ "hostnospace",no_argument,0,0 },// optidx=16
+		{ "split-http-req",required_argument,0,0 },// optidx=17
+		{ "split-pos",required_argument,0,0 },// optidx=18
+		{ "methodspace",no_argument,0,0 },// optidx=19
+		{ "methodeol",no_argument,0,0 },// optidx=20
+		{ "hosttab",no_argument,0,0 },// optidx=21
+		{ "unixeol",no_argument,0,0 },// optidx=22
+		{ "hostlist",required_argument,0,0 },// optidx=23
+		{ "pidfile",required_argument,0,0 },// optidx=24
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -593,22 +618,14 @@ void parse_params(int argc, char *argv[])
 			params.bindaddr[sizeof(params.bindaddr) - 1] = 0;
 			break;
 		case 3: /* bind-iface4 */
-			if (*params.bindiface6)
-			{
-				fprintf(stderr, "can bind only to single ip address\n");
-				exit_clean(1);
-			}
-			strncpy(params.bindiface4, optarg, sizeof(params.bindiface4));
-			params.bindiface4[sizeof(params.bindiface4) - 1] = 0;
+			params.bind_if6=false;
+			strncpy(params.bindiface, optarg, sizeof(params.bindiface));
+			params.bindiface[sizeof(params.bindiface) - 1] = 0;
 			break;
 		case 4: /* bind-iface6 */
-			if (*params.bindiface4)
-			{
-				fprintf(stderr, "can bind only to single ip address\n");
-				exit_clean(1);
-			}
-			strncpy(params.bindiface6, optarg, sizeof(params.bindiface6));
-			params.bindiface6[sizeof(params.bindiface6) - 1] = 0;
+			params.bind_if6=true;
+			strncpy(params.bindiface, optarg, sizeof(params.bindiface));
+			params.bindiface[sizeof(params.bindiface) - 1] = 0;
 			break;
 		case 5: /* bind-linklocal */
 			params.bindll = true;
@@ -620,7 +637,16 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 6: /* port */
+		case 6: /* bind-wait-ifup */
+			params.bind_wait_ifup = atoi(optarg);
+			break;
+		case 7: /* bind-wait-ip */
+			params.bind_wait_ip = atoi(optarg);
+			break;
+		case 8: /* bind-wait-ip-linklocal */
+			params.bind_wait_ip_ll = atoi(optarg);
+			break;
+		case 9: /* port */
 			i = atoi(optarg);
 			if (i <= 0 || i > 65535)
 			{
@@ -629,10 +655,10 @@ void parse_params(int argc, char *argv[])
 			}
 			params.port = (uint16_t)i;
 			break;
-		case 7: /* daemon */
+		case 10: /* daemon */
 			params.daemon = true;
 			break;
-		case 8: /* user */
+		case 11: /* user */
 		{
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
@@ -644,7 +670,7 @@ void parse_params(int argc, char *argv[])
 			params.gid = pwd->pw_gid;
 			break;
 		}
-		case 9: /* maxconn */
+		case 12: /* maxconn */
 			params.maxconn = atoi(optarg);
 			if (params.maxconn <= 0)
 			{
@@ -652,10 +678,10 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 10: /* hostcase */
+		case 13: /* hostcase */
 			params.hostcase = true;
 			break;
-		case 11: /* hostspell */
+		case 14: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
 				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
@@ -664,13 +690,13 @@ void parse_params(int argc, char *argv[])
 			params.hostcase = true;
 			memcpy(params.hostspell, optarg, 4);
 			break;
-		case 12: /* hostdot */
+		case 15: /* hostdot */
 			params.hostdot = true;
 			break;
-		case 13: /* hostnospace */
+		case 16: /* hostnospace */
 			params.hostnospace = true;
 			break;
-		case 14: /* split-http-req */
+		case 17: /* split-http-req */
 			if (!strcmp(optarg, "method"))
 				params.split_http_req = split_method;
 			else if (!strcmp(optarg, "host"))
@@ -681,7 +707,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 15: /* split-pos */
+		case 18: /* split-pos */
 			i = atoi(optarg);
 			if (i)
 				params.split_pos = i;
@@ -691,25 +717,25 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 16: /* methodspace */
+		case 19: /* methodspace */
 			params.methodspace = true;
 			break;
-		case 17: /* methodeol */
+		case 20: /* methodeol */
 			params.methodeol = true;
 			break;
-		case 18: /* hosttab */
+		case 21: /* hosttab */
 			params.hosttab = true;
 			break;
-		case 19: /* unixeol */
+		case 22: /* unixeol */
 			params.unixeol = true;
 			break;
-		case 20: /* hostlist */
+		case 23: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
 			params.hostfile[sizeof(params.hostfile)-1]='\0';
 			break;
-		case 21: /* pidfile */
+		case 24: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
@@ -779,31 +805,88 @@ bool writepid(const char *filename)
 	return true;
 }
 
+
+
+bool find_listen_addr(struct sockaddr_storage *salisten, bool bindll, int *if_index)
+{
+	struct ifaddrs *addrs,*a;
+	bool found=false;
+    
+	if (getifaddrs(&addrs)<0)
+		return false;
+
+	a  = addrs;
+	while (a)
+	{
+		if (a->ifa_addr)
+		{
+			if (a->ifa_addr->sa_family==AF_INET &&
+			    *params.bindiface && !params.bind_if6 && !strcmp(a->ifa_name, params.bindiface))
+			{
+				salisten->ss_family = AF_INET;
+				memcpy(&((struct sockaddr_in*)salisten)->sin_addr, &((struct sockaddr_in*)a->ifa_addr)->sin_addr, sizeof(struct in_addr));
+				found=true;
+				break;
+			}
+			// ipv6 links locals are fe80::/10
+			else if (a->ifa_addr->sa_family==AF_INET6
+			          &&
+			         (!*params.bindiface && bindll ||
+			          *params.bindiface && params.bind_if6 && !strcmp(a->ifa_name, params.bindiface))
+			          &&
+				 (!bindll ||
+				  ((struct sockaddr_in6*)a->ifa_addr)->sin6_addr.s6_addr[0]==0xFE &&
+				  (((struct sockaddr_in6*)a->ifa_addr)->sin6_addr.s6_addr[1] & 0xC0)==0x80))
+			{
+				salisten->ss_family = AF_INET6;
+				memcpy(&((struct sockaddr_in6*)salisten)->sin6_addr, &((struct sockaddr_in6*)a->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
+				if (if_index) *if_index = if_nametoindex(a->ifa_name);
+				found=true;
+				break;
+			}
+		}
+		a = a->ifa_next;
+	}
+	freeifaddrs(addrs);
+	return found;
+}
+
+
 int main(int argc, char *argv[]) {
 	int listen_fd = -1;
 	int yes = 1, retval = 0;
 	int r;
 	struct sockaddr_storage salisten;
 	socklen_t salisten_len;
-	int ipv6_only=0,if_index6=0;
+	int ipv6_only=0,if_index=0;
 
 	parse_params(argc, argv);
 
 	memset(&salisten, 0, sizeof(salisten));
-	if (*params.bindiface4)
+	if (*params.bindiface)
 	{
-		if (!if_nametoindex(params.bindiface4))
+		if (params.bind_wait_ifup > 0)
 		{
-			printf("bad iface %s\n",params.bindiface4);
-			goto exiterr;
+			int sec=0;
+			if (!is_interface_online(params.bindiface))
+			{
+				fprintf(stderr,"waiting ifup of %s for up to %d seconds...\n",params.bindiface,params.bind_wait_ifup);
+				do
+				{
+					sleep(1);
+					sec++;
+				}
+				while (!is_interface_online(params.bindiface) && sec<params.bind_wait_ifup);
+				if (sec>=params.bind_wait_ifup)
+				{
+					printf("wait timed out\n");
+					goto exiterr;
+				}
+			}
 		}
-	}
-	if (*params.bindiface6)
-	{
-		if_index6 = if_nametoindex(params.bindiface6);
-		if (!if_index6)
+		if (!(if_index = if_nametoindex(params.bindiface)) && params.bind_wait_ip<=0)
 		{
-			printf("bad iface %s\n",params.bindiface6);
+			printf("bad iface %s\n",params.bindiface);
 			goto exiterr;
 		}
 	}
@@ -820,72 +903,45 @@ int main(int argc, char *argv[]) {
 		}
 		else
 		{
-			printf("bad bind addr\n");
+			printf("bad bind addr : %s\n", params.bindaddr);
 			goto exiterr;
 		}
 	}
 	else
 	{
-		if (*params.bindiface4 || *params.bindiface6 || params.bindll)
+		if (*params.bindiface || params.bindll)
 		{
-			struct ifaddrs *addrs,*a;
-			bool found=0;
-    
-			if (getifaddrs(&addrs)<0)
+			bool found;
+			int sec=0;
+			
+			if (params.bind_wait_ip > 0)
 			{
-				printf("getifaddrs failed\n");
-				goto exiterr;
+				fprintf(stderr,"waiting for ip for %d seconds...\n", params.bind_wait_ip);
+				if (params.bindll && !params.bindll_force && params.bind_wait_ip_ll>0)
+					fprintf(stderr,"during the first %d seconds accepting only link locals...\n", params.bind_wait_ip_ll);
 			}
+			
+			for(;;)
+			{
+				found = find_listen_addr(&salisten,params.bindll,&if_index);
+				if (found) break;
+				
+				if (params.bindll && !params.bindll_force && sec>=params.bind_wait_ip_ll)
+					if (found = find_listen_addr(&salisten,false,&if_index)) break;
+				
+				if (sec>=params.bind_wait_ip)
+					break;
+				
+				sleep(1);
+				sec++;
+			} 
 
-			for (;;)
-			{
-				a  = addrs;
-				while (a)
-				{
-					if (a->ifa_addr)
-					{
-						if (a->ifa_addr->sa_family==AF_INET &&
-						    *params.bindiface4 && !strcmp(a->ifa_name, params.bindiface4))
-						{
-							salisten.ss_family = AF_INET;
-							memcpy(&((struct sockaddr_in*)&salisten)->sin_addr, &((struct sockaddr_in*)a->ifa_addr)->sin_addr, sizeof(struct in_addr));
-							found=1;
-							break;
-						}
-						// ipv6 links locals are fe80::/10
-						else if (a->ifa_addr->sa_family==AF_INET6
-						          &&
-						         (!*params.bindiface6 && params.bindll ||
-						          *params.bindiface6 && !strcmp(a->ifa_name, params.bindiface6))
-						          &&
-							 (!params.bindll ||
-							  ((struct sockaddr_in6*)a->ifa_addr)->sin6_addr.s6_addr[0]==0xFE &&
-							  (((struct sockaddr_in6*)a->ifa_addr)->sin6_addr.s6_addr[1] & 0xC0)==0x80))
-						{
-							salisten.ss_family = AF_INET6;
-							memcpy(&((struct sockaddr_in6*)&salisten)->sin6_addr, &((struct sockaddr_in6*)a->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
-							if_index6 = if_nametoindex(a->ifa_name);
-							ipv6_only = 1;
-							found=1;
-							break;
-						}
-					}
-					a = a->ifa_next;
-				}
-				if (!found && params.bindll && !params.bindll_force)
-				{
-					params.bindll=false;
-					// give it another try without bindll
-					continue;
-				}
-				break;
-			}
-			freeifaddrs(addrs);
 			if (!found)
 			{
 				printf("suitable ip address not found\n");
 				goto exiterr;
 			}
+			ipv6_only=1;
 		}
 		else
 		{
@@ -897,7 +953,7 @@ int main(int argc, char *argv[]) {
 	{
 		salisten_len = sizeof(struct sockaddr_in6);
 		((struct sockaddr_in6*)&salisten)->sin6_port = htons(params.port);
-		((struct sockaddr_in6*)&salisten)->sin6_scope_id = if_index6;
+		((struct sockaddr_in6*)&salisten)->sin6_scope_id = if_index;
 	}
 	else
 	{
