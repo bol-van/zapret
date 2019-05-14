@@ -31,6 +31,9 @@ INIT_APPLY_FW=1
 # do not work with ipv6
 DISABLE_IPV6=1
 
+# thread number for multithread dns resolver (1-100)
+MDIG_THREADS=30
+
 # select which init script will be used to get ip or host list
 # possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
 # comment if not required
