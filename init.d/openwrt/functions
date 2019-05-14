@@ -102,56 +102,51 @@ fw_nfqws6()
  done
 }
 
-fw_tpws()
+IPT_OWNER="-m owner ! --uid-owner $TPWS_USER"
+__fw_tpws()
 {
+ # $1 - use https
  local DEVICE wan_iface
  network_find_wan_all wan_iface
  for ext_iface in $wan_iface; do
     network_get_device DEVICE $ext_iface
-    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+    ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+    [ "$1" != "1" ] || ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
  done
  network_get_device DEVICE lan
  sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
  ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
+ [ "$1" != "1" ] || ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
+}
+fw_tpws()
+{
+ __fw_tpws 0
 }
 fw_tpws_https()
 {
- local DEVICE wan_iface
- network_find_wan_all wan_iface
- for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
-    ipt OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
- done
- network_get_device DEVICE lan
- sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
- ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
- ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
+ __fw_tpws 1
 }
 
-fw_tpws6()
+__fw_tpws6()
 {
+ # $1 - use https
  local DEVICE wan_iface ip6
  network_find_wan6_all wan_iface
  for ext_iface in $wan_iface; do
     network_get_device DEVICE $ext_iface
-    ipt6 OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to [::1]:$TPPORT_HTTP
+    ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTP -j DNAT --to [::1]:$TPPORT_HTTP
+    [ "$1" != "1" ] || ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTPS -j DNAT --to [::1]:$TPPORT_HTTPS
  done
  network_get_device DEVICE lan
  dnat6_target
  ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
+ [ "$1" != "1" ] || ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
+}
+fw_tpws6()
+{
+ __fw_tpws6 0
 }
 fw_tpws_https6()
 {
- local DEVICE wan_iface ip6
- network_find_wan6_all wan_iface
- for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    ipt6 OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTP -j DNAT --to [::1]:$TPPORT_HTTP
-    ipt6 OUTPUT -t nat -o $DEVICE -m owner ! --uid-owner $TPWS_USER $IPT_FILTER_HTTPS -j DNAT --to [::1]:$TPPORT_HTTPS
- done
- network_get_device DEVICE lan
- dnat6_target
- ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
- ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
+ __fw_tpws6 1
 }
