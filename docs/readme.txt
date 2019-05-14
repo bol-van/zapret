@@ -143,7 +143,7 @@ tpws - это transparent proxy.
  --bind-iface6=<iface>	; слушать на первом ipv6 интерфейса iface. при bind-linklocal определяет интерфейс, откуда брать ipv6 link local
  --bind-wait-ifup=<sec>	; ждать до N секунд появления и поднятия интерфейса
  --bind-wait-ip=<sec>	; ждать до N секунд получения IP адреса (если задан --bind-wait-ifup - время идет после поднятия интерфейса)
- --bind-wait-ip-linklocal ; (только если заданы --bind-wait-ip и --bind-linklocal=prefer) согласиться на global address после N секунд
+ --bind-wait-ip-linklocal=<sec> ; (только если заданы --bind-wait-ip и --bind-linklocal=prefer) согласиться на global address после N секунд
  --port=<port>		; на каком порту слушать
  --split-http-req=method|host	; способ разделения http запросов на сегменты : около метода (GET,POST) или около заголовка Host
  --split-pos=<offset>	; делить все посылы на сегменты в указанной позиции. Если отсыл длинее 8Kb (размер буфера приема), то будет разделен каждый блок по 8Kb.
