@@ -1,0 +1,261 @@
+# init script functions library for desktop linux systems
+
+[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
+# SHOULD EDIT config
+. "$ZAPRET_BASE/config"
+
+PIDDIR=/var/run
+
+IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
+
+QNUM=200
+NFQWS=$ZAPRET_BASE/nfq/nfqws
+NFQWS_OPT_BASE="--qnum=$QNUM"
+
+TPWS_USER=tpws
+TPPORT_HTTP=1188
+TPPORT_HTTPS=1189
+TPWS=$ZAPRET_BASE/tpws/tpws
+TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt.gz
+[ -f "$TPWS_HOSTLIST" ] || TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts-user.txt
+TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
+TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
+TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer"
+TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
+TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
+
+[ -n "$IFACE_WAN" ] && IPT_OWAN="-o $IFACE_WAN"
+[ -n "$IFACE_WAN" ] && IPT_IWAN="-i $IFACE_WAN"
+[ -n "$IFACE_LAN" ] && IPT_ILAN="-i $IFACE_LAN"
+
+exists()
+{
+	which $1 >/dev/null 2>/dev/null
+}
+
+ipt()
+{
+	iptables -C $@ 2>/dev/null || iptables -I $@
+}
+ipt_del()
+{
+	iptables -C $@ 2>/dev/null && iptables -D $@
+}
+ipt6()
+{
+	ip6tables -C $@ 2>/dev/null || ip6tables -I $@
+}
+ipt6_del()
+{
+	ip6tables -C $@ 2>/dev/null && ip6tables -D $@
+}
+
+# there's no route_localnet for ipv6
+# the best we can is to route to link local of the incoming interface
+# OUTPUT - can DNAT to ::1
+# PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr
+# not a good idea to expose tpws to the world (bind to ::)
+
+get_ipv6_linklocal()
+{
+	# $1 - interface name. if empty - any interface
+	local dev
+	[ -n "$1" ] && dev="dev $1"
+	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope link.*$/\1/;t;d' | head -n 1
+}
+get_ipv6_global()
+{
+	# $1 - interface name. if empty - any interface
+	local dev
+	[ -n "$1" ] && dev="dev $1"
+	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope global.*$/\1/;t;d' | head -n 1
+}
+dnat6_target()
+{
+	# get target ip address for DNAT. prefer link locals
+	# tpws should be as inaccessible from outside as possible
+	[ -n "$DNAT6_TARGET" ] || {
+		DNAT6_TARGET=$(get_ipv6_linklocal $IFACE_LAN)
+		[ -z "$DNAT6_TARGET" ] && DNAT6_TARGET=$(get_ipv6_global $IFACE_LAN)
+	}
+}
+
+
+fw_tpws_add()
+{
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	# $3 - tpws port
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Adding iptables rule for tpws : $1"
+		[ -n "$IFACE_LAN" ] && {
+			ipt PREROUTING -t nat $IPT_ILAN -p tcp $1 -j DNAT --to 127.0.0.1:$3
+	 	}
+		ipt OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$3
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Adding ip6tables rule for tpws : $2"
+		[ -n "$IFACE_LAN" ] && {
+			dnat6_target
+			ipt6 PREROUTING -t nat $IPT_ILAN -p tcp $2 -j DNAT --to [$DNAT6_TARGET]:$3
+	 	}
+		ipt6 OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $2 -j DNAT --to [::1]:$3
+	}
+}
+fw_tpws_del()
+{
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	# $3 - tpws port
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Deleting iptables rule for tpws : $1"
+		[ -n "$IFACE_LAN" ] && {
+			ipt_del PREROUTING -t nat $IPT_ILAN -p tcp $1 -j DNAT --to 127.0.0.1:$3
+		}
+		ipt_del OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$3
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Deleting ip6tables rule for tpws : $2"
+		[ -n "$IFACE_LAN" ] && {
+			dnat6_target
+			ipt6_del PREROUTING -t nat $IPT_ILAN -p tcp $2 -j DNAT --to [$DNAT6_TARGET]:$3
+		}
+		ipt6_del OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $2 -j DNAT --to [::1]:$3
+	}
+}
+
+fw_nfqws_add_pre()
+{
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Adding iptables rule for nfqws prerouting : $1"
+		ipt PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Adding ip6tables rule for nfqws prerouting : $2"
+		ipt6 PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+}
+fw_nfqws_del_pre()
+{
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Deleting iptables rule for nfqws prerouting : $1"
+		ipt_del PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Deleting ip6tables rule for nfqws prerouting : $2"
+		ipt6_del PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+}
+fw_nfqws_add_post()
+{
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Adding iptables rule for nfqws postrouting : $1"
+		ipt POSTROUTING -t mangle $IPT_OWAN -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Adding ip6tables rule for nfqws postrouting : $2"
+		ipt6 POSTROUTING -t mangle $IPT_OWAN -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+}
+fw_nfqws_del_post()
+{
+	# $1 - iptable filter for ipv4
+	# $2 - iptable filter for ipv6
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+		echo "Deleting iptables rule for nfqws postrouting : $1"
+		ipt_del POSTROUTING -t mangle $IPT_OWAN -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+		echo "Deleting ip6tables rule for nfqws postrouting : $2"
+		ipt6_del POSTROUTING -t mangle $IPT_OWAN -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+	}
+}
+
+
+run_daemon()
+{
+	# $1 - daemon number : 1,2,3,...
+	# $2 - daemon
+	# $3 - daemon args
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	echo "Starting daemon $1: $2 $3"
+	if exists start-stop-daemon ; then
+		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3
+	else
+		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
+			echo already running
+		else
+			"$2" $3 >/dev/null 2>/dev/null &
+			PID=$!
+			if [ -n "$PID" ]; then
+				echo $PID >$PIDFILE
+			else
+				echo could not start daemon $1 : $2 $3
+				false
+			fi
+		fi
+	fi
+}
+stop_daemon()
+{
+	# $1 - daemon number : 1,2,3,...
+	# $2 - daemon
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	echo "Stopping daemon $1: $2"
+	if exists start-stop-daemon ; then
+		start-stop-daemon --stop --pidfile "$PIDFILE" --exec "$2"
+	else
+		if [ -f "$PIDFILE" ]; then
+			read PID <"$PIDFILE"
+			kill $PID
+			rm -f "$PIDFILE"
+		else
+			echo no pidfile : $PIDFILE
+		fi
+	fi
+}
+
+prepare_tpws()
+{
+	# $TPWS_USER is required to prevent redirection of the traffic originating from TPWS itself
+	# otherwise infinite loop will occur
+	# also its good idea not to run tpws as root
+	id -u $TPWS_USER >/dev/null 2>/dev/null || useradd --no-create-home --system --shell /bin/false $TPWS_USER
+	# otherwise linux kernel will treat 127.0.0.1 as "martian" ip and refuse routing to it
+	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
+	[ -n "$IFACE_LAN" ] && sysctl -qw net.ipv4.conf.$IFACE_LAN.route_localnet=1
+}
+
+run_tpws()
+{
+	[ "$DISABLE_IPV4" != "1" ] && run_daemon $1 $TPWS "$TPWS_OPT_BASE $2"
+	[ "$DISABLE_IPV6" != "1" ] && {
+		run_daemon $((60+$1)) $TPWS "$TPWS_OPT_BASE6 $2"
+		[ -n "$IFACE_LAN" ] && run_daemon $((660+$1)) $TPWS "$TPWS_OPT_BASE6_PRE --bind-iface6=$IFACE_LAN $2"
+	}
+}
+stop_tpws()
+{
+	[ "$DISABLE_IPV4" != "1" ] && stop_daemon $1 $TPWS
+	[ "$DISABLE_IPV6" != "1" ] && {
+		stop_daemon $((60+$1)) $TPWS
+		[ -n "$IFACE_LAN" ] && stop_daemon $((660+$1)) $TPWS
+	}
+}
+
+
+create_ipset()
+{
+	echo "Creating ipset"
+	"$IPSET_CR"
+}
