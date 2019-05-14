@@ -14,19 +14,26 @@ NAME=zapret
 DESC=anti-zapret
 
 case "$1" in
-  start)
-  	zapret_run_daemons
-  	[ "$INIT_APPLY_FW" = "1" ] && zapret_apply_firewall
-	;;
+	start)
+		zapret_run_daemons
+		[ "$INIT_APPLY_FW" != "1" ] || zapret_apply_firewall
+		;;
 
-  stop)
-  	zapret_stop_daemons
-  	[ "$INIT_APPLY_FW" = "1" ] && zapret_unapply_firewall
-	;;
+	stop)
+		zapret_stop_daemons
+		[ "$INIT_APPLY_FW" != "1" ] || zapret_unapply_firewall
+		;;
 
+	start-fw)
+		zapret_apply_firewall
+		;;
+	stop-fw)
+		zapret_unapply_firewall
+		;;
+	
   *)
 	N=/etc/init.d/$NAME
-	echo "Usage: $N {start|stop}" >&2
+	echo "Usage: $N {start|stop|start-fw|stop-fw}" >&2
 	exit 1
 	;;
 esac

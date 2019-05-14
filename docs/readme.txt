@@ -338,6 +338,10 @@ zapret_stop_daemons
 
 Посмотрите init скрипт /opt/zapret/init.d/sysv/zapret и все поймете сами.
 
+Есть вариант вызывать готовый скрипт по каким-то событиям :
+ /opt/zapret/init.d/sysv/zapret start-fw
+ /opt/zapret/init.d/sysv/zapret stop-fw
+
 Пример установки на debian-подобную систему
 -------------------------------------------
 

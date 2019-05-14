@@ -78,7 +78,9 @@ dnat6_target()
  # get target ip address for DNAT. prefer link locals
  # tpws should be as inaccessible from outside as possible
  # link local address can appear not immediately after ifup
- [ -n "$DNAT6_TARGET" ] || {
+ 
+ # DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
+ [ "$DNAT6_TARGET" = '-' ] || {
     # no reason to query if its down
     network_is_up lan || return
 
@@ -95,9 +97,13 @@ dnat6_target()
       sleep 1
     do :; done
 
-    [ -z "$DNAT6_TARGET" ] && {
-    	echo no link local. getting global
-    	DNAT6_TARGET=$(get_ipv6_global $DEVICE)
+    [ -n "$DNAT6_TARGET" ] || {
+      echo no link local. getting global
+      DNAT6_TARGET=$(get_ipv6_global $DEVICE)
+      [ -n "$DNAT6_TARGET" ] || {
+        echo could not get any address
+        DNAT6_TARGET=-
+      }
     }
  }
 }
@@ -161,8 +167,10 @@ __fw_tpws6()
  done
  network_get_device DEVICE lan
  dnat6_target
- ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
- [ "$1" != "1" ] || ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
+ [ "$DNAT6_TARGET" != '-' ] && {
+    ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
+    [ "$1" != "1" ] || ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
+ }
 }
 fw_tpws6()
 {
@@ -177,6 +185,6 @@ fw_tpws_https6()
 
 create_ipset()
 {
-	echo "Creating ipset"
-	"$IPSET_CR" $1
+ echo "Creating ipset"
+ "$IPSET_CR" $1
 }
