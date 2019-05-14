@@ -650,7 +650,10 @@ install_sysv_init()
 {
 	echo \* installing init script
 
-	[ -x "$INIT_SCRIPT" ] && "$INIT_SCRIPT" stop
+	[ -x "$INIT_SCRIPT" ] && {
+		"$INIT_SCRIPT" stop
+		"$INIT_SCRIPT" disable
+	}
 	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
 	"$INIT_SCRIPT" enable
 }

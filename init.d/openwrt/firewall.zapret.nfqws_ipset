@@ -3,4 +3,5 @@ IPT_FILTER_POST="-p tcp --dport 80 -m set --match-set zapret dst"
 
 . /opt/zapret/init.d/openwrt/functions
 
+create_ipset no-update
 fw_nfqws

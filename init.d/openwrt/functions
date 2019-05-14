@@ -5,6 +5,12 @@ TPPORT_HTTP=1188
 TPPORT_HTTPS=1189
 TPWS_USER=daemon
 
+# max wait time for the link local ipv6 on the LAN interface
+LINKLOCAL_WAIT_SEC=5
+
+[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
+IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
+
 exists()
 {
  which $1 >/dev/null 2>/dev/null
@@ -71,14 +77,30 @@ dnat6_target()
 {
  # get target ip address for DNAT. prefer link locals
  # tpws should be as inaccessible from outside as possible
+ # link local address can appear not immediately after ifup
  [ -n "$DNAT6_TARGET" ] || {
+    # no reason to query if its down
+    network_is_up lan || return
+
     local DEVICE
     network_get_device DEVICE lan
-    DNAT6_TARGET=$(get_ipv6_linklocal $DEVICE)
-    [ -z "$DNAT6_TARGET" ] && DNAT6_TARGET=$(get_ipv6_global $DEVICE)
+
+    local ct=0
+    while 
+      DNAT6_TARGET=$(get_ipv6_linklocal $DEVICE)
+      [ -n "$DNAT6_TARGET" ] && break
+      [ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
+      echo waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
+      ct=$(($ct+1))
+      sleep 1
+    do :; done
+
+    [ -z "$DNAT6_TARGET" ] && {
+    	echo no link local. getting global
+    	DNAT6_TARGET=$(get_ipv6_global $DEVICE)
+    }
  }
 }
-
 
 
 fw_nfqws()
@@ -149,4 +171,12 @@ fw_tpws6()
 fw_tpws_https6()
 {
  __fw_tpws6 1
+}
+
+
+
+create_ipset()
+{
+	echo "Creating ipset"
+	"$IPSET_CR" $1
 }

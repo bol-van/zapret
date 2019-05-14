@@ -2,4 +2,5 @@ IPT_FILTER_HTTP="-p tcp --dport 80 -m set --match-set zapret6 dst"
 
 . /opt/zapret/init.d/openwrt/functions
 
+create_ipset no-update
 fw_tpws6

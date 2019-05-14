@@ -20,13 +20,17 @@ TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt.gz
 [ -f "$TPWS_HOSTLIST" ] || TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts-user.txt
 TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
 TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
-TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer"
+# first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
+TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer --bind-wait-ifup=30 --bind-wait-ip=30 --bind-wait-ip-linklocal=3"
 TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
 TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
 
 [ -n "$IFACE_WAN" ] && IPT_OWAN="-o $IFACE_WAN"
 [ -n "$IFACE_WAN" ] && IPT_IWAN="-i $IFACE_WAN"
 [ -n "$IFACE_LAN" ] && IPT_ILAN="-i $IFACE_LAN"
+
+# max wait time for the link local ipv6 on the LAN interface
+LINKLOCAL_WAIT_SEC=5
 
 exists()
 {
@@ -70,16 +74,53 @@ get_ipv6_global()
 	[ -n "$1" ] && dev="dev $1"
 	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope global.*$/\1/;t;d' | head -n 1
 }
+
+iface_is_up()
+{	
+	# $1 - interface name
+	[ -f /sys/class/net/$1/operstate ] || return
+	local state
+	read state </sys/class/net/$1/operstate
+	[ "$state" != "down" ]
+}
+wait_ifup()
+{
+	# $1 - interface name
+	local ct=0
+	while
+		iface_is_up $1 && return
+		[ "$ct" -ge "$IFUP_WAIT_SEC" ] && break
+		echo waiting for ifup of $1 for another $(($IFUP_WAIT_SEC - $ct)) seconds ...
+		ct=$(($ct+1))
+		sleep 1
+	do :; done
+	false
+}
+
+
 dnat6_target()
 {
 	# get target ip address for DNAT. prefer link locals
 	# tpws should be as inaccessible from outside as possible
+	# link local address can appear not immediately after ifup
 	[ -n "$DNAT6_TARGET" ] || {
-		DNAT6_TARGET=$(get_ipv6_linklocal $IFACE_LAN)
-		[ -z "$DNAT6_TARGET" ] && DNAT6_TARGET=$(get_ipv6_global $IFACE_LAN)
+
+		local ct=0
+		while
+			DNAT6_TARGET=$(get_ipv6_linklocal $IFACE_LAN)
+			[ -n "$DNAT6_TARGET" ] && break
+			[ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
+			echo waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
+			ct=$(($ct+1))
+			sleep 1
+		do :; done
+
+		[ -z "$DNAT6_TARGET" ] && {
+		    	echo no link local. getting global
+			DNAT6_TARGET=$(get_ipv6_global $IFACE_LAN)
+		}
 	}
 }
-
 
 fw_tpws_add()
 {

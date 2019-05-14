@@ -1,8 +1,8 @@
 #!/bin/sh /etc/rc.common
 
 USE_PROCD=1
-# start betfore firewall - we need ipset populated
-START=18
+# after network
+START=21
 
 . /lib/functions/network.sh
 
@@ -13,7 +13,6 @@ ZAPRET_BASE=/opt/zapret
 # !!!!! in openwrt firewall rules are configured separately
 
 PIDDIR=/var/run
-IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 
 QNUM=200
 NFQWS=$ZAPRET_BASE/nfq/nfqws
@@ -27,7 +26,8 @@ TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt.gz
 [ -f "$TPWS_HOSTLIST" ] || TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts-user.txt
 TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
 TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
-TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer"
+# first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
+TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer --bind-wait-ifup=30 --bind-wait-ip=30 --bind-wait-ip-linklocal=3"
 TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
 TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
 
@@ -44,12 +44,6 @@ run_daemon()
 	procd_set_param command $2 $3
 	procd_set_param pidfile $PIDDIR/$DAEMONBASE$1.pid
 	procd_close_instance
-}
-
-create_ipset()
-{
-	echo "Creating ipset"
-	$IPSET_CR
 }
 
 run_tpws()
@@ -77,16 +71,13 @@ start_service() {
 			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
 			;;
 	    tpws_ipset|tpws_all)
-			create_ipset
 			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			;;
 	    tpws_ipset_https|tpws_all_https)
-			create_ipset
 			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
 			;;
 	    nfqws_ipset|nfqws_ipset_https)
-			create_ipset
 			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
 			;;
 	    nfqws_all|nfqws_all_https)

@@ -21,7 +21,7 @@ ZIPLIST_USER_IPBAN6=$EXEDIR/zapret-ip-user-ipban6.txt
 ZUSERLIST_IPBAN=$EXEDIR/zapret-hosts-user-ipban.txt
 
 MDIG=$EXEDIR/../mdig/mdig
-MDIG_THREADS=30
+[ -z "$MDIG_THREADS" ] && MDIG_THREADS=30
 
 zzexist()
 {

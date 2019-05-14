@@ -3,4 +3,5 @@ IPT_FILTER_HTTPS="-p tcp --dport 443 -m set --match-set zapret6 dst"
 
 . /opt/zapret/init.d/openwrt/functions
 
+create_ipset no-update
 fw_tpws_https6

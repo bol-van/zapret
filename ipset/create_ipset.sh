@@ -1,5 +1,6 @@
 #!/bin/sh
 # create ipset from resolved ip's
+# $1=no-update   - do not update ipset, only create if its absent
 
 SCRIPT=$(readlink -f "$0")
 EXEDIR=$(dirname "$SCRIPT")
@@ -8,6 +9,7 @@ IP2NET=$EXEDIR/../ip2net/ip2net
 
 . "$EXEDIR/def.sh"
 
+[ "$1" = "no-update" ] && NO_UPDATE=1
 
 create_ipset()
 {
@@ -17,7 +19,10 @@ if [ -x "$IP2NET" ]; then
 else
  IPSTYPE=$1
 fi
-ipset flush $2 2>/dev/null || ipset create $2 $IPSTYPE $IPSET_OPT
+ipset create $2 $IPSTYPE $IPSET_OPT 2>/dev/null || {
+ [ "$NO_UPDATE" = "1" ] && return
+}
+ipset flush $2
 for f in "$3" "$4"
 do
  zzexist "$f" && {
@@ -44,7 +49,10 @@ return 0
 create_ipset6()
 {
 local IPSTYPE=$1
-ipset flush $2 2>/dev/null || ipset create $2 $IPSTYPE $IPSET_OPT family inet6
+ipset create $2 $IPSTYPE $IPSET_OPT family inet6 2>/dev/null || {
+ [ "$NO_UPDATE" = "1" ] && return
+}
+ipset flush $2
 for f in "$3" "$4"
 do
  zzexist "$f" && {
