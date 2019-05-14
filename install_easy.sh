@@ -195,7 +195,6 @@ select_ipv6()
 
 ask_config()
 {
-	select_ipv6
 	select_mode
 	select_getlist
 }
@@ -452,6 +451,7 @@ install_systemd()
 	check_prerequisites_linux
 	service_stop_systemd
 	install_binaries
+	select_ipv6
 	ask_config_desktop
 	ask_config
 	service_install_systemd
@@ -674,6 +674,7 @@ install_openwrt()
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	
 	check_location copy_minimal
+	select_ipv6
 	check_prerequisites_openwrt
 	install_binaries
 	ask_config
