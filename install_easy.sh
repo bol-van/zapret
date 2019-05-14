@@ -122,7 +122,7 @@ ask_list()
 	local M_ALL=$M_DEFAULT
 	local M=""
 	
-	[ -n "$3" ] && find_str_in_list "$M_DEFAULT" "$2" || M_DEFAULT="$3"
+	[ -n "$3" ] && { find_str_in_list "$M_DEFAULT" "$2" || M_DEFAULT="$3" ;}
 	
 	n=1
 	for m in $2; do
@@ -198,6 +198,43 @@ ask_config()
 	select_ipv6
 	select_mode
 	select_getlist
+}
+
+ask_iface()
+{
+	# $1 - var to ask
+	ask_list $1 "$(ls /sys/class/net)" && write_config_var $1
+}
+
+select_router_iface()
+{
+	local T=N
+	[ -n "$IFACE_LAN" ] && [ -n "$IFACE_WAN" ] && T=Y
+	local old_lan=$IFACE_LAN
+	local old_wan=$IFACE_WAN
+
+	echo -n "is this system a router (default : $T) (Y/N) ? "
+	read A
+	[ -z "$A" ] && A=$T
+	if [ "$A" = 'Y' ] || [ "$A" = 'y' ]; then
+		echo LAN interface :
+		ask_iface IFACE_LAN
+		echo WAN interface :
+		ask_iface IFACE_WAN
+	else
+		[ -n "$old_lan" ] && {
+			IFACE_LAN=""
+			write_config_var IFACE_LAN
+		}
+		[ -n "$old_wan" ] && {
+			IFACE_WAN=""
+			write_config_var IFACE_WAN
+		}
+	fi
+}
+ask_config_desktop()
+{
+	select_router_iface
 }
 
 copy_all()
@@ -415,6 +452,7 @@ install_systemd()
 	check_prerequisites_linux
 	service_stop_systemd
 	install_binaries
+	ask_config_desktop
 	ask_config
 	service_install_systemd
 	download_list
