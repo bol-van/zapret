@@ -109,7 +109,6 @@ timer_remove_systemd()
 
 remove_systemd()
 {
-	INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
 	INIT_SCRIPT=/etc/init.d/zapret
 	
 	service_stop_systemd
@@ -171,6 +170,13 @@ restart_openwrt_firewall()
 	}
 }
 
+remove_openwrt_iface_hook()
+{
+	echo \* removing ifup hook
+	
+	rm -f /etc/hotplug.d/iface/??-zapret
+}
+
 
 service_remove_sysv()
 {
@@ -185,13 +191,13 @@ service_remove_sysv()
 
 remove_openwrt()
 {
-	INIT_SCRIPT_SRC=$EXEDIR/init.d/openwrt/zapret
 	INIT_SCRIPT=/etc/init.d/zapret
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 
 	remove_openwrt_firewall
 	restart_openwrt_firewall
 	service_remove_sysv
+	remove_openwrt_iface_hook
 	crontab_del
 }
 

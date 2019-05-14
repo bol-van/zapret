@@ -1,0 +1,7 @@
+#!/bin/sh
+
+ZAPRET=/etc/init.d/zapret
+[ -x "$ZAPRET" ] && [ "$INTERFACE" = "lan" ] && {
+	[ "$ACTION" = "ifup" ] && $ZAPRET start
+	[ "$ACTION" = "ifdown" ] && $ZAPRET stop
+}

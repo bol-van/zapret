@@ -646,8 +646,16 @@ remove_openwrt_firewall()
 	openwrt_fw_section_del 6
 }
 
+install_openwrt_iface_hook()
+{
+	echo \* installing ifup hook
+	
+	ln -fs "$OPENWRT_IFACE_HOOK" /etc/hotplug.d/iface
+}
+
 install_sysv_init()
 {
+	# $1 - "0"=disable
 	echo \* installing init script
 
 	[ -x "$INIT_SCRIPT" ] && {
@@ -655,7 +663,7 @@ install_sysv_init()
 		"$INIT_SCRIPT" disable
 	}
 	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
-	"$INIT_SCRIPT" enable
+	[ "$1" != "0" ] && "$INIT_SCRIPT" enable
 }
 
 service_start_sysv()
@@ -675,13 +683,14 @@ install_openwrt()
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/openwrt/zapret
 	FW_SCRIPT_SRC_DIR=$EXEDIR/init.d/openwrt/firewall.zapret
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
+	OPENWRT_IFACE_HOOK=$EXEDIR/init.d/openwrt/90-zapret
 	
 	check_location copy_minimal
 	select_ipv6
 	check_prerequisites_openwrt
 	install_binaries
 	ask_config
-	install_sysv_init
+	install_sysv_init 0
 	# can be previous firewall preventing access
 	remove_openwrt_firewall
 	restart_openwrt_firewall
@@ -689,6 +698,7 @@ install_openwrt()
 	# router system : works 24/7. night is the best time
 	crontab_add 0 6
 	service_start_sysv
+	install_openwrt_iface_hook
 	install_openwrt_firewall_all
 	restart_openwrt_firewall
 }
