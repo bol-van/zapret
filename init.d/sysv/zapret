@@ -15,124 +15,13 @@ DESC=anti-zapret
 
 case "$1" in
   start)
-	case "${MODE}" in
-	    tpws_hostlist)
-			prepare_tpws
-			fw_tpws_add "--dport 80" "--dport 80" $TPPORT_HTTP
-			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
-			;;
-	    tpws_ipset)
-			create_ipset
-			prepare_tpws
-			fw_tpws_add "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
-			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-			;;
-	    tpws_ipset_https)
-			create_ipset
-			prepare_tpws
-			fw_tpws_add "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
-			fw_tpws_add "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
-			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-			;;
-	    tpws_all)
-			prepare_tpws
-			fw_tpws_add "--dport 80" "--dport 80" $TPPORT_HTTP
-			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-			;;
-	    tpws_all_https)
-			prepare_tpws
-			fw_tpws_add "--dport 80" "--dport 80" $TPPORT_HTTP
-			fw_tpws_add "--dport 443" "--dport 443" $TPPORT_HTTPS
-			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
-			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-			;;
-	    nfqws_ipset)
-			create_ipset
-			fw_nfqws_add_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src"
-			fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
-			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
-	    nfqws_ipset_https)
-			create_ipset
-			fw_nfqws_add_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src"
-			fw_nfqws_add_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
-			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
-	    nfqws_all)
-			fw_nfqws_add_pre "--sport 80" "--sport 80"
-			fw_nfqws_add_post "--dport 80" "--dport 80"
-			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
-	    nfqws_all_https)
-			fw_nfqws_add_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443"
-			fw_nfqws_add_post "--dport 80" "--dport 80"
-			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
-	    ipset)
-			create_ipset
-			;;
-	    custom)
-			# PLACEHOLDER
-			echo !!! NEED ATTENTION !!!
-			echo Configure iptables for required actions
-			echo Start daemon\(s\)
-			echo Study how other sections work
-			run_daemon 1 /bin/sleep 20
-			;;
-	esac
+  	zapret_run_daemons
+  	[ "$INIT_APPLY_FW" = "1" ] && zapret_apply_firewall
 	;;
 
   stop)
-	case "${MODE}" in
-	    tpws_hostlist|tpws_all)
-			fw_tpws_del "--dport 80" "--dport 80" $TPPORT_HTTP
-			stop_tpws 1
-			;;
-	    tpws_ipset)
-			fw_tpws_del "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
-			stop_tpws 1
-			;;
-	    tpws_ipset_https)
-			fw_tpws_del "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
-			fw_tpws_del "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
-			stop_tpws 1
-			stop_tpws 2
-			;;
-	    tpws_all_https)
-			fw_tpws_del "--dport 80" "--dport 80" $TPPORT_HTTP
-			fw_tpws_del "--dport 443" "--dport 443" $TPPORT_HTTPS
-			stop_tpws 1
-			stop_tpws 2
-			;;
-	    nfqws_ipset)
-			fw_nfqws_del_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src"
-			fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
-			stop_daemon 1 $NFQWS
-			;;
-	    nfqws_ipset_https)
-			fw_nfqws_del_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src"
-			fw_nfqws_del_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
-			stop_daemon 1 $NFQWS
-			;;
-	    nfqws_all)
-			fw_nfqws_del_pre "--sport 80" "--sport 80"
-			fw_nfqws_del_post "--dport 80" "--dport 80"
-			stop_daemon 1 $NFQWS
-			;;
-	    nfqws_all_https)
-			fw_nfqws_del_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443"
-			fw_nfqws_del_post "--dport 80" "--dport 80"
-			stop_daemon 1 $NFQWS
-			;;
-	    custom)
-			# PLACEHOLDER
-			echo !!! NEED ATTENTION !!!
-			echo Clear firewall rules here. Remove iptables changes made previously.
-			echo Stop daemon\(s\) previously started.
-			echo Study how other sections work.
-			;;
-	esac
+  	zapret_stop_daemons
+  	[ "$INIT_APPLY_FW" = "1" ] && zapret_unapply_firewall
 	;;
 
   *)
