@@ -28,6 +28,8 @@ TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
 [ -n "$IFACE_WAN" ] && IPT_IWAN="-i $IFACE_WAN"
 [ -n "$IFACE_LAN" ] && IPT_ILAN="-i $IFACE_LAN"
 
+[ -n "$APPLY_FW" ] || APPLY_FW=$INIT_APPLY_FW
+
 exists()
 {
 	which $1 >/dev/null 2>/dev/null
@@ -86,14 +88,14 @@ fw_tpws_add()
 	# $1 - iptable filter for ipv4
 	# $2 - iptable filter for ipv6
 	# $3 - tpws port
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
 		echo "Adding iptables rule for tpws : $1"
 		[ -n "$IFACE_LAN" ] && {
 			ipt PREROUTING -t nat $IPT_ILAN -p tcp $1 -j DNAT --to 127.0.0.1:$3
 	 	}
 		ipt OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$3
 	}
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
 		echo "Adding ip6tables rule for tpws : $2"
 		[ -n "$IFACE_LAN" ] && {
 			dnat6_target
@@ -107,14 +109,14 @@ fw_tpws_del()
 	# $1 - iptable filter for ipv4
 	# $2 - iptable filter for ipv6
 	# $3 - tpws port
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
 		echo "Deleting iptables rule for tpws : $1"
 		[ -n "$IFACE_LAN" ] && {
 			ipt_del PREROUTING -t nat $IPT_ILAN -p tcp $1 -j DNAT --to 127.0.0.1:$3
 		}
 		ipt_del OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $TPWS_USER -p tcp $1 -j DNAT --to 127.0.0.1:$3
 	}
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
 		echo "Deleting ip6tables rule for tpws : $2"
 		[ -n "$IFACE_LAN" ] && {
 			dnat6_target
@@ -128,11 +130,11 @@ fw_nfqws_add_pre()
 {
 	# $1 - iptable filter for ipv4
 	# $2 - iptable filter for ipv6
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
 		echo "Adding iptables rule for nfqws prerouting : $1"
 		ipt PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
 		echo "Adding ip6tables rule for nfqws prerouting : $2"
 		ipt6 PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
@@ -141,11 +143,11 @@ fw_nfqws_del_pre()
 {
 	# $1 - iptable filter for ipv4
 	# $2 - iptable filter for ipv6
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
 		echo "Deleting iptables rule for nfqws prerouting : $1"
 		ipt_del PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
 		echo "Deleting ip6tables rule for nfqws prerouting : $2"
 		ipt6_del PREROUTING -t raw $IPT_IWAN -p tcp --tcp-flags SYN,ACK SYN,ACK $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
@@ -154,11 +156,11 @@ fw_nfqws_add_post()
 {
 	# $1 - iptable filter for ipv4
 	# $2 - iptable filter for ipv6
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
 		echo "Adding iptables rule for nfqws postrouting : $1"
 		ipt POSTROUTING -t mangle $IPT_OWAN -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
 		echo "Adding ip6tables rule for nfqws postrouting : $2"
 		ipt6 POSTROUTING -t mangle $IPT_OWAN -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
@@ -167,11 +169,11 @@ fw_nfqws_del_post()
 {
 	# $1 - iptable filter for ipv4
 	# $2 - iptable filter for ipv6
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV4" != "1" ] && {
 		echo "Deleting iptables rule for nfqws postrouting : $1"
 		ipt_del POSTROUTING -t mangle $IPT_OWAN -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
-	[ "$INIT_APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
+	[ "$APPLY_FW" = "1" ] && [ "$DISABLE_IPV6" != "1" ] && {
 		echo "Deleting ip6tables rule for nfqws postrouting : $2"
 		ipt6_del POSTROUTING -t mangle $IPT_OWAN -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
 	}
