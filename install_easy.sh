@@ -494,7 +494,8 @@ check_prerequisites_openwrt()
 	local UPD=0
 	
 	# in recent lede/openwrt iptable_raw in separate package
-	if ([ "$DISABLE_IPV6" = "1" ] || check_kmod ip6table_nat) && check_kmod iptable_raw && check_packages_openwrt $PKGS ; then
+	if ([ "$DISABLE_IPV6" = "1" ] || (check_kmod ip6table_nat && check_kmod ip6table_raw)) && \
+	   check_kmod iptable_raw && check_packages_openwrt $PKGS ; then
 		echo everything is present
 	else
 		echo \* installing prerequisites
@@ -502,6 +503,7 @@ check_prerequisites_openwrt()
 		opkg update
 		UPD=1
 		if check_package_exists_openwrt kmod-ipt-raw ; then PKGS="$PKGS kmod-ipt-raw" ; fi
+		if [ "$DISABLE_IPV6" != "1" ] && check_package_exists_openwrt kmod-ipt-raw6 ; then PKGS="$PKGS kmod-ipt-raw6" ; fi
 		opkg install $PKGS || {
 			echo could not install prerequisites
 			exitp 6
