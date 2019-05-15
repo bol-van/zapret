@@ -167,7 +167,7 @@ __fw_tpws6()
  done
  network_get_device DEVICE lan
  dnat6_target
- [ "$DNAT6_TARGET" != '-' ] && {
+ [ "$DNAT6_TARGET" != "-" ] && {
     ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
     [ "$1" != "1" ] || ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
  }
