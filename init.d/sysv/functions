@@ -341,7 +341,7 @@ zapret_do_firewall()
 			fw_nfqws_post $1 "--dport 80" "--dport 80"
 			;;
 	    ipset)
-			[ "$1" = "1" ] && create_ipset
+			[ "$1" != "1" ] || create_ipset
 			;;
 	    custom)
 			# PLACEHOLDER
@@ -378,9 +378,6 @@ zapret_run_daemons()
 			;;
 	    nfqws_ipset|nfqws_ipset_https|nfqws_all|nfqws_all_https)
 			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
-	    ipset)
-			create_ipset
 			;;
 	    custom)
 			# PLACEHOLDER
