@@ -690,7 +690,7 @@ install_openwrt()
 	check_prerequisites_openwrt
 	install_binaries
 	ask_config
-	install_sysv_init 0
+	install_sysv_init
 	# can be previous firewall preventing access
 	remove_openwrt_firewall
 	restart_openwrt_firewall
