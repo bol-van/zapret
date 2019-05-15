@@ -105,7 +105,7 @@ dnat6_target()
 	# link local address can appear not immediately after ifup
 	
 	# DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
-	[ "$DNAT6_TARGET" = '-' ] || {
+	[ -n "$DNAT6_TARGET" ] || {
 		local ct=0
 		while
 			DNAT6_TARGET=$(get_ipv6_linklocal $IFACE_LAN)

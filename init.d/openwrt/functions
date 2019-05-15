@@ -80,7 +80,7 @@ dnat6_target()
  # link local address can appear not immediately after ifup
  
  # DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
- [ "$DNAT6_TARGET" = '-' ] || {
+ [ -n "$DNAT6_TARGET" ] || {
     # no reason to query if its down
     network_is_up lan || return
 
