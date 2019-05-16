@@ -121,7 +121,6 @@ remove_systemd()
 
 
 
-
 openwrt_fw_section_find()
 {
 	# $1 - fw include postfix
@@ -157,6 +156,7 @@ remove_openwrt_firewall()
 	echo \* removing firewall script
 	
 	openwrt_fw_section_del
+	# from old zapret versions. now we use single include
 	openwrt_fw_section_del 6
 }
 

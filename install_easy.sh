@@ -559,32 +559,29 @@ openwrt_fw_section_find()
 	false
 	return
 }
-openwrt_fw_section_add()
-{
-	# $1 - fw include postfix
-	# echoes section number
-
-	openwrt_fw_section_find $1 ||
-	{
-		uci add firewall include >/dev/null || return
-		echo -1
-	}
-}
 openwrt_fw_section_del()
 {
 	# $1 - fw include postfix
+
 	local id=$(openwrt_fw_section_find $1)
 	[ -n "$id" ] && {
 		uci delete firewall.@include[$id] && uci commit firewall
 		rm -f "$OPENWRT_FW_INCLUDE$1"
 	}
 }
+openwrt_fw_section_add()
+{
+	openwrt_fw_section_find ||
+	{
+		uci add firewall include >/dev/null || return
+		echo -1
+	}
+}
 openwrt_fw_section_configure()
 {
-	# $1 - fw include postfix
 	local id=$(openwrt_fw_section_add $1)
 	[ -z "$id" ] ||
-	 ! uci set firewall.@include[$id].path="$OPENWRT_FW_INCLUDE$1" ||
+	 ! uci set firewall.@include[$id].path="$OPENWRT_FW_INCLUDE" ||
 	 ! uci set firewall.@include[$id].reload="1" ||
 	 ! uci commit firewall &&
 	{
@@ -595,8 +592,6 @@ openwrt_fw_section_configure()
 
 install_openwrt_firewall()
 {
-	# $1 - fw include postfix
-
 	echo \* installing firewall script $1
 	
 	[ -n "MODE" ] || {
@@ -604,31 +599,12 @@ install_openwrt_firewall()
 		exitp 7
 	}
 	
-	local FW_SCRIPT_SRC="$FW_SCRIPT_SRC_DIR.$MODE$1"
-	[ -f "$FW_SCRIPT_SRC" ] || {
-		echo firewall script $FW_SCRIPT_SRC not found. removing firewall include
-		openwrt_fw_section_del
-		return
-	}
-	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE$1"
-	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE$1"
+	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
+	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"
 	
 	openwrt_fw_section_configure $1
 }
 
-install_openwrt_firewall_all()
-{
-	if [ "$DISABLE_IPV4" = "1" ] ; then
-		openwrt_fw_section_del
-	else
-		install_openwrt_firewall
-	fi
-	if [ "$DISABLE_IPV6" = "1" ] ; then
-		openwrt_fw_section_del 6
-	else
-		install_openwrt_firewall 6
-	fi
-}
 
 restart_openwrt_firewall()
 {
@@ -645,6 +621,7 @@ remove_openwrt_firewall()
 	echo \* removing firewall script
 	
 	openwrt_fw_section_del
+	# from old zapret versions. now we use single include
 	openwrt_fw_section_del 6
 }
 
@@ -683,7 +660,7 @@ service_start_sysv()
 install_openwrt()
 {
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/openwrt/zapret
-	FW_SCRIPT_SRC_DIR=$EXEDIR/init.d/openwrt/firewall.zapret
+	FW_SCRIPT_SRC=$EXEDIR/init.d/openwrt/firewall.zapret
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	OPENWRT_IFACE_HOOK=$EXEDIR/init.d/openwrt/90-zapret
 	
@@ -701,7 +678,7 @@ install_openwrt()
 	crontab_add 0 6
 	service_start_sysv
 	install_openwrt_iface_hook
-	install_openwrt_firewall_all
+	install_openwrt_firewall
 	restart_openwrt_firewall
 }
 

@@ -292,7 +292,7 @@ do_tpws()
 create_ipset()
 {
 	echo "Creating ipset"
-	"$IPSET_CR"
+	"$IPSET_CR" "$@"
 }
 
 

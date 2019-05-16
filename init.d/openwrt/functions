@@ -82,6 +82,7 @@ dnat6_target()
  # link local address can appear not immediately after ifup
  
  # DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
+
  [ -n "$DNAT6_TARGET" ] || {
     # no reason to query if its down
     network_is_up lan || return
@@ -111,86 +112,138 @@ dnat6_target()
 }
 
 
-fw_nfqws()
+fw_nfqws_pre()
 {
- [ "$DISABLE_IPV4" = "1" ] && return
+ # $1 - filter ipv4
+ # $2 - filter ipv6
+
  local DEVICE wan_iface
- network_find_wan_all wan_iface
- for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    ipt POSTROUTING -t mangle -o $DEVICE $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass
-    ipt PREROUTING -t raw -i $DEVICE $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
- done
+
+ [ "$DISABLE_IPV4" = "1" ] || {
+    network_find_wan_all wan_iface
+    for ext_iface in $wan_iface; do
+       network_get_device DEVICE $ext_iface
+       ipt PREROUTING -t raw -i $DEVICE -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+    done
+ }
+ [ "$DISABLE_IPV6" = "1" ] || {
+    network_find_wan6_all wan_iface
+    for ext_iface in $wan_iface; do
+       network_get_device DEVICE $ext_iface
+       ipt6 PREROUTING -t raw -i $DEVICE -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+    done
+ }
 }
-fw_nfqws6()
+fw_nfqws_post()
 {
- [ "$DISABLE_IPV6" = "1" ] && return
+ # $1 - filter ipv4
+ # $2 - filter ipv6
+
  local DEVICE wan_iface
- network_find_wan6_all wan_iface
- for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    ipt6 POSTROUTING -t mangle -o $DEVICE $IPT_FILTER_POST -j NFQUEUE --queue-num $QNUM --queue-bypass
-    ipt6 PREROUTING -t raw -i $DEVICE $IPT_FILTER_PRE -j NFQUEUE --queue-num $QNUM --queue-bypass
- done
+
+ [ "$DISABLE_IPV4" = "1" ] || {
+    network_find_wan_all wan_iface
+    for ext_iface in $wan_iface; do
+       network_get_device DEVICE $ext_iface
+       ipt POSTROUTING -t mangle -o $DEVICE -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+    done
+ }
+ [ "$DISABLE_IPV6" = "1" ] || {
+    network_find_wan6_all wan_iface
+    for ext_iface in $wan_iface; do
+       network_get_device DEVICE $ext_iface
+       ipt6 POSTROUTING -t mangle -o $DEVICE -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+    done
+ }
 }
 
 IPT_OWNER="-m owner ! --uid-owner $TPWS_USER"
-__fw_tpws()
-{
- # $1 - use https
- [ "$DISABLE_IPV4" = "1" ] && return
- local DEVICE wan_iface
- network_find_wan_all wan_iface
- for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
-    [ "$1" != "1" ] || ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
- done
- network_get_device DEVICE lan
- sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
- ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTP -j DNAT --to 127.0.0.1:$TPPORT_HTTP
- [ "$1" != "1" ] || ipt prerouting_lan_rule -t nat $IPT_FILTER_HTTPS -j DNAT --to 127.0.0.1:$TPPORT_HTTPS
-}
 fw_tpws()
 {
- __fw_tpws 0
-}
-fw_tpws_https()
-{
- __fw_tpws 1
-}
+ # $1 - filter ipv4
+ # $2 - filter ipv6
+ # $3 - tpws port
 
-__fw_tpws6()
-{
- # $1 - use https
- [ "$DISABLE_IPV6" = "1" ] && return
- local DEVICE wan_iface ip6
- network_find_wan6_all wan_iface
- for ext_iface in $wan_iface; do
-    network_get_device DEVICE $ext_iface
-    ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTP -j DNAT --to [::1]:$TPPORT_HTTP
-    [ "$1" != "1" ] || ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER $IPT_FILTER_HTTPS -j DNAT --to [::1]:$TPPORT_HTTPS
- done
- network_get_device DEVICE lan
- dnat6_target
- [ "$DNAT6_TARGET" != "-" ] && {
-    ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTP -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTP
-    [ "$1" != "1" ] || ipt6 PREROUTING -t nat -i $DEVICE $IPT_FILTER_HTTPS -j DNAT --to [$DNAT6_TARGET]:$TPPORT_HTTPS
+ local DEVICE wan_iface
+ 
+ [ "$DISABLE_IPV4" = "1" ] || {
+    network_find_wan_all wan_iface
+    for ext_iface in $wan_iface; do
+       network_get_device DEVICE $ext_iface
+       ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $1 -j DNAT --to 127.0.0.1:$3
+    done
+    ipt prerouting_lan_rule -t nat -p tcp $1 -j DNAT --to 127.0.0.1:$3
+    network_get_device DEVICE lan
+    sysctl -qw net.ipv4.conf.$DEVICE.route_localnet=1
+ }
+ [ "$DISABLE_IPV6" = "1" ] || {
+    network_find_wan6_all wan_iface
+    for ext_iface in $wan_iface; do
+       network_get_device DEVICE $ext_iface
+       ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $2 -j DNAT --to [::1]:$3
+    done
+    network_get_device DEVICE lan
+    dnat6_target
+    [ "$DNAT6_TARGET" != "-" ] && ipt6 PREROUTING -t nat -i $DEVICE -p tcp $2 -j DNAT --to [$DNAT6_TARGET]:$3
  }
 }
-fw_tpws6()
-{
- __fw_tpws6 0
-}
-fw_tpws_https6()
-{
- __fw_tpws6 1
-}
-
 
 
 create_ipset()
 {
  echo "Creating ipset"
- "$IPSET_CR" $1
+ "$IPSET_CR" "$@"
+}
+
+
+zapret_apply_firewall()
+{
+	case "${MODE}" in
+	    tpws_hostlist)
+			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
+			;;
+	    tpws_ipset)
+			create_ipset no-update
+			fw_tpws "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
+			;;
+	    tpws_ipset_https)
+			create_ipset no-update
+			fw_tpws "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
+			fw_tpws "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
+			;;
+	    tpws_all)
+			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
+			;;
+	    tpws_all_https)
+			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
+			fw_tpws "--dport 443" "--dport 443" $TPPORT_HTTPS
+			;;
+	    nfqws_ipset)
+			create_ipset no-update
+			fw_nfqws_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src"
+			fw_nfqws_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			;;
+	    nfqws_ipset_https)
+			create_ipset no-update
+			fw_nfqws_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src"
+			fw_nfqws_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			;;
+	    nfqws_all)
+			fw_nfqws_pre "--sport 80" "--sport 80"
+			fw_nfqws_post "--dport 80" "--dport 80"
+			;;
+	    nfqws_all_https)
+			fw_nfqws_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443"
+			fw_nfqws_post "--dport 80" "--dport 80"
+			;;
+	    ipset)
+			create_ipset no-update
+			;;
+	    custom)
+			# PLACEHOLDER
+			echo !!! NEED ATTENTION !!!
+			echo Configure iptables for required actions
+			echo Study how other sections work
+			;;
+	esac
 }

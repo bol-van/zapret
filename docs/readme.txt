@@ -616,11 +616,8 @@ ipset можно выкинуть, если не будем пользовать
 может быть критично, они не запустятся после перезагрузки.
 Cкрипт из /etc/hotplug.d/iface запустит недостающие службы при поднятии интерфейса lan.
 
-Если не включен параметр DISABLE_IPV4 :
-В зависимости от выбранного в файле config MODE создать ссылку на нужный файл настроек фаервола :
- ln -fs /opt/zapret/init.d/openwrt/firewall.zapret.$MODE /etc/firewall.zapret
-Например :
- ln -fs /opt/zapret/init.d/openwrt/firewall.zapret.tpws_ipset_https /etc/firewall.zapret
+Создать ссылку на firewall include :
+ ln -fs /opt/zapret/init.d/openwrt/firewall.zapret /etc/firewall.zapret
 Проверить была ли создана ранее запись о firewall include :
  uci show firewall | grep firewall.zapret
 Если firewall.zapret нет, значит добавить :
@@ -631,21 +628,6 @@ Cкрипт из /etc/hotplug.d/iface запустит недостающие с
 Перезапустить фаервол :
  fw3 restart
 
-Если не включен параметр DISABLE_IPV6 :
-В зависимости от выбранного в файле config MODE создать ссылку на нужный файл настроек фаервола :
- ln -fs /opt/zapret/init.d/openwrt/firewall.zapret.${MODE}6 /etc/firewall.zapret6
-Например :
- ln -fs /opt/zapret/init.d/openwrt/firewall.zapret.tpws_ipset_https6 /etc/firewall.zapret6
-Проверить была ли создана ранее запись о firewall include :
- uci show firewall | grep firewall.zapret6
-Если firewall.zapret6 нет, значит добавить :
- uci add firewall include
- uci set firewall.@include[-1].path="/etc/firewall.zapret6"
- uci set firewall.@include[-1].reload="1"
- uci commit firewall
-Перезапустить фаервол :
- fw3 restart
- 
 Посмотреть через iptables -nL, ip6tables -nL или через luci вкладку "firewall" появились ли нужные правила.
 
 ЭКОНОМИЯ МЕСТА : если его мало, то можно оставить в директории zapret лишь подкаталог ipset, файл config и init.d/openwrt.
@@ -656,7 +638,7 @@ Cкрипт из /etc/hotplug.d/iface запустит недостающие с
 ЕСЛИ ВСЕ ПЛОХО С МЕСТОМ : откажитесь от работы со списком РКН. используйте только get_user.sh
 
 ЕСЛИ СОВСЕМ ВСЕ УЖАСНО С МЕСТОМ : не надо устанавливать дополнительные пакеты через opkg.
-оставьте лишь /opt/zapret/tpws/tpws, /opt/zapret/config, /etc/init.d/zapret, /etc/firewall.zapret
+оставьте лишь /opt/zapret/tpws/tpws, /opt/zapret/config, /opt/zapret/init.d/openwrt
 используйте MODE=tpws_all или tpws_all_https
 такой вариант потребует около 100 кб места и полностью статичен.
 отсутствуют любые загрузки, обновления, изменения файлов.

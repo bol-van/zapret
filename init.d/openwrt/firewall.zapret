@@ -1,4 +1,3 @@
 . /opt/zapret/init.d/openwrt/functions
 
-create_ipset no-update
-
+zapret_apply_firewall

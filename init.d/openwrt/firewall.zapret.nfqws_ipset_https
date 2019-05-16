@@ -1,7 +1,0 @@
-IPT_FILTER_PRE="-p tcp --tcp-flags SYN,ACK SYN,ACK -m multiport --sports 80,443 -m set --match-set zapret src"
-IPT_FILTER_POST="-p tcp --dport 80 -m set --match-set zapret dst"
-
-. /opt/zapret/init.d/openwrt/functions
-
-create_ipset no-update
-fw_nfqws
