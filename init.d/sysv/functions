@@ -37,6 +37,8 @@ exists()
 	which $1 >/dev/null 2>/dev/null
 }
 
+for a in $(seq 1 50); do ALLARGS="$ALLARGS \"\$$a\"" ; done
+
 on_off_function()
 {
 	# $1 : function name on
@@ -47,7 +49,7 @@ on_off_function()
 	shift
 	shift
 	shift
-	"$F" $@
+	"$F" "$@"
 }
 
 
@@ -61,7 +63,7 @@ ipt_del()
 }
 ipt_add_del()
 {
-	on_off_function ipt ipt_del $@
+	on_off_function ipt ipt_del "$@"
 }
 ipt6()
 {
@@ -73,7 +75,7 @@ ipt6_del()
 }
 ipt6_add_del()
 {
-	on_off_function ipt6 ipt6_del $@
+	on_off_function ipt6 ipt6_del "$@"
 }
 
 # there's no route_localnet for ipv6
@@ -216,6 +218,8 @@ run_daemon()
 	# $2 - daemon
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	
+echo DARGS $3	
 	local DAEMONBASE=$(basename $2)
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
@@ -259,7 +263,7 @@ stop_daemon()
 do_daemon()
 {
 	# $1 - 1 - run, 0 - stop
-	on_off_function run_daemon stop_daemon $@
+	on_off_function run_daemon stop_daemon "$@"
 }
 
 
@@ -273,28 +277,18 @@ prepare_tpws()
 	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.1
 	[ -n "$IFACE_LAN" ] && sysctl -qw net.ipv4.conf.$IFACE_LAN.route_localnet=1
 }
-
-run_tpws()
-{
-	prepare_tpws
-	[ "$DISABLE_IPV4" = "1" ] || run_daemon $1 $TPWS "$TPWS_OPT_BASE $2"
-	[ "$DISABLE_IPV6" = "1" ] || {
-		run_daemon $((60+$1)) $TPWS "$TPWS_OPT_BASE6 $2"
-		[ -n "$IFACE_LAN" ] && run_daemon $((660+$1)) $TPWS "$TPWS_OPT_BASE6_PRE --bind-iface6=$IFACE_LAN $2"
-	}
-}
-stop_tpws()
-{
-	[ "$DISABLE_IPV4" = "1" ] || stop_daemon $1 $TPWS
-	[ "$DISABLE_IPV6" = "1" ] || {
-		stop_daemon $((60+$1)) $TPWS
-		[ -n "$IFACE_LAN" ] && stop_daemon $((660+$1)) $TPWS
-	}
-}
 do_tpws()
 {
-	# $1 - 1 - run, 0 - stop
-	on_off_function run_tpws stop_tpws $@
+	# $1 : 1 - run, 0 - stop
+	# $2 : daemon number
+	# $3 : daemon args
+
+	[ "$1" = "1" ] && prepare_tpws
+	[ "$DISABLE_IPV4" = "1" ] || do_daemon $1 $2 $TPWS "$TPWS_OPT_BASE $3"
+	[ "$DISABLE_IPV6" = "1" ] || {
+		do_daemon $1 $((60+$2)) $TPWS "$TPWS_OPT_BASE6 $3"
+		[ -n "$IFACE_LAN" ] && do_daemon $1 $((660+$2)) $TPWS "$TPWS_OPT_BASE6_PRE --bind-iface6=$IFACE_LAN $3"
+	}
 }
 
 
@@ -366,11 +360,11 @@ zapret_do_firewall()
 }
 zapret_apply_firewall()
 {
-	zapret_do_firewall 1 $@
+	zapret_do_firewall 1 "$@"
 }
 zapret_unapply_firewall()
 {
-	zapret_do_firewall 0 $@
+	zapret_do_firewall 0 "$@"
 }
 
 zapret_do_daemons()
@@ -406,9 +400,9 @@ zapret_do_daemons()
 
 zapret_run_daemons()
 {
-	zapret_do_daemons 1 $@
+	zapret_do_daemons 1 "$@"
 }
 zapret_stop_daemons()
 {
-	zapret_do_daemons 0 $@
+	zapret_do_daemons 0 "$@"
 }
