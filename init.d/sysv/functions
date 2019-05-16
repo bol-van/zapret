@@ -37,8 +37,6 @@ exists()
 	which $1 >/dev/null 2>/dev/null
 }
 
-for a in $(seq 1 50); do ALLARGS="$ALLARGS \"\$$a\"" ; done
-
 on_off_function()
 {
 	# $1 : function name on
