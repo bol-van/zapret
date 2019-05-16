@@ -53,11 +53,11 @@ on_off_function()
 
 ipt()
 {
-	iptables -C $@ 2>/dev/null || iptables -I $@
+	iptables -C "$@" 2>/dev/null || iptables -I "$@"
 }
 ipt_del()
 {
-	iptables -C $@ 2>/dev/null && iptables -D $@
+	iptables -C "$@" 2>/dev/null && iptables -D "$@"
 }
 ipt_add_del()
 {
@@ -65,11 +65,11 @@ ipt_add_del()
 }
 ipt6()
 {
-	ip6tables -C $@ 2>/dev/null || ip6tables -I $@
+	ip6tables -C "$@" 2>/dev/null || ip6tables -I "$@"
 }
 ipt6_del()
 {
-	ip6tables -C $@ 2>/dev/null && ip6tables -D $@
+	ip6tables -C "$@" 2>/dev/null && ip6tables -D "$@"
 }
 ipt6_add_del()
 {

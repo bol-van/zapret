@@ -39,11 +39,11 @@ network_find_wan6_all()
 
 ipt()
 {
- iptables -C $@ 2>/dev/null || iptables -I $@
+ iptables -C "$@" 2>/dev/null || iptables -I "$@"
 }
 ipt6()
 {
- ip6tables -C $@ 2>/dev/null || ip6tables -I $@
+ ip6tables -C "$@" 2>/dev/null || ip6tables -I "$@"
 }
 
 # there's no route_localnet for ipv6
