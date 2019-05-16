@@ -1,5 +1,8 @@
 . /lib/functions/network.sh
 
+[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
+. "$ZAPRET_BASE/config"
+
 QNUM=200
 TPPORT_HTTP=1188
 TPPORT_HTTPS=1189
@@ -111,6 +114,7 @@ dnat6_target()
 
 fw_nfqws()
 {
+ [ "$DISABLE_IPV4" = "1" ] && return
  local DEVICE wan_iface
  network_find_wan_all wan_iface
  for ext_iface in $wan_iface; do
@@ -121,6 +125,7 @@ fw_nfqws()
 }
 fw_nfqws6()
 {
+ [ "$DISABLE_IPV6" = "1" ] && return
  local DEVICE wan_iface
  network_find_wan6_all wan_iface
  for ext_iface in $wan_iface; do
@@ -134,6 +139,7 @@ IPT_OWNER="-m owner ! --uid-owner $TPWS_USER"
 __fw_tpws()
 {
  # $1 - use https
+ [ "$DISABLE_IPV4" = "1" ] && return
  local DEVICE wan_iface
  network_find_wan_all wan_iface
  for ext_iface in $wan_iface; do
@@ -158,6 +164,7 @@ fw_tpws_https()
 __fw_tpws6()
 {
  # $1 - use https
+ [ "$DISABLE_IPV6" = "1" ] && return
  local DEVICE wan_iface ip6
  network_find_wan6_all wan_iface
  for ext_iface in $wan_iface; do

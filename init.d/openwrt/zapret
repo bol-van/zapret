@@ -7,7 +7,6 @@ START=21
 . /lib/functions/network.sh
 
 ZAPRET_BASE=/opt/zapret
-# SHOULD EDIT config
 . "$ZAPRET_BASE/config"
 
 # !!!!! in openwrt firewall rules are configured separately
@@ -82,9 +81,6 @@ start_service() {
 			;;
 	    nfqws_all|nfqws_all_https)
 			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
-	    ipset)
-			create_ipset
 			;;
 	    custom)
 			# PLACEHOLDER

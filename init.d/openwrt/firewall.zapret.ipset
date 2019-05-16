@@ -1,0 +1,4 @@
+. /opt/zapret/init.d/openwrt/functions
+
+create_ipset no-update
+
