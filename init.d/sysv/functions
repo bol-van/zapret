@@ -219,7 +219,6 @@ run_daemon()
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 	
-echo DARGS $3	
 	local DAEMONBASE=$(basename $2)
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
