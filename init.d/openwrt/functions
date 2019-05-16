@@ -116,6 +116,7 @@ fw_nfqws_pre()
 {
  # $1 - filter ipv4
  # $2 - filter ipv6
+ # $3 - queue number
 
  local DEVICE wan_iface
 
@@ -123,14 +124,14 @@ fw_nfqws_pre()
     network_find_wan_all wan_iface
     for ext_iface in $wan_iface; do
        network_get_device DEVICE $ext_iface
-       ipt PREROUTING -t raw -i $DEVICE -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+       ipt PREROUTING -t raw -i $DEVICE -p tcp $1 -j NFQUEUE --queue-num $3 --queue-bypass
     done
  }
  [ "$DISABLE_IPV6" = "1" ] || {
     network_find_wan6_all wan_iface
     for ext_iface in $wan_iface; do
        network_get_device DEVICE $ext_iface
-       ipt6 PREROUTING -t raw -i $DEVICE -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+       ipt6 PREROUTING -t raw -i $DEVICE -p tcp $2 -j NFQUEUE --queue-num $3 --queue-bypass
     done
  }
 }
@@ -138,6 +139,7 @@ fw_nfqws_post()
 {
  # $1 - filter ipv4
  # $2 - filter ipv6
+ # $3 - queue number
 
  local DEVICE wan_iface
 
@@ -145,14 +147,14 @@ fw_nfqws_post()
     network_find_wan_all wan_iface
     for ext_iface in $wan_iface; do
        network_get_device DEVICE $ext_iface
-       ipt POSTROUTING -t mangle -o $DEVICE -p tcp $1 -j NFQUEUE --queue-num $QNUM --queue-bypass
+       ipt POSTROUTING -t mangle -o $DEVICE -p tcp $1 -j NFQUEUE --queue-num $3 --queue-bypass
     done
  }
  [ "$DISABLE_IPV6" = "1" ] || {
     network_find_wan6_all wan_iface
     for ext_iface in $wan_iface; do
        network_get_device DEVICE $ext_iface
-       ipt6 POSTROUTING -t mangle -o $DEVICE -p tcp $2 -j NFQUEUE --queue-num $QNUM --queue-bypass
+       ipt6 POSTROUTING -t mangle -o $DEVICE -p tcp $2 -j NFQUEUE --queue-num $3 --queue-bypass
     done
  }
 }
@@ -220,21 +222,21 @@ zapret_apply_firewall()
 			;;
 	    nfqws_ipset)
 			create_ipset no-update
-			fw_nfqws_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src"
-			fw_nfqws_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			fw_nfqws_pre "--sport 80 -m set --match-set zapret src" "--sport 80 -m set --match-set zapret6 src" $QNUM
+			fw_nfqws_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $QNUM
 			;;
 	    nfqws_ipset_https)
 			create_ipset no-update
-			fw_nfqws_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src"
-			fw_nfqws_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst"
+			fw_nfqws_pre "-m multiport --sports 80,443 -m set --match-set zapret src" "-m multiport --sports 80,443 -m set --match-set zapret6 src" $QNUM
+			fw_nfqws_post "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $QNUM
 			;;
 	    nfqws_all)
-			fw_nfqws_pre "--sport 80" "--sport 80"
-			fw_nfqws_post "--dport 80" "--dport 80"
+			fw_nfqws_pre "--sport 80" "--sport 80" $QNUM
+			fw_nfqws_post "--dport 80" "--dport 80" $QNUM
 			;;
 	    nfqws_all_https)
-			fw_nfqws_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443"
-			fw_nfqws_post "--dport 80" "--dport 80"
+			fw_nfqws_pre "-m multiport --sports 80,443" "-m multiport --sports 80,443" $QNUM
+			fw_nfqws_post "--dport 80" "--dport 80" $QNUM
 			;;
 	    ipset)
 			create_ipset no-update
