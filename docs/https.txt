@@ -97,12 +97,10 @@ redsocks {
 --- /etc/firewall.user -----
 SOXIFIER_PORT=1099
 
-ipt()
-{
-	iptables -C $@ 2>/dev/null || iptables -I $@
-}
+. /opt/zapret/init.d/openwrt/functions
 
-. /lib/functions/network.sh
+create_ipset no-update
+
 network_find_wan wan_iface
 
 for ext_iface in $wan_iface; do

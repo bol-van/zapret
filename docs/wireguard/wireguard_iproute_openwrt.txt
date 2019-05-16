@@ -233,12 +233,10 @@ OUTPUT относится к исходящим с роутера пакетам
 Если с самого роутера ничего заруливать не надо, можно опустить все до команд с PREROUTING.
 
 --/etc/firewall.user----------------------------
-ipt()
-{
-	iptables -C $@ 2>/dev/null || iptables -I $@
-}
+. /opt/zapret/init.d/openwrt/functions
 
-. /lib/functions/network.sh
+create_ipset no-update
+
 network_find_wan wan_iface
 
 for ext_iface in $wan_iface; do
@@ -304,12 +302,10 @@ config rule
 Если вам не актуальны исходящие с самого роутера, то можно ничего не менять.
 
 --/etc/firewall.user----------------------------
-ipt()
-{
-	iptables -C $@ 2>/dev/null || iptables -I $@
-}
+. /opt/zapret/init.d/openwrt/functions
 
-. /lib/functions/network.sh
+create_ipset no-update
+
 network_find_wan wan_iface
 
 for ext_iface in $wan_iface; do
