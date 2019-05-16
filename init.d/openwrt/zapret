@@ -83,9 +83,6 @@ start_service() {
 	    nfqws_all|nfqws_all_https)
 			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
 			;;
-	    ipset)
-			create_ipset
-			;;
 	    custom)
 			# PLACEHOLDER
 			echo !!! NEED ATTENTION !!!
