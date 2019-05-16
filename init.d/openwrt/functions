@@ -11,7 +11,6 @@ TPWS_USER=daemon
 # max wait time for the link local ipv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
 
-[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
 IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
 
 exists()
