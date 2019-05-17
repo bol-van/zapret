@@ -101,8 +101,7 @@ SOXIFIER_PORT=1099
 
 create_ipset no-update
 
-network_find_wan wan_iface
-
+network_find_wan_all wan_iface
 for ext_iface in $wan_iface; do
     network_get_device ext_device $ext_iface
     ipt OUTPUT -t nat -o $ext_device -p tcp --dport 443 -m set --match-set zapret dst -j REDIRECT --to-port $SOXIFIER_PORT

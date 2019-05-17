@@ -237,11 +237,9 @@ OUTPUT относится к исходящим с роутера пакетам
 
 create_ipset no-update
 
-network_find_wan wan_iface
-
+network_find_wan_all wan_iface
 for ext_iface in $wan_iface; do
 	network_get_device DEVICE $ext_iface
-
 	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
 	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
 done
@@ -306,11 +304,9 @@ config rule
 
 create_ipset no-update
 
-network_find_wan wan_iface
-
+network_find_wan_all wan_iface
 for ext_iface in $wan_iface; do
 	network_get_device DEVICE $ext_iface
-
 	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
 	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
 	ipt OUTPUT -t mangle -o $DEVICE -j MARK --set-mark 0x1000/0x1000
