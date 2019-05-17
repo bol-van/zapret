@@ -328,8 +328,8 @@ Https blocking bypass
 As a rule, DPI tricks do not help to bypass https blocking.
 You have to redirect traffic through a third-party host.
 It is proposed to use transparent redirect through socks5 using iptables + redsocks, or iptables + iproute + vpn.
-Setting the option from redsocks to openwrt is described in https.txt.
-Setting options with iproute + wireguard - in wireguard_iproute_openwrt.txt.
+Redsocks variant is described in https.txt.
+iproute + wireguard - in wireguard_iproute_openwrt.txt.
 (they are russian)
 
 SOMETIMES (but not often) a tls handshake split trick works.
