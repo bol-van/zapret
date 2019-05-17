@@ -251,17 +251,59 @@ struct cbdata_s
 	char hostspell[4];
 };
 
+
+static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
+// data/len points to data payload
+bool modify_tcp_packet(unsigned char *data,int len,struct tcphdr *tcphdr,const struct cbdata_s *cbdata)
+{
+	const char **method;
+	size_t method_len = 0;
+	unsigned char *phost,*pua;
+	bool bRet = false;
+	
+	if (cbdata->wsize && tcp_synack_segment(tcphdr))
+	{
+		tcp_rewrite_winsize(tcphdr,(uint16_t)cbdata->wsize);
+		bRet = true;
+	}
+
+	if ((cbdata->hostcase || cbdata->hostnospace) && (phost = find_bin(data,len,"\r\nHost: ",8)))
+	{
+		if (cbdata->hostcase)
+		{
+			printf("modifying Host: => %c%c%c%c:\n",cbdata->hostspell[0],cbdata->hostspell[1],cbdata->hostspell[2],cbdata->hostspell[3]);
+			memcpy(phost+2,cbdata->hostspell,4);
+			bRet = true;
+		}
+		if (cbdata->hostnospace && (pua = find_bin(data,len,"\r\nUser-Agent: ",14)) && (pua = find_bin(pua+1,len-(pua-data)-1,"\r\n",2)))
+		{
+			printf("removing space after Host: and adding it to User-Agent:\n");
+			if (pua > phost)
+			{
+				memmove(phost+7,phost+8,pua-phost-8);
+				phost[pua-phost-1] = ' ';
+			}
+			else
+			{
+				memmove(pua+1,pua,phost-pua+7);
+				*pua = ' ';
+			}
+			bRet = true;
+		}
+	}
+	return bRet;
+}
+
 // ret: false - not modified, true - modified
 bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata)
 {
 	struct iphdr *iphdr = NULL;
 	struct ip6_hdr *ip6hdr = NULL;
 	struct tcphdr *tcphdr = NULL;
-	unsigned char *phost,*pua;
 	int len_tcp;
 	bool bRet = false;
 	uint8_t proto;
-	
+
 	if (proto_check_ipv4(data,len))
 	{
 		iphdr = (struct iphdr *) data;
@@ -281,40 +323,13 @@ bool processPacketData(unsigned char *data,int len,const struct cbdata_s *cbdata
 	
 	if (proto==IPPROTO_TCP && proto_check_tcp(data,len))
 	{
+	
 		tcphdr = (struct tcphdr *) data;
 		len_tcp = len;
 		proto_skip_tcp(&data,&len);
 		//printf("got TCP packet. payload_len=%d\n",len);
-		if (cbdata->wsize && tcp_synack_segment(tcphdr))
-		{
-			tcp_rewrite_winsize(tcphdr,(uint16_t)cbdata->wsize);
-			bRet = true;
-		}
-		if ((cbdata->hostcase || cbdata->hostnospace) && (phost = find_bin(data,len,"\r\nHost: ",8)))
-		{
-			if (cbdata->hostcase)
-			{
-				printf("modifying Host: => %c%c%c%c:\n",cbdata->hostspell[0],cbdata->hostspell[1],cbdata->hostspell[2],cbdata->hostspell[3]);
-				memcpy(phost+2,cbdata->hostspell,4);
-				bRet = true;
-			}
-			if (cbdata->hostnospace && (pua = find_bin(data,len,"\r\nUser-Agent: ",14)) && (pua = find_bin(pua+1,len-(pua-data)-1,"\r\n",2)))
-			{
-				printf("removing space after Host: and adding it to User-Agent:\n");
-				if (pua > phost)
-				{
-					memmove(phost+7,phost+8,pua-phost-8);
-					phost[pua-phost-1] = ' ';
-				}
-				else
-				{
-					memmove(pua+1,pua,phost-pua+7);
-					*pua = ' ';
-				}
-				bRet = true;
-			}
-		}
-		if (bRet)
+
+		if (bRet = modify_tcp_packet(data,len,tcphdr,cbdata))
 		{
 			if (iphdr)
 				tcp_fix_checksum(tcphdr,len_tcp,iphdr->saddr,iphdr->daddr);
@@ -509,18 +524,17 @@ int main(int argc, char **argv)
 	    }
 	}
 
-	
 	if (daemon) daemonize();
 	
 	h = NULL;
 	qh = NULL;
-	
+
 	if (*pidfile && !writepid(pidfile))
 	{
 		fprintf(stderr,"could not write pidfile\n");
 		goto exiterr;
 	}
-	
+
 	printf("opening library handle\n");
 	h = nfq_open();
 	if (!h) {
