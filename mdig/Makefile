@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS += -s -O3
-LIBS = 
+LIBS = -lpthread
 SRC_FILES = *.c
 
 all: mdig
