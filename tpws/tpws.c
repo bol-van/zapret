@@ -52,7 +52,7 @@ struct params_s
 
 struct params_s params;
 
-unsigned char *find_bin(void *data, ssize_t len, const void *blk, ssize_t blk_len)
+unsigned char *find_bin(void *data, size_t len, const void *blk, size_t blk_len)
 {
 	while (len >= blk_len)
 	{
@@ -86,10 +86,10 @@ void dohup()
  }
 }
 
-ssize_t send_with_flush(int sockfd, const void *buf, size_t len, int flags)
+size_t send_with_flush(int sockfd, const void *buf, size_t len, int flags)
 {
 	int flag, err;
-	ssize_t wr;
+	size_t wr;
 
 	flag = 1;
 	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
@@ -108,27 +108,181 @@ void close_tcp_conn(tproxy_conn_t *conn, struct tailhead *conn_list,
 	TAILQ_INSERT_TAIL(close_list, conn, conn_ptrs);
 }
 
-static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
-
 #define RD_BLOCK_SIZE 8192
 
 // pHost points to "Host: ..."
-bool find_host(char **pHost,char *buf,ssize_t bs)
+bool find_host(char **pHost,char *buf,size_t bs)
 {
  if (!*pHost)
  {
   *pHost = find_bin(buf, bs, "\nHost: ", 7);
   if (*pHost) (*pHost)++;
-  printf("Found Host: at pos %zd\n",*pHost - buf);
+  printf("Found Host: at pos %zu\n",*pHost - buf);
  }
  return !!*pHost;
 }
 
-bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
+static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
+void modify_tcp_segment(char *segment,size_t *size,size_t *split_pos)
+{
+	char *p, *pp, *pHost = NULL;
+	size_t method_len = 0, pos;
+	const char **method;
+	bool bIsHttp = false, bBypass = false;
+	char bRemovedHostSpace = 0;
+	char Host[128];
+	
+	*split_pos=0;
+
+	for (method = http_methods; *method; method++)
+	{
+		method_len = strlen(*method);
+		if (method_len <= *size && !memcmp(segment, *method, method_len))
+		{
+			bIsHttp = true;
+			method_len -= 2; // "GET /" => "GET"
+			break;
+		}
+	}
+	if (bIsHttp)
+	{
+		printf("Data block looks like http request start : %s\n", *method);
+		// cpu saving : we search host only if and when required. we do not research host every time we need its position
+		if (params.hostlist && find_host(&pHost,segment,*size))
+		{
+			bool bInHostList = false;
+			p = pHost + 6;
+			while (p < (segment + *size) && (*p == ' ' || *p == '\t')) p++;
+			pp = p;
+			while (pp < (segment + *size) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
+			memcpy(Host, p, pp - p);
+			Host[pp - p] = '\0';
+			printf("Requested Host is : %s\n", Host);
+			for(p = Host; *p; p++) *p=tolower(*p);
+			p = Host;
+			while (p)
+			{
+				bInHostList = StrPoolCheckStr(params.hostlist, p);
+				printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
+				if (bInHostList) break;
+				p = strchr(p, '.');
+				if (p) p++;
+			}
+			bBypass = !bInHostList;
+		}
+		if (!bBypass)
+		{
+			if (params.unixeol)
+			{
+				p = pp = segment;
+				while (p = find_bin(p, segment + *size - p, "\r\n", 2))
+				{
+					*p = '\n'; p++;
+					memmove(p, p + 1, segment + *size - p - 1);
+					(*size)--;
+					if (pp == (p - 1))
+					{
+						// probably end of http headers
+						printf("Found double EOL at pos %zu. Stop replacing.\n", pp - segment);
+						break;
+					}
+					pp = p;
+				}
+				pHost = NULL; // invalidate
+			}
+
+			if (params.methodspace)
+			{
+				// we only work with data blocks looking as HTTP query, so method is at the beginning
+				printf("Adding extra space after method\n");
+				p = segment + method_len + 1;
+				pos = method_len + 1;
+				memmove(p + 1, p, *size - pos);
+				*p = ' '; // insert extra space
+				(*size)++; // block will grow by 1 byte
+				if (pHost) pHost++; // Host: position will move by 1 byte
+			}
+			if ((params.hostdot || params.hosttab) && find_host(&pHost,segment,*size))
+			{
+				p = pHost + 6;
+				while (p < (segment + *size) && *p != '\r' && *p != '\n') p++;
+				if (p < (segment + *size))
+				{
+					pos = p - segment;
+					printf("Adding %s to host name at pos %zu\n", params.hostdot ? "dot" : "tab", pos);
+					memmove(p + 1, p, *size - pos);
+					*p = params.hostdot ? '.' : '\t'; // insert dot or tab
+					(*size)++; // block will grow by 1 byte
+				}
+			}
+			if (params.hostnospace && find_host(&pHost,segment,*size) && pHost[5] == ' ')
+			{
+				p = pHost + 6;
+				pos = p - segment;
+				printf("Removing space before host name at pos %zu\n", pos);
+				memmove(p - 1, p, *size - pos);
+				(*size)--; // block will shrink by 1 byte
+				bRemovedHostSpace = 1;
+			}
+			if (!params.split_pos)
+			{
+				switch (params.split_http_req)
+				{
+				case split_method:
+					*split_pos = method_len - 1;
+					break;
+				case split_host:
+					if (find_host(&pHost,segment,*size))
+						*split_pos = pHost + 6 - bRemovedHostSpace - segment;
+					break;
+				}
+			}
+			if (params.hostcase && find_host(&pHost,segment,*size))
+			{
+				printf("Changing 'Host:' => '%c%c%c%c:' at pos %zu\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment);
+				memcpy(pHost, params.hostspell, 4);
+			}
+			if (params.methodeol)
+			{
+				printf("Adding EOL before method\n");
+				if (params.unixeol)
+				{
+					memmove(segment + 1, segment, *size);
+					(*size)++;;
+					segment[0] = '\n';
+					if (*split_pos) (*split_pos)++;
+				}
+				else
+				{
+					memmove(segment + 2, segment, *size);
+					*size += 2;
+					segment[0] = '\r';
+					segment[1] = '\n';
+					if (*split_pos) *split_pos += 2;
+				}
+			}
+			if (params.split_pos && params.split_pos < *size) *split_pos = params.split_pos;
+		}
+		else
+		{
+			printf("Not acting on this request\n");
+		}
+	}
+	else
+	{
+		printf("Data block does not look like http request start\n");
+		// this is the only parameter applicable to non-http block (may be https ?)
+		if (params.split_pos && params.split_pos < *size) *split_pos = params.split_pos;
+	}
+}
+
+
+bool handle_epollin(tproxy_conn_t *conn, ssize_t *data_transferred) {
 	int numbytes;
 	int fd_in, fd_out;
 	bool bOutgoing;
-	ssize_t rd = 0, wr = 0, bs;
+	ssize_t rd = 0, wr = 0;
+	size_t bs;
 
 	//Easy way to determin which socket is ready for reading
 	//TODO: Optimize. This one allows me quick lookup for conn, but
@@ -157,166 +311,14 @@ bool handle_epollin(tproxy_conn_t *conn, int *data_transferred) {
 			rd = recv(fd_in, buf, RD_BLOCK_SIZE, MSG_DONTWAIT);
 			if (rd > 0)
 			{
-				char *p, *pp, *pHost = NULL;
-				ssize_t method_len = 0, split_pos = 0, pos;
-				const char **method;
-				bool bIsHttp = false, bBypass = false;
-				char bRemovedHostSpace = 0;
-				char Host[128];
-
+				size_t split_pos;
+				
 				bs = rd;
-
-				for (method = http_methods; *method; method++)
-				{
-					method_len = strlen(*method);
-					if (method_len <= bs && !memcmp(buf, *method, method_len))
-					{
-						bIsHttp = true;
-						method_len -= 2; // "GET /" => "GET"
-						break;
-					}
-				}
-				if (bIsHttp)
-				{
-					printf("Data block looks like http request start : %s\n", *method);
-
-					// cpu saving : we search host only if and when required. we do not research host every time we need its position
-					if (params.hostlist && find_host(&pHost,buf,bs))
-					{
-						bool bInHostList = false;
-						p = pHost + 6;
-						while (p < (buf + bs) && (*p == ' ' || *p == '\t')) p++;
-						pp = p;
-						while (pp < (buf + bs) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
-						memcpy(Host, p, pp - p);
-						Host[pp - p] = '\0';
-						printf("Requested Host is : %s\n", Host);
-						for(p = Host; *p; p++) *p=tolower(*p);
-						p = Host;
-						while (p)
-						{
-							bInHostList = StrPoolCheckStr(params.hostlist, p);
-							printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
-							if (bInHostList) break;
-							p = strchr(p, '.');
-							if (p) p++;
-						}
-						bBypass = !bInHostList;
-					}
-					if (!bBypass)
-					{
-						if (params.unixeol)
-						{
-							p = pp = buf;
-							while (p = find_bin(p, buf + bs - p, "\r\n", 2))
-							{
-								*p = '\n'; p++;
-								memmove(p, p + 1, buf + bs - p - 1);
-								bs--;
-								if (pp == (p - 1))
-								{
-									// probably end of http headers
-									printf("Found double EOL at pos %zd. Stop replacing.\n", pp - buf);
-									break;
-								}
-								pp = p;
-							}
-							pHost = NULL; // invalidate
-						}
-
-						if (params.methodspace)
-						{
-							// we only work with data blocks looking as HTTP query, so method is at the beginning
-							printf("Adding extra space after method\n");
-							p = buf + method_len + 1;
-							pos = method_len + 1;
-							memmove(p + 1, p, bs - pos);
-							*p = ' '; // insert extra space
-							bs++; // block will grow by 1 byte
-							if (pHost) pHost++; // Host: position will move by 1 byte
-						}
-
-						if ((params.hostdot || params.hosttab) && find_host(&pHost,buf,bs))
-						{
-							p = pHost + 6;
-							while (p < (buf + bs) && *p != '\r' && *p != '\n') p++;
-							if (p < (buf + bs))
-							{
-								pos = p - buf;
-								printf("Adding %s to host name at pos %zd\n", params.hostdot ? "dot" : "tab", pos);
-								memmove(p + 1, p, bs - pos);
-								*p = params.hostdot ? '.' : '\t'; // insert dot or tab
-								bs++; // block will grow by 1 byte
-							}
-						}
-
-						if (params.hostnospace && find_host(&pHost,buf,bs) && pHost[5] == ' ')
-						{
-							p = pHost + 6;
-							pos = p - buf;
-							printf("Removing space before host name at pos %zd\n", pos);
-							memmove(p - 1, p, bs - pos);
-							bs--; // block will shrink by 1 byte
-							bRemovedHostSpace = 1;
-						}
-
-						if (!params.split_pos)
-						{
-							switch (params.split_http_req)
-							{
-							case split_method:
-								split_pos = method_len - 1;
-								break;
-							case split_host:
-								if (find_host(&pHost,buf,bs))
-									split_pos = pHost + 6 - bRemovedHostSpace - buf;
-								break;
-							}
-						}
-
-						if (params.hostcase && find_host(&pHost,buf,bs))
-						{
-							printf("Changing 'Host:' => '%c%c%c%c:' at pos %zd\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - buf);
-							memcpy(pHost, params.hostspell, 4);
-						}
-
-						if (params.methodeol)
-						{
-							printf("Adding EOL before method\n");
-							if (params.unixeol)
-							{
-								memmove(buf + 1, buf, bs);
-								bs++;;
-								buf[0] = '\n';
-								if (split_pos) split_pos++;
-							}
-							else
-							{
-								memmove(buf + 2, buf, bs);
-								bs += 2;
-								buf[0] = '\r';
-								buf[1] = '\n';
-								if (split_pos) split_pos += 2;
-							}
-						}
-
-						if (params.split_pos && params.split_pos < bs) split_pos = params.split_pos;
-					}
-					else
-					{
-						printf("Not acting on this request\n");
-					}
-				}
-				else
-				{
-					printf("Data block does not look like http request start\n");
-					// this is the only parameter applicable to non-http block (may be https ?)
-					if (params.split_pos && params.split_pos < bs) split_pos = params.split_pos;
-        			}
+				modify_tcp_segment(buf,&bs,&split_pos);
 
 				if (split_pos)
 				{
-					printf("Splitting at pos %zd\n", split_pos);
+					printf("Splitting at pos %zu\n", split_pos);
 					wr = send_with_flush(fd_out, buf, split_pos, 0);
 					if (wr >= 0)
 						wr = send(fd_out, buf + split_pos, bs - split_pos, 0);
@@ -355,7 +357,7 @@ void remove_closed_connections(struct tailhead *close_list) {
 		conn = (tproxy_conn_t*)close_list->tqh_first;
 		TAILQ_REMOVE(close_list, close_list->tqh_first, conn_ptrs);
 
-		int rd = 0;
+		ssize_t rd = 0;
 		while (handle_epollin(conn, &rd) && rd);
 
 		printf("Socket %d and %d closed, connection removed\n",
