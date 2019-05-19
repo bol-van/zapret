@@ -794,8 +794,7 @@ bool dropcaps()
 {
 	cap_t capabilities;
 
-	capabilities = cap_init();
-	if (cap_clear(capabilities))
+	if (!(capabilities = cap_init()))
 	{
 		perror("cap_init");
 		return false;
