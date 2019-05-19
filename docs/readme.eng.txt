@@ -109,6 +109,16 @@ In the PREROUTING DNAT chain, it is possible to any global address or to the lin
 the packet came from.
 NFQUEUE works without changes.
 
+When it will not work
+----------------------
+
+* If blocking is done by IP.
+* If a connection passes through a filter capable of reconstructing a TCP connection, and which
+follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack,
+fragmentation disappears immediately as a means of circumvention. Squid is correct, it will find everything
+as it should, it is useless to deceive him.
+BUT. Only small providers can afford using squid, since it is very resource intensive.
+Large companies usually use DPI, which is designed for much greater bandwidth.
 
 nfqws
 -----
