@@ -23,6 +23,7 @@
 #include <getopt.h>
 #include <pwd.h>
 #include <signal.h>
+#include <sys/capability.h>
 
 #include "tpws.h"
 #include "tpws_conn.h"
@@ -789,6 +790,26 @@ void daemonize()
 	/* stderror */
 }
 
+bool dropcaps()
+{
+	cap_t capabilities;
+
+	capabilities = cap_init();
+	if (cap_clear(capabilities))
+	{
+		perror("cap_init");
+		return false;
+	}
+	if (cap_set_proc(capabilities))
+	{
+		perror("cap_set_proc");
+		cap_free(capabilities);
+		return false;
+	}
+	cap_free(capabilities);
+	return true;
+}
+
 bool droproot()
 {
 	if (params.uid || params.gid)
@@ -804,8 +825,9 @@ bool droproot()
 			return false;
 		}
 	}
-	return true;
+	return dropcaps();
 }
+
 
 bool writepid(const char *filename)
 {
@@ -1002,7 +1024,7 @@ int main(int argc, char *argv[]) {
 		perror("setsockopt (SO_KEEPALIVE): ");
 		goto exiterr;
 	}
-
+	
 	//Mark that this socket can be used for transparent proxying
 	//This allows the socket to accept connections for non-local IPs
 	if (setsockopt(listen_fd, SOL_IP, IP_TRANSPARENT, &yes, sizeof(yes)) == -1)
@@ -1027,7 +1049,7 @@ int main(int argc, char *argv[]) {
 		perror("listen: ");
 		goto exiterr;
 	}
-
+	
 	//splice() causes the process to receive the SIGPIPE-signal if one part (for
 	//example a socket) is closed during splice(). I would rather have splice()
 	//fail and return -1, so blocking SIGPIPE.
