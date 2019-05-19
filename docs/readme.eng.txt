@@ -170,6 +170,7 @@ tpws is transparent proxy.
  --daemon                       ; daemonize
  --pidfile=<filename>           ; write pid to file
  --user=<username>              ; drop root privs
+ --uid=uid[:gid]		; менять uid процесса
  
 The manipulation parameters can be combined in any way.
 There are exceptions: split-pos replaces split-http-req. hostdot and hosttab are mutually exclusive.

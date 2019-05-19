@@ -548,6 +548,7 @@ void exithelp()
 		" --daemon\t\t\t; daemonize\n"
 		" --pidfile=<filename>\t\t; write pid to file\n"
 		" --user=<username>\t\t; drop root privs\n"
+		" --uid=uid[:gid]\t\t; drop root privs\n"
 	);
 	exit(1);
 }
@@ -591,19 +592,20 @@ void parse_params(int argc, char *argv[])
 		{ "port",required_argument,0,0 },// optidx=9
 		{ "daemon",no_argument,0,0 },// optidx=10
 		{ "user",required_argument,0,0 },// optidx=11
-		{ "maxconn",required_argument,0,0 },// optidx=12
-		{ "hostcase",no_argument,0,0 },// optidx=13
-		{ "hostspell",required_argument,0,0 },// optidx=14
-		{ "hostdot",no_argument,0,0 },// optidx=15
-		{ "hostnospace",no_argument,0,0 },// optidx=16
-		{ "split-http-req",required_argument,0,0 },// optidx=17
-		{ "split-pos",required_argument,0,0 },// optidx=18
-		{ "methodspace",no_argument,0,0 },// optidx=19
-		{ "methodeol",no_argument,0,0 },// optidx=20
-		{ "hosttab",no_argument,0,0 },// optidx=21
-		{ "unixeol",no_argument,0,0 },// optidx=22
-		{ "hostlist",required_argument,0,0 },// optidx=23
-		{ "pidfile",required_argument,0,0 },// optidx=24
+		{ "uid",required_argument,0,0 },// optidx=12
+		{ "maxconn",required_argument,0,0 },// optidx=13
+		{ "hostcase",no_argument,0,0 },// optidx=14
+		{ "hostspell",required_argument,0,0 },// optidx=15
+		{ "hostdot",no_argument,0,0 },// optidx=16
+		{ "hostnospace",no_argument,0,0 },// optidx=17
+		{ "split-http-req",required_argument,0,0 },// optidx=18
+		{ "split-pos",required_argument,0,0 },// optidx=19
+		{ "methodspace",no_argument,0,0 },// optidx=20
+		{ "methodeol",no_argument,0,0 },// optidx=21
+		{ "hosttab",no_argument,0,0 },// optidx=22
+		{ "unixeol",no_argument,0,0 },// optidx=23
+		{ "hostlist",required_argument,0,0 },// optidx=24
+		{ "pidfile",required_argument,0,0 },// optidx=25
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -672,7 +674,15 @@ void parse_params(int argc, char *argv[])
 			params.gid = pwd->pw_gid;
 			break;
 		}
-		case 12: /* maxconn */
+		case 12: /* uid */
+			params.gid=0x7FFFFFFF; // default git. drop gid=0
+			if (!sscanf(optarg,"%u:%u",&params.uid,&params.gid))
+			{
+				fprintf(stderr, "--uid should be : uid[:gid]\n");
+				exit_clean(1);
+			}
+			break;
+		case 13: /* maxconn */
 			params.maxconn = atoi(optarg);
 			if (params.maxconn <= 0)
 			{
@@ -680,10 +690,10 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 13: /* hostcase */
+		case 14: /* hostcase */
 			params.hostcase = true;
 			break;
-		case 14: /* hostspell */
+		case 15: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
 				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
@@ -692,13 +702,13 @@ void parse_params(int argc, char *argv[])
 			params.hostcase = true;
 			memcpy(params.hostspell, optarg, 4);
 			break;
-		case 15: /* hostdot */
+		case 16: /* hostdot */
 			params.hostdot = true;
 			break;
-		case 16: /* hostnospace */
+		case 17: /* hostnospace */
 			params.hostnospace = true;
 			break;
-		case 17: /* split-http-req */
+		case 18: /* split-http-req */
 			if (!strcmp(optarg, "method"))
 				params.split_http_req = split_method;
 			else if (!strcmp(optarg, "host"))
@@ -709,7 +719,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 18: /* split-pos */
+		case 19: /* split-pos */
 			i = atoi(optarg);
 			if (i)
 				params.split_pos = i;
@@ -719,25 +729,25 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 19: /* methodspace */
+		case 20: /* methodspace */
 			params.methodspace = true;
 			break;
-		case 20: /* methodeol */
+		case 21: /* methodeol */
 			params.methodeol = true;
 			break;
-		case 21: /* hosttab */
+		case 22: /* hosttab */
 			params.hosttab = true;
 			break;
-		case 22: /* unixeol */
+		case 23: /* unixeol */
 			params.unixeol = true;
 			break;
-		case 23: /* hostlist */
+		case 24: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
 			params.hostfile[sizeof(params.hostfile)-1]='\0';
 			break;
-		case 24: /* pidfile */
+		case 25: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
@@ -781,7 +791,7 @@ void daemonize()
 
 bool droproot()
 {
-	if (params.uid)
+	if (params.uid || params.gid)
 	{
 		if (setgid(params.gid))
 		{
@@ -1001,15 +1011,17 @@ int main(int argc, char *argv[]) {
 		goto exiterr;
 	}
 
-	if (!droproot())
-	{
-		goto exiterr;
-	}
-
 	if (bind(listen_fd, (struct sockaddr *)&salisten, salisten_len) == -1) {
 		perror("bind: ");
 		goto exiterr;
 	}
+
+	if (!droproot())
+	{
+		goto exiterr;
+	}
+	
+	fprintf(stderr,"Running as UID=%u GID=%u\n",getuid(),getgid());
 
 	if (listen(listen_fd, BACKLOG) == -1) {
 		perror("listen: ");
