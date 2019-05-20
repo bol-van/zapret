@@ -13,6 +13,8 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <sys/capability.h>
+#include <sys/prctl.h>
 
 bool proto_check_ipv4(unsigned char *data,int len)
 {
@@ -363,22 +365,52 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
+bool dropcaps()
+{
+	cap_value_t cap_values[] = {CAP_NET_ADMIN};
+	cap_t capabilities;
+	if (!(capabilities = cap_init()))
+	{
+		perror("cap_init");
+		return false;
+	}
+	if (cap_set_flag(capabilities, CAP_PERMITTED, sizeof(cap_values)/sizeof(*cap_values), cap_values, CAP_SET) ||
+	    cap_set_flag(capabilities, CAP_EFFECTIVE, sizeof(cap_values)/sizeof(*cap_values), cap_values, CAP_SET))
+	{
+		perror("cap_set_flag");
+		cap_free(capabilities);
+		return false;
+	}
+	if (cap_set_proc(capabilities))
+	{
+		perror("cap_set_proc");
+		cap_free(capabilities);
+		return false;
+	}
+	cap_free(capabilities);
+	return true;
+}
 bool droproot(uid_t uid, gid_t gid)
 {
-    if (uid)
-    {
-         if (setgid(gid))
-         {
-		perror("setgid: ");
-		return false;
-         }
-         if (setuid(uid))
-         {
-		perror("setuid: ");
-		return false;
-         }
-    }
-   return true;
+	if (uid || gid)
+	{
+		if (prctl(PR_SET_KEEPCAPS, 1L))
+		{
+			perror("prctl(PR_SET_KEEPCAPS): ");
+			return false;
+		}
+		if (setgid(gid))
+		{
+			perror("setgid: ");
+			return false;
+		}
+		if (setuid(uid))
+		{
+			perror("setuid: ");
+			return false;
+		}
+	}
+	return dropcaps();
 }
 
 void daemonize()
@@ -424,14 +456,16 @@ bool writepid(const char *filename)
 void exithelp()
 {
 	printf(
-          " --qnum=<nfqueue_number>\n"
-          " --wsize=<window_size>\t; set window size. 0 = do not modify\n"
-          " --hostcase\t\t; change Host: => host:\n"
-          " --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-          " --hostnospace\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
-          " --daemon\t\t; daemonize\n"
-	  " --pidfile=<filename>\t; write pid to file\n"
-        );
+	" --qnum=<nfqueue_number>\n"
+	" --wsize=<window_size>\t; set window size. 0 = do not modify\n"
+	" --hostcase\t\t; change Host: => host:\n"
+	" --hostspell\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+	" --hostnospace\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
+	" --daemon\t\t; daemonize\n"
+	" --pidfile=<filename>\t; write pid to file\n"
+	" --user=<username>\t; drop root privs\n"
+	" --uid=uid[:gid]\t; drop root privs\n"
+	);
 	exit(1);
 }
 
@@ -447,7 +481,7 @@ int main(int argc, char **argv)
 	int v;
 	bool daemon=false;
 	uid_t uid=0;
-	gid_t gid;
+	gid_t gid=0;
 	char pidfile[256];
 
 	memset(&cbdata,0,sizeof(cbdata));
@@ -455,15 +489,16 @@ int main(int argc, char **argv)
 	*pidfile = 0;
 
 	const struct option long_options[] = {
-    	    {"qnum",required_argument,0,0},	// optidx=0
-    	    {"daemon",no_argument,0,0},		// optidx=1
-    	    {"wsize",required_argument,0,0},	// optidx=2
-    	    {"hostcase",no_argument,0,0},	// optidx=3
-    	    {"hostspell",required_argument,0,0}, // optidx=4
-    	    {"hostnospace",no_argument,0,0},	// optidx=5
-    	    {"user",required_argument,0,0},	// optidx=6
-    	    {"pidfile",required_argument,0,0},	// optidx=7
-    	    {NULL,0,NULL,0}
+		{"qnum",required_argument,0,0},	// optidx=0
+		{"daemon",no_argument,0,0},		// optidx=1
+		{"wsize",required_argument,0,0},	// optidx=2
+		{"hostcase",no_argument,0,0},	// optidx=3
+		{"hostspell",required_argument,0,0}, // optidx=4
+		{"hostnospace",no_argument,0,0},	// optidx=5
+		{"pidfile",required_argument,0,0},	// optidx=6
+		{"user",required_argument,0,0 },// optidx=7
+		{"uid",required_argument,0,0 },// optidx=8
+		{NULL,0,NULL,0}
 	};
 	if (argc<2) exithelp();
 	while ((v=getopt_long_only(argc,argv,"",long_options,&option_index))!=-1)
@@ -505,7 +540,11 @@ int main(int argc, char **argv)
 		case 5: /* hostnospace */
 		    cbdata.hostnospace = true;
 		    break;
-		case 6: /* user */
+		case 6: /* pidfile */
+		    strncpy(pidfile,optarg,sizeof(pidfile));
+		    pidfile[sizeof(pidfile)-1]='\0';
+		    break;
+		case 7: /* user */
 	    	{
 	    		struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
@@ -517,10 +556,14 @@ int main(int argc, char **argv)
 			gid = pwd->pw_gid;
 			break;
 	    	}
-		case 7: /* pidfile */
-		    strncpy(pidfile,optarg,sizeof(pidfile));
-		    pidfile[sizeof(pidfile)-1]='\0';
-		    break;
+		case 8: /* uid */
+			gid=0x7FFFFFFF; // default git. drop gid=0
+			if (!sscanf(optarg,"%u:%u",&uid,&gid))
+			{
+				fprintf(stderr, "--uid should be : uid[:gid]\n");
+				exit(1);
+			}
+			break;
 	    }
 	}
 
@@ -566,16 +609,15 @@ int main(int argc, char **argv)
 		fprintf(stderr, "can't set packet_copy mode\n");
 		goto exiterr;
 	}
-
+	
+	if (!droproot(uid,gid)) goto exiterr;
+	fprintf(stderr,"Running as UID=%u GID=%u\n",getuid(),getgid());
+		
 	fd = nfq_fd(h);
-
-	if (droproot(uid,gid))
+	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0)
 	{
-		while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0)
-		{
-		    int r=nfq_handle_packet(h, buf, rv);
-		    if (r) fprintf(stderr,"nfq_handle_packet error %d\n",r);
-		}
+	    int r=nfq_handle_packet(h, buf, rv);
+	    if (r) fprintf(stderr,"nfq_handle_packet error %d\n",r);
 	}
 
 	printf("unbinding from queue 0\n");

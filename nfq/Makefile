@@ -1,6 +1,6 @@
 CC ?= gcc
-CFLAGS ?= -s -O3
-LIBS = -lnetfilter_queue -lnfnetlink
+CFLAGS += -s -O3
+LIBS = -lnetfilter_queue -lnfnetlink -lcap
 SRC_FILES = *.c
 
 all: nfqws

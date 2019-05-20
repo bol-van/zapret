@@ -14,8 +14,9 @@ ZAPRET_BASE=/opt/zapret
 PIDDIR=/var/run
 
 QNUM=200
+NFQWS_USER=daemon
 NFQWS=$ZAPRET_BASE/nfq/nfqws
-NFQWS_OPT_BASE="--qnum=$QNUM"
+NFQWS_OPT_BASE="--qnum=$QNUM --user=$NFQWS_USER"
 
 TPWS_USER=daemon
 TPPORT_HTTP=1188
