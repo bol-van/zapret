@@ -816,23 +816,33 @@ bool setpcap(cap_value_t *caps,int ncaps)
 	cap_free(capabilities);
 	return true;
 }
+int getmaxcap()
+{
+	int maxcap = CAP_LAST_CAP;
+	FILE *F = fopen("/proc/sys/kernel/cap_last_cap","r");
+	if (F)
+	{
+		fscanf(F,"%d",&maxcap);
+		fclose(F);
+	}
+	return maxcap;
+	
+}
 bool dropcaps()
 {
 	// must have CAP_SETPCAP at the end. its required to clear bounding set
 	cap_value_t cap_values[] = {CAP_SETPCAP};
 	int capct=sizeof(cap_values)/sizeof(*cap_values);
+	int maxcap = getmaxcap();
 
 	if (setpcap(cap_values, capct))
 	{
-		for(int cap=0;cap<=63;cap++)
+		for(int cap=0;cap<=maxcap;cap++)
 		{
 			if (cap_drop_bound(cap))
 			{
-				if (errno!=EINVAL)
-				{
-					fprintf(stderr,"could not drop cap %d\n",cap);
-					perror("cap_drop_bound");
-				}
+				fprintf(stderr,"could not drop cap %d\n",cap);
+				perror("cap_drop_bound");
 			}
 		}
 	}
