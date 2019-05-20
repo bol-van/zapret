@@ -24,6 +24,7 @@
 #include <pwd.h>
 #include <signal.h>
 #include <sys/capability.h>
+#include <sys/prctl.h>
 
 #include "tpws.h"
 #include "tpws_conn.h"
@@ -100,13 +101,6 @@ size_t send_with_flush(int sockfd, const void *buf, size_t len, int flags)
 	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
 	errno = err;
 	return wr;
-}
-
-void close_tcp_conn(tproxy_conn_t *conn, struct tailhead *conn_list,
-	struct tailhead *close_list) {
-	conn->state = CONN_CLOSED;
-	TAILQ_REMOVE(conn_list, conn, conn_ptrs);
-	TAILQ_INSERT_TAIL(close_list, conn, conn_ptrs);
 }
 
 #define RD_BLOCK_SIZE 8192
@@ -278,7 +272,8 @@ void modify_tcp_segment(char *segment,size_t *size,size_t *split_pos)
 }
 
 
-bool handle_epollin(tproxy_conn_t *conn, ssize_t *data_transferred) {
+bool handle_epollin(tproxy_conn_t *conn, ssize_t *data_transferred)
+{
 	int numbytes;
 	int fd_in, fd_out;
 	bool bOutgoing;
@@ -351,7 +346,8 @@ bool handle_epollin(tproxy_conn_t *conn, ssize_t *data_transferred) {
 	return rd != -1 && wr != -1;
 }
 
-void remove_closed_connections(struct tailhead *close_list) {
+void remove_closed_connections(struct tailhead *close_list)
+{
 	tproxy_conn_t *conn = NULL;
 
 	while (close_list->tqh_first != NULL) {
@@ -367,7 +363,15 @@ void remove_closed_connections(struct tailhead *close_list) {
 	}
 }
 
-int event_loop(int listen_fd) {
+void close_tcp_conn(tproxy_conn_t *conn, struct tailhead *conn_list, struct tailhead *close_list)
+{
+	conn->state = CONN_CLOSED;
+	TAILQ_REMOVE(conn_list, conn, conn_ptrs);
+	TAILQ_INSERT_TAIL(close_list, conn, conn_ptrs);
+}
+
+int event_loop(int listen_fd)
+{
 	int retval = 0, num_events = 0;
 	int tmp_fd = 0; //Used to temporarily hold the accepted file descriptor
 	tproxy_conn_t *conn = NULL;
@@ -483,7 +487,8 @@ int event_loop(int listen_fd) {
 	return retval;
 }
 
-int8_t block_sigpipe() {
+int8_t block_sigpipe()
+{
 	sigset_t sigset;
 	memset(&sigset, 0, sizeof(sigset));
 
@@ -790,29 +795,61 @@ void daemonize()
 	/* stderror */
 }
 
-bool dropcaps()
+bool setpcap(cap_value_t *caps,int ncaps)
 {
 	cap_t capabilities;
-
+	
 	if (!(capabilities = cap_init()))
+		return false;
+	
+	if (ncaps && (cap_set_flag(capabilities, CAP_PERMITTED, ncaps, caps, CAP_SET) ||
+		cap_set_flag(capabilities, CAP_EFFECTIVE, ncaps, caps, CAP_SET)))
 	{
-		perror("cap_init");
+		cap_free(capabilities);
 		return false;
 	}
 	if (cap_set_proc(capabilities))
 	{
-		perror("cap_set_proc");
 		cap_free(capabilities);
 		return false;
 	}
 	cap_free(capabilities);
 	return true;
 }
+bool dropcaps()
+{
+	// must have CAP_SETPCAP at the end. its required to clear bounding set
+	cap_value_t cap_values[] = {CAP_SETPCAP};
+	int capct=sizeof(cap_values)/sizeof(*cap_values);
 
+	if (setpcap(cap_values, capct))
+	{
+		for(int cap=0;cap<=CAP_LAST_CAP;cap++)
+		{
+			if (cap_drop_bound(cap))
+			{
+				perror("cap_drop_bound");
+				return false;
+			}
+		}
+	}
+	// now without CAP_SETPCAP
+	if (!setpcap(cap_values, capct - 1))
+	{
+		perror("setpcap");
+		return false;
+	}
+	return true;
+}
 bool droproot()
 {
 	if (params.uid || params.gid)
 	{
+		if (prctl(PR_SET_KEEPCAPS, 1L))
+		{
+			perror("prctl(PR_SET_KEEPCAPS): ");
+			return false;
+		}
 		if (setgid(params.gid))
 		{
 			perror("setgid: ");

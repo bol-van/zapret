@@ -365,29 +365,50 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
-bool dropcaps()
+bool setpcap(cap_value_t *caps,int ncaps)
 {
-	cap_value_t cap_values[] = {CAP_NET_ADMIN};
 	cap_t capabilities;
+	
 	if (!(capabilities = cap_init()))
-	{
-		perror("cap_init");
 		return false;
-	}
-	if (cap_set_flag(capabilities, CAP_PERMITTED, sizeof(cap_values)/sizeof(*cap_values), cap_values, CAP_SET) ||
-	    cap_set_flag(capabilities, CAP_EFFECTIVE, sizeof(cap_values)/sizeof(*cap_values), cap_values, CAP_SET))
+	
+	if (ncaps && (cap_set_flag(capabilities, CAP_PERMITTED, ncaps, caps, CAP_SET) ||
+		cap_set_flag(capabilities, CAP_EFFECTIVE, ncaps, caps, CAP_SET)))
 	{
-		perror("cap_set_flag");
 		cap_free(capabilities);
 		return false;
 	}
 	if (cap_set_proc(capabilities))
 	{
-		perror("cap_set_proc");
 		cap_free(capabilities);
 		return false;
 	}
 	cap_free(capabilities);
+	return true;
+}
+bool dropcaps()
+{
+	// must have CAP_SETPCAP at the end. its required to clear bounding set
+	cap_value_t cap_values[] = {CAP_NET_ADMIN,CAP_SETPCAP};
+	int capct=sizeof(cap_values)/sizeof(*cap_values);
+
+	if (setpcap(cap_values, capct))
+	{
+		for(int cap=0;cap<=CAP_LAST_CAP;cap++)
+		{
+			if (cap_drop_bound(cap))
+			{
+				perror("cap_drop_bound");
+				return false;
+			}
+		}
+	}
+	// now without CAP_SETPCAP
+	if (!setpcap(cap_values, capct - 1))
+	{
+		perror("setpcap");
+		return false;
+	}
 	return true;
 }
 bool droproot(uid_t uid, gid_t gid)
