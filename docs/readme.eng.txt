@@ -112,6 +112,9 @@ NFQUEUE works without changes.
 When it will not work
 ----------------------
 
+* If DNS server returns false responses. ISP can return false IP addresses or not return anything
+when blocked domains are queried. If this is the case change DNS to public ones, such as 8.8.8.8 or 1.1.1.1.
+Sometimes ISP hijacks queries to any DNS server. Dnscrypt or dns-over-tls help.
 * If blocking is done by IP.
 * If a connection passes through a filter capable of reconstructing a TCP connection, and which
 follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack,
