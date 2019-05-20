@@ -15,6 +15,7 @@
 #include <pwd.h>
 #include <sys/capability.h>
 #include <sys/prctl.h>
+#include <errno.h>
 
 bool proto_check_ipv4(unsigned char *data,int len)
 {
@@ -394,12 +395,15 @@ bool dropcaps()
 
 	if (setpcap(cap_values, capct))
 	{
-		for(int cap=0;cap<=CAP_LAST_CAP;cap++)
+		for(int cap=0;cap<=63;cap++)
 		{
 			if (cap_drop_bound(cap))
 			{
-				perror("cap_drop_bound");
-				return false;
+				if (errno!=EINVAL)
+				{
+					fprintf(stderr,"could not drop cap %d\n",cap);
+					perror("cap_drop_bound");
+				}
 			}
 		}
 	}
