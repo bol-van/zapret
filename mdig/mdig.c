@@ -163,8 +163,8 @@ static void *t_resolver(void *arg)
 					print_addrinfo(result);
 					freeaddrinfo(result);
 					is_ok=1;
-					break;
 				}
+				break;
 			}
 			stat_plus(is_ok);
 		}
