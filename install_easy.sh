@@ -83,20 +83,29 @@ check_system()
 	echo system is based on $SYSTEM
 }
 
+check_bins()
+{
+	echo \* checking executables
+
+	local arch=$(get_bin_arch)
+	if [ -n "$arch" ] ; then
+		echo found. architecture is : "\"$arch\""
+	elif exists make; then
+		echo trying to compile
+		make -C "$EXEDIR" || {
+			echo could not compile
+			exitp 8
+		}
+		echo compiled
+	else
+		echo build tools not found
+		exitp 8
+	fi
+}
+
 call_install_bin()
 {
-	"$EXEDIR/install_bin.sh" $1 || {
-		echo binaries compatible with your system not found
-		if exists make; then
-			echo trying to compile
-			make -C "$EXEDIR" || {
-				echo could not compile
-				exitp 8
-			}
-		else
-			exitp 8
-		fi
-	}
+	"$EXEDIR/install_bin.sh" $1
 }
 get_bin_arch()
 {
@@ -107,7 +116,10 @@ install_binaries()
 {
 	echo \* installing binaries
 
-	call_install_bin
+	call_install_bin || {
+		echo compatible binaries not found
+		exitp 8
+	}
 }
 
 find_str_in_list()
@@ -455,6 +467,7 @@ install_systemd()
 {
 	INIT_SCRIPT_SRC=$EXEDIR/init.d/sysv/zapret
 
+	check_bins
 	check_location copy_all
 	check_prerequisites_linux
 	service_stop_systemd
@@ -672,6 +685,7 @@ install_openwrt()
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	OPENWRT_IFACE_HOOK=$EXEDIR/init.d/openwrt/90-zapret
 	
+	check_bins
 	check_location copy_minimal
 	select_ipv6
 	check_prerequisites_openwrt
