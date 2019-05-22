@@ -87,7 +87,15 @@ call_install_bin()
 {
 	"$EXEDIR/install_bin.sh" $1 || {
 		echo binaries compatible with your system not found
-		exitp 8
+		if exists make; then
+			echo trying to compile
+			make -C "$EXEDIR" || {
+				echo could not compile
+				exitp 8
+			}
+		else
+			exitp 8
+		fi
 	}
 }
 get_bin_arch()

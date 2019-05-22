@@ -20,11 +20,12 @@ ccp()
 	#cp -f "$BINDIR/$1" "$EXEDIR/$2" && echo copying : "$BINDIR/$1" =\> "$EXEDIR/$2"
 }
 
-ARCHLIST="aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc x86_64 x86"
+ARCHLIST="my aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc x86_64 x86"
 
 if [ "$1" = "getarch" ]; then
 	for arch in $ARCHLIST
 	do
+		[ -d "$BINDIR/$arch" ] || continue
 		if check_dir $arch; then
 	 		echo $arch
 	 		exit 0
@@ -33,6 +34,7 @@ if [ "$1" = "getarch" ]; then
 else
 	for arch in $ARCHLIST
 	do
+		[ -d "$BINDIR/$arch" ] || continue
 		if check_dir $arch; then
 			echo $arch is OK
 			echo installing binaries ...
@@ -47,4 +49,4 @@ else
 	done
 fi
 
-false
+exit 1
