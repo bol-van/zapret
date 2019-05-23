@@ -9,7 +9,7 @@ all:	clean
 	for exe in $$(find ${DIRS} -type f -executable); do \
 		mv -f "$(@D)/$$exe" "$(@D)/${TGT}" ; \
 		ln -fs "../${TGT}/$$(basename "$$exe")" "$$exe" ; \
-	done \
+	done
 
 clean:
 	for dir in $(DIRS); do \
