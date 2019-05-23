@@ -4,7 +4,8 @@ TGT := binaries/my
 all:	clean
 	mkdir -p "$(@D)/$(TGT)"; \
 	for dir in $(DIRS); do \
-		$(MAKE) -C "$(@D)/$$dir" || exit 1; \
+		chmod -x "$(@D)/$$dir/"*; \
+		$(MAKE) -C "$(@D)/$$dir" || exit; \
 	done ; \
 	for exe in $$(find ${DIRS} -type f -executable); do \
 		mv -f "$(@D)/$$exe" "$(@D)/${TGT}" ; \
