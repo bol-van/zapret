@@ -88,9 +88,17 @@ check_bins()
 	echo \* checking executables
 
 	local arch=$(get_bin_arch)
+	[ "$FORCE_BUILD" = "1" ] && {
+		echo forced build mode
+		if [ "$arch" = "my" ]; then
+			echo already compiled
+		else
+			arch=""
+		fi
+	}
 	if [ -n "$arch" ] ; then
-		echo found. architecture is : "\"$arch\""
-	elif exists make; then
+		echo found architecture "\"$arch\""
+	elif [ -f "$EXEDIR/Makefile" ] && exists make; then
 		echo trying to compile
 		make -C "$EXEDIR" || {
 			echo could not compile
@@ -705,6 +713,8 @@ install_openwrt()
 }
 
 
+# build binaries, do not use precompiled
+[ "$1" = "make" ] && FORCE_BUILD=1
 
 check_system
 
