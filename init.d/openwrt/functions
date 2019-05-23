@@ -201,7 +201,7 @@ create_ipset()
 zapret_apply_firewall()
 {
 	case "${MODE}" in
-	    tpws_hostlist)
+	    tpws_hostlist|tpws_all)
 			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
 			;;
 	    tpws_ipset)
@@ -212,9 +212,6 @@ zapret_apply_firewall()
 			create_ipset no-update
 			fw_tpws "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
 			fw_tpws "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
-			;;
-	    tpws_all)
-			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
 			;;
 	    tpws_all_https)
 			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
