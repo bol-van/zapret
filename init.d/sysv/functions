@@ -323,7 +323,7 @@ zapret_do_firewall()
 	# $1 - 1 - add, 0 - del
 
 	case "${MODE}" in
-	    tpws_hostlist)
+	    tpws_hostlist|tpws_all)
 			[ "$1" = "1" ] && prepare_tpws
 			fw_tpws $1 "--dport 80" "--dport 80" $TPPORT_HTTP
 			;;
@@ -337,10 +337,6 @@ zapret_do_firewall()
 			[ "$1" = "1" ] && prepare_tpws
 			fw_tpws $1 "--dport 80 -m set --match-set zapret dst" "--dport 80 -m set --match-set zapret6 dst" $TPPORT_HTTP
 			fw_tpws $1 "--dport 443 -m set --match-set zapret dst" "--dport 443 -m set --match-set zapret6 dst" $TPPORT_HTTPS
-			;;
-	    tpws_all)
-			[ "$1" = "1" ] && prepare_tpws
-			fw_tpws $1 "--dport 80" "--dport 80" $TPPORT_HTTP
 			;;
 	    tpws_all_https)
 			[ "$1" = "1" ] && prepare_tpws
@@ -393,15 +389,12 @@ zapret_do_daemons()
 	    tpws_hostlist)
 			do_tpws $1 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$TPWS_HOSTLIST"
 			;;
-	    tpws_ipset)
+	    tpws_ipset|tpws_all)
 			do_tpws $1 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			;;
 	    tpws_ipset_https|tpws_all_https)
 			do_tpws $1 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			do_tpws $1 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-			;;
-	    tpws_all)
-			do_tpws $1 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			;;
 	    nfqws_ipset|nfqws_ipset_https|nfqws_all|nfqws_all_https)
 			do_nfqws $1 1 "$NFQWS_OPT"
