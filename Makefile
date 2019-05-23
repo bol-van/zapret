@@ -15,6 +15,7 @@ all:	clean
 	done
 
 clean:
+	[ -d "$(TGT)" ] && rm -r "$(TGT)" ; \
 	for dir in $(DIRS); do \
 		$(MAKE) -C "$$dir" clean; \
 	done
