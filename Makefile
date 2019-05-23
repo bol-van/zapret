@@ -7,7 +7,7 @@ all:	clean
 		chmod -x "$$dir/"*; \
 		$(MAKE) -C "$$dir" || exit; \
 		for exe in "$$dir/"*; do \
-			if [ -f"$$exe" ] && [ -x "$$exe" ]; then \
+			if [ -f "$$exe" ] && [ -x "$$exe" ]; then \
 				mv -f "$$exe" "${TGT}" ; \
 				ln -fs "../${TGT}/$$(basename "$$exe")" "$$exe" ; \
 			fi \
