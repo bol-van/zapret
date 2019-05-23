@@ -43,8 +43,8 @@ exitp()
 
 get_dir_inode()
 {
-	local dir=$1
-	[ -L "$dir" ] && dir=$(readlink -f $dir)
+	local dir="$1"
+	[ -L "$dir" ] && dir=$(readlink -f "$dir")
 	ls -id "$dir" | awk '{print $1}'
 }
 
