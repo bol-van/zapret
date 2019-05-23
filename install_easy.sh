@@ -183,7 +183,7 @@ write_config_var()
 select_mode()
 {
 	echo select MODE :
-	ask_list MODE "tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https ipset" tpws_ipset_https && write_config_var MODE
+	ask_list MODE "tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https ipset custom" tpws_ipset_https && write_config_var MODE
 }
 select_getlist()
 {
