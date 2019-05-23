@@ -43,7 +43,9 @@ exitp()
 
 get_dir_inode()
 {
-	ls -id "$1" | awk '{print $1}'
+	local dir=$1
+	[ -L "$dir" ] && dir=$(readlink -f $dir)
+	ls -id "$dir" | awk '{print $1}'
 }
 
 md5file()
