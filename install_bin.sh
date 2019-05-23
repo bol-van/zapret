@@ -20,7 +20,7 @@ ccp()
 	#cp -f "$BINDIR/$1" "$EXEDIR/$2" && echo copying : "$BINDIR/$1" =\> "$EXEDIR/$2"
 }
 
-ARCHLIST="my aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc x86_64 x86"
+ARCHLIST="my x86_64 x86 aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
 
 if [ "$1" = "getarch" ]; then
 	for arch in $ARCHLIST
