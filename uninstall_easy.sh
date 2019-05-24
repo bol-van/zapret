@@ -131,7 +131,7 @@ openwrt_fw_section_find()
 	do
 		path=$(uci -q get firewall.@include[$i].path)
 		[ -n "$path" ] || break
-		[ "$path" == "$OPENWRT_FW_INCLUDE$1" ] && {
+		[ "$path" = "$OPENWRT_FW_INCLUDE$1" ] && {
 	 		echo $i
 	 		return
 		}

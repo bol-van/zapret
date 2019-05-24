@@ -27,6 +27,8 @@ whichq()
 
 exitp()
 {
+	local A
+
 	echo
 	echo press enter to continue
 	read A
@@ -39,6 +41,35 @@ exitp()
 	exists su && exec su -c "$0"
 	echo su or sudo not found
 	exitp 2
+}
+
+read_yes_no()
+{
+	# $1 - default (Y/N)
+	local A
+	read A
+	[ -z "$A" ] || ([ "$A" != "Y" ] && [ "$A" != "y" ] && [ "$A" != "N" ] && [ "$A" != "n" ]) && A=$1
+	[ "$A" = "Y" ] || [ "$A" = "y" ]
+}
+ask_yes_no()
+{
+	# $1 - default (Y/N)
+	# $2 - text
+	echo -n "$2 (default : $1) (Y/N) ? "
+	read_yes_no $1
+}
+
+on_off_function()
+{
+	# $1 : function name on
+	# $2 : function name off
+	# $3 : 0 - off, 1 - on
+	local F="$1"
+	[ "$3" = "1" ] || F="$2"
+	shift
+	shift
+	shift
+	"$F" "$@"
 }
 
 get_dir_inode()
@@ -151,6 +182,7 @@ ask_list()
 	eval M_DEFAULT="\$$1"
 	local M_ALL=$M_DEFAULT
 	local M=""
+	local m
 	
 	[ -n "$3" ] && { find_str_in_list "$M_DEFAULT" "$2" || M_DEFAULT="$3" ;}
 	
@@ -190,12 +222,10 @@ select_mode()
 select_getlist()
 {
 	# do not touch this in custom mode
-	[ "$MODE" == "custom" ] && return
+	[ "$MODE" = "custom" ] && return
 
 	if [ "${MODE%hostlist*}" != "$MODE" ] || [ "${MODE%ipset*}" != "$MODE" ]; then
-		echo -n "do you want to auto download ip/host list (Y/N) ? "
-		read A
-		if [ "$A" != 'N' ] && [ "$A" != 'n' ]; then
+		if ask_yes_no Y "do you want to auto download ip/host list"; then
 			if [ "${MODE%hostlist*}" != "$MODE" ] ; then
 				local GL_OLD=$GETLIST
 				GETLIST="get_hostlist.sh"
@@ -214,13 +244,12 @@ select_getlist()
 select_ipv6()
 {
 	local T=N
+
 	[ "$DISABLE_IPV6" != '1' ] && T=Y
-	echo -n "enable ipv6 support (default : $T) (Y/N) ? "
-	read A
 	local old6=$DISABLE_IPV6
-	if [ "$A" = 'Y' ] || [ "$A" = 'y' ]; then
+	if ask_yes_no $T "enable ipv6 support"; then
 		DISABLE_IPV6=0
-	elif [ "$A" = 'N' ] || [ "$A" = 'n' ]; then
+	else
 		DISABLE_IPV6=1
 	fi
 	[ "$old6" != "$DISABLE_IPV6" ] && write_config_var DISABLE_IPV6
@@ -245,10 +274,7 @@ select_router_iface()
 	local old_lan=$IFACE_LAN
 	local old_wan=$IFACE_WAN
 
-	echo -n "is this system a router (default : $T) (Y/N) ? "
-	read A
-	[ -z "$A" ] && A=$T
-	if [ "$A" = 'Y' ] || [ "$A" = 'y' ]; then
+	if ask_yes_no $T "is this system a router"; then
 		echo LAN interface :
 		ask_iface IFACE_LAN
 		echo WAN interface :
@@ -287,6 +313,29 @@ copy_minimal()
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
 
+_backup_settings()
+{
+	local i=0
+	for f in "$@"; do
+		[ -f "$ZAPRET_BASE/$f" ] && cp -f "$ZAPRET_BASE/$f" "/tmp/zapret-bkp-$i"
+		i=$(($i+1))
+	done
+}
+_restore_settings()
+{
+	local i=0
+	for f in "$@"; do
+		[ -f "/tmp/zapret-bkp-$i" ] && mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_BASE/$f"
+		i=$(($i+1))
+	done
+}
+backup_restore_settings()
+{
+	# $1 - 1 - backup, 0 - restore
+	local mode=$1
+	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/openwrt/custom"
+}
+
 check_location()
 {
 	# $1 - copy function
@@ -297,14 +346,14 @@ check_location()
 	[ -d "$ZAPRET_BASE" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_BASE") ] || {
 		echo easy install is supported only from default location : $ZAPRET_BASE
 		echo currently its run from $EXEDIR
-		echo -n "do you want the installer to copy it for you (Y/N) ? "
-		read A
-		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+		if ask_yes_no N "do you want the installer to copy it for you"; then
+			local keep=Y
 			if [ -d "$ZAPRET_BASE" ]; then
 				echo installer found existing $ZAPRET_BASE
-				echo -n "do you want to delete all files there and copy this version (Y/N) ? "
-				read A
-				if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+				echo directory needs to be replaced. config and custom scripts can be kept or replaced with clean version
+				if ask_yes_no N "do you want to delete all files there and copy this version"; then
+					ask_yes_no Y "keep config and custom scripts" || keep=N
+					[ "$keep" = "Y" ] && backup_restore_settings 1
 					rm -r "$ZAPRET_BASE"
 				else
 					echo refused to overwrite $ZAPRET_BASE. exiting
@@ -314,6 +363,7 @@ check_location()
 			local B=$(dirname "$ZAPRET_BASE")
 			[ -d "$B" ] || mkdir -p "$B"
 			$1 "$EXEDIR" "$ZAPRET_BASE"
+			[ "$keep" = "Y" ] && backup_restore_settings 0
 			echo relaunching itself from $ZAPRET_BASE
 			exec $ZAPRET_BASE/$(basename $0)
 		else
@@ -526,6 +576,7 @@ check_prerequisites_openwrt()
 	local PKGS="iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt ipset curl"
 	[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS kmod-ipt-nat6"
 	local UPD=0
+	local A
 	
 	# in recent lede/openwrt iptable_raw in separate package
 	if ([ "$DISABLE_IPV6" = "1" ] || (check_kmod ip6table_nat && check_kmod ip6table_raw)) && \
@@ -548,9 +599,7 @@ check_prerequisites_openwrt()
 		echo your system uses default busybox gzip. its several times slower than gnu gzip.
 		echo ip/host list scripts will run much faster with gnu gzip
 		echo installer can install gnu gzip but it requires about 100 Kb space
-		echo -n "do you want to install gnu gzip (Y/N) ? "
-		read A
-		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+		if ask_yes_no N "do you want to install gnu gzip"; then
 			[ "$UPD" = "0" ] && {
 				opkg update
 				UPD=1
@@ -562,9 +611,7 @@ check_prerequisites_openwrt()
 		echo your system uses default busybox grep. its damn infinite slow with -f option
 		echo get_combined.sh will be severely impacted
 		echo installer can install gnu grep but it requires about 0.5 Mb space
-		echo -n "do you want to install gnu grep (Y/N) ? "
-		read A
-		if [ "$A" = "Y" ] || [ "$A" = "y" ]; then
+		if ask_yes_no N "do you want to install gnu grep"; then
 			[ "$UPD" = "0" ] && {
 				opkg update
 				UPD=1
@@ -584,7 +631,7 @@ openwrt_fw_section_find()
 	do
 		path=$(uci -q get firewall.@include[$i].path)
 		[ -n "$path" ] || break
-		[ "$path" == "$OPENWRT_FW_INCLUDE$1" ] && {
+		[ "$path" = "$OPENWRT_FW_INCLUDE$1" ] && {
 	 		echo $i
 	 		return
 		}
