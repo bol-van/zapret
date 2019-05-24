@@ -11,12 +11,20 @@ TPWS_USER=daemon
 # max wait time for the link local ipv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
 
-IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
+IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
+
+CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/openwrt/custom"
+[ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
 
 exists()
 {
- which $1 >/dev/null 2>/dev/null
+ which "$1" >/dev/null 2>/dev/null
 }
+existf()
+{
+ type "$1" >/dev/null 2>/dev/null
+}
+
 
 # can be multiple ipv6 outgoing interfaces
 # uplink from isp, tunnelbroker, vpn, ...
@@ -239,10 +247,7 @@ zapret_apply_firewall()
 			create_ipset no-update
 			;;
 	    custom)
-			# PLACEHOLDER
-			echo !!! NEED ATTENTION !!!
-			echo Configure iptables for required actions
-			echo Study how other sections work
+	    		existf zapret_custom_firewall && zapret_custom_firewall $1
 			;;
 	esac
 }

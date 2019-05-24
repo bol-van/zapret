@@ -4,10 +4,8 @@ USE_PROCD=1
 # after network
 START=21
 
-. /lib/functions/network.sh
-
 ZAPRET_BASE=/opt/zapret
-. "$ZAPRET_BASE/config"
+. "$ZAPRET_BASE/init.d/openwrt/functions"
 
 # !!!!! in openwrt firewall rules are configured separately
 
@@ -30,7 +28,6 @@ TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
 TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer --bind-wait-ifup=30 --bind-wait-ip=30 --bind-wait-ip-linklocal=3"
 TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
 TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
-
 
 run_daemon()
 {
@@ -81,10 +78,7 @@ start_service() {
 			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
 			;;
 	    custom)
-			# PLACEHOLDER
-			echo !!! NEED ATTENTION !!!
-			echo Start daemon\(s\)
-			echo Study how other sections work
+	    		existf zapret_custom_daemons && zapret_custom_daemons $1
 			;;
 	esac
 }

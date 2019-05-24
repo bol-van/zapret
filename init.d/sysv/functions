@@ -6,17 +6,17 @@
 
 PIDDIR=/var/run
 
-IPSET_CR=$ZAPRET_BASE/ipset/create_ipset.sh
+IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
 WS_USER=tpws
 
 QNUM=200
-NFQWS=$ZAPRET_BASE/nfq/nfqws
+NFQWS="$ZAPRET_BASE/nfq/nfqws"
 NFQWS_OPT_BASE="--qnum=$QNUM --user=$WS_USER"
 
 TPPORT_HTTP=1188
 TPPORT_HTTPS=1189
-TPWS=$ZAPRET_BASE/tpws/tpws
+TPWS="$ZAPRET_BASE/tpws/tpws"
 TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts.txt.gz
 [ -f "$TPWS_HOSTLIST" ] || TPWS_HOSTLIST=$ZAPRET_BASE/ipset/zapret-hosts-user.txt
 TPWS_OPT_BASE="--user=$WS_USER --bind-addr=127.0.0.1"
@@ -33,9 +33,16 @@ TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
 # max wait time for the link local ipv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
 
+CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/sysv/custom"
+[ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
+
 exists()
 {
-	which $1 >/dev/null 2>/dev/null
+	which "$1" >/dev/null 2>/dev/null
+}
+existf()
+{
+	type "$1" >/dev/null 2>/dev/null
 }
 
 on_off_function()
@@ -219,7 +226,7 @@ run_daemon()
 	# $2 - daemon
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
-	
+
 	local DAEMONBASE=$(basename $2)
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
@@ -365,10 +372,7 @@ zapret_do_firewall()
 			[ "$1" != "1" ] || create_ipset
 			;;
 	    custom)
-			# PLACEHOLDER
-			echo !!! NEED ATTENTION !!!
-			echo Configure iptables for required actions
-			echo Study how other sections work
+	    		existf zapret_custom_firewall && zapret_custom_firewall $1
 			;;
 	esac
 }
@@ -400,11 +404,7 @@ zapret_do_daemons()
 			do_nfqws $1 1 "$NFQWS_OPT"
 			;;
 	    custom)
-			# PLACEHOLDER
-			echo !!! NEED ATTENTION !!!
-			echo Start daemon\(s\)
-			echo Study how other sections work
-			do_daemon $1 1 /bin/sleep 20
+	    		existf zapret_custom_daemons && zapret_custom_daemons $1
 			;;
 	esac
 }
