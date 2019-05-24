@@ -347,12 +347,12 @@ check_location()
 		echo easy install is supported only from default location : $ZAPRET_BASE
 		echo currently its run from $EXEDIR
 		if ask_yes_no N "do you want the installer to copy it for you"; then
-			local keep=Y
+			local keep=N
 			if [ -d "$ZAPRET_BASE" ]; then
 				echo installer found existing $ZAPRET_BASE
 				echo directory needs to be replaced. config and custom scripts can be kept or replaced with clean version
 				if ask_yes_no N "do you want to delete all files there and copy this version"; then
-					ask_yes_no Y "keep config and custom scripts" || keep=N
+					ask_yes_no Y "keep config and custom scripts" && keep=Y
 					[ "$keep" = "Y" ] && backup_restore_settings 1
 					rm -r "$ZAPRET_BASE"
 				else
