@@ -8,7 +8,7 @@ EXEDIR=$(dirname "$SCRIPT")
 
 #ZURL=https://github.com/zapret-info/z-i/raw/master/dump.csv
 ZURL=http://antizapret.prostovpn.org/iplist.txt
-ZIPLISTTMP=$TMPDIR/zapret-ip.txt
+ZIPLISTTMP="$TMPDIR/zapret-ip.txt"
 
 getuser
 

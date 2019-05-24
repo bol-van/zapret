@@ -6,12 +6,12 @@ EXEDIR=$(dirname "$SCRIPT")
 
 . "$EXEDIR/def.sh"
 
-ZREESTR=$TMPDIR/reestr.txt
+ZREESTR="$TMPDIR/reestr.txt"
 #ZURL_REESTR=https://reestr.rublacklist.net/api/current
 ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
-ZAZ=$TMPDIR/zapret-ip.txt
+ZAZ="$TMPDIR/zapret-ip.txt"
 ZURL_AZ=http://antizapret.prostovpn.org/iplist.txt
-ZIPLIST_IPBAN_TMP=/tmp/zapret-ipban.txt
+ZIPLIST_IPBAN_TMP="$TMPDIR/zapret-ipban.txt"
 
 getuser
 

@@ -3,24 +3,24 @@
 TMPDIR=/tmp
 ZIPSET=zapret
 ZIPSET6=zapret6
-ZIPLIST=$EXEDIR/zapret-ip.txt
-ZIPLIST6=$EXEDIR/zapret-ip6.txt
-ZIPLIST_EXCLUDE=$EXEDIR/zapret-ip-exclude.txt
-ZIPLIST_EXCLUDE6=$EXEDIR/zapret-ip-exclude6.txt
-ZIPLIST_USER=$EXEDIR/zapret-ip-user.txt
-ZIPLIST_USER6=$EXEDIR/zapret-ip-user6.txt
-ZUSERLIST=$EXEDIR/zapret-hosts-user.txt
-ZHOSTLIST=$EXEDIR/zapret-hosts.txt
+ZIPLIST="$EXEDIR/zapret-ip.txt"
+ZIPLIST6="$EXEDIR/zapret-ip6.txt"
+ZIPLIST_EXCLUDE="$EXEDIR/zapret-ip-exclude.txt"
+ZIPLIST_EXCLUDE6="$EXEDIR/zapret-ip-exclude6.txt"
+ZIPLIST_USER="$EXEDIR/zapret-ip-user.txt"
+ZIPLIST_USER6="$EXEDIR/zapret-ip-user6.txt"
+ZUSERLIST="$EXEDIR/zapret-hosts-user.txt"
+ZHOSTLIST="$EXEDIR/zapret-hosts.txt"
 
 ZIPSET_IPBAN=ipban
 ZIPSET_IPBAN6=ipban6
-ZIPLIST_IPBAN=$EXEDIR/zapret-ip-ipban.txt
-ZIPLIST_IPBAN6=$EXEDIR/zapret-ip-ipban6.txt
-ZIPLIST_USER_IPBAN=$EXEDIR/zapret-ip-user-ipban.txt
-ZIPLIST_USER_IPBAN6=$EXEDIR/zapret-ip-user-ipban6.txt
-ZUSERLIST_IPBAN=$EXEDIR/zapret-hosts-user-ipban.txt
+ZIPLIST_IPBAN="$EXEDIR/zapret-ip-ipban.txt"
+ZIPLIST_IPBAN6="$EXEDIR/zapret-ip-ipban6.txt"
+ZIPLIST_USER_IPBAN="$EXEDIR/zapret-ip-user-ipban.txt"
+ZIPLIST_USER_IPBAN6="$EXEDIR/zapret-ip-user-ipban6.txt"
+ZUSERLIST_IPBAN="$EXEDIR/zapret-hosts-user-ipban.txt"
 
-MDIG=$EXEDIR/../mdig/mdig
+MDIG="$EXEDIR/../mdig/mdig"
 [ -z "$MDIG_THREADS" ] && MDIG_THREADS=30
 
 zzexist()
