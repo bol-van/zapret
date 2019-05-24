@@ -189,6 +189,9 @@ select_mode()
 }
 select_getlist()
 {
+	# do not touch this in custom mode
+	[ "$MODE" == "custom" ] && return
+
 	if [ "${MODE%hostlist*}" != "$MODE" ] || [ "${MODE%ipset*}" != "$MODE" ]; then
 		echo -n "do you want to auto download ip/host list (Y/N) ? "
 		read A
