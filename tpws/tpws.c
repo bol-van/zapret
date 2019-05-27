@@ -126,6 +126,7 @@ void exithelp()
 		" --pidfile=<filename>\t\t; write pid to file\n"
 		" --user=<username>\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t; drop root privs\n"
+		" --debug\t\t\t; print debug messages\n"
 	);
 	exit(1);
 }
@@ -183,6 +184,7 @@ void parse_params(int argc, char *argv[])
 		{ "unixeol",no_argument,0,0 },// optidx=23
 		{ "hostlist",required_argument,0,0 },// optidx=24
 		{ "pidfile",required_argument,0,0 },// optidx=25
+		{ "debug",no_argument,0,0 },// optidx=26
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -327,6 +329,9 @@ void parse_params(int argc, char *argv[])
 		case 25: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
+			break;
+		case 26:
+			params.debug = true;
 			break;
 		}
 	}

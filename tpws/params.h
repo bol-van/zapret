@@ -25,6 +25,9 @@ struct params_s
 	char hostfile[256];
 	char pidfile[256];
 	strpool *hostlist;
+	bool debug;
 };
 
 extern struct params_s params;
+
+#define DBGPRINT(format, ...) { if (params.debug) printf(format "\n", ##__VA_ARGS__); }

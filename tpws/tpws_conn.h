@@ -43,6 +43,8 @@ struct tproxy_conn
 	
 	// total read,write
 	size_t trd,twr;
+	// number of epoll_wait events
+	unsigned int event_count;
 
 	// connection is either spliced or send/recv
 	// spliced connection have pipe buffering but also can have send_buffer's
