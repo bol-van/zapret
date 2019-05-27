@@ -133,3 +133,8 @@ v26
 
 ipv6 support
 tpws : advanced bind options
+
+v27
+
+tpws : major connection code rewrite. originally it was derived from not top quality example , with many bugs and potential problems.
+next generation connection code uses nonblocking sockets. now its in EXPERIMENTAL state.

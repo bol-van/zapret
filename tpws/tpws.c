@@ -13,8 +13,6 @@
 #include <sys/select.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <sys/queue.h>
-#include <sys/epoll.h>
 #include <sys/ioctl.h>
 #include <signal.h>
 #include <errno.h>
@@ -29,463 +27,36 @@
 #include "tpws.h"
 #include "tpws_conn.h"
 #include "hostlist.h"
-
-enum splithttpreq { split_none = 0, split_method, split_host };
-
-struct params_s
-{
-	char bindaddr[64],bindiface[IFNAMSIZ];
-	bool bind_if6;
-	bool bindll,bindll_force;
-	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
-	uid_t uid;
-	gid_t gid;
-	uint16_t port;
-	bool daemon;
-	bool hostcase, hostdot, hosttab, hostnospace, methodspace, methodeol, unixeol;
-	char hostspell[4];
-	enum splithttpreq split_http_req;
-	int split_pos;
-	int maxconn;
-	char hostfile[256];
-	char pidfile[256];
-	strpool *hostlist;
-};
-
+#include "params.h"
+                     
 struct params_s params;
-
-unsigned char *find_bin(void *data, size_t len, const void *blk, size_t blk_len)
-{
-	while (len >= blk_len)
-	{
-		if (!memcmp(data, blk, blk_len))
-			return data;
-		data = (char*)data + 1;
-		len--;
-	}
-	return NULL;
-}
 
 bool bHup = false;
 void onhup(int sig)
 {
- printf("HUP received !\n");
- if (params.hostlist)
-  printf("Will reload hostlist on next request\n");
- bHup = true;
+	printf("HUP received !\n");
+	if (params.hostlist)
+		printf("Will reload hostlist on next request\n");
+	bHup = true;
 }
 // should be called in normal execution
 void dohup()
 {
- if (bHup)
- {
-  if (params.hostlist)
-  {
-   if (!LoadHostList(&params.hostlist, params.hostfile))
-	exit(1);
-  }
-  bHup = false;
- }
-}
-
-size_t send_with_flush(int sockfd, const void *buf, size_t len, int flags)
-{
-	int flag, err;
-	size_t wr;
-
-	flag = 1;
-	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
-	wr = send(sockfd, buf, len, flags);
-	err = errno;
-	flag = 0;
-	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
-	errno = err;
-	return wr;
-}
-
-#define RD_BLOCK_SIZE 8192
-
-// pHost points to "Host: ..."
-bool find_host(char **pHost,char *buf,size_t bs)
-{
- if (!*pHost)
- {
-  *pHost = find_bin(buf, bs, "\nHost: ", 7);
-  if (*pHost) (*pHost)++;
-  printf("Found Host: at pos %zu\n",*pHost - buf);
- }
- return !!*pHost;
-}
-
-static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
-void modify_tcp_segment(char *segment,size_t *size,size_t *split_pos)
-{
-	char *p, *pp, *pHost = NULL;
-	size_t method_len = 0, pos;
-	const char **method;
-	bool bIsHttp = false, bBypass = false;
-	char bRemovedHostSpace = 0;
-	char Host[128];
-	
-	*split_pos=0;
-
-	for (method = http_methods; *method; method++)
+	if (bHup)
 	{
-		method_len = strlen(*method);
-		if (method_len <= *size && !memcmp(segment, *method, method_len))
+		if (params.hostlist)
 		{
-			bIsHttp = true;
-			method_len -= 2; // "GET /" => "GET"
-			break;
+			if (!LoadHostList(&params.hostlist, params.hostfile))
+			{
+				// what will we do without hostlist ?? sure, gonna die
+				exit(1);
+			}
 		}
-	}
-	if (bIsHttp)
-	{
-		printf("Data block looks like http request start : %s\n", *method);
-		// cpu saving : we search host only if and when required. we do not research host every time we need its position
-		if (params.hostlist && find_host(&pHost,segment,*size))
-		{
-			bool bInHostList = false;
-			p = pHost + 6;
-			while (p < (segment + *size) && (*p == ' ' || *p == '\t')) p++;
-			pp = p;
-			while (pp < (segment + *size) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
-			memcpy(Host, p, pp - p);
-			Host[pp - p] = '\0';
-			printf("Requested Host is : %s\n", Host);
-			for(p = Host; *p; p++) *p=tolower(*p);
-			p = Host;
-			while (p)
-			{
-				bInHostList = StrPoolCheckStr(params.hostlist, p);
-				printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
-				if (bInHostList) break;
-				p = strchr(p, '.');
-				if (p) p++;
-			}
-			bBypass = !bInHostList;
-		}
-		if (!bBypass)
-		{
-			if (params.unixeol)
-			{
-				p = pp = segment;
-				while (p = find_bin(p, segment + *size - p, "\r\n", 2))
-				{
-					*p = '\n'; p++;
-					memmove(p, p + 1, segment + *size - p - 1);
-					(*size)--;
-					if (pp == (p - 1))
-					{
-						// probably end of http headers
-						printf("Found double EOL at pos %zu. Stop replacing.\n", pp - segment);
-						break;
-					}
-					pp = p;
-				}
-				pHost = NULL; // invalidate
-			}
-
-			if (params.methodspace)
-			{
-				// we only work with data blocks looking as HTTP query, so method is at the beginning
-				printf("Adding extra space after method\n");
-				p = segment + method_len + 1;
-				pos = method_len + 1;
-				memmove(p + 1, p, *size - pos);
-				*p = ' '; // insert extra space
-				(*size)++; // block will grow by 1 byte
-				if (pHost) pHost++; // Host: position will move by 1 byte
-			}
-			if ((params.hostdot || params.hosttab) && find_host(&pHost,segment,*size))
-			{
-				p = pHost + 6;
-				while (p < (segment + *size) && *p != '\r' && *p != '\n') p++;
-				if (p < (segment + *size))
-				{
-					pos = p - segment;
-					printf("Adding %s to host name at pos %zu\n", params.hostdot ? "dot" : "tab", pos);
-					memmove(p + 1, p, *size - pos);
-					*p = params.hostdot ? '.' : '\t'; // insert dot or tab
-					(*size)++; // block will grow by 1 byte
-				}
-			}
-			if (params.hostnospace && find_host(&pHost,segment,*size) && pHost[5] == ' ')
-			{
-				p = pHost + 6;
-				pos = p - segment;
-				printf("Removing space before host name at pos %zu\n", pos);
-				memmove(p - 1, p, *size - pos);
-				(*size)--; // block will shrink by 1 byte
-				bRemovedHostSpace = 1;
-			}
-			if (!params.split_pos)
-			{
-				switch (params.split_http_req)
-				{
-				case split_method:
-					*split_pos = method_len - 1;
-					break;
-				case split_host:
-					if (find_host(&pHost,segment,*size))
-						*split_pos = pHost + 6 - bRemovedHostSpace - segment;
-					break;
-				}
-			}
-			if (params.hostcase && find_host(&pHost,segment,*size))
-			{
-				printf("Changing 'Host:' => '%c%c%c%c:' at pos %zu\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment);
-				memcpy(pHost, params.hostspell, 4);
-			}
-			if (params.methodeol)
-			{
-				printf("Adding EOL before method\n");
-				if (params.unixeol)
-				{
-					memmove(segment + 1, segment, *size);
-					(*size)++;;
-					segment[0] = '\n';
-					if (*split_pos) (*split_pos)++;
-				}
-				else
-				{
-					memmove(segment + 2, segment, *size);
-					*size += 2;
-					segment[0] = '\r';
-					segment[1] = '\n';
-					if (*split_pos) *split_pos += 2;
-				}
-			}
-			if (params.split_pos && params.split_pos < *size) *split_pos = params.split_pos;
-		}
-		else
-		{
-			printf("Not acting on this request\n");
-		}
-	}
-	else
-	{
-		printf("Data block does not look like http request start\n");
-		// this is the only parameter applicable to non-http block (may be https ?)
-		if (params.split_pos && params.split_pos < *size) *split_pos = params.split_pos;
+		bHup = false;
 	}
 }
 
 
-bool handle_epollin(tproxy_conn_t *conn, ssize_t *data_transferred)
-{
-	int numbytes;
-	int fd_in, fd_out;
-	bool bOutgoing;
-	ssize_t rd = 0, wr = 0;
-	size_t bs;
-
-	//Easy way to determin which socket is ready for reading
-	//TODO: Optimize. This one allows me quick lookup for conn, but
-	//I need to make a system call to determin which socket
-	numbytes = 0;
-	if (ioctl(conn->local_fd, FIONREAD, &numbytes) != -1
-		&& numbytes > 0) {
-		fd_in = conn->local_fd;
-		fd_out = conn->remote_fd;
-		bOutgoing = true;
-	}
-	else {
-		fd_in = conn->remote_fd;
-		fd_out = conn->local_fd;
-		numbytes = 0;
-		ioctl(fd_in, FIONREAD, &numbytes);
-		bOutgoing = false;
-	}
-
-	if (numbytes)
-	{
-		if (bOutgoing)
-		{
-			char buf[RD_BLOCK_SIZE + 4];
-
-			rd = recv(fd_in, buf, RD_BLOCK_SIZE, MSG_DONTWAIT);
-			if (rd > 0)
-			{
-				size_t split_pos;
-				
-				bs = rd;
-				modify_tcp_segment(buf,&bs,&split_pos);
-
-				if (split_pos)
-				{
-					printf("Splitting at pos %zu\n", split_pos);
-					wr = send_with_flush(fd_out, buf, split_pos, 0);
-					if (wr >= 0)
-						wr = send(fd_out, buf + split_pos, bs - split_pos, 0);
-				}
-				else
-				{
-					wr = send(fd_out, buf, bs, 0);
-				}
-			}
-		}
-		else
-		{
-			// *** we are not interested in incoming traffic
-			// splice it without processing
-
-			//printf("splicing numbytes=%d\n",numbytes);
-			rd = numbytes = splice(fd_in, NULL, conn->splice_pipe[1], NULL,
-				SPLICE_LEN, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-			//printf("spliced rd=%d\n",rd);
-			if (rd > 0)
-			{
-				wr = splice(conn->splice_pipe[0], NULL, fd_out, NULL,
-					rd, SPLICE_F_MOVE);
-			}
-			//printf("splice rd=%d wr=%d\n",rd,wr);
-		}
-	}
-	if (data_transferred) *data_transferred = rd < 0 ? 0 : rd;
-	return rd != -1 && wr != -1;
-}
-
-void remove_closed_connections(struct tailhead *close_list)
-{
-	tproxy_conn_t *conn = NULL;
-
-	while (close_list->tqh_first != NULL) {
-		conn = (tproxy_conn_t*)close_list->tqh_first;
-		TAILQ_REMOVE(close_list, close_list->tqh_first, conn_ptrs);
-
-		ssize_t rd = 0;
-		while (handle_epollin(conn, &rd) && rd);
-
-		printf("Socket %d and %d closed, connection removed\n",
-			conn->local_fd, conn->remote_fd);
-		free_conn(conn);
-	}
-}
-
-void close_tcp_conn(tproxy_conn_t *conn, struct tailhead *conn_list, struct tailhead *close_list)
-{
-	conn->state = CONN_CLOSED;
-	TAILQ_REMOVE(conn_list, conn, conn_ptrs);
-	TAILQ_INSERT_TAIL(close_list, conn, conn_ptrs);
-}
-
-int event_loop(int listen_fd)
-{
-	int retval = 0, num_events = 0;
-	int tmp_fd = 0; //Used to temporarily hold the accepted file descriptor
-	tproxy_conn_t *conn = NULL;
-	int efd, i;
-	struct epoll_event ev, events[MAX_EPOLL_EVENTS];
-	struct tailhead conn_list, close_list;
-	uint8_t check_close = 0;
-	int conncount = 0;
-
-	//Initialize queue (remember that TAILQ_HEAD just defines the struct)
-	TAILQ_INIT(&conn_list);
-	TAILQ_INIT(&close_list);
-
-	if ((efd = epoll_create(1)) == -1) {
-		perror("epoll_create");
-		return -1;
-	}
-
-	//Start monitoring listen socket
-	memset(&ev, 0, sizeof(ev));
-	ev.events = EPOLLIN;
-	//There is only one listen socket, and I want to use ptr in order to have 
-	//easy access to the connections. So if ptr is NULL that means an event on
-	//listen socket.
-	ev.data.ptr = NULL;
-	if (epoll_ctl(efd, EPOLL_CTL_ADD, listen_fd, &ev) == -1) {
-		perror("epoll_ctl (listen socket)");
-		return -1;
-	}
-
-	while (1) {
-		if ((num_events = epoll_wait(efd, events, MAX_EPOLL_EVENTS, -1)) == -1) {
-			if (errno == EINTR) continue; // system call was interrupted
-			perror("epoll_wait");
-			retval = -1;
-			break;
-		}
-
-		dohup();
-
-		for (i = 0; i < num_events; i++) {
-			if (events[i].data.ptr == NULL) {
-				//Accept new connection
-				tmp_fd = accept(listen_fd, NULL, 0);
-				if (tmp_fd < 0)
-				{
-					fprintf(stderr, "Failed to accept connection\n");
-				}
-				else if (conncount >= params.maxconn)
-				{
-					close(tmp_fd);
-					fprintf(stderr, "Too much connections : %d\n", conncount);
-				}
-				else if ((conn = add_tcp_connection(efd, &conn_list, tmp_fd, params.port)) == NULL)
-				{
-					close(tmp_fd);
-					fprintf(stderr, "Failed to add connection\n");
-				}
-				else
-				{
-					conncount++;
-					printf("Connections : %d\n", conncount);
-				}
-			}
-			else {
-				conn = (tproxy_conn_t*)events[i].data.ptr;
-
-				//Only applies to remote_fd, connection attempt has
-				//succeeded/failed
-				if (events[i].events & EPOLLOUT) {
-					if (check_connection_attempt(conn, efd) == -1) {
-						fprintf(stderr, "Connection attempt failed for %d\n",
-							conn->remote_fd);
-						check_close = 1;
-						close_tcp_conn(conn, &conn_list, &close_list);
-						conncount--;
-					}
-					continue;
-				}
-				else if (conn->state != CONN_CLOSED &&
-					(events[i].events & EPOLLRDHUP ||
-						events[i].events & EPOLLHUP ||
-						events[i].events & EPOLLERR)) {
-					check_close = 1;
-					close_tcp_conn(conn, &conn_list, &close_list);
-					conncount--;
-					continue;
-				}
-
-				//Since I use an event cache, earlier events might cause for
-				//example this connection to be closed. No need to process fd if
-				//that is the case
-				if (conn->state == CONN_CLOSED) {
-					continue;
-				}
-
-				if (!handle_epollin(conn, NULL)) {
-					close_tcp_conn(conn, &conn_list, &close_list);
-					conncount--;
-					check_close = 1;
-				}
-			}
-		}
-
-		//Remove connections
-		if (check_close)
-			remove_closed_connections(&close_list);
-
-		check_close = 0;
-	}
-
-	//Add cleanup
-	return retval;
-}
 
 int8_t block_sigpipe()
 {
@@ -768,7 +339,7 @@ void parse_params(int argc, char *argv[])
 
 void daemonize()
 {
-	int pid;
+	int pid,fd;
 
 	pid = fork();
 	if (pid == -1)
@@ -789,9 +360,9 @@ void daemonize()
 	/* redirect fd's 0,1,2 to /dev/null */
 	open("/dev/null", O_RDWR);
 	/* stdin */
-	dup(0);
+	fd=dup(0);
 	/* stdout */
-	dup(0);
+	fd=dup(0);
 	/* stderror */
 }
 
@@ -822,7 +393,7 @@ int getmaxcap()
 	FILE *F = fopen("/proc/sys/kernel/cap_last_cap","r");
 	if (F)
 	{
-		fscanf(F,"%d",&maxcap);
+		int n=fscanf(F,"%d",&maxcap);
 		fclose(F);
 	}
 	return maxcap;
@@ -1066,11 +637,6 @@ int main(int argc, char *argv[]) {
 	if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
 	{
 		perror("setsockopt (SO_REUSEADDR): ");
-		goto exiterr;
-	}
-	if (setsockopt(listen_fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) == -1)
-	{
-		perror("setsockopt (SO_KEEPALIVE): ");
 		goto exiterr;
 	}
 	
