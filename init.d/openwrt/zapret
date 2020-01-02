@@ -1,0 +1,90 @@
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+# after network
+START=21
+
+ZAPRET_BASE=/opt/zapret
+. "$ZAPRET_BASE/init.d/openwrt/functions"
+
+# !!!!! in openwrt firewall rules are configured separately
+
+PIDDIR=/var/run
+
+QNUM=200
+NFQWS_USER=daemon
+NFQWS="$ZAPRET_BASE/nfq/nfqws"
+NFQWS_OPT_BASE="--qnum=$QNUM --user=$NFQWS_USER"
+
+TPWS_USER=daemon
+TPPORT_HTTP=1188
+TPPORT_HTTPS=1189
+TPWS="$ZAPRET_BASE/tpws/tpws"
+HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
+[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts-user.txt"
+TPWS_OPT_BASE="--user=$TPWS_USER --bind-addr=127.0.0.1"
+TPWS_OPT_BASE6="--user=$TPWS_USER --bind-addr=::1"
+# first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
+TPWS_OPT_BASE6_PRE="--user=$TPWS_USER --bind-linklocal=prefer --bind-wait-ifup=30 --bind-wait-ip=30 --bind-wait-ip-linklocal=3"
+TPWS_OPT_BASE_HTTP="--port=$TPPORT_HTTP"
+TPWS_OPT_BASE_HTTPS="--port=$TPPORT_HTTPS"
+
+run_daemon()
+{
+	# $1 - daemon string id or number. can use 1,2,3,...
+	# $2 - daemon
+	# $3 - daemon args
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	echo "Starting daemon $1: $2 $3"
+	procd_open_instance
+	procd_set_param command $2 $3
+	procd_set_param pidfile $PIDDIR/$DAEMONBASE$1.pid
+	procd_close_instance
+}
+
+run_tpws()
+{
+	[ "$DISABLE_IPV4" = "1" ] || run_daemon $1 $TPWS "$TPWS_OPT_BASE $2"
+	[ "$DISABLE_IPV6" = "1" ] || {
+		run_daemon $((60+$1)) $TPWS "$TPWS_OPT_BASE6 $2"
+		network_get_device DEVICE lan
+		[ -n "$DEVICE" ] && run_daemon $((660+$1)) $TPWS "$TPWS_OPT_BASE6_PRE --bind-iface6=$DEVICE $2"
+	}
+}
+stop_tpws()
+{
+	[ "$DISABLE_IPV4" = "1" ] || stop_daemon $1 $TPWS
+	[ "$DISABLE_IPV6" = "1" ] || {
+		stop_daemon $((60+$1)) $TPWS
+		stop_daemon $((660+$1)) $TPWS
+	}
+}
+
+
+start_service() {
+	case "${MODE}" in
+		tpws_hostlist)
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP --hostlist=$HOSTLIST"
+			;;
+		tpws_ipset|tpws_all)
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			;;
+		tpws_ipset_https|tpws_all_https)
+			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
+			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
+			;;
+		nfqws_ipset|nfqws_ipset_https|nfqws_all|nfqws_all_https)
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
+			;;
+		nfqws_ipset_desync|nfqws_all_desync)
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC"
+			;;
+		nfqws_hostlist_desync)
+			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC --hostlist=$HOSTLIST"
+			;;
+		custom)
+	    		existf zapret_custom_daemons && zapret_custom_daemons $1
+			;;
+	esac
+}

@@ -1,0 +1,13 @@
+[Unit]
+Description=zapret ip/host list update
+
+[Service]
+Restart=no
+IgnoreSIGPIPE=no
+KillMode=control-group
+GuessMainPID=no
+RemainAfterExit=no
+ExecStart=/opt/zapret/ipset/get_config.sh
+
+[Install]
+WantedBy=multi-user.target

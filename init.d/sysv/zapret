@@ -1,0 +1,48 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:		zapret
+# Required-Start:	$local_fs $network
+# Required-Stop:	$local_fs $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+### END INIT INFO
+
+ZAPRET_BASE=/opt/zapret
+. "$ZAPRET_BASE/init.d/sysv/functions"
+
+NAME=zapret
+DESC=anti-zapret
+
+case "$1" in
+	start)
+		zapret_run_daemons
+		[ "$INIT_APPLY_FW" != "1" ] || zapret_apply_firewall
+		;;
+
+	stop)
+		zapret_stop_daemons
+		[ "$INIT_APPLY_FW" != "1" ] || zapret_unapply_firewall
+		;;
+
+	start-fw)
+		zapret_apply_firewall
+		;;
+	stop-fw)
+		zapret_unapply_firewall
+		;;
+	
+	start-daemons)
+		zapret_run_daemons
+		;;
+	stop-daemons)
+		zapret_stop_daemons
+		;;
+		
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|start-fw|stop-fw|start-daemons|stop-daemons}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

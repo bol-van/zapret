@@ -1,0 +1,3 @@
+. /opt/zapret/init.d/openwrt/functions
+
+zapret_apply_firewall
