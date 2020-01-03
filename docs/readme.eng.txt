@@ -139,7 +139,7 @@ It takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync[=fake|rst|rstack|disorder] ; try to desync dpi state
+ --dpi-desync[=<mode>]			; try to desync dpi state. modes : fake rst rstack disorder disorder2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-fooling=none|md5sig|badsum
@@ -192,6 +192,7 @@ If position is higher than packet length, pos=1 is used.
 This sequence is designed to make reconstruction of critical message as difficult as possible.
 Fake segments may not be required to bypass some DPIs, but can potentially help if more sophisticated reconstruction
 algorithms are used.
+Mode 'disorder2' disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
 Hostlist is applicable only to desync attack. It does not work for other options.
 Hosts are extracted from plain http request Host: header and SNI of ClientHelllo TLS message.

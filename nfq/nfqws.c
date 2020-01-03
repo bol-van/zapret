@@ -75,7 +75,8 @@ enum dpi_desync_mode {
 	DESYNC_FAKE,
 	DESYNC_RST,
 	DESYNC_RSTACK,
-	DESYNC_DISORDER
+	DESYNC_DISORDER,
+	DESYNC_DISORDER2
 };
 
 
@@ -550,6 +551,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 				}
 				break;
 			case DESYNC_DISORDER:
+			case DESYNC_DISORDER2:
 				{
 					size_t split_pos=len_payload>params.desync_split_pos ? params.desync_split_pos : 1;
 					uint8_t fakeseg[1600];
@@ -568,14 +570,17 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 					}
 
 
-					DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
-					fakeseg_len = sizeof(fakeseg);
-					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq,
-							ttl_fake,params.desync_tcp_fooling_mode,
-							zeropkt, split_pos, fakeseg, &fakeseg_len) ||
-						!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
+					if (params.desync_mode==DESYNC_DISORDER)
 					{
-						return false;
+						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
+						fakeseg_len = sizeof(fakeseg);
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq,
+								ttl_fake,params.desync_tcp_fooling_mode,
+								zeropkt, split_pos, fakeseg, &fakeseg_len) ||
+							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
+						{
+							return false;
+						}
 					}
 
 
@@ -589,9 +594,12 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 						return false;
 					}
 
-					DLOG("sending fake(2) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
-					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
-						return false;
+					if (params.desync_mode==DESYNC_DISORDER)
+					{
+						DLOG("sending fake(2) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
+						if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
+							return false;
+					}
 
 					return true;
 				}
@@ -718,7 +726,7 @@ static void exithelp()
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
-		" --dpi-desync[=<mode>]\t\t\t; try to desync dpi state. modes : fake rst rstack disorder\n"
+		" --dpi-desync[=<mode>]\t\t\t; try to desync dpi state. modes : fake rst rstack disorder disorder2\n"
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X\n"
 		" --dpi-desync-ttl=<int>\t\t\t; set ttl for desync packet\n"
 		" --dpi-desync-fooling=none|md5sig|badsum\n"
@@ -875,6 +883,8 @@ int main(int argc, char **argv)
 				params.desync_mode = DESYNC_RSTACK;
 			else if (!strcmp(optarg,"disorder"))
 				params.desync_mode = DESYNC_DISORDER;
+			else if (!strcmp(optarg,"disorder2"))
+				params.desync_mode = DESYNC_DISORDER2;
 			else
 			{
 				fprintf(stderr, "invalid dpi-desync mode\n");
