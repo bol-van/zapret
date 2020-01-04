@@ -553,7 +553,7 @@ TPWS_OPT_HTTPS="--split-pos=3"
 Отдельно настраиваются опции для атаки по десинхронизации DPI :
 
 DESYNC_MARK=0x40000000
-NFQWS_OPT_DESYNC="--dpi-desync --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
+NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
 
 
 Параметр GETLIST указывает инсталятору install_easy.sh какой скрипт дергать

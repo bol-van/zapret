@@ -335,18 +335,18 @@ The file /opt/zapret/config is used by various components of the system and cont
 It needs to be viewed and edited if necessary.
 Select MODE:
 
-nfqws_ipset - use nfqws for http. targets are filtered by ipset "zapret"
-nfqws_ipset_https - use nfqws for http and https. targets are filtered by ipset "zapret"
-nfqws_all - use nfqws for all http
-nfqws_all_https - use nfqws for all http and https
-nfqws_all_desync - use nfqws for DPI desync attack on http и https for all http and https
-nfqws_ipset_desync - use nfqws for DPI desync attack on http и https for all http and https. targets are filtered by ipset "zapret"
-nfqws_hostlist_desync - use nfqws for DPI desync attack on http и https , only to hosts from hostlist
+nfqws_ipset - use nfqws on http, targets are filtered by ipset "zapret"
+nfqws_ipset_https - use nfqws on http and https, targets are filtered by ipset "zapret"
+nfqws_all - use nfqws on all http
+nfqws_all_https - use nfqws on all http and https
+nfqws_all_desync - use nfqws for DPI desync attack on all http and https
+nfqws_ipset_desync - use nfqws for DPI desync attack on http and https , targets filtered by ipset "zapret"
+nfqws_hostlist_desync - use nfqws for DPI desync attack on http and https , only to hostnames from hostlist
 
-tpws_ipset - use tpws for http. targets are filtered by ipset "zapret"
-tpws_ipset_https - use tpws for http and https. targets are filtered by ipset "zapret"
-tpws_all - use tpws for all http
-tpws_all_https - use tpws for all http and https
+tpws_ipset - use tpws on http, targets are filtered by ipset "zapret"
+tpws_ipset_https - use tpws on http and https, targets are filtered by ipset "zapret"
+tpws_all - use tpws on all http
+tpws_all_https - use tpws on all http and https
 tpws_hostlist - same as tpws_all but touch only domains from the hostlist
 
 ipset - only fill ipset. futher actions depend on your own code
@@ -360,7 +360,7 @@ TPWS_OPT_HTTPS="--split-pos=3"
 Options for DPI desync attack are configured separately:
 
 DESYNC_MARK=0x40000000
-NFQWS_OPT_DESYNC="--dpi-desync --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
+NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
 
 
 The GETLIST parameter tells the install_easy.sh installer which script to call
