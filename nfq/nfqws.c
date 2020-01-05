@@ -732,7 +732,7 @@ static void exithelp()
 		" --dpi-desync-fooling=none|md5sig|badsum\n"
 		" --dpi-desync-retrans=0|1\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=<1..%d>\t; (for disorder only) split TCP packet at specified position\n"
+		" --dpi-desync-split-pos=<1..%zu>\t; (for disorder only) split TCP packet at specified position\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
 		DPI_DESYNC_FWMARK_DEFAULT,sizeof(zeropkt)
 	);
@@ -926,7 +926,7 @@ int main(int argc, char **argv)
 			params.desync_split_pos = atoi(optarg);
 			if (params.desync_split_pos<1 || params.desync_split_pos>sizeof(zeropkt))
 			{
-				fprintf(stderr, "dpi-desync-split-pos must be within 1..%u range\n",sizeof(zeropkt));
+				fprintf(stderr, "dpi-desync-split-pos must be within 1..%zu range\n",sizeof(zeropkt));
 				exit_clean(1);
 			}
 			break;
