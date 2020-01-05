@@ -534,7 +534,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 		switch(params.desync_mode)
 		{
 			case DESYNC_FAKE:
-				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq,
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 					ttl_fake,params.desync_tcp_fooling_mode,
 					fake, fake_size, newdata, &newlen))
 				{
@@ -543,7 +543,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 				break;
 			case DESYNC_RST:
 			case DESYNC_RSTACK:
-				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (params.desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->seq, tcphdr->ack_seq,
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (params.desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 					ttl_fake,params.desync_tcp_fooling_mode,
 					NULL, 0, newdata, &newlen))
 				{
@@ -560,7 +560,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 					if (split_pos<len_payload)
 					{
 						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu\n",split_pos,len_payload-1, len_payload-split_pos)
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq+split_pos, tcphdr->ack_seq,
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->seq,split_pos), tcphdr->ack_seq, tcphdr->window,
 								ttl_orig,TCP_FOOL_NONE,
 								data_payload+split_pos, len_payload-split_pos, newdata, &newlen) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
@@ -574,7 +574,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 					{
 						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
 						fakeseg_len = sizeof(fakeseg);
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq,
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 								ttl_fake,params.desync_tcp_fooling_mode,
 								zeropkt, split_pos, fakeseg, &fakeseg_len) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
@@ -586,7 +586,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
 					newlen = sizeof(newdata);
-					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq,
+					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 							ttl_orig,TCP_FOOL_NONE,
 							data_payload, split_pos, newdata, &newlen) ||
 						!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))

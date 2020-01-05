@@ -7,21 +7,22 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include "checksum.h"
 
-uint16_t tcp_checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_addr);
-void tcp_fix_checksum(struct tcphdr *tcp,int len, in_addr_t src_addr, in_addr_t dest_addr);
-uint16_t tcp6_checksum(const void *buff, int len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr);
-void tcp6_fix_checksum(struct tcphdr *tcp,int len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr);
+// returns netorder value
+uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 
 enum tcp_fooling_mode {
 	TCP_FOOL_NONE=0,
 	TCP_FOOL_MD5SIG=1,
 	TCP_FOOL_BADSUM=2
 };
+// seq and wsize have network byte order
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
+	uint16_t wsize,
 	uint8_t ttl,
 	enum tcp_fooling_mode fooling,
 	const void *data, uint16_t len,
@@ -30,6 +31,7 @@ bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
+	uint16_t wsize,
 	uint8_t ttl,
 	enum tcp_fooling_mode fooling,
 	const void *data, uint16_t len,
@@ -38,6 +40,7 @@ bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
+	uint16_t wsize,
 	uint8_t ttl,
 	enum tcp_fooling_mode fooling,
 	const void *data, uint16_t len,

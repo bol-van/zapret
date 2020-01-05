@@ -1,114 +1,17 @@
 #define _GNU_SOURCE
-#include "darkmagic.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "darkmagic.h"
 
-uint16_t tcp_checksum(const void *buff, int len, in_addr_t src_addr, in_addr_t dest_addr)
+uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
-	const uint16_t *buf=buff;
-	uint16_t *ip_src=(uint16_t *)&src_addr, *ip_dst=(uint16_t *)&dest_addr;
-	uint32_t sum;
-	int length=len;
-
-	// Calculate the sum
-	sum = 0;
-	while (len > 1)
-	{
-		sum += *buf++;
-		if (sum & 0x80000000)
-			sum = (sum & 0xFFFF) + (sum >> 16);
-		len -= 2;
-	}
-	if ( len & 1 )
-	{
-		// Add the padding if the packet lenght is odd
-		uint16_t v=0;
-		*(uint8_t *)&v = *((uint8_t *)buf);
-		sum += v;
-	}
-		
-	// Add the pseudo-header
-	sum += *(ip_src++);
-	sum += *ip_src;
-	sum += *(ip_dst++);
-	sum += *ip_dst;
-	sum += htons(IPPROTO_TCP);
-	sum += htons(length);
-	
-	// Add the carries
-	while (sum >> 16)
-		sum = (sum & 0xFFFF) + (sum >> 16);
-
-	// Return the one's complement of sum
-	return (uint16_t)(~sum);
-}
-void tcp_fix_checksum(struct tcphdr *tcp,int len, in_addr_t src_addr, in_addr_t dest_addr)
-{
-	tcp->check = 0;
-	tcp->check = tcp_checksum(tcp,len,src_addr,dest_addr);
-}
-uint16_t tcp6_checksum(const void *buff, int len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
-{
-	const uint16_t *buf=buff;
-	const uint16_t *ip_src=(uint16_t *)src_addr, *ip_dst=(uint16_t *)dest_addr;
-	uint32_t sum;
-	int length=len;
-	
-	// Calculate the sum
-	sum = 0;
-	while (len > 1)
-	{
-		sum += *buf++;
-		if (sum & 0x80000000)
-			sum = (sum & 0xFFFF) + (sum >> 16);
-		len -= 2;
-	}
-	if ( len & 1 )
-	{
-		// Add the padding if the packet lenght is odd
-		uint16_t v=0;
-		*(uint8_t *)&v = *((uint8_t *)buf);
-		sum += v;
-	}
-	
-	// Add the pseudo-header
-	sum += *(ip_src++);
-	sum += *(ip_src++);
-	sum += *(ip_src++);
-	sum += *(ip_src++);
-	sum += *(ip_src++);
-	sum += *(ip_src++);
-	sum += *(ip_src++);
-	sum += *ip_src;
-	sum += *(ip_dst++);
-	sum += *(ip_dst++);
-	sum += *(ip_dst++);
-	sum += *(ip_dst++);
-	sum += *(ip_dst++);
-	sum += *(ip_dst++);
-	sum += *(ip_dst++);
-	sum += *ip_dst;
-	sum += htons(IPPROTO_TCP);
-	sum += htons(length);
-	
-	// Add the carries
-	while (sum >> 16)
-		sum = (sum & 0xFFFF) + (sum >> 16);
-
-	// Return the one's complement of sum
-	return (uint16_t)(~sum);
-}
-void tcp6_fix_checksum(struct tcphdr *tcp,int len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
-{
-	tcp->check = 0;
-	tcp->check = tcp6_checksum(tcp,len,src_addr,dest_addr);
+	return htonl(ntohl(netorder_value)+cpuorder_increment);
 }
 
 
-
-static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uint32_t ack_seq, enum tcp_fooling_mode fooling, uint16_t nsport, uint16_t ndport)
+static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uint32_t ack_seq, enum tcp_fooling_mode fooling, uint16_t nsport, uint16_t ndport, uint16_t nwsize)
 {
 	char *tcpopt = (char*)(tcp+1);
 	memset(tcp,0,sizeof(*tcp));
@@ -118,7 +21,7 @@ static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uin
 	tcp->ack_seq    = ack_seq;
 	tcp->doff       = 5;
 	*((uint8_t*)tcp+13)= tcp_flags;
-	tcp->window     = htons(65535);
+	tcp->window     = nwsize;
 	if (fooling==TCP_FOOL_MD5SIG)
 	{
 		tcp->doff += 5; // +20 bytes
@@ -185,6 +88,7 @@ bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
+	uint16_t wsize,
 	uint8_t ttl,
 	enum tcp_fooling_mode fooling,
 	const void *data, uint16_t len,
@@ -212,7 +116,7 @@ bool prepare_tcp_segment4(
 	ip->saddr = src->sin_addr.s_addr;
 	ip->daddr = dst->sin_addr.s_addr;
 
-	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin_port,dst->sin_port);
+	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin_port,dst->sin_port,wsize);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
 	tcp_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,ip->saddr,ip->daddr);
@@ -227,6 +131,7 @@ bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
+	uint16_t wsize,
 	uint8_t ttl,
 	enum tcp_fooling_mode fooling,
 	const void *data, uint16_t len,
@@ -252,7 +157,7 @@ bool prepare_tcp_segment6(
 	ip6->ip6_src = src->sin6_addr;
 	ip6->ip6_dst = dst->sin6_addr;
 
-	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin6_port,dst->sin6_port);
+	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin6_port,dst->sin6_port,wsize);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
 	tcp6_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip6->ip6_src,&ip6->ip6_dst);
@@ -266,15 +171,16 @@ bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
+	uint16_t wsize,
 	uint8_t ttl,
 	enum tcp_fooling_mode fooling,
 	const void *data, uint16_t len,
 	char *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,seq,ack_seq,ttl,fooling,data,len,buf,buflen) :
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,seq,ack_seq,wsize,ttl,fooling,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,seq,ack_seq,ttl,fooling,data,len,buf,buflen) :
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,seq,ack_seq,wsize,ttl,fooling,data,len,buf,buflen) :
 		false;
 }
 
