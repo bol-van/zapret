@@ -194,6 +194,19 @@ Fake segments may not be required to bypass some DPIs, but can potentially help 
 algorithms are used.
 Mode 'disorder2' disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
+There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
+that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server
+with ACK sequence number corresponding to the length of the ClientHello+1.
+In the disorder variant, a selective acknowledgement (SACK) usually arrives first, then a full ACK.
+If, instead of ACK or SACK, there is an RST packet with minimal delay, DPI cuts you off at the request stage.
+If the RST is after a full ACK after a delay of about ping to the server, then probably DPI acts
+on the server response. The DPI may be satisfied with good ClientHello and stop monitoring the TCP session
+without checking ServeHello. Then you were lucky. 'fake' option could work.
+If it does not stop monitoring and persistently checks the ServerHello, also performing reconstruction of TCP segments,
+doing something about it is hardly possible without the help of the server.
+The best solution is to enable TLS 1.3 support on the server. TLS 1.3 sends the server certificate in encrypted form.
+This is recommendation to all admins of blocked sites. Enable TLS 1.3. You will give more opportunities to overcome DPI.
+
 Hostlist is applicable only to desync attack. It does not work for other options.
 Hosts are extracted from plain http request Host: header and SNI of ClientHelllo TLS message.
 Subdomains are applied automatically. gzip lists are supported.
