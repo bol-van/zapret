@@ -88,7 +88,7 @@ struct params_s
 	bool hostcase, hostnospace;
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode;
-	bool desync_retrans,desync_skip_nosni;
+	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	int desync_split_pos;
 	uint8_t desync_ttl;
 	enum tcp_fooling_mode desync_tcp_fooling_mode;
@@ -496,21 +496,26 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const str
 				bHaveHost=TLSHelloExtractHost(data_payload,len_payload,host,sizeof(host));
 				if (params.desync_skip_nosni && !bHaveHost)
 				{
-					DLOG("Not applying dpi-desync to TLS ClientHello without hostname in the SNI\n")
+					DLOG("not applying dpi-desync to TLS ClientHello without hostname in the SNI\n")
 					return false;
 				}
 			}
 			
 		}
 		else
-			return false;
+		{
+			if (!params.desync_any_proto) return false;
+			DLOG("applying dpi-desync to unknown protocol\n")
+			fake = zeropkt;
+			fake_size = 256;
+		}
 
 		if (bHaveHost)
 		{
 			DLOG("hostname: %s\n",host)
 			if (params.hostlist && !SearchHostList(params.hostlist,host,params.debug))
 			{
-				DLOG("Not applying dpi-desync to this request\n")
+				DLOG("not applying dpi-desync to this request\n")
 				return false;
 			}
 		}
@@ -733,6 +738,7 @@ static void exithelp()
 		" --dpi-desync-retrans=0|1\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%zu>\t; (for disorder only) split TCP packet at specified position\n"
+		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
 		DPI_DESYNC_FWMARK_DEFAULT,sizeof(zeropkt)
 	);
@@ -774,7 +780,7 @@ int main(int argc, char **argv)
 	gid_t gid = 0;
 	char pidfile[256];
 
-	srand(time(NULL));
+	srandom(time(NULL));
 
 	memset(zeropkt, 0, sizeof(zeropkt));
 
@@ -804,7 +810,8 @@ int main(int argc, char **argv)
 		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=14
 		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=15
 		{"dpi-desync-split-pos",required_argument,0,0},// optidx=16
-		{"hostlist",required_argument,0,0},		// optidx=17
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=17
+		{"hostlist",required_argument,0,0},		// optidx=18
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -930,7 +937,10 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 17: /* hostlist */
+		case 17: /* dpi-desync-any-protocol */
+			params.desync_any_proto = !optarg || atoi(optarg);
+			break;
+		case 18: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

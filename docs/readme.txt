@@ -174,6 +174,7 @@ nfqws
  --dpi-desync-retrans=0|1               ; (только для fake,rst,rstack) 0(default)=отправлять оригинал следом за фейком  1=дропать оригинал, заставляя ОС выполнять ретрансмиссию через 0.2 сек
  --dpi-desync-skip-nosni=0|1		; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI
  --dpi-desync-split-pos=<1..1500>	; (только для disorder) разбивать пакет на указанной позиции
+ --dpi-desync-any-protocol=0|1		; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
  --hostlist=<filename>			; применять dpi-desync только к хостам из листа
 
 Параметры манипуляции могут сочетаться в любых комбинациях.

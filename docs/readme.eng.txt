@@ -146,6 +146,7 @@ It takes the following parameters:
  --dpi-desync-retrans=0|1               ; (fake,rst,rstack only) 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for disorder only) split TCP packet at specified position
+ --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
  --hostlist=<filename>                  ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)
 
 The manipulation parameters can be combined in any way.
@@ -201,7 +202,7 @@ In the disorder variant, a selective acknowledgement (SACK) usually arrives firs
 If, instead of ACK or SACK, there is an RST packet with minimal delay, DPI cuts you off at the request stage.
 If the RST is after a full ACK after a delay of about ping to the server, then probably DPI acts
 on the server response. The DPI may be satisfied with good ClientHello and stop monitoring the TCP session
-without checking ServeHello. Then you were lucky. 'fake' option could work.
+without checking ServerHello. Then you were lucky. 'fake' option could work.
 If it does not stop monitoring and persistently checks the ServerHello, also performing reconstruction of TCP segments,
 doing something about it is hardly possible without the help of the server.
 The best solution is to enable TLS 1.3 support on the server. TLS 1.3 sends the server certificate in encrypted form.
