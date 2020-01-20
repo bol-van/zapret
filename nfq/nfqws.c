@@ -91,7 +91,7 @@ struct params_s
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	int desync_split_pos;
 	uint8_t desync_ttl;
-	uint8_t desync_tcp_fooling_mode;
+	enum tcp_fooling_mode desync_tcp_fooling_mode;
 	uint32_t desync_fwmark;
 	char hostfile[256];
 	strpool *hostlist;
@@ -467,7 +467,7 @@ static bool modify_tcp_packet(uint8_t *data, size_t len, struct tcphdr *tcphdr)
 
 
 // result : true - drop original packet, false = dont drop
-static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *iphdr, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, uint8_t *data_payload, size_t len_payload)
+static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, const struct iphdr *iphdr, const struct ip6_hdr *ip6hdr, const struct tcphdr *tcphdr, const uint8_t *data_payload, size_t len_payload)
 {
 	if (!!iphdr == !!ip6hdr) return false; // one and only one must be present
 
@@ -535,12 +535,11 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct ip
 		uint8_t ttl_orig = iphdr ? iphdr->ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 		uint8_t ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
 		uint8_t flags_orig = *((uint8_t*)tcphdr+13);
-		uint32_t *timestamps = tcp_find_timestamps(tcphdr);
 
 		switch(params.desync_mode)
 		{
 			case DESYNC_FAKE:
-				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window, timestamps,
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 					ttl_fake,params.desync_tcp_fooling_mode,
 					fake, fake_size, newdata, &newlen))
 				{
@@ -549,7 +548,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct ip
 				break;
 			case DESYNC_RST:
 			case DESYNC_RSTACK:
-				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (params.desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->seq, tcphdr->ack_seq, tcphdr->window, timestamps,
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (params.desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 					ttl_fake,params.desync_tcp_fooling_mode,
 					NULL, 0, newdata, &newlen))
 				{
@@ -566,7 +565,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct ip
 					if (split_pos<len_payload)
 					{
 						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu\n",split_pos,len_payload-1, len_payload-split_pos)
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->seq,split_pos), tcphdr->ack_seq, tcphdr->window, timestamps,
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->seq,split_pos), tcphdr->ack_seq, tcphdr->window,
 								ttl_orig,TCP_FOOL_NONE,
 								data_payload+split_pos, len_payload-split_pos, newdata, &newlen) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
@@ -580,7 +579,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct ip
 					{
 						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
 						fakeseg_len = sizeof(fakeseg);
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window, timestamps,
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 								ttl_fake,params.desync_tcp_fooling_mode,
 								zeropkt, split_pos, fakeseg, &fakeseg_len) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
@@ -592,7 +591,7 @@ static bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct ip
 
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
 					newlen = sizeof(newdata);
-					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window, timestamps,
+					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->seq, tcphdr->ack_seq, tcphdr->window,
 							ttl_orig,TCP_FOOL_NONE,
 							data_payload, split_pos, newdata, &newlen) ||
 						!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
@@ -735,7 +734,7 @@ static void exithelp()
 		" --dpi-desync[=<mode>]\t\t\t; try to desync dpi state. modes : fake rst rstack disorder disorder2\n"
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X\n"
 		" --dpi-desync-ttl=<int>\t\t\t; set ttl for desync packet\n"
-		" --dpi-desync-fooling=none|md5sig|ts|badseq|badsum\t; can use multiple comma separated values\n"
+		" --dpi-desync-fooling=none|md5sig|badsum\n"
 		" --dpi-desync-retrans=0|1\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%zu>\t; (for disorder only) split TCP packet at specified position\n"
@@ -912,27 +911,16 @@ int main(int argc, char **argv)
 			params.desync_ttl = (uint8_t)atoi(optarg);
 			break;
 		case 13: /* dpi-desync-fooling */
+			if (!strcmp(optarg,"none"))
+				params.desync_tcp_fooling_mode = TCP_FOOL_NONE;
+			else if (!strcmp(optarg,"md5sig"))
+				params.desync_tcp_fooling_mode = TCP_FOOL_MD5SIG;
+			else if (!strcmp(optarg,"badsum"))
+				params.desync_tcp_fooling_mode = TCP_FOOL_BADSUM;
+			else
 			{
-				char *e,*p = optarg;
-				while (p)
-				{
-					e = strchr(p,',');
-					if (e) *e++=0;
-					if (!strcmp(p,"md5sig"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_MD5SIG;
-					else if (!strcmp(p,"ts"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_TS;
-					else if (!strcmp(p,"badsum"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_BADSUM;
-					else if (!strcmp(p,"badseq"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_BADSEQ;
-					else if (strcmp(p,"none"))
-					{
-						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum\n");
-						exit_clean(1);
-					}
-					p = e;
-				}
+				fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,badsum\n");
+				exit_clean(1);
 			}
 			break;
 		case 14: /* dpi-desync-retrans */
