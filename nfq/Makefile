@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS += -std=c99 -s -O3
-LIBS = -lnetfilter_queue -lnfnetlink -lcap -lz
+LIBS = -lnetfilter_queue -lnfnetlink -lz
 SRC_FILES = *.c
 
 all: nfqws
@@ -10,3 +10,4 @@ nfqws: $(SRC_FILES)
 
 clean:
 	rm -f nfqws *.o
+

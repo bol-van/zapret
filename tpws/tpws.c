@@ -20,8 +20,6 @@
 #include <netinet/tcp.h>
 #include <getopt.h>
 #include <pwd.h>
-#include <sys/capability.h>
-#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <time.h>
 
@@ -29,7 +27,8 @@
 #include "tpws_conn.h"
 #include "hostlist.h"
 #include "params.h"
-                     
+#include "sec.h"
+
 struct params_s params;
 
 bool bHup = false;
@@ -422,128 +421,6 @@ void parse_params(int argc, char *argv[])
 	}
 }
 
-static void daemonize()
-{
-	int pid,fd;
-
-	pid = fork();
-	if (pid == -1)
-	{
-		perror("fork: ");
-		exit(2);
-	}
-	else if (pid != 0)
-		exit(0);
-
-	if (setsid() == -1)
-		exit(2);
-	if (chdir("/") == -1)
-		exit(2);
-	close(STDIN_FILENO);
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
-	/* redirect fd's 0,1,2 to /dev/null */
-	open("/dev/null", O_RDWR);
-	/* stdin */
-	fd=dup(0);
-	/* stdout */
-	fd=dup(0);
-	/* stderror */
-}
-
-static bool setpcap(cap_value_t *caps,int ncaps)
-{
-	cap_t capabilities;
-	
-	if (!(capabilities = cap_init()))
-		return false;
-	
-	if (ncaps && (cap_set_flag(capabilities, CAP_PERMITTED, ncaps, caps, CAP_SET) ||
-		cap_set_flag(capabilities, CAP_EFFECTIVE, ncaps, caps, CAP_SET)))
-	{
-		cap_free(capabilities);
-		return false;
-	}
-	if (cap_set_proc(capabilities))
-	{
-		cap_free(capabilities);
-		return false;
-	}
-	cap_free(capabilities);
-	return true;
-}
-static int getmaxcap()
-{
-	int maxcap = CAP_LAST_CAP;
-	FILE *F = fopen("/proc/sys/kernel/cap_last_cap","r");
-	if (F)
-	{
-		int n=fscanf(F,"%d",&maxcap);
-		fclose(F);
-	}
-	return maxcap;
-	
-}
-static bool dropcaps()
-{
-	// must have CAP_SETPCAP at the end. its required to clear bounding set
-	cap_value_t cap_values[] = {CAP_SETPCAP};
-	int capct=sizeof(cap_values)/sizeof(*cap_values);
-	int maxcap = getmaxcap();
-
-	if (setpcap(cap_values, capct))
-	{
-		for(int cap=0;cap<=maxcap;cap++)
-		{
-			if (cap_drop_bound(cap))
-			{
-				fprintf(stderr,"could not drop cap %d\n",cap);
-				perror("cap_drop_bound");
-			}
-		}
-	}
-	// now without CAP_SETPCAP
-	if (!setpcap(cap_values, capct - 1))
-	{
-		perror("setpcap");
-		return false;
-	}
-	return true;
-}
-static bool droproot()
-{
-	if (params.uid || params.gid)
-	{
-		if (prctl(PR_SET_KEEPCAPS, 1L))
-		{
-			perror("prctl(PR_SET_KEEPCAPS): ");
-			return false;
-		}
-		if (setgid(params.gid))
-		{
-			perror("setgid: ");
-			return false;
-		}
-		if (setuid(params.uid))
-		{
-			perror("setuid: ");
-			return false;
-		}
-	}
-	return dropcaps();
-}
-
-
-static bool writepid(const char *filename)
-{
-	FILE *F;
-	if (!(F=fopen(filename,"w")))
-		return false;
-	fprintf(F,"%d",getpid());
-	fclose(F);
-	return true;
-}
-
 
 
 static bool find_listen_addr(struct sockaddr_storage *salisten, bool bindll, int *if_index)
@@ -806,11 +683,11 @@ int main(int argc, char *argv[]) {
 
 	set_ulimit();
 
-	if (!droproot())
+	if (!droproot(params.uid,params.gid))
 	{
 		goto exiterr;
 	}
-	
+
 	fprintf(stderr,"Running as UID=%u GID=%u\n",getuid(),getgid());
 
 	if (listen(listen_fd, BACKLOG) == -1) {
