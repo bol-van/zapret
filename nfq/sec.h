@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
-bool setpcap(uint64_t caps);
+bool setpcap(cap_value_t *caps, int ncaps);
 int getmaxcap();
 bool dropcaps();
 bool droproot(uid_t uid, gid_t gid);

@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS += -std=c99 -s -O3
-LIBS = -lz
+LIBS = -lz -lcap
 SRC_FILES = *.c
 
 all: tpws

@@ -5,26 +5,26 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-bool checkpcap(uint64_t caps)
+bool setpcap(cap_value_t *caps, int ncaps)
 {
-	struct __user_cap_header_struct ch = {_LINUX_CAPABILITY_VERSION_3, getpid()};
-	struct __user_cap_data_struct cd[2];
-	uint32_t c0 = (uint32_t)caps;
-	uint32_t c1 = (uint32_t)(caps>>32);
+	cap_t capabilities;
 
-	return !capget(&ch,cd) && (cd[0].effective & c0)==c0 && (cd[0].effective & c1)==c1;
-}
-bool setpcap(uint64_t caps)
-{
-	struct __user_cap_header_struct ch = {_LINUX_CAPABILITY_VERSION_3, getpid()};
-	struct __user_cap_data_struct cd[2];
-	
-	cd[0].effective = cd[0].permitted = (uint32_t)caps;
-	cd[0].inheritable = 0;
-	cd[1].effective = cd[1].permitted = (uint32_t)(caps>>32);
-	cd[1].inheritable = 0;
+	if (!(capabilities = cap_init()))
+		return false;
 
-	return !capset(&ch,cd);
+	if (ncaps && (cap_set_flag(capabilities, CAP_PERMITTED, ncaps, caps, CAP_SET) ||
+		cap_set_flag(capabilities, CAP_EFFECTIVE, ncaps, caps, CAP_SET)))
+	{
+		cap_free(capabilities);
+		return false;
+	}
+	if (cap_set_proc(capabilities))
+	{
+		cap_free(capabilities);
+		return false;
+	}
+	cap_free(capabilities);
+	return true;
 }
 int getmaxcap()
 {
@@ -40,25 +40,27 @@ int getmaxcap()
 }
 bool dropcaps()
 {
-	uint64_t caps = (1<<CAP_NET_ADMIN)|(1<<CAP_NET_RAW);
+	// must have CAP_SETPCAP at the end. its required to clear bounding set
+	cap_value_t cap_values[] = { CAP_NET_ADMIN,CAP_NET_RAW,CAP_SETPCAP };
+	int capct = sizeof(cap_values) / sizeof(*cap_values);
 	int maxcap = getmaxcap();
 
-	if (setpcap(caps|(1<<CAP_SETPCAP)))
+	if (setpcap(cap_values, capct))
 	{
 		for (int cap = 0; cap <= maxcap; cap++)
 		{
-			if (prctl(PR_CAPBSET_DROP, cap)<0)
+			if (cap_drop_bound(cap))
 			{
-				fprintf(stderr, "could not drop bound cap %d\n", cap);
+				fprintf(stderr, "could not drop cap %d\n", cap);
 				perror("cap_drop_bound");
 			}
 		}
 	}
 	// now without CAP_SETPCAP
-	if (!setpcap(caps))
+	if (!setpcap(cap_values, capct - 1))
 	{
 		perror("setpcap");
-		return checkpcap(caps);
+		return false;
 	}
 	return true;
 }
