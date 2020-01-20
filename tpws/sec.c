@@ -40,7 +40,7 @@ int getmaxcap()
 }
 bool dropcaps()
 {
-	uint64_t caps = (1<<CAP_NET_ADMIN)|(1<<CAP_NET_RAW);
+	uint64_t caps = 0;
 	int maxcap = getmaxcap();
 
 	if (setpcap(caps|(1<<CAP_SETPCAP)))
