@@ -12,7 +12,7 @@ bool checkpcap(uint64_t caps)
 	uint32_t c0 = (uint32_t)caps;
 	uint32_t c1 = (uint32_t)(caps>>32);
 
-	return !capget(&ch,cd) && (cd[0].effective & c0)==c0 && (cd[0].effective & c1)==c1;
+	return !capget(&ch,cd) && (cd[0].effective & c0)==c0 && (cd[1].effective & c1)==c1;
 }
 bool setpcap(uint64_t caps)
 {
