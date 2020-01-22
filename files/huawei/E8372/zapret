@@ -1,0 +1,15 @@
+#!/system/bin/busybox sh
+
+# $1 - additional parameters for nfqws
+
+insmod /online/modules/unfuck_nfqueue.ko  2>/dev/null
+
+rule="PREROUTING -t nat -i br0 ! -d 192.168.0.0/16 -p tcp -m multiport --dports 80,443 -j REDIRECT --to-port 1"
+iptables -C $rule 2>/dev/null || iptables -I $rule
+
+tpws --uid 1:3003 --port=1 --daemon
+
+rule="OUTPUT -t mangle -o wan0 -p tcp -m multiport --dports 80,443  -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass"
+iptables -C $rule 2>/dev/null || iptables -I $rule
+
+nfqws --uid 2 --qnum=200 --dpi-desync=disorder --dpi-desync-ttl=8 --dpi-desync-fooling=md5sig --daemon $1
