@@ -91,6 +91,14 @@ static bool socks_send_rep_errno(uint8_t ver, int fd, int errn)
 {
 	return ver==5 ? socks5_send_rep_errno(fd,errn) : socks4_send_rep_errno(fd, errn);
 }
+static int get_so_error(int fd)
+{
+	int errn;
+	socklen_t optlen = sizeof(errn);
+	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
+		errn=errno;
+	return errn;
+}
 static bool proxy_remote_conn_ack(tproxy_conn_t *conn)
 {
 	// if proxy mode acknowledge connection request
@@ -102,10 +110,7 @@ static bool proxy_remote_conn_ack(tproxy_conn_t *conn)
 		case CONN_TYPE_SOCKS:
 			if (conn->partner->socks_state==S_WAIT_CONNECTION)
 			{
-				int errn;
-				socklen_t optlen = sizeof(errn);
-				if(getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
-					errn=errno;
+				int errn=get_so_error(conn->fd);
 				conn->partner->socks_state=S_TCP;
 				bres = socks_send_rep_errno(conn->partner->socks_ver,conn->partner->fd, errn);
 				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d",bres,errn,conn->fd,conn->partner->fd)
@@ -1310,8 +1315,16 @@ int event_loop(int listen_fd)
 				{
 					if (events[i].events & (EPOLLHUP|EPOLLERR))
 					{
-						if (events[i].events & EPOLLERR) DBGPRINT("EPOLLERR")
-						if (events[i].events & EPOLLHUP) DBGPRINT("EPOLLHUP")
+						int errn = get_so_error(conn->fd);
+						const char *se;
+						switch (events[i].events & (EPOLLHUP|EPOLLERR))
+						{
+							case EPOLLERR: se="EPOLLERR"; break;
+							case EPOLLHUP: se="EPOLLHUP"; break;
+							case EPOLLHUP|EPOLLERR: se="EPOLLERR EPOLLHUP"; break;
+							default: se=NULL;
+						}
+						VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) %s so_error=%d (%s)",conn->fd,conn->partner ? conn->partner->fd : 0,conn->remote,se,errn,strerror(errn));
 						proxy_remote_conn_ack(conn);
 						read_all_and_buffer(conn,3);
 						conn_close_with_partner_check(&conn_list,&close_list,conn);
