@@ -93,13 +93,15 @@ static bool socks_send_rep_errno(uint8_t ver, int fd, int errn)
 }
 static int get_so_error(int fd)
 {
+	// getsockopt(SO_ERROR) clears error
 	int errn;
 	socklen_t optlen = sizeof(errn);
 	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
 		errn=errno;
+	
 	return errn;
 }
-static bool proxy_remote_conn_ack(tproxy_conn_t *conn)
+static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)
 {
 	// if proxy mode acknowledge connection request
 	// conn = remote. conn->partner = local
@@ -110,10 +112,9 @@ static bool proxy_remote_conn_ack(tproxy_conn_t *conn)
 		case CONN_TYPE_SOCKS:
 			if (conn->partner->socks_state==S_WAIT_CONNECTION)
 			{
-				int errn=get_so_error(conn->fd);
 				conn->partner->socks_state=S_TCP;
-				bres = socks_send_rep_errno(conn->partner->socks_ver,conn->partner->fd, errn);
-				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d",bres,errn,conn->fd,conn->partner->fd)
+				bres = socks_send_rep_errno(conn->partner->socks_ver,conn->partner->fd,sock_err);
+				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d",bres,sock_err,conn->fd,conn->partner->fd)
 			}
 			break;
 	}
@@ -707,7 +708,7 @@ static bool check_connection_attempt(tproxy_conn_t *conn, int efd)
 			return false;
 		conn->state = CONN_AVAILABLE;
 	}
-	return proxy_remote_conn_ack(conn) && !errn;
+	return proxy_remote_conn_ack(conn,get_so_error(conn->fd)) && !errn;
 }
 
 
@@ -1325,7 +1326,7 @@ int event_loop(int listen_fd)
 							default: se=NULL;
 						}
 						VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) %s so_error=%d (%s)",conn->fd,conn->partner ? conn->partner->fd : 0,conn->remote,se,errn,strerror(errn));
-						proxy_remote_conn_ack(conn);
+						proxy_remote_conn_ack(conn,errn);
 						read_all_and_buffer(conn,3);
 						conn_close_with_partner_check(&conn_list,&close_list,conn);
 						continue;
