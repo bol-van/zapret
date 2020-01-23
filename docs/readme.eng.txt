@@ -142,7 +142,7 @@ It takes the following parameters:
  --dpi-desync[=<mode>]			; try to desync dpi state. modes : fake rst rstack disorder disorder2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
- --dpi-desync-fooling=none|md5sig|badsum
+ --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; can take multiple comma separated values
  --dpi-desync-retrans=0|1               ; (fake,rst,rstack only) 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for disorder only) split TCP packet at specified position
@@ -174,10 +174,13 @@ add tcp option "MD5 signature". All of them have their own disadvantages :
   If nfqws is on the router, its not neccessary to switch of "net.netfilter.nf_conntrack_checksum".
   Fake packet doesn't go through FORWARD chain, it goes through OUTPUT. But if your router is behind another NAT, for example ISP NAT,
   and that NAT does not pass invalid packets, you cant do anything.
+* badseq packets will be dropped by server, but DPI also can ignore them
 * TTL looks like the best option, but it requires special tuning for earch ISP. If DPI is further than local ISP websites
   you can cut access to them. Manual IP exclude list is required. Its possible to use md5sig with ttl.
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
   If automatic solution cannot be found then use zapret-hosts-user-exclude.txt.
+
+--dpi-desync-fooling takes multiple comma separated values.
 
 For fake,rst,rstack modes original packet can be sent after the fake one or just dropped.
 If its dropped OS will perform first retransmission after 0.2 sec, then the delay increases exponentially.
@@ -212,12 +215,17 @@ Hostlist is applicable only to desync attack. It does not work for other options
 Hosts are extracted from plain http request Host: header and SNI of ClientHelllo TLS message.
 Subdomains are applied automatically. gzip lists are supported.
 
-iptables for performing the attack :
+iptables for performing the attack on the first packet :
 
 iptables -t mangle -I POSTROUTING -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
 
-connbytes will only queue the first data packet. mark is needed to keep away generated packets from NFQUEUE.
-nfqws sets fwmark when it sends generated packets.
+This is good if DPI does not track all requests in http keep-alive session.
+If it does, then pass all outgoing packets for http and only first data packet for https :
+
+iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+iptables -t mangle -I POSTROUTING -p tcp --dport 443 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+
+mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark when it sends generated packets.
 
 tpws
 -----
