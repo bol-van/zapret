@@ -1,0 +1,11 @@
+#!/system/bin/busybox sh
+
+rule="PREROUTING -t nat -i br0 -p tcp -m multiport --dports 80,443 -j tpws"
+iptables -C $rule 2>/dev/null && iptables -D $rule
+iptables -F tpws -t nat
+iptables -X tpws -t nat
+killall tpws
+
+rule="OUTPUT -t mangle -o wan0 -p tcp -m multiport --dports 80,443  -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass"
+iptables -C $rule 2>/dev/null && iptables -D $rule
+killall nfqws
