@@ -484,15 +484,14 @@ mobile data on/off, ...
 Https blocking bypass
 ----------------------
 
-As a rule, DPI tricks do not help to bypass https blocking.
-You have to redirect traffic through a third-party host.
-It is proposed to use transparent redirect through socks5 using iptables + redsocks, or iptables + iproute + vpn.
-Redsocks variant is described in https.txt.
-iproute + wireguard - in wireguard_iproute_openwrt.txt.
-(they are russian)
-
 SOMETIMES (but not often) a tls handshake split trick works.
 Try MODE=..._https
 May be you're lucky.
 
 MORE OFTEN DPI desync attack work, but it may require some manual tuning.
+
+OTHERWISE you have to redirect traffic through a third-party host.
+It is proposed to use transparent redirect through socks5 using iptables + redsocks, or iptables + iproute + vpn.
+Redsocks variant is described in https.txt.
+iproute + wireguard - in wireguard_iproute_openwrt.txt.
+(they are russian)
