@@ -4,7 +4,7 @@
 
 zapret_custom_daemons()
 {
-	run_daemon $1 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC"
+	do_nfqws $1 1 "$NFQWS_OPT_DESYNC"
 }
 zapret_custom_firewall()
 {
