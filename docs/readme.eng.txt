@@ -42,7 +42,7 @@ In short, the options can be classified according to the following scheme:
 This option is out of the scope of the project. If you do not allow ban trigger to fire, then you won’t have to
 deal with its consequences.
 2) Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
-3) Modification of TCP connection at the packet level. Implemented through the NFQUEUE queue handler and raw sockets.
+3) Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
 
 For options 2 and 3, tpws and nfqws programs are implemented, respectively.
 You need to run them with the necessary parameters and redirect certain traffic with iptables.
@@ -81,7 +81,6 @@ Some DPIs catch only the first http request, ignoring subsequent requests in a k
 Then we can reduce CPU load, refusing to process unnecessary packets.
 
 iptables -t mangle -I POSTROUTING -o <внешний_интерфейс> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
-
 
 
 ip6tables
@@ -189,6 +188,8 @@ Split mode is very similar to disorder but without segment reordering :
 3. fake 1st segment, data filled with zeroes (2nd copy)
 4. 2nd segment
 Mode 'split2' disables sending of fake segments. It can be used as a faster alternative to --wsize.
+
+In disorder2 and split2 modes no fake packets are sent, so no fooling options are required.
 
 There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
 that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server
