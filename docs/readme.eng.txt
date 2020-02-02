@@ -1,7 +1,8 @@
 What is it for
 --------------
 
-Bypass the blocking of web sites http.
+Bypass the blocking of http/https web sites on DPI without the use of third-party servers.
+
 The project is mainly aimed at the Russian audience to fight russian regulator named "Roskomnadzor".
 Some features of the project are russian reality specific (such as getting list of sites
 blocked by Roskomnadzor), but most others are common.
@@ -9,10 +10,18 @@ blocked by Roskomnadzor), but most others are common.
 How it works
 ------------
 
-DPI providers have gaps. They happen because DPI rules are writtten for
-ordinary user programs, omitting all possible cases that are permissible by standards.
-This is done for simplicity and speed. It makes no sense to catch 0.01% hackers,
-because these blockings are quite simple and easily bypassed even by ordinary users.
+In the simplest case you are dealing with passive DPI. Passive DPI can read passthrough traffic,
+inject its own packets, but cannot drop packets.
+If the request is prohibited the passive DPI will inject its own RST packet and optionally http redirect packet.
+If fake packets from DPI are only sent to client, you can use iptables commands to drop them if you can write
+correct filter rules. This requires manual in-deep traffic analysis and tuning for specific ISP.
+This is how we bypass the consequences of a ban trigger.
+
+If the passive DPI sends an RST packet also to the server, there is nothing you can do about it.
+Your task is to prevent ban trigger from firing up. Iptables alone will not work.
+This project is aimed at preventing the ban rather than eliminating its consequences.
+
+To do that send what DPI does not expect and what breaks its algorithm of recognizing requests and blocking them.
 
 Some DPIs cannot recognize the http request if it is divided into TCP segments.
 For example, a request of the form "GET / HTTP / 1.1 \ r \ nHost: kinozal.tv ......"
@@ -21,79 +30,59 @@ Other DPIs stumble when the "Host:" header is written in another case: for examp
 Sometimes work adding extra space after the method: "GET /" => "GET  /"
 or adding a dot at the end of the host name: "Host: kinozal.tv."
 
+There is also more advanced magic for bypassing DPI at the packet level.
+
 
 How to put this into practice in the linux system
 -------------------------------------------------
 
-How to make the system break the request into parts? You can pipe the entire TCP session
-through transparent proxy, or you can replace the tcp window size field on the first incoming TCP packet with a SYN, ACK.
-Then the client will think that the server has set a small window size for it and the first data segment
-will send no more than the specified length. In subsequent packages, we will not change anything.
-The further behavior of the system depends on the implemented algorithm in the OS.
-Experience shows that linux always sends first packet no more than the specified
-in window size length, the rest of the packets until some time sends no more than max (36, specified_size).
-After a number of packets, the window scaling mechanism is triggered and starts taking
-the scaling factor into account. The packet size becomes no more than max (36, specified_ramer << scale_factor).
-The behavior is not very elegant, but since we do not affect the size of the incoming packets,
-and the amount of data received in http is usually much higher than the amount sent, then visually
-there will be only small delays.
-Windows behaves in a similar case much more predictably. First segment
-the specified length goes away, then the window size changes depending on the value,
-sent in new tcp packets. That is, the speed is almost immediately restored to the possible maximum.
+In short, the options can be classified according to the following scheme:
 
-Its easy to intercept a packet with SYN, ACK using iptables.
-However, the options for editing packets in iptables are severely limited.
-It’s not possible to change window size with standard modules.
-For this, we will use the NFQUEUE. This tool allows transfer packets to the processes running in user mode.
-The process, accepting a packet, can change it, which is what we need.
+1) Passive DPI not sending RST to the server. ISP tuned iptables commands can help.
+This option is out of the scope of the project. If you do not allow ban trigger to fire, then you won’t have to
+deal with its consequences.
+2) Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
+3) Modification of TCP connection at the packet level. Implemented through the NFQUEUE queue handler and raw sockets.
 
-iptables -t mangle -I PREROUTING -p tcp --sport 80 --tcp-flags SYN,ACK SYN,ACK -j NFQUEUE --queue-num 200 --queue-bypass
+For options 2 and 3, tpws and nfqws programs are implemented, respectively.
+You need to run them with the necessary parameters and redirect certain traffic with iptables.
 
-It will queue the packets we need to the process that listens on the queue with the number 200.
-Process will replace the window size. PREROUTING will catch packets addressed to the host itself and routed packets.
-That is, the solution works the same way as on the client, so on the router. On a PC-based or OpenWRT router.
-In principle, this is enough.
-However, with such an impact on TCP there will be a slight delay.
-In order not to touch the hosts that are not blocked by the provider, you can make such a move.
-Create a list of blocked domains, resolve them to IP addresses and save to ipset named "zapret".
-Add to rule:
+To redirect a TCP connection to a transparent proxy, the following commands are used:
 
-iptables -t mangle -I PREROUTING -p tcp --sport 80 --tcp-flags SYN,ACK SYN,ACK -m set --match-set zapret src -j NFQUEUE --queue-num 200 --queue-bypass
+forwarded fraffic :
+iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.1:1188
+outgoing traffic :
+iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.1:1188
 
-Thus, the impact will be made only on ip addresses related to blocked sites.
-The list can be updated in scheduled task every few days.
+DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING chain without enabling the route_localnet parameter:
 
-If DPI cant be bypassed with splitting a request into segments, then sometimes helps changing case
-of the "Host:" http header. We may not need a window size replacement, so the do not need PREROUTING chain.
-Instead, we hang on outgoing packets in the POSTROUTING chain:
+sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1
 
-iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
-
-In this case, additional points are also possible. DPI can catch only the first http request, ignoring
-subsequent requests in the keep-alive session. Then we can reduce the cpu load abandoning the processing of unnecessary packages.
-
-iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:5 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
-
-It happens that the provider monitors the entire HTTP session with keep-alive requests. In this case
-it is not enough to restrict the TCP window when establishing a connection. Each http request must be splitted
-to multiple TCP segments. This task is solved through the full proxying of traffic using
-transparent proxy (TPROXY or DNAT). TPROXY does not work with connections originating from the local system
-so this solution is applicable only on the router. DNAT works with local connections,
-but there is a danger of entering into endless recursion, so the daemon is launched as a separate user,
-and for this user, DNAT is disabled via "-m owner". Full proxying requires more resources than outbound packet
-manipulation without reconstructing a TCP connection.
-
-iptables -t nat -I PREROUTING -p tcp --dport 80 -j DNAT --to 127.0.0.1:1188
-iptables -t nat -I OUTPUT -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.1:1188
-
-NOTE: DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING chain without enabling the route_localnet parameter:
-
-sysctl -w net.ipv4.conf.<incoming_interface_name>.route_localnet=1
-
-You can use "-j REDIRECT --to-port 1188" instead of DNAT, but in this case the transpareny proxy process
+You can use "-j REDIRECT --to-port 1188" instead of DNAT, but in this case the transparent proxy process
 should listen on the ip address of the incoming interface or on all addresses. Listen all - not good
-in terms of security. Listening one (local) is possible, but in the case of automated
-script will have to recognize it, then dynamically enter it into the command. In any case, additional efforts are required.
+in terms of security. Listening one (local) is possible, but automated scripts will have to recognize it,
+then dynamically enter it into the command. In any case, additional efforts are required.
+
+Owner filter is necessary to prevent recursive redirection of connections from tpws itself.
+tpws must be started under OS user "tpws".
+
+
+NFQUEUE redirection of the outgoing traffic and forwarded traffic going towards the external interface,
+can be done with the following commands:
+
+iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -j NFQUEUE --queue-num 200 --queue-bypass
+
+In order not to touch the traffic to unblocked addresses, you can take a list of blocked hosts, resolve it
+into IP addresses and put them to ipset 'zapret', then add a filter to the command:
+
+iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
+
+Some DPIs catch only the first http request, ignoring subsequent requests in a keep-alive session.
+Then we can reduce CPU load, refusing to process unnecessary packets.
+
+iptables -t mangle -I POSTROUTING -o <внешний_интерфейс> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
+
+
 
 ip6tables
 ---------
@@ -131,7 +120,7 @@ It takes the following parameters:
 
  --debug=0|1				; 1=print debug info
  --qnum=<nfqueue_number>
- --wsize=<window_size> 			; set window size. 0 = do not modify
+ --wsize=<window_size> 			; set window size. 0 = do not modify (obsolete !)
  --hostcase           			; change Host: => host:
  --hostspell=HoSt      			; exact spelling of the "Host" header. must be 4 chars. default is "host"
  --hostnospace         			; remove space after Host: and add it to User-Agent: to preserve packet size
@@ -360,10 +349,6 @@ The file /opt/zapret/config is used by various components of the system and cont
 It needs to be viewed and edited if necessary.
 Select MODE:
 
-nfqws_ipset - use nfqws on http, targets are filtered by ipset "zapret"
-nfqws_ipset_https - use nfqws on http and https, targets are filtered by ipset "zapret"
-nfqws_all - use nfqws on all http
-nfqws_all_https - use nfqws on all http and https
 nfqws_all_desync - use nfqws for DPI desync attack on all http and https
 nfqws_ipset_desync - use nfqws for DPI desync attack on http and https , targets filtered by ipset "zapret"
 nfqws_hostlist_desync - use nfqws for DPI desync attack on http and https , only to hostnames from hostlist
