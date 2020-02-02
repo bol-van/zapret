@@ -5,6 +5,7 @@
 #include "helpers.h"
 #include "checksum.h"
 #include "params.h"
+#include "protocol.h"
 #include "hostlist.h"
 
 #include <stdio.h>
@@ -165,34 +166,57 @@ static bool modify_tcp_packet(uint8_t *data, size_t len, struct tcphdr *tcphdr)
 	uint8_t *phost, *pua;
 	bool bRet = false;
 
-	if (params.wsize && tcp_synack_segment(tcphdr))
+	if (tcp_synack_segment(tcphdr))
 	{
-		tcp_rewrite_winsize(tcphdr, (uint16_t)params.wsize);
-		bRet = true;
-	}
-
-	if ((params.hostcase || params.hostnospace) && (phost = find_bin(data, len, "\r\nHost: ", 8)))
-	{
-		if (params.hostcase)
+		if (params.wsize)
 		{
-			DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
-			memcpy(phost + 2, params.hostspell, 4);
+			tcp_rewrite_winsize(tcphdr, (uint16_t)params.wsize);
 			bRet = true;
 		}
-		if (params.hostnospace && (pua = find_bin(data, len, "\r\nUser-Agent: ", 14)) && (pua = find_bin(pua + 1, len - (pua - data) - 1, "\r\n", 2)))
+	}
+	else if ((params.hostcase || params.hostnospace) && IsHttp(data,len))
+	{
+		if (params.hostlist)
 		{
-			DLOG("removing space after Host: and adding it to User-Agent:\n")
-			if (pua > phost)
+			char host[256];
+			if (HttpExtractHost(data,len,host,sizeof(host)))
 			{
-				memmove(phost + 7, phost + 8, pua - phost - 8);
-				phost[pua - phost - 1] = ' ';
+				DLOG("hostname: %s\n",host)
+				if (!SearchHostList(params.hostlist,host,params.debug))
+				{
+					DLOG("not applying tampering to this request\n")
+					return false;
+				}
 			}
 			else
 			{
-				memmove(pua + 1, pua, phost - pua + 7);
-				*pua = ' ';
+				DLOG("could not extract host from http request. not applying tampering\n")
+				return false;
 			}
-			bRet = true;
+		}
+		if (phost = (uint8_t*)memmem(data, len, "\r\nHost: ", 8))
+		{
+			if (params.hostcase)
+			{
+				DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
+				memcpy(phost + 2, params.hostspell, 4);
+				bRet = true;
+			}
+			if (params.hostnospace && (pua = (uint8_t*)memmem(data, len, "\r\nUser-Agent: ", 14)) && (pua = (uint8_t*)memmem(pua + 1, len - (pua - data) - 1, "\r\n", 2)))
+			{
+				DLOG("removing space after Host: and adding it to User-Agent:\n")
+				if (pua > phost)
+				{
+					memmove(phost + 7, phost + 8, pua - phost - 8);
+					phost[pua - phost - 1] = ' ';
+				}
+				else
+				{
+					memmove(pua + 1, pua, phost - pua + 7);
+					*pua = ' ';
+				}
+				bRet = true;
+			}
 		}
 	}
 	return bRet;
@@ -529,12 +553,6 @@ int main(int argc, char **argv)
 			params.hostfile[sizeof(params.hostfile)-1]='\0';
 			break;
 		}
-	}
-
-	if (params.desync_mode==DESYNC_NONE && params.hostlist)
-	{
-		fprintf(stderr, "hostlist is applicable only to dpi-desync\n");
-		exit_clean(1);
 	}
 
 	if (daemon) daemonize();

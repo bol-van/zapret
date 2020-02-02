@@ -98,7 +98,6 @@ static int get_so_error(int fd)
 	socklen_t optlen = sizeof(errn);
 	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
 		errn=errno;
-	
 	return errn;
 }
 static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)

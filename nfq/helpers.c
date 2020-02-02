@@ -1,29 +1,9 @@
-#include "helpers.h"
-#include <string.h>
-#include <stdio.h>
+#define _GNU_SOURCE
 
-const uint8_t *find_bin_const(const uint8_t *data, size_t len, const void *blk, size_t blk_len)
-{
-	while (len >= blk_len)
-	{
-		if (!memcmp(data, blk, blk_len))
-			return data;
-		data++;
-		len--;
-	}
-	return NULL;
-}
-uint8_t *find_bin(uint8_t *data, size_t len, const void *blk, size_t blk_len)
-{
-	while (len >= blk_len)
-	{
-		if (!memcmp(data, blk, blk_len))
-			return data;
-		data++;
-		len--;
-	}
-	return NULL;
-}
+#include "helpers.h"
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 
 void print_sockaddr(const struct sockaddr *sa)
 {
@@ -41,4 +21,25 @@ void print_sockaddr(const struct sockaddr *sa)
 	default:
 		printf("UNKNOWN_FAMILY_%d", sa->sa_family);
 	}
+}
+
+char *strncasestr(const char *s,const char *find, size_t slen)
+{
+	char c, sc;
+	size_t len;
+
+	if ((c = *find++) != '\0')
+	{
+		len = strlen(find);
+		do
+		{
+			do
+			{
+				if (slen-- < 1 || (sc = *s++) == '\0') return NULL;
+			} while (toupper(c) != toupper(sc));
+			if (len > slen)	return NULL;
+		} while (strncasecmp(s, find, len) != 0);
+		s--;
+	}
+	return (char *)s;
 }

@@ -1,8 +1,11 @@
+#define _GNU_SOURCE
+
 #include "protocol.h"
 #include "helpers.h"
 #include <string.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 bool IsHttp(const char *data, size_t len)
@@ -21,7 +24,7 @@ bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_hos
 {
 	const uint8_t *p, *s, *e=data+len;
 
-	p = find_bin_const(data, len, "\nHost:", 6);
+	p = (uint8_t*)strncasestr((char*)data, "\nHost:", len);
 	if (!p) return false;
 	p+=6;
 	while(p<e && (*p==' ' || *p=='\t')) p++;

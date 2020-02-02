@@ -1,27 +1,17 @@
+#define _GNU_SOURCE
+
 #include "tamper.h"
 #include "params.h"
 #include "hostlist.h"
 #include <string.h>
 #include <stdio.h>
 
-char *find_bin(void *data, size_t len, const void *blk, size_t blk_len)
-{
-	while (len >= blk_len)
-	{
-		if (!memcmp(data, blk, blk_len))
-			return data;
-		data = (char*)data + 1;
-		len--;
-	}
-	return NULL;
-}
-
 // pHost points to "Host: ..."
 bool find_host(char **pHost,char *buf,size_t bs)
 {
 	if (!*pHost)
 	{
-		*pHost = find_bin(buf, bs, "\nHost:", 6);
+		*pHost = memmem(buf, bs, "\nHost:", 6);
 		if (*pHost)
 		{
 			(*pHost)++;
@@ -74,7 +64,7 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 			if (params.unixeol)
 			{
 				p = pp = segment;
-				while (p = find_bin(p, segment + *size - p, "\r\n", 2))
+				while (p = memmem(p, segment + *size - p, "\r\n", 2))
 				{
 					*p = '\n'; p++;
 					memmove(p, p + 1, segment + *size - p - 1);

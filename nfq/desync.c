@@ -76,6 +76,11 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 			fake = (uint8_t*)fake_http_request;
 			fake_size = sizeof(fake_http_request);
 			if (params.hostlist || params.debug) bHaveHost=HttpExtractHost(data_payload,len_payload,host,sizeof(host));
+			if (params.hostlist && !bHaveHost)
+			{
+				DLOG("not applying dpi-desync to HTTP without Host:\n")
+				return false;
+			}
 		}
 		else if (IsTLSClientHello(data_payload,len_payload))
 		{

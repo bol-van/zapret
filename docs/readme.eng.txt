@@ -135,7 +135,7 @@ It takes the following parameters:
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for disorder only) split TCP packet at specified position
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
- --hostlist=<filename>                  ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)
+ --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
 
 The manipulation parameters can be combined in any way.
 
@@ -189,7 +189,7 @@ Split mode is very similar to disorder but without segment reordering :
 4. 2nd segment
 Mode 'split2' disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
-In disorder2 and split2 modes no fake packets are sent, so no fooling options are required.
+In disorder2 and split2 modes no fake packets are sent, so ttl and fooling options are not required.
 
 There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
 that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server
@@ -204,7 +204,6 @@ doing something about it is hardly possible without the help of the server.
 The best solution is to enable TLS 1.3 support on the server. TLS 1.3 sends the server certificate in encrypted form.
 This is recommendation to all admins of blocked sites. Enable TLS 1.3. You will give more opportunities to overcome DPI.
 
-Hostlist is applicable only to desync attack. It does not work for other options.
 Hosts are extracted from plain http request Host: header and SNI of ClientHelllo TLS message.
 Subdomains are applied automatically. gzip lists are supported.
 
