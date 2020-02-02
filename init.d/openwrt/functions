@@ -304,13 +304,9 @@ zapret_apply_firewall()
 			fw_nfqws_post "--dport 80" "--dport 80" $QNUM
 			;;
 	    nfqws_all_desync|nfqws_hostlist_desync)
-			rule="-m multiport --sports 80,443 $synack"
-			fw_nfqws_pre "$rule" "$rule" $QNUM                                                                                                                           
 			fw_nfqws_post "$desync" "$desync" $QNUM
 			;;
 	    nfqws_ipset_desync)
-			rule="-m multiport --sports 80,443 $synack"
-			fw_nfqws_pre "$rule $ipset_zapret src" "$rule $ipset_zapret6 src" $QNUM
 			fw_nfqws_post "$desync $ipset_zapret dst" "$desync $ipset_zapret6 dst" $QNUM
 			;;
 	    custom)
