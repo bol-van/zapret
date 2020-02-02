@@ -151,11 +151,7 @@ It takes the following parameters:
 
 The manipulation parameters can be combined in any way.
 
-COMMENT. As described earlier, Linux behaves strangely when the window size is changed, unlike Windows.
-Following segments do not restore their full length. Connection can go for a long time in batches of small packets.
-Package modification parameters (--hostcase, ...) may not work, because nfqws does not work with the connection,
-but only with separate packets in which the search may not be found, because scattered across multiple packets.
-If the source of the packages is Windows, there is no such problem.
+WARNING. --wsize parameter is now not used anymore in scripts. TCP split can be achieved using DPI desync attack.
 
 DPI DESYNC ATTACK
 After completion of the tcp 3-way handshake, the first data packet from the client goes.
@@ -382,7 +378,6 @@ ipset - only fill ipset. futher actions depend on your own code
 
 Its possible to change manipulation options used by the daemons :
 
-NFQWS_OPT="--wsize=3 --hostspell=HOST"
 TPWS_OPT_HTTP="--hostspell=HOST --split-http-req=method"
 TPWS_OPT_HTTPS="--split-pos=3"
 
