@@ -1,9 +1,9 @@
 #define _GNU_SOURCE
+#include "darkmagic.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "darkmagic.h"
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
