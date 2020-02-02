@@ -7,7 +7,7 @@
 #  MODE=custom
 #  NFQWS_OPT_DESYNC=your choice of nfqws desync options
 #  GETLIST=your choice of script in ipset/get_*.sh, or comment if list downloading is not needed
-# if hostlist is needed then uncomment run_daemon with --hostlist and comment run_daemon without --hoslist
+# if hostlist is needed then uncomment run_daemon with --hostlist and comment run_daemon without --hostlist
 # restart zapret
 
 zapret_custom_daemons()
