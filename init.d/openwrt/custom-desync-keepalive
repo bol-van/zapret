@@ -1,0 +1,15 @@
+# this script contain your special code to launch daemons and configure firewall
+# use helpers from "functions" file and "zapret" init script
+# in case of upgrade keep this file only, do not modify others
+
+zapret_custom_daemons()
+{
+	run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC"
+}
+zapret_custom_firewall()
+{
+	local desync_http="--dport 80 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
+	local desync_https="--dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
+	fw_nfqws_post "$desync_http" "$desync_http" $QNUM
+	fw_nfqws_post "$desync_https" "$desync_https" $QNUM
+}

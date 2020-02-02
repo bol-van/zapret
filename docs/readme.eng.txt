@@ -139,7 +139,7 @@ It takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync[=<mode>]			; try to desync dpi state. modes : fake rst rstack disorder disorder2
+ --dpi-desync[=<mode>]			; try to desync dpi state. modes : fake rst rstack disorder disorder2 split split2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; can take multiple comma separated values
@@ -196,7 +196,14 @@ If position is higher than packet length, pos=1 is used.
 This sequence is designed to make reconstruction of critical message as difficult as possible.
 Fake segments may not be required to bypass some DPIs, but can potentially help if more sophisticated reconstruction
 algorithms are used.
-Mode 'disorder2' disables sending of fake segments. It can be used as a faster alternative to --wsize.
+Mode 'disorder2' disables sending of fake segments.
+
+Split mode is very similar to disorder but without segment reordering :
+1. 1st segment
+2. fake 1st segment, data filled with zeroes
+3. fake 1st segment, data filled with zeroes (2nd copy)
+4. 2nd segment
+Mode 'split2' disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
 There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
 that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server
