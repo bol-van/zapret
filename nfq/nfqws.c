@@ -214,6 +214,8 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 	packet_process_result res = pass;
 	uint8_t proto;
 
+	if (*mark & params.desync_fwmark) return res;
+
 	if (proto_check_ipv4(data, len))
 	{
 		iphdr = (struct iphdr *) data;
@@ -231,7 +233,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 		return res;
 	}
 
-	if (!(*mark & params.desync_fwmark) && proto==IPPROTO_TCP && proto_check_tcp(data, len))
+	if (proto==IPPROTO_TCP && proto_check_tcp(data, len))
 	{
 		tcphdr = (struct tcphdr *) data;
 		len_tcp = len;
