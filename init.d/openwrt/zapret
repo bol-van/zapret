@@ -74,9 +74,6 @@ start_service() {
 			run_tpws 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			run_tpws 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
 			;;
-		nfqws_ipset|nfqws_ipset_https|nfqws_all|nfqws_all_https)
-			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT"
-			;;
 		nfqws_ipset_desync|nfqws_all_desync)
 			run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC"
 			;;

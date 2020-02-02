@@ -404,24 +404,6 @@ zapret_do_firewall()
 			fw_tpws $1 "--dport 80" "--dport 80" $TPPORT_HTTP
 			fw_tpws $1 "--dport 443" "--dport 443" $TPPORT_HTTPS
 			;;
-	    nfqws_ipset)
-			fw_nfqws_pre $1 "--sport 80 $synack $ipset_zapret src" "--sport 80 $synack $ipset_zapret6 src" $QNUM
-			fw_nfqws_post $1 "--dport 80 $ipset_zapret dst" "--dport 80 $ipset_zapret6 dst" $QNUM
-			;;
-	    nfqws_ipset_https)
-			rule="-m multiport --sports 80,443 $synack"
-			fw_nfqws_pre $1 "$rule $ipset_zapret src" "$rule $ipset_zapret6 src" $QNUM
-			fw_nfqws_post $1 "--dport 80 $ipset_zapret dst" "--dport 80 $ipset_zapret6 dst" $QNUM
-			;;
-	    nfqws_all)
-			fw_nfqws_pre $1 "--sport 80 $synack" "--sport 80 $synack" $QNUM
-			fw_nfqws_post $1 "--dport 80" "--dport 80" $QNUM
-			;;
-	    nfqws_all_https)
-			rule="-m multiport --sports 80,443 $synack"
-			fw_nfqws_pre $1 "$rule" "$rule" $QNUM
-			fw_nfqws_post $1 "--dport 80" "--dport 80" $QNUM
-			;;
 	    nfqws_all_desync|nfqws_hostlist_desync)
 			fw_nfqws_post $1 "$desync" "$desync" $QNUM
 			;;
@@ -456,9 +438,6 @@ zapret_do_daemons()
 	    tpws_ipset_https|tpws_all_https)
 			do_tpws $1 1 "$TPWS_OPT_BASE_HTTP $TPWS_OPT_HTTP"
 			do_tpws $1 2 "$TPWS_OPT_BASE_HTTPS $TPWS_OPT_HTTPS"
-			;;
-	    nfqws_ipset|nfqws_ipset_https|nfqws_all|nfqws_all_https)
-			do_nfqws $1 1 "$NFQWS_OPT"
 			;;
 	    nfqws_ipset_desync|nfqws_all_desync)
 			do_nfqws $1 1 "$NFQWS_OPT_DESYNC"

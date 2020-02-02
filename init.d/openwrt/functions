@@ -285,24 +285,6 @@ zapret_apply_firewall()
 			fw_tpws "--dport 80" "--dport 80" $TPPORT_HTTP
 			fw_tpws "--dport 443" "--dport 443" $TPPORT_HTTPS
 			;;
-	    nfqws_ipset)
-			fw_nfqws_pre "--sport 80 $synack $ipset_zapret src" "--sport 80 $synack $ipset_zapret6 src" $QNUM
-			fw_nfqws_post "--dport 80 $ipset_zapret dst" "--dport 80 $ipset_zapret6 dst" $QNUM
-			;;
-	    nfqws_ipset_https)
-			rule="-m multiport --sports 80,443 $synack"
-			fw_nfqws_pre "$rule $ipset_zapret src" "$rule $ipset_zapret6 src" $QNUM
-			fw_nfqws_post "--dport 80 $ipset_zapret dst" "--dport 80 $ipset_zapret6 dst" $QNUM
-			;;
-	    nfqws_all)
-			fw_nfqws_pre "--sport 80 $synack" "--sport 80 $synack" $QNUM
-			fw_nfqws_post "--dport 80" "--dport 80" $QNUM
-			;;
-	    nfqws_all_https)
-			rule="-m multiport --sports 80,443 $synack"
-			fw_nfqws_pre "$rule" "$rule" $QNUM
-			fw_nfqws_post "--dport 80" "--dport 80" $QNUM
-			;;
 	    nfqws_all_desync|nfqws_hostlist_desync)
 			fw_nfqws_post "$desync" "$desync" $QNUM
 			;;

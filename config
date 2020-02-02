@@ -20,9 +20,6 @@ IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
 # custom mode : custom . should modify init script and add your own code
 MODE=tpws_ipset_https
 
-# CHOOSE NFQWS DAEMON OPTIONS. run "nfq/nfqws --help" for option list
-NFQWS_OPT="--wsize=3 --hostspell=HOST"
-
 # CHOOSE NFQWS DAEMON OPTIONS for DPI desync mode. run "nfq/nfqws --help" for option list
 DESYNC_MARK=0x40000000
 NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
