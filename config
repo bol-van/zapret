@@ -14,7 +14,7 @@ IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
 IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
 
 # CHOOSE OPERATION MODE
-# use nfqws : nfqws_ipset nfqws_ipset_https nfqws_all nfqws_all_https
+# use nfqws : nfqws_all_desync nfqws_ipset_desync nfqws_hostlist_desync
 # use tpws : tpws_ipset tpws_ipset_https tpws_all tpws_all_https tpws_hostlist
 # no daemon, just ipset : ipset
 # custom mode : custom . should modify init script and add your own code
