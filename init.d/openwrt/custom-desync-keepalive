@@ -6,12 +6,14 @@
 # check config :
 #  MODE=custom
 #  NFQWS_OPT_DESYNC=your choice of nfqws desync options
-#  GETLIST=your choise of script in ipset/get_*.sh, or comment if list downloading is not needed
+#  GETLIST=your choice of script in ipset/get_*.sh, or comment if list downloading is not needed
+# if hostlist is needed then uncomment run_daemon with --hostlist and comment run_daemon without --hoslist
 # restart zapret
 
 zapret_custom_daemons()
 {
 	run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC"
+	#run_daemon 1 $NFQWS "$NFQWS_OPT_BASE $NFQWS_OPT_DESYNC --hostlist=$HOSTLIST"
 }
 zapret_custom_firewall()
 {
