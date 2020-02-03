@@ -327,8 +327,7 @@ zapret-hosts-user-exclude.txt can contain domains, ipv4 and ipv6 addresses or su
 Domain name filtering
 ---------------------
 
-An alternative to ipset is to use tpws with a list of domains.
-tpws can only read one hostlist.
+An alternative to ipset is to use tpws or nfqws with a list of domains. Only one list is supported.
 
 Enter the blocked domains to ipset/zapret-hosts-users.txt. Remove ipset/zapret-hosts.txt.gz.
 Then the init script will run tpws with the zapret-hosts-users.txt list.
@@ -336,11 +335,11 @@ Then the init script will run tpws with the zapret-hosts-users.txt list.
 Other option ( Roskomnadzor list - get_hostlist.sh ) is russian specific.
 You can write your own replacement for get_hostlist.sh.
 
-When filtering by domain name, tpws should run without filtering by ipset.
-All http traffic goes through tpws, and it decides whether to use manipulation depending on the Host: field in the http request.
+When filtering by domain name, daemons should run without filtering by ipset.
+All traffic goes through daemon, and it decides whether to use manipulation depending on the Host: field in the http request.
 This creates an increased load on the system.
 The domain search itself works very quickly, the load is connected with pumping the amount of data through the process.
-When using large regulator lists estimate the amount of RAM on the router!
+When using large regulator lists estimate the amount of RAM on the router !
 
 Choosing parameters
 -------------------
