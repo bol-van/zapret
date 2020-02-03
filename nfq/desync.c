@@ -58,9 +58,12 @@ void desync_init()
 
 
 // result : true - drop original packet, false = dont drop
-bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *iphdr, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, uint8_t *data_payload, size_t len_payload)
+packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct iphdr *iphdr, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {
-	if (!!iphdr == !!ip6hdr) return false; // one and only one must be present
+	packet_process_result res=pass;
+
+	if (!!iphdr == !!ip6hdr) return res; // one and only one must be present
+	if (params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace) return res; // nothing to do. do not waste cpu
 
 	if (!tcphdr->syn && len_payload)
 	{
@@ -69,8 +72,9 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 		size_t fake_size;
 		char host[256];
 		bool bHaveHost=false;
+		bool bIsHttp;
 
-		if (IsHttp(data_payload,len_payload)) 
+		if (bIsHttp = IsHttp(data_payload,len_payload))
 		{
 			DLOG("packet contains HTTP request\n")
 			fake = (uint8_t*)fake_http_request;
@@ -78,8 +82,8 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 			if (params.hostlist || params.debug) bHaveHost=HttpExtractHost(data_payload,len_payload,host,sizeof(host));
 			if (params.hostlist && !bHaveHost)
 			{
-				DLOG("not applying dpi-desync to HTTP without Host:\n")
-				return false;
+				DLOG("not applying tampering to HTTP without Host:\n")
+				return res;
 			}
 		}
 		else if (IsTLSClientHello(data_payload,len_payload))
@@ -92,16 +96,15 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 				bHaveHost=TLSHelloExtractHost(data_payload,len_payload,host,sizeof(host));
 				if (params.desync_skip_nosni && !bHaveHost)
 				{
-					DLOG("not applying dpi-desync to TLS ClientHello without hostname in the SNI\n")
-					return false;
+					DLOG("not applying tampering to TLS ClientHello without hostname in the SNI\n")
+					return res;
 				}
 			}
-			
 		}
 		else
 		{
-			if (!params.desync_any_proto) return false;
-			DLOG("applying dpi-desync to unknown protocol\n")
+			if (!params.desync_any_proto) return res;
+			DLOG("applying tampering to unknown protocol\n")
 			fake = zeropkt;
 			fake_size = 256;
 		}
@@ -111,10 +114,41 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 			DLOG("hostname: %s\n",host)
 			if (params.hostlist && !SearchHostList(params.hostlist,host,params.debug))
 			{
-				DLOG("not applying dpi-desync to this request\n")
-				return false;
+				DLOG("not applying tampering to this request\n")
+				return res;
+			}
+
+			uint8_t *phost;
+			if (bIsHttp && (params.hostcase || params.hostnospace) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
+			{
+				if (params.hostcase)
+				{
+					DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
+					memcpy(phost + 2, params.hostspell, 4);
+					res=modify;
+				}
+				uint8_t *pua;
+				if (params.hostnospace &&
+					(pua = (uint8_t*)memmem(data_payload, len_payload, "\r\nUser-Agent: ", 14)) &&
+					(pua = (uint8_t*)memmem(pua + 1, len_payload - (pua - data_payload) - 1, "\r\n", 2)))
+				{
+					DLOG("removing space after Host: and adding it to User-Agent:\n")
+					if (pua > phost)
+					{
+						memmove(phost + 7, phost + 8, pua - phost - 8);
+						phost[pua - phost - 1] = ' ';
+					}
+					else
+					{
+						memmove(pua + 1, pua, phost - pua + 7);
+						*pua = ' ';
+					}
+					res=modify;
+				}
 			}
 		}
+
+		if (params.desync_mode==DESYNC_NONE) return res;
 
 		extract_endpoints(iphdr, ip6hdr, tcphdr, &src, &dst);
 		if (params.debug)
@@ -150,7 +184,7 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 								data_payload+split_pos, len_payload-split_pos, newdata, &newlen) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
 						{
-							return false;
+							return res;
 						}
 					}
 
@@ -164,7 +198,7 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 								zeropkt, split_pos, fakeseg, &fakeseg_len) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
 						{
-							return false;
+							return res;
 						}
 					}
 
@@ -176,17 +210,17 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 							data_payload, split_pos, newdata, &newlen) ||
 						!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
 					{
-						return false;
+						return res;
 					}
 
 					if (params.desync_mode==DESYNC_DISORDER)
 					{
 						DLOG("sending fake(2) 1st out-of-order tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
 						if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
-							return false;
+							return res;
 					}
 
-					return true;
+					return drop;
 				}
 				break;
 			case DESYNC_SPLIT:
@@ -205,7 +239,7 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 								zeropkt, split_pos, fakeseg, &fakeseg_len) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
 						{
-							return false;
+							return res;
 						}
 					}
 
@@ -216,14 +250,14 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 							data_payload, split_pos, newdata, &newlen) ||
 						!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
 					{
-						return false;
+						return res;
 					}
 
 					if (params.desync_mode==DESYNC_SPLIT)
 					{
 						DLOG("sending fake(2) 1st tcp segment 0-%zu len=%zu\n",split_pos-1, split_pos)
 						if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
-							return false;
+							return res;
 					}
 
 					if (split_pos<len_payload)
@@ -235,11 +269,11 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 								data_payload+split_pos, len_payload-split_pos, newdata, &newlen) ||
 							!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
 						{
-							return false;
+							return res;
 						}
 					}
 
-					return true;
+					return drop;
 				}
 				break;
 
@@ -248,7 +282,7 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 					ttl_fake,params.desync_tcp_fooling_mode,
 					fake, fake_size, newdata, &newlen))
 				{
-					return false;
+					return res;
 				}
 				break;
 			case DESYNC_RST:
@@ -257,27 +291,29 @@ bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *ip
 					ttl_fake,params.desync_tcp_fooling_mode,
 					NULL, 0, newdata, &newlen))
 				{
-					return false;
+					return res;
 				}
 				break;
 
 			default:
-				return false;
+				return res;
 		}
 
 		if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
-			return false;
+			return res;
 
 		if (params.desync_retrans)
 			DLOG("dropping packet to force retransmission. len=%zu len_payload=%zu\n", len_pkt, len_payload)
 		else
 		{
 			DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
+			// if original packet was tampered earlier it needs checksum fixed
+			if (res==modify) tcp_fix_checksum(tcphdr,len_tcp,iphdr,ip6hdr);
 			if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, data_pkt, len_pkt))
-				return false;
+				return res;
 		}
-		return true;
+		return drop;
 	}
 
-	return false;
+	return res;
 }

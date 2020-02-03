@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include "nfqws.h"
 #include "sec.h"
 #include "desync.h"
 #include "helpers.h"
@@ -138,17 +139,6 @@ static inline bool tcp_synack_segment(const struct tcphdr *tcphdr)
 		tcphdr->syn == 1 &&
 		tcphdr->fin == 0;
 }
-static inline bool tcp_ack_segment(const struct tcphdr *tcphdr)
-{
-	/* check for set bits in TCP hdr */
-	return  tcphdr->urg == 0 &&
-		tcphdr->ack == 1 &&
-		tcphdr->rst == 0 &&
-		tcphdr->syn == 0 &&
-		tcphdr->fin == 0;
-}
-
-
 static void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize)
 {
 	uint16_t winsize_old;
@@ -157,77 +147,19 @@ static void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize)
 	DLOG("Window size change %u => %u\n", winsize_old, winsize)
 }
 
-
 // data/len points to data payload
 static bool modify_tcp_packet(uint8_t *data, size_t len, struct tcphdr *tcphdr)
 {
-	const char **method;
-	size_t method_len = 0;
-	uint8_t *phost, *pua;
-	bool bRet = false;
-
-	if (tcp_synack_segment(tcphdr))
+	if (tcp_synack_segment(tcphdr) && params.wsize)
 	{
-		if (params.wsize)
-		{
-			tcp_rewrite_winsize(tcphdr, (uint16_t)params.wsize);
-			bRet = true;
-		}
+		tcp_rewrite_winsize(tcphdr, (uint16_t)params.wsize);
+		return true;
 	}
-	else if ((params.hostcase || params.hostnospace) && IsHttp(data,len))
-	{
-		if (params.hostlist)
-		{
-			char host[256];
-			if (HttpExtractHost(data,len,host,sizeof(host)))
-			{
-				DLOG("hostname: %s\n",host)
-				if (!SearchHostList(params.hostlist,host,params.debug))
-				{
-					DLOG("not applying tampering to this request\n")
-					return false;
-				}
-			}
-			else
-			{
-				DLOG("could not extract host from http request. not applying tampering\n")
-				return false;
-			}
-		}
-		if (phost = (uint8_t*)memmem(data, len, "\r\nHost: ", 8))
-		{
-			if (params.hostcase)
-			{
-				DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
-				memcpy(phost + 2, params.hostspell, 4);
-				bRet = true;
-			}
-			if (params.hostnospace && (pua = (uint8_t*)memmem(data, len, "\r\nUser-Agent: ", 14)) && (pua = (uint8_t*)memmem(pua + 1, len - (pua - data) - 1, "\r\n", 2)))
-			{
-				DLOG("removing space after Host: and adding it to User-Agent:\n")
-				if (pua > phost)
-				{
-					memmove(phost + 7, phost + 8, pua - phost - 8);
-					phost[pua - phost - 1] = ' ';
-				}
-				else
-				{
-					memmove(pua + 1, pua, phost - pua + 7);
-					*pua = ' ';
-				}
-				bRet = true;
-			}
-		}
-	}
-	return bRet;
+	return false;
 }
 
 
 
-typedef enum
-{
-	pass = 0, modify, drop
-} packet_process_result;
 static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt, uint32_t *mark)
 {
 	struct iphdr *iphdr = NULL;
@@ -235,7 +167,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 	struct tcphdr *tcphdr = NULL;
 	size_t len = len_pkt, len_tcp;
 	uint8_t *data = data_pkt;
-	packet_process_result res = pass;
+	packet_process_result res = pass, res2;
 	uint8_t proto;
 
 	if (*mark & params.desync_fwmark) return res;
@@ -266,18 +198,10 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 
 		if (modify_tcp_packet(data, len, tcphdr))
 			res = modify;
-		if (params.desync_mode!=DESYNC_NONE)
-		{
-			if (dpi_desync_packet(data_pkt, len_pkt, iphdr, ip6hdr, tcphdr, data, len))
-				res = drop;
-		}
-		if (res==modify)
-		{
-			if (iphdr)
-				tcp_fix_checksum(tcphdr, len_tcp, iphdr->saddr, iphdr->daddr);
-			else
-				tcp6_fix_checksum(tcphdr, len_tcp, &ip6hdr->ip6_src, &ip6hdr->ip6_dst);
-		}
+
+		res2 = dpi_desync_packet(data_pkt, len_pkt, iphdr, ip6hdr, tcphdr, len_tcp, data, len);
+		res = (res2==pass && res==modify) ? modify : res2;
+		if (res==modify) tcp_fix_checksum(tcphdr,len_tcp,iphdr,ip6hdr);
 	}
 	return res;
 }
@@ -320,7 +244,7 @@ static void exithelp()
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
 		" --user=<username>\t\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t\t; drop root privs\n"
-		" --wsize=<window_size>\t\t\t; set window size. 0 = do not modify\n"
+		" --wsize=<window_size>\t\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"

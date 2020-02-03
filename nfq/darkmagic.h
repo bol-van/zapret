@@ -1,5 +1,7 @@
 #pragma once
 
+#include "checksum.h"
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <netinet/ip.h>
@@ -7,7 +9,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include "checksum.h"
+
 
 // returns netorder value
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);

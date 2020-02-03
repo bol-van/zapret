@@ -119,7 +119,7 @@ uint16_t csum_ipv6_magic(const void *saddr, const void *daddr, size_t len, uint8
 }
 
 
-void tcp_fix_checksum(struct tcphdr *tcp,int len, in_addr_t src_addr, in_addr_t dest_addr)
+void tcp4_fix_checksum(struct tcphdr *tcp,int len, in_addr_t src_addr, in_addr_t dest_addr)
 {
 	tcp->check = 0;
 	tcp->check = csum_tcpudp_magic(src_addr,dest_addr,len,IPPROTO_TCP,csum_partial(tcp, len));
@@ -128,4 +128,11 @@ void tcp6_fix_checksum(struct tcphdr *tcp,int len, const struct in6_addr *src_ad
 {
 	tcp->check = 0;
 	tcp->check = csum_ipv6_magic(src_addr,dest_addr,len,IPPROTO_TCP,csum_partial(tcp, len));	
+}
+void tcp_fix_checksum(struct tcphdr *tcp,int len,const struct iphdr *iphdr,const struct ip6_hdr *ip6hdr)
+{
+	if (iphdr)
+		tcp4_fix_checksum(tcp, len, iphdr->saddr, iphdr->daddr);
+	else if (ip6hdr)
+		tcp6_fix_checksum(tcp, len, &ip6hdr->ip6_src, &ip6hdr->ip6_dst);
 }

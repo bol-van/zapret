@@ -1,6 +1,7 @@
 #pragma once
 
 #include "darkmagic.h"
+#include "nfqws.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -24,4 +25,4 @@ enum dpi_desync_mode {
 };
 
 void desync_init();
-bool dpi_desync_packet(const uint8_t *data_pkt, size_t len_pkt, struct iphdr *iphdr, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, uint8_t *data_payload, size_t len_payload);
+packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct iphdr *iphdr, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload);

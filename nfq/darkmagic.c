@@ -192,7 +192,7 @@ bool prepare_tcp_segment4(
 	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin_port,dst->sin_port,wsize,timestamps);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
-	tcp_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,ip->saddr,ip->daddr);
+	tcp4_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,ip->saddr,ip->daddr);
 	if (fooling & TCP_FOOL_BADSUM) tcp->check^=0xBEAF;
 
 	*buflen = pktlen;
