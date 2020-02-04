@@ -7,7 +7,8 @@
 #  MODE=custom
 #  NFQWS_OPT_DESYNC=your choice of nfqws desync options
 #  GETLIST=your choice of script in ipset/get_*.sh, or comment if list downloading is not needed
-# if hostlist is needed then uncomment do_nfqws with --hostlist and comment do_nfqws without --hostlist
+# if hostlist is needed then uncomment run_daemon with --hostlist and comment run_daemon without --hostlist
+# if ipset filter is needed then uncomment lines starting with "ipset_zapret" and "ipset_zapret6"
 # restart zapret
 
 zapret_custom_daemons()
@@ -19,6 +20,9 @@ zapret_custom_firewall()
 {
 	local desync_http="--dport 80 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
 	local desync_https="--dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	fw_nfqws_post $1 "$desync_http" "$desync_http" $QNUM
-	fw_nfqws_post $1 "$desync_https" "$desync_https" $QNUM
+	local ipset_zapret ipset_zapret6
+	#ipset_zapret="-m set --match-set zapret dst"
+	#ipset_zapret6="-m set --match-set zapret6 dst"
+	fw_nfqws_post $1 "$desync_http $ipset_zapret" "$desync_http $ipset_zapret6" $QNUM
+	fw_nfqws_post $1 "$desync_https $ipset_zapret" "$desync_https $ipset_zapret6" $QNUM
 }
