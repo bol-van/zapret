@@ -9,7 +9,8 @@
 #  GETLIST=your choice of script in ipset/get_*.sh, or comment if list downloading is not needed
 # if hostlist is needed then uncomment run_daemon with --hostlist and comment run_daemon without --hostlist
 # if ipset filter is needed then uncomment lines starting with "ipset_zapret" and "ipset_zapret6"
-# restart zapret
+# /etc/init.d/zapret restart
+# fw3 restart
 
 zapret_custom_daemons()
 {

@@ -2,6 +2,8 @@
 # so processing of every outgoing packet is necessary
 # for https its enough to act on client hello packet. ignore others and save CPU time
 
+# systemd: systemctl stop zapret
+# sysv init: /etc/init.d/zapret stop
 # copy this file to custom
 # check config :
 #  MODE=custom
@@ -9,7 +11,8 @@
 #  GETLIST=your choice of script in ipset/get_*.sh, or comment if list downloading is not needed
 # if hostlist is needed then uncomment run_daemon with --hostlist and comment run_daemon without --hostlist
 # if ipset filter is needed then uncomment lines starting with "ipset_zapret" and "ipset_zapret6"
-# restart zapret
+# systemd: systemctl start zapret
+# sysv init: /etc/init.d/zapret start
 
 zapret_custom_daemons()
 {
