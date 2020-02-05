@@ -105,12 +105,16 @@ static void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type)
 		switch (HeaderType)
 		{
 		case 0: // Hop-by-Hop Options
-		case 60: // Destination Options
 		case 43: // routing
+		case 51: // authentication
+		case 60: // Destination Options
+		case 135: // mobility
+		case 139: // Host Identity Protocol Version v2
+		case 140: // Shim6
 			if (*len < 2) return; // error
 			hdrlen = 8 + ((*data)[1] << 3);
 			break;
-		case 44: // fragment
+		case 44: // fragment. length fixed to 8, hdrlen field defined as reserved
 			hdrlen = 8;
 			break;
 		case 59: // no next header
