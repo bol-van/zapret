@@ -353,7 +353,7 @@ check_location()
 				echo installer found existing $ZAPRET_BASE
 				echo directory needs to be replaced. config and custom scripts can be kept or replaced with clean version
 				if ask_yes_no N "do you want to delete all files there and copy this version"; then
-					ask_yes_no Y "keep config and custom scripts" && keep=Y
+					ask_yes_no Y "keep config, custom scripts and user lists" && keep=Y
 					[ "$keep" = "Y" ] && backup_restore_settings 1
 					rm -r "$ZAPRET_BASE"
 				else
