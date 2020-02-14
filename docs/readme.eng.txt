@@ -214,8 +214,8 @@ iptables -t mangle -I POSTROUTING -p tcp -m multiport --dports 80,443 -m connbyt
 This is good if DPI does not track all requests in http keep-alive session.
 If it does, then pass all outgoing packets for http and only first data packet for https :
 
-iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
-iptables -t mangle -I POSTROUTING -p tcp --dport 443 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+iptables -t mangle -I POSTROUTING -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+iptables -t mangle -I POSTROUTING -p tcp --dport 80 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
 
 mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark when it sends generated packets.
 
