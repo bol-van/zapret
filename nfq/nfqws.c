@@ -517,11 +517,21 @@ int main(int argc, char **argv)
 		fprintf(stderr, "error during nfq_unbind_pf()\n");
 		goto exiterr;
 	}
+	printf("unbinding existing nf_queue handler for AF_INET6 (if any)\n");
+	if (nfq_unbind_pf(h, AF_INET6) < 0) {
+		fprintf(stderr, "error during nfq_unbind_pf()\n");
+		// ignore error. system can be without ipv6
+	}
 
 	printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(h, AF_INET) < 0) {
 		fprintf(stderr, "error during nfq_bind_pf()\n");
 		goto exiterr;
+	}
+	printf("binding nfnetlink_queue as nf_queue handler for AF_INET6\n");
+	if (nfq_bind_pf(h, AF_INET6) < 0) {
+		fprintf(stderr, "error during nfq_bind_pf()\n");
+		// ignore error. system can be without ipv6
 	}
 
 	printf("binding this socket to queue '%u'\n", params.qnum);
