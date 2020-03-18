@@ -19,7 +19,7 @@ struct params_s
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
-	int desync_split_pos;
+	int desync_repeats,desync_split_pos;
 	uint8_t desync_ttl;
 	uint8_t desync_tcp_fooling_mode;
 	uint32_t desync_fwmark;

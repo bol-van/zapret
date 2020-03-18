@@ -132,6 +132,7 @@ It takes the following parameters:
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; can take multiple comma separated values
  --dpi-desync-retrans=0|1               ; (fake,rst,rstack only) 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
+ --dpi-desync-repeats=<N>               ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for disorder only) split TCP packet at specified position
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet

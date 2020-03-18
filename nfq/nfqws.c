@@ -257,6 +257,7 @@ static void exithelp()
 		" --dpi-desync-ttl=<int>\t\t\t; set ttl for desync packet\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum\n"
 		" --dpi-desync-retrans=0|1\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
+		" --dpi-desync-repeats=<N>\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%u>\t; (for disorder only) split TCP packet at specified position\n"
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
@@ -310,6 +311,7 @@ int main(int argc, char **argv)
 	params.desync_fwmark = DPI_DESYNC_FWMARK_DEFAULT;
 	params.desync_skip_nosni = true;
 	params.desync_split_pos = 3;
+	params.desync_repeats = 1;
 
 	const struct option long_options[] = {
 		{"debug",optional_argument,0,0},	// optidx=0
@@ -327,10 +329,11 @@ int main(int argc, char **argv)
 		{"dpi-desync-ttl",required_argument,0,0},	// optidx=12
 		{"dpi-desync-fooling",required_argument,0,0},	// optidx=13
 		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=14
-		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=15
-		{"dpi-desync-split-pos",required_argument,0,0},// optidx=16
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=17
-		{"hostlist",required_argument,0,0},		// optidx=18
+		{"dpi-desync-repeats",required_argument,0,0},	// optidx=15
+		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=16
+		{"dpi-desync-split-pos",required_argument,0,0},// optidx=17
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=18
+		{"hostlist",required_argument,0,0},		// optidx=19
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -460,10 +463,18 @@ int main(int argc, char **argv)
 		case 14: /* dpi-desync-retrans */
 			params.desync_retrans = !optarg || atoi(optarg);
 			break;
-		case 15: /* dpi-desync-skip-nosni */
+		case 15: /* dpi-desync-repeats */
+			params.desync_repeats = atoi(optarg);
+			if (params.desync_repeats<=0 || params.desync_repeats>20)
+			{
+				fprintf(stderr, "dpi-desync-repeats must be within 1..20\n");
+				exit_clean(1);
+			}
+			break;
+		case 16: /* dpi-desync-skip-nosni */
 			params.desync_skip_nosni = !optarg || atoi(optarg);
 			break;
-		case 16: /* dpi-desync-split-pos */
+		case 17: /* dpi-desync-split-pos */
 			params.desync_split_pos = atoi(optarg);
 			if (params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
 			{
@@ -471,10 +482,10 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 17: /* dpi-desync-any-protocol */
+		case 18: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 18: /* hostlist */
+		case 19: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
