@@ -319,7 +319,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 			DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
 			// if original packet was tampered earlier it needs checksum fixed
 			if (res==modify) tcp_fix_checksum(tcphdr,len_tcp,iphdr,ip6hdr);
-			if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, data_pkt, len_pkt))
+			if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, data_pkt, len_pkt))
 				return res;
 		}
 		return drop;
