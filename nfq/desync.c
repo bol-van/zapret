@@ -83,6 +83,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		char host[256];
 		bool bHaveHost=false;
 		bool bIsHttp;
+		uint8_t *phost;
 
 		if (bIsHttp = IsHttp(data_payload,len_payload))
 		{
@@ -127,34 +128,33 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 				DLOG("not applying tampering to this request\n")
 				return res;
 			}
+		}
 
-			uint8_t *phost;
-			if (bIsHttp && (params.hostcase || params.hostnospace) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
+		if (bIsHttp && (params.hostcase || params.hostnospace) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
+		{
+			if (params.hostcase)
 			{
-				if (params.hostcase)
+				DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
+				memcpy(phost + 2, params.hostspell, 4);
+				res=modify;
+			}
+			uint8_t *pua;
+			if (params.hostnospace &&
+				(pua = (uint8_t*)memmem(data_payload, len_payload, "\r\nUser-Agent: ", 14)) &&
+				(pua = (uint8_t*)memmem(pua + 1, len_payload - (pua - data_payload) - 1, "\r\n", 2)))
+			{
+				DLOG("removing space after Host: and adding it to User-Agent:\n")
+				if (pua > phost)
 				{
-					DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
-					memcpy(phost + 2, params.hostspell, 4);
-					res=modify;
+					memmove(phost + 7, phost + 8, pua - phost - 8);
+					phost[pua - phost - 1] = ' ';
 				}
-				uint8_t *pua;
-				if (params.hostnospace &&
-					(pua = (uint8_t*)memmem(data_payload, len_payload, "\r\nUser-Agent: ", 14)) &&
-					(pua = (uint8_t*)memmem(pua + 1, len_payload - (pua - data_payload) - 1, "\r\n", 2)))
+				else
 				{
-					DLOG("removing space after Host: and adding it to User-Agent:\n")
-					if (pua > phost)
-					{
-						memmove(phost + 7, phost + 8, pua - phost - 8);
-						phost[pua - phost - 1] = ' ';
-					}
-					else
-					{
-						memmove(pua + 1, pua, phost - pua + 7);
-						*pua = ' ';
-					}
-					res=modify;
+					memmove(pua + 1, pua, phost - pua + 7);
+					*pua = ' ';
 				}
+				res=modify;
 			}
 		}
 
