@@ -13,9 +13,8 @@ check_dir()
 			echo 0.0.0.0 | "$exe" 1>/dev/null 2>/dev/null
 		else
 			echo "$exe is not executable. set proper chmod."
-		return 1
-	fi
-
+			return 1
+		fi
 	else
 		echo "$exe is absent"
 		return 2
@@ -32,7 +31,7 @@ ccp()
 	#cp -f "$BINDIR/$1" "$EXEDIR/$2" && echo copying : "$BINDIR/$1" =\> "$EXEDIR/$2"
 }
 
-ARCHLIST="my x86_64 x86 aarch64 armhf mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
+ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
 
 if [ "$1" = "getarch" ]; then
 	for arch in $ARCHLIST
