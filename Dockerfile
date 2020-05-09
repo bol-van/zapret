@@ -1,6 +1,6 @@
 FROM alpine:3.11
 
-COPY binaries/x86_64/* /app
+COPY binaries/x86_64/* /app/
 
 RUN ln -s /app/* /usr/bin
 
