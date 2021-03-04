@@ -1153,13 +1153,11 @@ install_openwrt()
 
 
 
-remove_macos_firewall()
+remove_pf_zapret_hooks()
 {
 	echo \* removing zapret PF hooks
 
 	pf_anchors_clear
-	pf_anchor_root_del
-	pf_anchor_root_reload
 }
 service_install_macos()
 {
@@ -1207,7 +1205,7 @@ install_macos()
 	ask_config_desktop
 	ask_config
 	service_install_macos
-	remove_macos_firewall
+	remove_pf_zapret_hooks
 	macos_fw_reload_trigger_clear
 	# gzip lists are incompatible with PF
 	GZIP_LISTS=0 write_config_var GZIP_LISTS
