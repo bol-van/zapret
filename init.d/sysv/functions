@@ -24,8 +24,9 @@ HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
 TPWS_OPT_BASE="--user=$WS_USER --port=$TPPORT"
 TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
 TPWS_OPT_BASE6="--bind-addr=::1"
+TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 # first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
-TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer --bind-wait-ifup=30 --bind-wait-ip=30 --bind-wait-ip-linklocal=3"
+TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
 
 [ -n "$IFACE_WAN" ] && IPT_OWAN="-o $IFACE_WAN"
 [ -n "$IFACE_WAN" ] && IPT_IWAN="-i $IFACE_WAN"
@@ -383,7 +384,7 @@ do_tpws()
 		[ -n "$IFACE_LAN" ] && OPT="$OPT --bind-iface6=$IFACE_LAN $TPWS_OPT_BASE6_PRE"
 	}
 
-	do_daemon $1 $2 $TPWS "$OPT $3"
+	do_daemon $1 $2 "$TPWS" "$OPT $3"
 }
 do_nfqws()
 {
@@ -392,7 +393,7 @@ do_nfqws()
 	# $3 : daemon args
 
 	[ "$1" = "1" ] && prepare_user
-	do_daemon $1 $2 $NFQWS "$NFQWS_OPT_BASE $3"
+	do_daemon $1 $2 "$NFQWS" "$NFQWS_OPT_BASE $3"
 }
 
 
@@ -424,6 +425,20 @@ filter_apply_hostlist_target()
 {
 	# $1 - var name of tpws or nfqws params
 	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
+}
+tpws_apply_socks_binds()
+{
+	local o
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		o="--bind-addr=127.0.0.1"
+		[ -n "$IFACE_LAN" ] && o="$o --bind-iface4=$IFACE_LAN $TPWS_WAIT"
+	}
+	[ "$DISABLE_IPV6" = "1" ] || {
+		o="$o --bind-addr=::1"
+		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN $TPWS_WAIT"
+	}
+	eval $1="\"\$$1 $o\""
 }
 
 
@@ -510,6 +525,12 @@ zapret_do_daemons()
 			opt="$TPWS_OPT"
 			filter_apply_hostlist_target opt
 			do_tpws $1 1 "$opt"
+			;;
+		tpws-socks)
+			opt="$TPWS_OPT_BASE --socks $TPWS_OPT"
+			tpws_apply_socks_binds opt
+			filter_apply_hostlist_target opt
+			do_daemon $1 1 "$TPWS" "$opt"
 			;;
 		nfqws)
 			opt="$NFQWS_OPT_DESYNC"

@@ -291,8 +291,8 @@ write_config_var()
 
 select_mode_mode()
 {
-	local MODES="tpws nfqws filter custom"
-	[ "$SYSTEM" = "macos" ] && MODES="tpws filter custom"
+	local MODES="tpws tpws-socks nfqws filter custom"
+	[ "$SYSTEM" = "macos" ] && MODES="tpws tpws-socks filter custom"
 	echo
 	echo select MODE :
 	ask_list MODE "$MODES" tpws && write_config_var MODE
@@ -311,7 +311,7 @@ select_mode_mode()
 }
 select_mode_http()
 {
-	[ "$MODE" != "filter" ] && {
+	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && {
 		echo
 		ask_yes_no_var MODE_HTTP "enable http support"
 		write_config_var MODE_HTTP
@@ -329,7 +329,7 @@ select_mode_keepalive()
 }
 select_mode_https()
 {
-	[ "$MODE" != "filter" ] && {
+	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && {
 		echo
 		ask_yes_no_var MODE_HTTPS "enable https support"
 		write_config_var MODE_HTTPS
@@ -337,9 +337,11 @@ select_mode_https()
 }
 select_mode_filter()
 {
+	local filter="none ipset hostlist"
+	[ "$MODE" = "tpws-socks" ] && filter="none hostlist"
 	echo
 	echo select filtering :
-	ask_list MODE_FILTER "none ipset hostlist" none && write_config_var MODE_FILTER
+	ask_list MODE_FILTER "$filter" none && write_config_var MODE_FILTER
 }
 select_mode()
 {
@@ -1180,7 +1182,7 @@ service_stop_macos()
 macos_fw_reload_trigger_clear()
 {
 	case "$MODE" in
-		tpws|custom)
+		tpws|tpws-socks|custom)
 			LISTS_RELOAD=
 			write_config_var LISTS_RELOAD
 			;;

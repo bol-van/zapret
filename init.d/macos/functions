@@ -9,6 +9,7 @@ HOSTLIST="$ZHOSTLIST.gz"
 
 PIDDIR=/var/run
 TPPORT=988
+TPWS_USER=daemon
 TPWS_WAIT="--bind-wait-ip=60"
 TPWS="$ZAPRET_BASE/tpws/tpws"
 
@@ -85,6 +86,7 @@ filter_apply_hostlist_target()
 	# $1 - var name of tpws or nfqws params
 	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
 }
+
 tpws_apply_binds()
 {
 	local o
@@ -93,6 +95,20 @@ tpws_apply_binds()
 		for i in lo0 $IFACE_LAN; do
 			o="$o --bind-iface6=$i --bind-linklocal=force $TPWS_WAIT"
 		done
+	}
+	eval $1="\"\$$1 $o\""
+}
+tpws_apply_socks_binds()
+{
+	local o
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		o="--bind-addr=127.0.0.1"
+		[ -n "$IFACE_LAN" ] && o="$o --bind-iface4=$IFACE_LAN $TPWS_WAIT"
+	}
+	[ "$DISABLE_IPV6" = "1" ] || {
+		o="$o --bind-addr=::1"
+		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN $TPWS_WAIT"
 	}
 	eval $1="\"\$$1 $o\""
 }
@@ -374,6 +390,8 @@ zapret_do_firewall()
 				pf_anchors_clear
 			fi
 			;;
+		tpws-socks)
+			;;
 		*)
 			echo "unsupported MODE=$MODE"
 			return 1
@@ -414,6 +432,16 @@ zapret_do_daemons()
 			filter_apply_hostlist_target opt
 			tpws_apply_binds opt
 			opt="$opt $TPWS_OPT"
+			do_daemon $1 1 "$TPWS" "$opt"
+			;;
+		tpws-socks)
+			[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
+				echo "both ipv4 and ipv6 are disabled. nothing to do"
+				return 0
+			}
+			opt="--socks --user=$TPWS_USER --port=$TPPORT"
+			tpws_apply_socks_binds opt
+			filter_apply_hostlist_target opt
 			do_daemon $1 1 "$TPWS" "$opt"
 			;;
 		filter)

@@ -619,8 +619,10 @@ tpws и nfqws решают нужно ли применять дурение в 
 
 
 Основной режим :
-tpws - использовать tpws
-tpws - использовать nfqws
+tpws - tpws в режиме transparent
+tpws-socks - tpws в режиме socks.
+ вешается на localhost и LAN интерфейс (если задан IFACE_LAN или если система - OpenWRT). порт 988
+nfqws - nfqws
 filter - только заполнить ipset или загрузить hostlist
 custom - нужно самому запрограммировать запуск демонов в init скрипте и правила iptables
 

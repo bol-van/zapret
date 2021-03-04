@@ -398,8 +398,12 @@ It needs to be viewed and edited if necessary.
 
 
 Main mode :
-tpws - use tpws
-tpws - use nfqws
+tpws - tpws transparent mode
+tpws-socks - tpws socks mode
+ binds to localhost and LAN interface (if IFACE_LAN is specified or the system is OpenWRT). port 988
+nfqws - nfqws
+nfqws - use nfqws
+
 filter - only fill ipset or load hostlist
 custom - use custom script for running daemons and establishing firewall rules
 
