@@ -373,3 +373,19 @@ start-fw создает 3 файла anchors в /etc/pf.anchors : zapret,zapret-
 Таблицы zapret6,zapret6-user - в anchor "zapret-v6".
 Если какая-то версия протокола отключена - соответствующий anchor пустой и не упоминается в anchor "zapret".
 Таблицы и правила создаются только на те листы, которые фактически есть в директории ipset.
+
+
+MacOS вариант custom
+--------------------
+
+Так же как и в других системах, поддерживаемых в простом инсталяторе, можно создавать свои custom скрипты.
+Расположение : /opt/zapret/init.d/macos/custom
+
+zapret_custom_daemons() получает в $1 "0" или "1". "0" - stop, "1" - start
+custom firewall отличается от linux варианта.
+Вместо заполнения iptables вам нужно сгенерировать правила для zapret-v4 и zapret-v6 anchors и выдать их в stdout.
+Это делается в функциях zapret_custom_firewall_v4() и zapret_custom_firewall_v6().
+Определения таблиц заполняются основным скриптом - вам это делать не нужно.
+Можно ссылаться на таблицы zapret и zapret-user в v4, zapret6 и zapret6-user.
+
+Cм. пример в файле custom-tpws

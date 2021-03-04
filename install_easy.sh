@@ -292,7 +292,7 @@ write_config_var()
 select_mode_mode()
 {
 	local MODES="tpws nfqws filter custom"
-	[ "$SYSTEM" = "macos" ] && MODES="tpws filter"
+	[ "$SYSTEM" = "macos" ] && MODES="tpws filter custom"
 	echo
 	echo select MODE :
 	ask_list MODE "$MODES" tpws && write_config_var MODE
@@ -540,7 +540,7 @@ backup_restore_settings()
 {
 	# $1 - 1 - backup, 0 - restore
 	local mode=$1
-	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/openwrt/custom" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt"
+	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/openwrt/custom" "init.d/macos/custom" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt"
 }
 
 check_location()
@@ -1176,17 +1176,21 @@ service_start_macos()
 }
 macos_fw_reload_trigger_clear()
 {
-	[ "$MODE" = "tpws" ] && {
-		LISTS_RELOAD=
-		write_config_var LISTS_RELOAD
-	}
+	case "$MODE" in
+		tpws|custom)
+			LISTS_RELOAD=
+			write_config_var LISTS_RELOAD
+			;;
+	esac
 }
 macos_fw_reload_trigger_set()
 {
-	[ "$MODE" = "tpws" ] && {
-		LISTS_RELOAD="$INIT_SCRIPT_SRC reload-fw-tables"
-		write_config_var LISTS_RELOAD
-	}
+	case "$MODE" in
+		tpws|custom)
+			LISTS_RELOAD="$INIT_SCRIPT_SRC reload-fw-tables"
+			write_config_var LISTS_RELOAD
+			;;
+	esac
 }
 
 install_macos()

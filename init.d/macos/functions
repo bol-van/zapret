@@ -20,6 +20,14 @@ PF_ANCHOR_ZAPRET_V6="$PF_ANCHOR_DIR/zapret-v6"
 
 [ -n "$IFACE_WAN" ] && OWAN=" on $IFACE_WAN"
 
+CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/macos/custom"
+[ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
+
+existf()
+{
+	type "$1" >/dev/null 2>/dev/null
+}
+
 on_off_function()
 {
 	# $1 : function name on
@@ -220,46 +228,72 @@ pf_anchor_port_target()
 		echo "80"
 	fi
 }
+pf_anchor_zapret_v4_tpws()
+{
+	# $1 - port
+
+	local port=$(pf_anchor_port_target)
+	[ -n "$IFACE_LAN" ] && {
+		for t in $tbl; do
+			 echo "rdr on $IFACE_LAN inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
+		done
+	}
+	echo "rdr on lo0 inet proto tcp from !127.0.0.0/8 to any port $port -> 127.0.0.1 port $1"
+	for t in $tbl; do
+		echo "pass out$OWAN route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
+	done
+}
+
 pf_anchor_zapret_v4()
 {
 	local tbl port
-
 	[ "$DISABLE_IPV4" = "1" ] || {
-		[ "$MODE" = "tpws" ] && {
-			[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-			pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-			port=$(pf_anchor_port_target)
-			for t in $tbl; do
-				[ -n "$IFACE_LAN" ] && echo "rdr on $IFACE_LAN inet proto tcp from any to $t port $port -> 127.0.0.1 port $TPPORT"
-			done
-			echo "rdr on lo0 inet proto tcp from !127.0.0.0/8 to any port $port -> 127.0.0.1 port $TPPORT"
-			for t in $tbl; do
-				echo "pass out$OWAN route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
-			done
-		}
+		case $MODE in
+			tpws)
+				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
+				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+				pf_anchor_zapret_v4_tpws $TPPORT
+				;;
+			custom)
+				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+				existf zapret_custom_firewall_v4 && zapret_custom_firewall_v4
+				;;
+		esac
 	}
+}
+pf_anchor_zapret_v6_tpws()
+{
+	# $1 - port
+
+	local port=$(pf_anchor_port_target)
+	# LAN link local is only for router
+	[ -n "$IFACE_LAN" ] && LL_LAN=$(get_ipv6_linklocal $IFACE_LAN)
+	[ -n "$LL_LAN" ] && {
+		for t in $tbl; do
+			echo "rdr on $IFACE_LAN inet6 proto tcp from any to $t port $port -> $LL_LAN port $1"
+		done
+	}
+	echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $1"
+	for t in $tbl; do
+		echo "pass out$OWAN route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
+	done
 }
 pf_anchor_zapret_v6()
 {
 	local tbl port LL_LAN
 
 	[ "$DISABLE_IPV6" = "1" ] || {
-		[ "$MODE" = "tpws" ] && {
-			[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-
-			# LAN link local is only for router
-			[ -n "$IFACE_LAN" ] && LL_LAN=$(get_ipv6_linklocal $IFACE_LAN)
-
-			pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-			port=$(pf_anchor_port_target)
-			for t in $tbl; do
-				[ -n "$LL_LAN" ] && echo "rdr on $IFACE_LAN inet6 proto tcp from any to $t port $port -> $LL_LAN port $TPPORT"
-			done
-			echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $TPPORT"
-			for t in $tbl; do
-				echo "pass out$OWAN route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
-			done
-		}
+		case $MODE in
+			tpws)
+				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
+				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
+				pf_anchor_zapret_v6_tpws $TPPORT
+				;;
+			custom)
+				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
+				existf zapret_custom_firewall_v6 && zapret_custom_firewall_v6
+				;;
+		esac
 	}
 }
 pf_anchors_create()
@@ -330,7 +364,7 @@ zapret_do_firewall()
 	# $1 - 1 - add, 0 - del
 
 	case "${MODE}" in
-		tpws|filter)
+		tpws|filter|custom)
 			if [ "$1" = "1" ] ; then
 				pf_anchor_root || return 1
 				pf_anchors_create
@@ -383,6 +417,9 @@ zapret_do_daemons()
 			do_daemon $1 1 "$TPWS" "$opt"
 			;;
 		filter)
+			;;
+		custom)
+			existf zapret_custom_daemons && zapret_custom_daemons $1
 			;;
 		*)
 			echo "unsupported MODE=$MODE"
