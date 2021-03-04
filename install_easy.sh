@@ -1169,8 +1169,13 @@ service_start_macos()
 {
 	echo \* starting zapret service
 
-	ln -fs /opt/zapret/init.d/macos/zapret.plist /Library/LaunchDaemons
 	"$INIT_SCRIPT_SRC" start
+}
+service_stop_macos()
+{
+	echo \* stopping zapret service
+
+	"$INIT_SCRIPT_SRC" stop
 }
 macos_fw_reload_trigger_clear()
 {
@@ -1199,6 +1204,7 @@ install_macos()
 	check_bins
 	require_root
 	check_location copy_all
+	service_stop_macos
 	install_binaries
 	check_dns
 	select_ipv6
