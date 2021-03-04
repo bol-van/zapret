@@ -1176,13 +1176,17 @@ service_start_macos()
 }
 macos_fw_reload_trigger_clear()
 {
-	LISTS_RELOAD=
-	write_config_var LISTS_RELOAD
+	[ "$MODE" = "tpws" ] && {
+		LISTS_RELOAD=
+		write_config_var LISTS_RELOAD
+	}
 }
 macos_fw_reload_trigger_set()
 {
-	LISTS_RELOAD="$INIT_SCRIPT_SRC reload-fw-tables"
-	write_config_var LISTS_RELOAD
+	[ "$MODE" = "tpws" ] && {
+		LISTS_RELOAD="$INIT_SCRIPT_SRC reload-fw-tables"
+		write_config_var LISTS_RELOAD
+	}
 }
 
 install_macos()
