@@ -175,14 +175,13 @@ pf_anchor_zapret()
 			echo "table <nozapret> persist"
 		fi
 	}
-	[ "$DISABLE_IPV4" = "1" ] || {
+	[ "$DISABLE_IPV6" = "1" ] || {
 		if [ -f "$ZIPLIST_EXCLUDE6" ]; then
 			echo "table <nozapret6> persist file \"$ZIPLIST_EXCLUDE6\""
 		else
 			echo "table <nozapret6> persist"
 		fi
 	}
-	echo
 	[ "$DISABLE_IPV4" = "1" ] || echo "rdr-anchor \"/zapret-v4\" inet to !<nozapret>"
 	[ "$DISABLE_IPV6" = "1" ] || echo "rdr-anchor \"/zapret-v6\" inet6 to !<nozapret6>"
 	[ "$DISABLE_IPV4" = "1" ] || echo "anchor \"/zapret-v4\" inet to !<nozapret>"
@@ -226,16 +225,18 @@ pf_anchor_zapret_v4()
 	local tbl port
 
 	[ "$DISABLE_IPV4" = "1" ] || {
-		[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-		pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-		port=$(pf_anchor_port_target)
-		for t in $tbl; do
-			[ -n "$IFACE_LAN" ] && echo "rdr on $IFACE_LAN inet proto tcp from any to $t port $port -> 127.0.0.1 port $TPPORT"
-		done
-		echo "rdr on lo0 inet proto tcp from !127.0.0.0/8 to any port $port -> 127.0.0.1 port $TPPORT"
-		for t in $tbl; do
-			echo "pass out$OWAN route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
-		done
+		[ "$MODE" = "tpws" ] && {
+			[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
+			pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+			port=$(pf_anchor_port_target)
+			for t in $tbl; do
+				[ -n "$IFACE_LAN" ] && echo "rdr on $IFACE_LAN inet proto tcp from any to $t port $port -> 127.0.0.1 port $TPPORT"
+			done
+			echo "rdr on lo0 inet proto tcp from !127.0.0.0/8 to any port $port -> 127.0.0.1 port $TPPORT"
+			for t in $tbl; do
+				echo "pass out$OWAN route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
+			done
+		}
 	}
 }
 pf_anchor_zapret_v6()
@@ -243,20 +244,22 @@ pf_anchor_zapret_v6()
 	local tbl port LL_LAN
 
 	[ "$DISABLE_IPV6" = "1" ] || {
-		[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
+		[ "$MODE" = "tpws" ] && {
+			[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
 
-		# LAN link local is only for router
-		[ -n "$IFACE_LAN" ] && LL_LAN=$(get_ipv6_linklocal $IFACE_LAN)
+			# LAN link local is only for router
+			[ -n "$IFACE_LAN" ] && LL_LAN=$(get_ipv6_linklocal $IFACE_LAN)
 
-		pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-		port=$(pf_anchor_port_target)
-		for t in $tbl; do
-			[ -n "$LL_LAN" ] && echo "rdr on $IFACE_LAN inet6 proto tcp from any to $t port $port -> $LL_LAN port $TPPORT"
-		done
-		echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $TPPORT"
-		for t in $tbl; do
-			echo "pass out$OWAN route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
-		done
+			pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
+			port=$(pf_anchor_port_target)
+			for t in $tbl; do
+				[ -n "$LL_LAN" ] && echo "rdr on $IFACE_LAN inet6 proto tcp from any to $t port $port -> $LL_LAN port $TPPORT"
+			done
+			echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $TPPORT"
+			for t in $tbl; do
+				echo "pass out$OWAN route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
+			done
+		}
 	}
 }
 pf_anchors_create()
@@ -319,12 +322,15 @@ pf_table_reload()
 	[ "$DISABLE_IPV6" = "1" ] || pfctl -qTl -a zapret-v6 -f "$PF_ANCHOR_ZAPRET_V6"
 	pfctl -qTl -a zapret -f "$PF_ANCHOR_ZAPRET"
 }
+
+
+
 zapret_do_firewall()
 {
 	# $1 - 1 - add, 0 - del
 
 	case "${MODE}" in
-		tpws)
+		tpws|filter)
 			if [ "$1" = "1" ] ; then
 				pf_anchor_root || return 1
 				pf_anchors_create
@@ -333,8 +339,6 @@ zapret_do_firewall()
 			else
 				pf_anchors_clear
 			fi
-			;;
-		filter)
 			;;
 		*)
 			echo "unsupported MODE=$MODE"
