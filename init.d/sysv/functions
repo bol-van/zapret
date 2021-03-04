@@ -1,0 +1,532 @@
+# init script functions library for desktop linux systems
+
+[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
+# SHOULD EDIT config
+. "$ZAPRET_BASE/config"
+
+PIDDIR=/var/run
+
+IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
+
+WS_USER=tpws
+
+QNUM=200
+NFQWS="$ZAPRET_BASE/nfq/nfqws"
+NFQWS_OPT_BASE="--qnum=$QNUM --user=$WS_USER"
+
+TPPORT=988
+TPWS="$ZAPRET_BASE/tpws/tpws"
+TPWS_LOCALHOST4=127.0.0.127
+HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
+[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"
+[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts-user.txt"
+
+TPWS_OPT_BASE="--user=$WS_USER --port=$TPPORT"
+TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
+TPWS_OPT_BASE6="--bind-addr=::1"
+# first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
+TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer --bind-wait-ifup=30 --bind-wait-ip=30 --bind-wait-ip-linklocal=3"
+
+[ -n "$IFACE_WAN" ] && IPT_OWAN="-o $IFACE_WAN"
+[ -n "$IFACE_WAN" ] && IPT_IWAN="-i $IFACE_WAN"
+[ -n "$IFACE_LAN" ] && IPT_ILAN="-i $IFACE_LAN"
+
+[ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
+
+# max wait time for the link local ipv6 on the LAN interface
+LINKLOCAL_WAIT_SEC=5
+
+CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/sysv/custom"
+[ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
+
+IPSET_EXCLUDE="-m set ! --match-set nozapret"
+IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
+
+exists()
+{
+	which "$1" >/dev/null 2>/dev/null
+}
+existf()
+{
+	type "$1" >/dev/null 2>/dev/null
+}
+
+on_off_function()
+{
+	# $1 : function name on
+	# $2 : function name off
+	# $3 : 0 - off, 1 - on
+	local F="$1"
+	[ "$3" = "1" ] || F="$2"
+	shift
+	shift
+	shift
+	"$F" "$@"
+}
+
+
+ipt()
+{
+	iptables -C "$@" 2>/dev/null || iptables -I "$@"
+}
+ipt_del()
+{
+	iptables -C "$@" 2>/dev/null && iptables -D "$@"
+}
+ipt_add_del()
+{
+	on_off_function ipt ipt_del "$@"
+}
+ipt6()
+{
+	ip6tables -C "$@" 2>/dev/null || ip6tables -I "$@"
+}
+ipt6_del()
+{
+	ip6tables -C "$@" 2>/dev/null && ip6tables -D "$@"
+}
+ipt6_add_del()
+{
+	on_off_function ipt6 ipt6_del "$@"
+}
+
+# there's no route_localnet for ipv6
+# the best we can is to route to link local of the incoming interface
+# OUTPUT - can DNAT to ::1
+# PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr
+# not a good idea to expose tpws to the world (bind to ::)
+
+get_ipv6_linklocal()
+{
+	# $1 - interface name. if empty - any interface
+	local dev
+	[ -n "$1" ] && dev="dev $1"
+	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope link.*$/\1/;t;d' | head -n 1
+}
+get_ipv6_global()
+{
+	# $1 - interface name. if empty - any interface
+	local dev
+	[ -n "$1" ] && dev="dev $1"
+	ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope global.*$/\1/;t;d' | head -n 1
+}
+
+iface_is_up()
+{	
+	# $1 - interface name
+	[ -f /sys/class/net/$1/operstate ] || return
+	local state
+	read state </sys/class/net/$1/operstate
+	[ "$state" != "down" ]
+}
+wait_ifup()
+{
+	# $1 - interface name
+	local ct=0
+	while
+		iface_is_up $1 && return
+		[ "$ct" -ge "$IFUP_WAIT_SEC" ] && break
+		echo waiting for ifup of $1 for another $(($IFUP_WAIT_SEC - $ct)) seconds ...
+		ct=$(($ct+1))
+		sleep 1
+	do :; done
+	false
+}
+
+
+dnat6_target()
+{
+	# get target ip address for DNAT. prefer link locals
+	# tpws should be as inaccessible from outside as possible
+	# link local address can appear not immediately after ifup
+	
+	# DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
+	[ -n "$DNAT6_TARGET" ] || {
+		local ct=0
+		while
+			DNAT6_TARGET=$(get_ipv6_linklocal $IFACE_LAN)
+			[ -n "$DNAT6_TARGET" ] && break
+			[ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
+			echo waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
+			ct=$(($ct+1))
+			sleep 1
+		do :; done
+
+		[ -n "$DNAT6_TARGET" ] || {
+		    	echo no link local. getting global
+			DNAT6_TARGET=$(get_ipv6_global $IFACE_LAN)
+			[ -n "$DNAT6_TARGET" ] || {
+				echo could not get any address
+				DNAT6_TARGET=-
+			}
+		}
+	}
+}
+
+prepare_tpws_fw4()
+{
+	# otherwise linux kernel will treat 127.0.0.0/8 as "martian" ip and refuse routing to it
+	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.0/8
+	[ -n "$IFACE_LAN" ] && {
+		iptables -C INPUT -i $IFACE_LAN -j input_lan_rule_zapret 2>/dev/null || {
+			# allow localnet route only to special tpws IP
+			iptables -N input_lan_rule_zapret 2>/dev/null
+			iptables -F input_lan_rule_zapret
+			iptables -A input_lan_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
+			iptables -A input_lan_rule_zapret -d 127.0.0.0/8 -j DROP
+			iptables -I INPUT -i $IFACE_LAN -j input_lan_rule_zapret
+		}
+		sysctl -qw net.ipv4.conf.$IFACE_LAN.route_localnet=1
+	}
+}
+unprepare_tpws_fw4()
+{
+	[ -n "$IFACE_LAN" ] && {
+		iptables -C INPUT -i $IFACE_LAN -j input_lan_rule_zapret 2>/dev/null && {
+			sysctl -qw net.ipv4.conf.$IFACE_LAN.route_localnet=0
+			iptables -D INPUT -i $IFACE_LAN -j input_lan_rule_zapret
+			iptables -F input_lan_rule_zapret
+			iptables -X input_lan_rule_zapret
+		}
+	}
+}
+unprepare_tpws_fw()
+{
+	unprepare_tpws_fw4
+}
+
+
+print_op()
+{
+	if [ "$1" = "1" ]; then
+		echo "Adding ip$4tables rule for $3 : $2"
+	else
+		echo "Deleting ip$4tables rule for $3 : $2"
+	fi
+}
+
+fw_tpws4()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - tpws port
+	[ "$DISABLE_IPV4" = "1" ] || {
+		[ "$1" = 1 ] && prepare_tpws_fw4
+		print_op $1 "$2" "tpws"
+		[ -n "$IFACE_LAN" ] && {
+			ipt_add_del $1 PREROUTING -t nat $IPT_ILAN -p tcp $2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3
+	 	}
+		ipt_add_del $1 OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $WS_USER -p tcp $2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3
+	}
+}
+fw_tpws6()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv6
+	# $3 - tpws port
+	[ "$DISABLE_IPV6" = "1" ] || {
+		print_op $1 "$2" "tpws" 6
+		[ -n "$IFACE_LAN" ] && {
+			dnat6_target
+			[ "$DNAT6_TARGET" != "-" ] && ipt6_add_del $1 PREROUTING -t nat $IPT_ILAN -p tcp $2 $IPSET_EXCLUDE6 dst -j DNAT --to [$DNAT6_TARGET]:$3
+	 	}
+		ipt6_add_del $1 OUTPUT -t nat $IPT_OWAN -m owner ! --uid-owner $WS_USER -p tcp $2 $IPSET_EXCLUDE6 dst -j DNAT --to [::1]:$3
+	}
+}
+fw_tpws()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - iptable filter for ipv6
+	# $4 - tpws port
+	fw_tpws4 $1 "$2" $4
+	fw_tpws6 $1 "$3" $4
+}
+
+
+fw_nfqws_pre4()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - queue number
+	[ "$DISABLE_IPV4" = "1" ] || {
+		print_op $1 "$2" "nfqws prerouting"
+		ipt_add_del $1 PREROUTING -t mangle $IPT_IWAN -p tcp $2 $IPSET_EXCLUDE src -j NFQUEUE --queue-num $3 --queue-bypass
+	}
+}
+fw_nfqws_pre6()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv6
+	# $3 - queue number
+	[ "$DISABLE_IPV6" = "1" ] || {
+		print_op $1 "$2" "nfqws prerouting" 6
+		ipt6_add_del $1 PREROUTING -t mangle $IPT_IWAN -p tcp $2 $IPSET_EXCLUDE6 src -j NFQUEUE --queue-num $3 --queue-bypass
+	}
+}
+fw_nfqws_pre()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - iptable filter for ipv6
+	# $4 - queue number
+	fw_nfqws_pre4 $1 "$2" $4
+	fw_nfqws_pre6 $1 "$3" $4
+}
+fw_nfqws_post4()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - queue number
+	[ "$DISABLE_IPV4" = "1" ] || {
+		print_op $1 "$2" "nfqws postrouting"
+		ipt_add_del $1 POSTROUTING -t mangle $IPT_OWAN -p tcp $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass
+	}
+}
+fw_nfqws_post6()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv6
+	# $3 - queue number
+	[ "$DISABLE_IPV6" = "1" ] || {
+		print_op $1 "$2" "nfqws postrouting" 6
+		ipt6_add_del $1 POSTROUTING -t mangle $IPT_OWAN -p tcp $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass
+	}
+}
+fw_nfqws_post()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - iptable filter for ipv6
+	# $4 - queue number
+	fw_nfqws_post4 $1 "$2" $4
+	fw_nfqws_post6 $1 "$3" $4
+}
+
+
+run_daemon()
+{
+	# $1 - daemon number : 1,2,3,...
+	# $2 - daemon
+	# $3 - daemon args
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+
+	local DAEMONBASE=$(basename $2)
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	echo "Starting daemon $1: $2 $3"
+	if exists start-stop-daemon ; then
+		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3
+	else
+		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
+			echo already running
+		else
+			"$2" $3 >/dev/null 2>/dev/null &
+			PID=$!
+			if [ -n "$PID" ]; then
+				echo $PID >$PIDFILE
+			else
+				echo could not start daemon $1 : $2 $3
+				false
+			fi
+		fi
+	fi
+}
+stop_daemon()
+{
+	# $1 - daemon number : 1,2,3,...
+	# $2 - daemon
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE=$(basename $2)
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	echo "Stopping daemon $1: $2"
+	if exists start-stop-daemon ; then
+		start-stop-daemon --stop --pidfile "$PIDFILE" --exec "$2"
+	else
+		if [ -f "$PIDFILE" ]; then
+			read PID <"$PIDFILE"
+			kill $PID
+			rm -f "$PIDFILE"
+		else
+			echo no pidfile : $PIDFILE
+		fi
+	fi
+}
+do_daemon()
+{
+	# $1 - 1 - run, 0 - stop
+	on_off_function run_daemon stop_daemon "$@"
+}
+
+
+prepare_user()
+{
+	# $WS_USER is required to prevent redirection of the traffic originating from TPWS itself
+	# otherwise infinite loop will occur
+	# also its good idea not to run tpws as root
+	id -u $WS_USER >/dev/null 2>/dev/null || useradd --no-create-home --system --shell /bin/false $WS_USER
+}
+do_tpws()
+{
+	# $1 : 1 - run, 0 - stop
+	# $2 : daemon number
+	# $3 : daemon args
+
+	[ "$1" = "1" ] && prepare_user
+
+	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
+
+	local OPT="$TPWS_OPT_BASE"
+
+	[ "$DISABLE_IPV4" = "1" ] || OPT="$OPT $TPWS_OPT_BASE4"
+	[ "$DISABLE_IPV6" = "1" ] || {
+		OPT="$OPT $TPWS_OPT_BASE6"
+		[ -n "$IFACE_LAN" ] && OPT="$OPT --bind-iface6=$IFACE_LAN $TPWS_OPT_BASE6_PRE"
+	}
+
+	do_daemon $1 $2 $TPWS "$OPT $3"
+}
+do_nfqws()
+{
+	# $1 : 1 - run, 0 - stop
+	# $2 : daemon number
+	# $3 : daemon args
+
+	[ "$1" = "1" ] && prepare_user
+	do_daemon $1 $2 $NFQWS "$NFQWS_OPT_BASE $3"
+}
+
+
+filter_apply_port_target()
+{
+	# $1 - var name of iptables filter
+	local f
+	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
+		f="-m multiport --dports 80,443"
+	elif [ "$MODE_HTTPS" = "1" ]; then
+		f="--dport 443"
+	elif [ "$MODE_HTTP" = "1" ]; then
+		f="--dport 80"
+	else
+		echo WARNING !!! HTTP and HTTPS are both disabled
+	fi
+	eval $1="\"\$$1 $f\""
+}
+filter_apply_ipset_target()
+{
+	# $1 - var name of ipv4 iptables filter
+	# $2 - var name of ipv6 iptables filter
+	if [ "$MODE_FILTER" = "ipset" ]; then
+		eval $1="\"\$$1 -m set --match-set zapret dst\""
+		eval $2="\"\$$2 -m set --match-set zapret6 dst\""
+	fi
+}
+filter_apply_hostlist_target()
+{
+	# $1 - var name of tpws or nfqws params
+	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
+}
+
+
+create_ipset()
+{
+	echo "Creating ipset"
+	"$IPSET_CR" "$@"
+}
+
+
+
+zapret_do_firewall()
+{
+	# $1 - 1 - add, 0 - del
+
+	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4"
+	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
+	local f4 f6
+
+	# always create ipsets. ip_exclude ipset is required
+	[ "$1" != "1" ] || create_ipset no-update
+
+	case "${MODE}" in
+		tpws)
+			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
+				echo both http and https are disabled. not applying redirection.
+			else
+				filter_apply_port_target f4
+				f6=$f4
+				filter_apply_ipset_target f4 f6
+				fw_tpws $1 "$f4" "$f6" $TPPORT
+			fi
+			;;
+	
+		nfqws)
+			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
+				echo both http and https are disabled. not applying redirection.
+			else
+				if [ "$MODE_HTTP_KEEPALIVE" = "1" ]; then
+					if [ "$MODE_HTTP" = "1" ]; then
+						f4="--dport 80"
+						f6=$f4
+						filter_apply_ipset_target f4 f6
+						fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+					fi
+					if [ "$MODE_HTTPS" = "1" ]; then
+						f4="--dport 443 $first_packet_only"
+						f6=$f4
+						filter_apply_ipset_target f4 f6
+						fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+					fi
+				else
+					filter_apply_port_target f4
+					f4="$f4 $first_packet_only"
+					f6=$f4
+					filter_apply_ipset_target f4 f6
+					fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+				fi
+			fi
+			;;
+		custom)
+	    		existf zapret_custom_firewall && zapret_custom_firewall $1
+			;;
+	esac
+	[ "$1" = 0 ] && unprepare_tpws_fw
+}
+zapret_apply_firewall()
+{
+	zapret_do_firewall 1 "$@"
+}
+zapret_unapply_firewall()
+{
+	zapret_do_firewall 0 "$@"
+}
+
+zapret_do_daemons()
+{
+	# $1 - 1 - run, 0 - stop
+
+	local opt
+
+	case "${MODE}" in
+		tpws)
+			opt="$TPWS_OPT"
+			filter_apply_hostlist_target opt
+			do_tpws $1 1 "$opt"
+			;;
+		nfqws)
+			opt="$NFQWS_OPT_DESYNC"
+			filter_apply_hostlist_target opt
+			do_nfqws $1 1 "$opt"
+			;;
+		custom)
+	    		existf zapret_custom_daemons && zapret_custom_daemons $1
+			;;
+	esac
+}
+
+zapret_run_daemons()
+{
+	zapret_do_daemons 1 "$@"
+}
+zapret_stop_daemons()
+{
+	zapret_do_daemons 0 "$@"
+}

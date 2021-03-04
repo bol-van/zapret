@@ -1,0 +1,11 @@
+SCRIPT=$(readlink /etc/init.d/zapret)
+if [ -n "$SCRIPT" ]; then
+ EXEDIR=$(dirname "$SCRIPT")
+ ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
+else
+ ZAPRET_BASE=/opt/zapret
+fi
+
+. "$ZAPRET_BASE/init.d/openwrt/functions"
+
+zapret_apply_firewall
