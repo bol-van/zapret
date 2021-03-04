@@ -1205,13 +1205,13 @@ install_macos()
 	require_root
 	check_location copy_all
 	service_stop_macos
+	remove_pf_zapret_hooks
 	install_binaries
 	check_dns
 	select_ipv6
 	ask_config_desktop
 	ask_config
 	service_install_macos
-	remove_pf_zapret_hooks
 	macos_fw_reload_trigger_clear
 	# gzip lists are incompatible with PF
 	GZIP_LISTS=0 write_config_var GZIP_LISTS
