@@ -22,9 +22,10 @@ GZIP_LISTS=1
 #LISTS_RELOAD="pfctl -f /etc/pf.conf"
 
 # CHOOSE OPERATION MODE
-# MODE : nfqws,tpws,filter,custom
-# nfqws : use nfqws
-# tpws : use tpws
+# MODE : nfqws,tpws,tpws-socks,filter,custom
+# nfqws : nfqws for dpi desync
+# tpws : tpws transparent mode
+# tpws-socks : tpws socks mode
 # filter : no daemon, just create ipset or download hostlist
 # custom : custom mode. should modify custom init script and add your own code
 MODE=tpws
