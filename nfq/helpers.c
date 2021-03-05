@@ -68,22 +68,44 @@ bool load_file_nonempty(const char *filename,void *buffer,size_t *buffer_size)
 
 
 
-void print_sockaddr(const struct sockaddr *sa)
+void ntop46(const struct sockaddr *sa, char *str, size_t len)
 {
-	char str[64];
+	if (!len) return;
+	*str=0;
 	switch (sa->sa_family)
 	{
 	case AF_INET:
-		if (inet_ntop(sa->sa_family, &((struct sockaddr_in*)sa)->sin_addr, str, sizeof(str)))
-			printf("%s:%d", str, ntohs(((struct sockaddr_in*)sa)->sin_port));
+		inet_ntop(sa->sa_family, &((struct sockaddr_in*)sa)->sin_addr, str, len);
 		break;
 	case AF_INET6:
-		if (inet_ntop(sa->sa_family, &((struct sockaddr_in6*)sa)->sin6_addr, str, sizeof(str)))
-			printf("[%s]:%d", str, ntohs(((struct sockaddr_in6*)sa)->sin6_port));
+		inet_ntop(sa->sa_family, &((struct sockaddr_in6*)sa)->sin6_addr, str, len);
 		break;
 	default:
-		printf("UNKNOWN_FAMILY_%d", sa->sa_family);
+		snprintf(str,len,"UNKNOWN_FAMILY_%d",sa->sa_family);
 	}
+}
+void ntop46_port(const struct sockaddr *sa, char *str, size_t len)
+{
+	char ip[40];
+	ntop46(sa,ip,sizeof(ip));
+	switch (sa->sa_family)
+	{
+	case AF_INET:
+		snprintf(str,len,"%s:%u",ip,ntohs(((struct sockaddr_in*)sa)->sin_port));
+		break;
+	case AF_INET6:
+		snprintf(str,len,"[%s]:%u",ip,ntohs(((struct sockaddr_in6*)sa)->sin6_port));
+		break;
+	default:
+		snprintf(str,len,"%s",ip);
+	}
+}
+void print_sockaddr(const struct sockaddr *sa)
+{
+	char ip_port[48];
+
+	ntop46_port(sa,ip_port,sizeof(ip_port));
+	printf("%s",ip_port);
 }
 
 void dbgprint_socket_buffers(int fd)

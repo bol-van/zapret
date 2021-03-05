@@ -14,5 +14,8 @@ bool load_file(const char *filename,void *buffer,size_t *buffer_size);
 bool load_file_nonempty(const char *filename,void *buffer,size_t *buffer_size);
 
 void print_sockaddr(const struct sockaddr *sa);
+void ntop46(const struct sockaddr *sa, char *str, size_t len);
+void ntop46_port(const struct sockaddr *sa, char *str, size_t len);
+
 void dbgprint_socket_buffers(int fd);
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);
