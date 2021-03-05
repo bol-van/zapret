@@ -442,6 +442,7 @@ zapret_do_daemons()
 			opt="--socks --user=$TPWS_USER --port=$TPPORT"
 			tpws_apply_socks_binds opt
 			filter_apply_hostlist_target opt
+			opt="$opt $TPWS_OPT"
 			do_daemon $1 1 "$TPWS" "$opt"
 			;;
 		filter)
