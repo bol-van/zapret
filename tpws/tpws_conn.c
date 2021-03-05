@@ -272,13 +272,13 @@ bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
 	DBGPRINT("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d",fd,rcvbuf,sndbuf)
 	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_RCVBUF): ");
+		perror("setsockopt (SO_RCVBUF)");
 		close(fd);
 		return false;
 	}
 	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_SNDBUF): ");
+		perror("setsockopt (SO_SNDBUF)");
 		close(fd);
 		return false;
 	}
@@ -296,20 +296,20 @@ static int connect_remote(const struct sockaddr *remote_addr)
 	
  	if((remote_fd = socket(remote_addr->sa_family, SOCK_STREAM, 0)) < 0)
  	{
-		perror("socket (connect_remote): ");
+		perror("socket (connect_remote)");
 		return -1;
 	}
 	// Use NONBLOCK to avoid slow connects affecting the performance of other connections
 	// separate fcntl call to comply with macos
 	if (fcntl(remote_fd, F_SETFL, O_NONBLOCK)<0)
 	{
-		perror("socket set O_NONBLOCK (connect_remote): ");
+		perror("socket set O_NONBLOCK (connect_remote)");
 		close(remote_fd);
 		return -1;
 	}
 	if(setsockopt(remote_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
 	{
-		perror("setsockopt (SO_REUSEADDR, connect_remote): ");
+		perror("setsockopt (SO_REUSEADDR, connect_remote)");
 		close(remote_fd);
 		return -1;
 	}
@@ -317,13 +317,13 @@ static int connect_remote(const struct sockaddr *remote_addr)
 		return -1;
 	if(!set_keepalive(remote_fd))
 	{
-		perror("set_keepalive: ");
+		perror("set_keepalive");
 		close(remote_fd);
 		return -1;
 	}
 	if (setsockopt(remote_fd, IPPROTO_TCP, TCP_NODELAY, params.skip_nodelay ? &no : &yes, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_NODELAY, connect_remote): ");
+		perror("setsockopt (SO_NODELAY, connect_remote)");
 		close(remote_fd);
 		return -1;
 	}
@@ -331,7 +331,7 @@ static int connect_remote(const struct sockaddr *remote_addr)
 	{
 		if(errno != EINPROGRESS)
 		{
-			perror("connect (connect_remote): ");
+			perror("connect (connect_remote)");
 			close(remote_fd);
 			return -1;
 		}
@@ -466,7 +466,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 
 	if(!set_keepalive(local_fd))
 	{
-		perror("set_keepalive: ");
+		perror("set_keepalive");
 		close(local_fd);
 		return 0;
 	}
@@ -1177,7 +1177,7 @@ int event_loop(int *listen_fd, size_t listen_fd_ct)
 				tmp_fd = accept(conn->fd, (struct sockaddr*)&accept_sa, &accept_salen);
 				if (tmp_fd < 0)
 				{
-					perror("Failed to accept connection : ");
+					perror("Failed to accept connection");
 				}
 				else if (legs_local >= params.maxconn) // each connection has 2 legs - local and remote
 				{
@@ -1187,7 +1187,7 @@ int event_loop(int *listen_fd, size_t listen_fd_ct)
 				// separate fcntl call to comply with macos
 				else if (fcntl(tmp_fd, F_SETFL, O_NONBLOCK) < 0)
 				{
-					perror("socket set O_NONBLOCK (accept): ");
+					perror("socket set O_NONBLOCK (accept)");
 					close(tmp_fd);
 				}
 				else if (!(conn=add_tcp_connection(efd, &conn_list, tmp_fd, (struct sockaddr*)&accept_sa, params.port, params.proxy_type)))

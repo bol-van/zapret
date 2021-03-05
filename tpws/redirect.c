@@ -46,7 +46,7 @@ static bool redir_open_private(const char *fname, int flags)
 	redirector_fd = open(fname, flags);
 	if (redirector_fd < 0)
 	{
-		perror("redir_openv_private: ");
+		perror("redir_openv_private");
 		return false;
 	}
 	DBGPRINT("opened redirector %s",fname);
@@ -179,7 +179,7 @@ bool get_dest_addr(int sockfd, const struct sockaddr *accept_sa, struct sockaddr
 		r=getsockname(sockfd, (struct sockaddr*) orig_dst, &addrlen);
 		if (r<0)
 		{
-			perror("getsockname: ");
+			perror("getsockname");
 			return false;
 		}
 		if (orig_dst->ss_family==AF_INET6)

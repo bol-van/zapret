@@ -35,6 +35,7 @@
 #include "params.h"
 #include "sec.h"
 #include "redirect.h"
+#include "helpers.h"
 
 struct params_s params;
 
@@ -496,10 +497,6 @@ void parse_params(int argc, char *argv[])
 }
 
 
-static bool is_linklocal(const struct sockaddr_in6* a)
-{
-	return a->sin6_addr.s6_addr[0]==0xFE && (a->sin6_addr.s6_addr[1] & 0xC0)==0x80;
-}
 static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bindiface, bool bind_if6, bool bindll, int *if_index)
 {
 	struct ifaddrs *addrs,*a;
@@ -508,8 +505,10 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 	if (getifaddrs(&addrs)<0)
 		return false;
 
-	int maxpass = (bind_if6 && !bindll) ? 2 : 1;
-	for(int pass=0;pass<maxpass;pass++)
+	// for ipv6 preference order
+	// bind-linklocal-1 : link-local,private,global
+	// bind-linklocal=0 : private,global,link-local
+	for(int pass=0;pass<3;pass++)
 	{
 		a  = addrs;
 		while (a)
@@ -531,7 +530,7 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 				          *bindiface && bind_if6 && !strcmp(a->ifa_name, bindiface))
 				          &&
 					 (bindll && is_linklocal((struct sockaddr_in6*)a->ifa_addr) ||
-					  !bindll && (pass || !is_linklocal((struct sockaddr_in6*)a->ifa_addr)))
+					  !bindll && (pass==2 || pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr)))
 					)
 				{
 					salisten->ss_family = AF_INET6;
@@ -639,11 +638,13 @@ struct salisten_s
 	struct sockaddr_storage salisten;
 	socklen_t salisten_len;
 	int ipv6_only;
+	int bind_wait_ip_left; // how much seconds left from bind_wait_ip
 };
 int main(int argc, char *argv[])
 {
 	int i, listen_fd[MAX_BINDS], yes = 1, retval = 0, if_index, exit_v=EXIT_FAILURE;
 	struct salisten_s list[MAX_BINDS];
+	char ip_port[48];
 
 	srand(time(NULL));
 	parse_params(argc, argv);
@@ -692,6 +693,7 @@ int main(int argc, char *argv[])
 				goto exiterr;
 			}
 		}
+		list[i].bind_wait_ip_left = params.binds[i].bind_wait_ip;
 		if (*params.binds[i].bindaddr)
 		{
 			if (inet_pton(AF_INET, params.binds[i].bindaddr, &((struct sockaddr_in*)(&list[i].salisten))->sin_addr))
@@ -747,6 +749,7 @@ int main(int argc, char *argv[])
 					printf("suitable ip address not found\n");
 					goto exiterr;
 				}
+				list[i].bind_wait_ip_left = params.binds[i].bind_wait_ip - sec;
 				list[i].ipv6_only=1;
 			}
 			else
@@ -771,7 +774,7 @@ int main(int argc, char *argv[])
 
 	if (params.bind_wait_only)
 	{
-		printf("bind wait condition satisfied. exiting.\n");
+		printf("bind wait condition satisfied\n");
 		exit_v = 0;
 		goto exiterr;
 	}
@@ -784,24 +787,28 @@ int main(int argc, char *argv[])
 	
 	for(i=0;i<=params.binds_last;i++)
 	{
-		VPRINT("Binding %d",i);
+		if (params.debug)
+		{
+			ntop46_port((struct sockaddr *)&list[i].salisten, ip_port, sizeof(ip_port));
+			VPRINT("Binding %d to %s",i,ip_port);
+		}
 
 		if ((listen_fd[i] = socket(list[i].salisten.ss_family, SOCK_STREAM, 0)) == -1) {
-			perror("socket: ");
+			perror("socket");
 			goto exiterr;
 		}
 #ifndef __OpenBSD__
 // in OpenBSD always IPV6_ONLY for wildcard sockets
 		if ((list[i].salisten.ss_family == AF_INET6) && setsockopt(listen_fd[i], IPPROTO_IPV6, IPV6_V6ONLY, &list[i].ipv6_only, sizeof(int)) == -1)
 		{
-			perror("setsockopt (IPV6_ONLY): ");
+			perror("setsockopt (IPV6_ONLY)");
 			goto exiterr;
 		}
 #endif
 
 		if (setsockopt(listen_fd[i], SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
 		{
-			perror("setsockopt (SO_REUSEADDR): ");
+			perror("setsockopt (SO_REUSEADDR)");
 			goto exiterr;
 		}
 	
@@ -812,13 +819,13 @@ int main(int argc, char *argv[])
 		#ifdef __linux__
 			if (setsockopt(listen_fd[i], SOL_IP, IP_TRANSPARENT, &yes, sizeof(yes)) == -1)
 			{
-				perror("setsockopt (IP_TRANSPARENT): ");
+				perror("setsockopt (IP_TRANSPARENT)");
 				goto exiterr;
 			}
 		#elif defined(BSD) && defined(SO_BINDANY)
 			if (setsockopt(listen_fd[i], SOL_SOCKET, SO_BINDANY, &yes, sizeof(yes)) == -1)
 			{
-				perror("setsockopt (SO_BINDANY): ");
+				perror("setsockopt (SO_BINDANY)");
 				goto exiterr;
 			}
 		#endif
@@ -837,12 +844,35 @@ int main(int argc, char *argv[])
 				setsockopt(listen_fd[i],SOL_SOCKET,SO_RCVBUF,&v,sizeof(int));
 			}
 		}
-		if (bind(listen_fd[i], (struct sockaddr *)&list[i].salisten, list[i].salisten_len) == -1) {
-			perror("bind: ");
-			goto exiterr;
+		bool bBindBug=false;
+		for(;;)
+		{
+			if (bind(listen_fd[i], (struct sockaddr *)&list[i].salisten, list[i].salisten_len) == -1)
+			{
+				// in linux strange behaviour was observed
+				// just after ifup and address assignment there's short window when bind() can't bind to addresses got from getifaddrs()
+				// it does not happen to transparent sockets because they cant bind to any non-existend ip
+				// also only ipv6 seem to be buggy this way
+				if (errno==EADDRNOTAVAIL && params.proxy_type!=CONN_TYPE_TRANSPARENT && list[i].bind_wait_ip_left)
+				{
+					if (!bBindBug)
+					{
+						ntop46_port((struct sockaddr *)&list[i].salisten, ip_port, sizeof(ip_port));
+						printf("address %s is not available. will retry for %d sec\n",ip_port,list[i].bind_wait_ip_left);
+						bBindBug=true;
+					}
+					sleep(1);
+					list[i].bind_wait_ip_left--;
+					continue;
+				}
+				perror("bind");
+				goto exiterr;
+			}
+			break;
 		}
-		if (listen(listen_fd[i], BACKLOG) == -1) {
-			perror("listen: ");
+		if (listen(listen_fd[i], BACKLOG) == -1)
+		{
+			perror("listen");
 			goto exiterr;
 		}
 	}

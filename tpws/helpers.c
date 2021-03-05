@@ -30,22 +30,44 @@ char *strncasestr(const char *s,const char *find, size_t slen)
 	return (char *)s;
 }
 
-void print_sockaddr(const struct sockaddr *sa)
+void ntop46(const struct sockaddr *sa, char *str, size_t len)
 {
-	char str[64];
+	if (!len) return;
+	*str=0;
 	switch (sa->sa_family)
 	{
 	case AF_INET:
-		if (inet_ntop(sa->sa_family, &((struct sockaddr_in*)sa)->sin_addr, str, sizeof(str)))
-			printf("%s:%d", str, ntohs(((struct sockaddr_in*)sa)->sin_port));
+		inet_ntop(sa->sa_family, &((struct sockaddr_in*)sa)->sin_addr, str, len);
 		break;
 	case AF_INET6:
-		if (inet_ntop(sa->sa_family, &((struct sockaddr_in6*)sa)->sin6_addr, str, sizeof(str)))
-			printf("%s:%d", str, ntohs(((struct sockaddr_in6*)sa)->sin6_port));
+		inet_ntop(sa->sa_family, &((struct sockaddr_in6*)sa)->sin6_addr, str, len);
 		break;
 	default:
-		printf("UNKNOWN_FAMILY_%d", sa->sa_family);
+		snprintf(str,len,"UNKNOWN_FAMILY_%d",sa->sa_family);
 	}
+}
+void ntop46_port(const struct sockaddr *sa, char *str, size_t len)
+{
+	char ip[40];
+	ntop46(sa,ip,sizeof(ip));
+	switch (sa->sa_family)
+	{
+	case AF_INET:
+		snprintf(str,len,"%s:%u",ip,ntohs(((struct sockaddr_in*)sa)->sin_port));
+		break;
+	case AF_INET6:
+		snprintf(str,len,"[%s]:%u",ip,ntohs(((struct sockaddr_in6*)sa)->sin6_port));
+		break;
+	default:
+		snprintf(str,len,"%s",ip);
+	}
+}
+void print_sockaddr(const struct sockaddr *sa)
+{
+	char ip_port[48];
+
+	ntop46_port(sa,ip_port,sizeof(ip_port));
+	printf("%s",ip_port);
 }
 
 
@@ -126,6 +148,17 @@ bool saconvmapped(struct sockaddr_storage *a)
 		return true;
 	}
 	return false;
+}
+
+bool is_linklocal(const struct sockaddr_in6* a)
+{
+	// fe80::/10
+	return a->sin6_addr.s6_addr[0]==0xFE && (a->sin6_addr.s6_addr[1] & 0xC0)==0x80;
+}
+bool is_private6(const struct sockaddr_in6* a)
+{
+	// fdf0::/8
+	return a->sin6_addr.s6_addr[0]==0xFD;
 }
 
 
