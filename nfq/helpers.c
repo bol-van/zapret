@@ -105,13 +105,13 @@ bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
 	DLOG("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n",fd,rcvbuf,sndbuf)
 	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_RCVBUF): ");
+		perror("setsockopt (SO_RCVBUF)");
 		close(fd);
 		return false;
 	}
 	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_SNDBUF): ");
+		perror("setsockopt (SO_SNDBUF)");
 		close(fd);
 		return false;
 	}

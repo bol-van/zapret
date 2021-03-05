@@ -87,24 +87,24 @@ bool droproot(uid_t uid, gid_t gid)
 #ifdef __linux__
 	if (prctl(PR_SET_KEEPCAPS, 1L))
 	{
-		perror("prctl(PR_SET_KEEPCAPS): ");
+		perror("prctl(PR_SET_KEEPCAPS)");
 		return false;
 	}
 #endif
 	// drop all SGIDs
 	if (setgroups(0,NULL))
 	{
-		perror("setgroups: ");
+		perror("setgroups");
 		return false;
 	}
 	if (setgid(gid))
 	{
-		perror("setgid: ");
+		perror("setgid");
 		return false;
 	}
 	if (setuid(uid))
 	{
-		perror("setuid: ");
+		perror("setuid");
 		return false;
 	}
 #ifdef __linux__
@@ -137,7 +137,7 @@ void daemonize()
 	pid = fork();
 	if (pid == -1)
 	{
-		perror("fork: ");
+		perror("fork");
 		exit(2);
 	}
 	else if (pid != 0)

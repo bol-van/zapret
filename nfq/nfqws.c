@@ -216,36 +216,36 @@ static int nfq_main()
 	printf("opening library handle\n");
 	h = nfq_open();
 	if (!h) {
-		perror("nfq_open() :");
+		perror("nfq_open()");
 		goto exiterr;
 	}
 
 	printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
-		perror("nfq_unbind_pf() :");
+		perror("nfq_unbind_pf()");
 		goto exiterr;
 	}
 
 	printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(h, AF_INET) < 0) {
-		perror("nfq_bind_pf() :");
+		perror("nfq_bind_pf()");
 		goto exiterr;
 	}
 
 	printf("binding this socket to queue '%u'\n", params.qnum);
 	qh = nfq_create_queue(h, params.qnum, &nfq_cb, &params);
 	if (!qh) {
-		perror("nfq_create_queue() :");
+		perror("nfq_create_queue()");
 		goto exiterr;
 	}
 
 	printf("setting copy_packet mode\n");
 	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-		perror("can't set packet_copy mode :");
+		perror("can't set packet_copy mode");
 		goto exiterr;
 	}
 	if (nfq_set_queue_maxlen(qh, Q_MAXLEN) < 0) {
-		perror("can't set queue maxlen : ");
+		perror("can't set queue maxlen");
 		goto exiterr;
 	}
 	// accept packets if they cant be handled
@@ -325,13 +325,13 @@ static int dvt_main()
 		printf("creating divert4 socket\n");
 		fd[0] = socket(AF_INET, SOCK_RAW, IPPROTO_DIVERT);
 		if (fd[0] == -1) {
-				perror("socket (DIVERT4): ");
+				perror("socket (DIVERT4)");
 			goto exiterr;
 		}
 		printf("binding divert4 socket\n");
 		if (bind(fd[0], (struct sockaddr*)&bp4, sizeof(bp4)) < 0)
 		{
-			perror("bind (DIVERT4): ");
+			perror("bind (DIVERT4)");
 			goto exiterr;
 		}
 		if (!set_socket_buffers(fd[0],Q_RCVBUF,Q_SNDBUF))
@@ -350,13 +350,13 @@ static int dvt_main()
 		printf("creating divert6 socket\n");
 		fd[1] = socket(AF_INET6, SOCK_RAW, IPPROTO_DIVERT);
 		if (fd[1] == -1) {
-			perror("socket (DIVERT6): ");
+			perror("socket (DIVERT6)");
 			goto exiterr;
 		}
 		printf("binding divert6 socket\n");
 		if (bind(fd[1], (struct sockaddr*)&bp6, sizeof(bp6)) < 0)
 		{
-			perror("bind (DIVERT6): ");
+			perror("bind (DIVERT6)");
 			goto exiterr;
 		}
 		fdct++;
@@ -391,7 +391,7 @@ static int dvt_main()
 				dohup();
 				continue;
 			}
-			perror("select: ");
+			perror("select");
 			goto exiterr;
 		}
 		for(i=0;i<fdct;i++)
@@ -402,7 +402,7 @@ static int dvt_main()
 				rd = recvfrom(fd[i], buf, sizeof(buf), 0, (struct sockaddr*)&sa_from, &socklen);
 				if (rd<0)
 				{
-					perror("recvfrom: ");
+					perror("recvfrom");
 					goto exiterr;
 				}
 				else if (rd>0)
@@ -416,7 +416,7 @@ static int dvt_main()
 						DLOG(ppr==pass ? "packet: id=%u reinject unmodified\n" : "packet: id=%u reinject modified\n", id);
 						wr = sendto(fd[i], buf, rd, 0, (struct sockaddr*)&sa_from, socklen);
 						if (wr<0)
-							perror("reinject sendto: ");
+							perror("reinject sendto");
 						else if (wr!=rd)
 							fprintf(stderr,"reinject sendto: not all data was reinjected. received %zd, sent %zd\n", rd, wr);
 						break;
