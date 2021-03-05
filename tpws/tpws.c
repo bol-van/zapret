@@ -506,7 +506,7 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 		return false;
 
 	// for ipv6 preference order
-	// bind-linklocal-1 : link-local,private,global
+	// bind-linklocal-1 : link-local,any
 	// bind-linklocal=0 : private,global,link-local
 	for(int pass=0;pass<3;pass++)
 	{

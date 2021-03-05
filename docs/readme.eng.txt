@@ -306,6 +306,8 @@ tpws can bind to multiple interfaces and IP addresses (up to 32).
 Port number is always the same.
 Parameters --bind-iface* и --bind-addr create new bind.
 Other parameters --bind-* are related to the last bind.
+--bind-iface6 without --bind-linklocal first selects a private address fd80::/8 then a global address, and last link local.
+--bind-iface6 with --bind-linklocal first selects link local then any ipv6 address.
 To bind to all ipv4 specify --bind-addr "0.0.0.0", all ipv6 - "::". --bind-addr="" - mean bind to all ipv4 and ipv6.
 If no binds are specified default bind to all ipv4 and ipv6 addresses is created.
 The --bind-wait* parameters can help in situations where you need to get IP from the interface, but it is not there yet, it is not raised
