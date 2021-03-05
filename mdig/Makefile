@@ -16,6 +16,7 @@ bsd: $(SRC_FILES)
 
 mac: $(SRC_FILES)
 	$(CC) $(CFLAGS) $(CFLAGS_BSD) $(CFLAGS_MAC) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS)
+	strip mdig
 
 clean:
 	rm -f mdig *.o

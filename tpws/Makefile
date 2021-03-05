@@ -16,6 +16,7 @@ bsd: $(SRC_FILES)
 
 mac: $(SRC_FILES)
 	$(CC) $(CFLAGS) $(CFLAGS_BSD) $(CFLAGS_MAC) -Iepoll-shim/include -Imacos -o tpws $(SRC_FILES) epoll-shim/src/*.c $(LDFLAGS) $(LIBS)
+	strip tpws
 
 clean:
 	rm -f tpws *.o

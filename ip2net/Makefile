@@ -16,6 +16,7 @@ bsd: $(SRC_FILES)
 
 mac: $(SRC_FILES)
 	$(CC) $(CFLAGS) $(CFLAGS_BSD) $(CFLAGS_MAC) -o ip2net $(SRC_FILES) $(LDFLAGS) $(LIBS)
+	strip ip2net
 
 clean:
 	rm -f ip2net *.o

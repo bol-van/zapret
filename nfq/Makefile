@@ -17,6 +17,7 @@ bsd: $(SRC_FILES)
 
 mac: $(SRC_FILES)
 	$(CC) $(CFLAGS) $(CFLAGS_BSD) $(CFLAGS_MAC) -o dvtws $(SRC_FILES) $(LDFLAGS) $(LIBS_BSD)
+	strip dvtws
 
 clean:
 	rm -f nfqws dvtws *.o
