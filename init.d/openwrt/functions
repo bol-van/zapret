@@ -3,8 +3,8 @@
 [ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
 . "$ZAPRET_BASE/config"
 
-QNUM=200
-TPPORT=988
+[ -n "$QNUM" ] || QNUM=200
+[ -n "$TPPORT" ] || TPPORT=988
 TPWS_USER=daemon
 TPWS_LOCALHOST4=127.0.0.127
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000

@@ -10,11 +10,11 @@ IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
 WS_USER=tpws
 
-QNUM=200
+[ -n "$QNUM" ] || QNUM=200
 NFQWS="$ZAPRET_BASE/nfq/nfqws"
 NFQWS_OPT_BASE="--qnum=$QNUM --user=$WS_USER"
 
-TPPORT=988
+[ -n "$TPPORT" ] || TPPORT=988
 TPWS="$ZAPRET_BASE/tpws/tpws"
 TPWS_LOCALHOST4=127.0.0.127
 HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
