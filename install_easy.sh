@@ -23,6 +23,8 @@ DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
 
+[ -n "$TPPORT" ] || TPPORT=988
+
 SYSTEMD_SYSTEM_DIR=/lib/systemd/system
 [ -d "$SYSTEMD_SYSTEM_DIR" ] || SYSTEMD_SYSTEM_DIR=/usr/lib/systemd/system
 
@@ -346,6 +348,7 @@ select_mode_filter()
 select_mode()
 {
 	select_mode_mode
+	select_mode_iface
 	select_mode_http
 	select_mode_keepalive
 	select_mode_https
@@ -395,24 +398,6 @@ ask_config()
 	select_getlist
 }
 
-ask_iface()
-{
-	# $1 - var to ask
-	# $2 - additional name (<any>)
-
-	local ifs i0
-	[ -n "$2" ] && i0="$2 "
-	case $SYSTEM in
-		macos)
-			ifs="$(ifconfig -l)"
-			;;
-		*)
-			ifs="$(ls /sys/class/net)"
-			;;
-	esac
-	ask_list $1 "$i0$ifs" && write_config_var $1
-}
-
 ask_config_offload()
 {
 	is_flow_offload_avail && {
@@ -460,47 +445,92 @@ ask_config_tmpdir()
 	}
 }
 
-select_router_iface()
+ask_iface()
 {
-	# $1 - ask iface function name
+	# $1 - var to ask
+	# $2 - additional name for empty string synonim
 
-	local T=N
-	[ -n "$IFACE_LAN" ] && T=Y
-	local old_lan=$IFACE_LAN
-	local old_wan=$IFACE_WAN
+	local ifs i0 def new
+	eval def="\$$1"
+
+	[ -n "$2" ] && i0="$2 "
+	case $SYSTEM in
+		macos)
+			ifs="$(ifconfig -l)"
+			;;
+		*)
+			ifs="$(ls /sys/class/net)"
+			;;
+	esac
+	[ -z "$def" ] && eval $1="$2"
+	ask_list $1 "$i0$ifs" && {
+		eval new="\$$1"
+		[ "$new" = "$2" ] && eval $1=""
+		write_config_var $1
+	}
+}
+ask_iface_lan()
+{
+	echo LAN interface :
+	ask_iface IFACE_LAN "NONE"
+}
+ask_iface_wan()
+{
+	echo WAN interface :
+	ask_iface IFACE_WAN "ANY"
+}
+
+select_mode_iface()
+{
+	# openwrt has its own interface management scheme
+	# filter just creates ip tables, no daemons involved
+	# nfqws sits in POSTROUTING chain and unable to filter by incoming interface
+	# tpws redirection works in PREROUTING chain
+	# in tpws-socks mode IFACE_LAN specifies additional bind interface for the socks listener
+	# it's not possible to instruct tpws to route outgoing connection to an interface (OS routing table decides)
+	# custom mode can also benefit from interface names (depends on custom script code)
+
+	if [ "$SYSTEM" = "openwrt" ] || [ "$MODE" = "filter" ]; then return; fi
 
 	echo
-	if [ "$SYSTEM" = "macos" ]; then
-		echo "WARNING ! OS feature \"internet sharing\" is not supported."
-		echo "Only manually configured PF router is supported."
-	else
-		echo "WARNING ! This installer will not configure routing, NAT, ... for you. Its your responsibility."
-	fi
-	if ask_yes_no $T "is this system a router"; then
-		echo LAN interface :
-		ask_iface IFACE_LAN
-		echo WAN interface :
-		[ -n "$IFACE_WAN" ] || IFACE_WAN="ANY"
-		ask_iface IFACE_WAN "ANY"
-		[ "$IFACE_WAN" = "ANY" ] && {
-			# any = not defined
-			IFACE_WAN=
-			write_config_var IFACE_WAN
-		}
-	else
-		[ -n "$old_lan" ] && {
-			IFACE_LAN=""
-			write_config_var IFACE_LAN
-		}
-		[ -n "$old_wan" ] && {
-			IFACE_WAN=""
-			write_config_var IFACE_WAN
-		}
-	fi
-}
-ask_config_desktop()
-{
-	select_router_iface
+	
+	case "$MODE" in
+		tpws-socks)
+			echo "select LAN interface to allow socks access from your LAN. select NONE for localhost only."
+			echo "expect socks on tcp port $TPPORT"
+			ask_iface_lan
+			;;
+		tpws)
+			echo "select LAN interface to operate in router mode. select NONE for local outgoing traffic only."
+			if [ "$SYSTEM" = "macos" ]; then
+				echo "WARNING ! OS feature \"internet sharing\" is not supported."
+				echo "Only manually configured PF router is supported."
+			else
+				echo "WARNING ! This installer will not configure routing, NAT, ... for you. Its your responsibility."
+			fi
+			ask_iface_lan
+			;;
+		custom)
+			echo "select LAN interface for your custom script (how it works depends on your code)"
+			ask_iface_lan
+			;;
+	esac
+
+	case "$MODE" in
+		tpws)
+			echo "select WAN interface for $MODE operations. select ANY to operate on any interface."
+			[ -n "$IFACE_LAN" ] && echo "WAN filtering works only for local outgoing traffic !"
+			ask_iface_wan
+			;;
+		nfqws)
+			echo "select WAN interface for $MODE operations. select ANY to operate on any interface."
+			ask_iface_wan
+			;;
+		custom)
+			echo "select WAN interface for your custom script (how it works depends on your code)"
+			ask_iface_wan
+			;;
+	esac
 }
 
 copy_all()
@@ -843,7 +873,6 @@ install_systemd()
 	install_binaries
 	check_dns
 	select_ipv6
-	ask_config_desktop
 	ask_config
 	service_install_systemd
 	download_list
@@ -1211,7 +1240,6 @@ install_macos()
 	install_binaries
 	check_dns
 	select_ipv6
-	ask_config_desktop
 	ask_config
 	service_install_macos
 	macos_fw_reload_trigger_clear
