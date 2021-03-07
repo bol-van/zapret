@@ -505,9 +505,9 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 	if (getifaddrs(&addrs)<0)
 		return false;
 
-	// ipv6 preference order
-	// bindll=1 : link-local
-	// bindll=0 : private,global,link-local
+	// for ipv6 preference order
+	// bind-linklocal-1 : link-local,any
+	// bind-linklocal=0 : private,global,link-local
 	for(int pass=0;pass<3;pass++)
 	{
 		a  = addrs;
@@ -851,7 +851,7 @@ int main(int argc, char *argv[])
 			{
 				// in linux strange behaviour was observed
 				// just after ifup and address assignment there's short window when bind() can't bind to addresses got from getifaddrs()
-				// it does not happen to transparent sockets because they cant bind to any non-existend ip
+				// it does not happen to transparent sockets because they can bind to any non-existend ip
 				// also only ipv6 seem to be buggy this way
 				if (errno==EADDRNOTAVAIL && params.proxy_type!=CONN_TYPE_TRANSPARENT && list[i].bind_wait_ip_left)
 				{
