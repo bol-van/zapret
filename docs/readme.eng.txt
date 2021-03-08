@@ -260,7 +260,11 @@ tpws is transparent proxy.
  --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %interface_name : fe80::1%br-lan
  --bind-iface4=<interface_name> ; bind to the first ipv4 addr of interface
  --bind-iface6=<interface_name> ; bind to the first ipv6 addr of interface
- --bind-linklocal=prefer|force  ; prefer or force ipv6 link local
+ --bind-linklocal=no|unwanted|prefer|force
+				; no : bind only to global ipv6
+ 				; unwanted (default) : prefer global address, then LL
+				; prefer : prefer LL, then global
+				; force : LL only
  --bind-wait-ifup=<sec>         ; wait for interface to appear and up
  --bind-wait-ip=<sec>           ; after ifup wait for ip address to appear up to N seconds
  --bind-wait-ip-linklocal=<sec> ; accept only link locals first N seconds then any
@@ -306,8 +310,12 @@ tpws can bind to multiple interfaces and IP addresses (up to 32).
 Port number is always the same.
 Parameters --bind-iface* и --bind-addr create new bind.
 Other parameters --bind-* are related to the last bind.
---bind-iface6 without --bind-linklocal first selects a private address fd00::/8 then a global address, and last link local.
---bind-iface6 with --bind-linklocal=prefer first selects link local then a private address fd00::/8 then a global address.
+Выбор режима использования link local ipv6 адресов (fe80:://8) :
+ipv6 link local usage modes :
+--bind-iface6 --bind-linklocal=no : first selects private address fd00::/8, then global address
+--bind-iface6 --bind-linklocal=unwanted : first selects private address fd00::/8, then global address, then LL
+--bind-iface6 --bind-linklocal=prefer : first selects LL, then private address fd00::/8, then global address
+--bind-iface6 --bind-linklocal=force : select only LL
 To bind to all ipv4 specify --bind-addr "0.0.0.0", all ipv6 - "::". --bind-addr="" - mean bind to all ipv4 and ipv6.
 If no binds are specified default bind to all ipv4 and ipv6 addresses is created.
 To bind to a specific link local address do : --bind-iface6=fe80::aaaa:bbbb:cccc:dddd%iface-name

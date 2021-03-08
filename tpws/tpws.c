@@ -113,10 +113,11 @@ static void exithelp()
 		" --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %%interface_name\n"
 		" --bind-iface4=<interface_name>\t; bind to the first ipv4 addr of interface\n"
 		" --bind-iface6=<interface_name>\t; bind to the first ipv6 addr of interface\n"
-		" --bind-linklocal=prefer|force\t; prefer or force ipv6 link local\n"
+		" --bind-linklocal=no|unwanted|prefer|force\n"
+		"\t\t\t\t; prohibit, accept, prefer or force ipv6 link local bind\n"
 		" --bind-wait-ifup=<sec>\t\t; wait for interface to appear and up\n"
 		" --bind-wait-ip=<sec>\t\t; after ifup wait for ip address to appear up to N seconds\n"
-		" --bind-wait-ip-linklocal=<sec>\t; accept only link locals first N seconds then any\n"
+		" --bind-wait-ip-linklocal=<sec>\t; (prefer) accept only LL first N seconds then any  (unwanted) accept only globals first N seconds then LL\n"
 		" --bind-wait-only\t\t; wait for bind conditions satisfaction then exit. return code 0 if success.\n"
 		" * multiple binds are supported. each bind-addr, bind-iface* start new bind\n"
 		" --port=<port>\t\t\t; only one port number for all binds is supported\n"
@@ -290,9 +291,15 @@ void parse_params(int argc, char *argv[])
 		case 5: /* bind-linklocal */
 			checkbind_clean();
 			params.binds[params.binds_last].bindll = true;
-			if (!strcmp(optarg, "force"))
-				params.binds[params.binds_last].bindll_force=true;
-			else if (strcmp(optarg, "prefer"))
+			if (!strcmp(optarg, "no"))
+				params.binds[params.binds_last].bindll=no;
+			else if (!strcmp(optarg, "prefer"))
+				params.binds[params.binds_last].bindll=prefer;
+			else if (!strcmp(optarg, "force"))
+				params.binds[params.binds_last].bindll=force;
+			else if (!strcmp(optarg, "unwanted"))
+				params.binds[params.binds_last].bindll=unwanted;
+			else
 			{
 				fprintf(stderr, "invalid parameter in bind-linklocal : %s\n",optarg);
 				exit_clean(1);
@@ -497,10 +504,11 @@ void parse_params(int argc, char *argv[])
 }
 
 
-static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bindiface, bool bind_if6, bool bindll, int *if_index)
+static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bindiface, bool bind_if6, enum bindll bindll, int *if_index)
 {
 	struct ifaddrs *addrs,*a;
 	bool found=false;
+	bool bindll_want = bindll==prefer || bindll==force;
     
 	if (getifaddrs(&addrs)<0)
 		return false;
@@ -526,11 +534,13 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 				// ipv6 links locals are fe80::/10
 				else if (a->ifa_addr->sa_family==AF_INET6
 				          &&
-				         (!*bindiface && bindll ||
+				         (!*bindiface && (bindll==prefer || bindll==force) ||
 				          *bindiface && bind_if6 && !strcmp(a->ifa_name, bindiface))
 				          &&
-					 (bindll && is_linklocal((struct sockaddr_in6*)a->ifa_addr) ||
-					  !bindll && (pass==2 || pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr)))
+					 (bindll==force && is_linklocal((struct sockaddr_in6*)a->ifa_addr) ||
+					  bindll==prefer && (pass==0 && is_linklocal((struct sockaddr_in6*)a->ifa_addr) || pass==1 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==2) ||
+					  bindll==no &&	(pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr)) ||
+					  bindll==unwanted && (pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr) || pass==2))
 					)
 				{
 					salisten->ss_family = AF_INET6;
@@ -640,6 +650,7 @@ struct salisten_s
 	int ipv6_only;
 	int bind_wait_ip_left; // how much seconds left from bind_wait_ip
 };
+static const char *bindll_s[] = { "unwanted","no","prefer","force" };
 int main(int argc, char *argv[])
 {
 	int i, listen_fd[MAX_BINDS], yes = 1, retval = 0, if_index, exit_v=EXIT_FAILURE;
@@ -662,8 +673,8 @@ int main(int argc, char *argv[])
 
 	for(i=0;i<=params.binds_last;i++)
 	{
-		VPRINT("Prepare bind %d : addr=%s iface=%s v6=%u link_local=%u link_local_force=%u wait_ifup=%d wait_ip=%d wait_ip_ll=%d",i,
-			params.binds[i].bindaddr,params.binds[i].bindiface,params.binds[i].bind_if6,params.binds[i].bindll,params.binds[i].bindll_force,
+		VPRINT("Prepare bind %d : addr=%s iface=%s v6=%u link_local=%s wait_ifup=%d wait_ip=%d wait_ip_ll=%d",i,
+			params.binds[i].bindaddr,params.binds[i].bindiface,params.binds[i].bind_if6,bindll_s[params.binds[i].bindll],
 			params.binds[i].bind_wait_ifup,params.binds[i].bind_wait_ip,params.binds[i].bind_wait_ip_ll);
 		if_index=0;
 		if (*params.binds[i].bindiface)
@@ -716,26 +727,36 @@ int main(int argc, char *argv[])
 			if (*params.binds[i].bindiface || params.binds[i].bindll)
 			{
 				bool found;
+				enum bindll bindll_1;
 				int sec=0;
 
 				if (params.binds[i].bind_wait_ip > 0)
 				{
 					printf("waiting for ip on %s for up to %d second(s)...\n", *params.binds[i].bindiface ? params.binds[i].bindiface : "<any>", params.binds[i].bind_wait_ip);
-					if (params.binds[i].bindll && !params.binds[i].bindll_force && params.binds[i].bind_wait_ip_ll>0)
-						printf("during the first %d second(s) accepting only link locals...\n", params.binds[i].bind_wait_ip_ll);
+					if (params.binds[i].bind_wait_ip_ll>0)
+					{
+						if (params.binds[i].bindll==prefer)
+							printf("during the first %d second(s) accepting only link locals...\n", params.binds[i].bind_wait_ip_ll);
+						else if (params.binds[i].bindll==unwanted)
+							printf("during the first %d second(s) accepting only ipv6 globals...\n", params.binds[i].bind_wait_ip_ll);
+					}
 				}
 
 				for(;;)
 				{
-					found = find_listen_addr(&list[i].salisten,params.binds[i].bindiface,params.binds[i].bind_if6,params.binds[i].bindll,&if_index);
+					// allow, no, prefer, force
+					bindll_1 =	(params.binds[i].bindll==prefer && sec<params.binds[i].bind_wait_ip_ll) ? force : 
+							(params.binds[i].bindll==unwanted && sec<params.binds[i].bind_wait_ip_ll) ? no : 
+							params.binds[i].bindll;
+					if (sec && sec==params.binds[i].bind_wait_ip_ll)
+					{
+						if (params.binds[i].bindll==prefer)
+							printf("link local address wait timeout. now accepting globals\n");
+						else if (params.binds[i].bindll==unwanted)
+							printf("global ipv6 address wait timeout. now accepting link locals\n");
+					}
+					found = find_listen_addr(&list[i].salisten,params.binds[i].bindiface,params.binds[i].bind_if6,bindll_1,&if_index);
 					if (found) break;
-
-					if (params.binds[i].bindll && !params.binds[i].bindll_force && sec>=params.binds[i].bind_wait_ip_ll)
-						if ((found = find_listen_addr(&list[i].salisten,params.binds[i].bindiface,params.binds[i].bind_if6,false,&if_index)))
-						{
-							printf("link local address wait timeout. using global address\n");
-							break;
-						}
 
 					if (sec>=params.binds[i].bind_wait_ip)
 						break;

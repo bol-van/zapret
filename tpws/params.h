@@ -6,13 +6,14 @@
 #include "strpool.h"
 
 enum splithttpreq { split_none = 0, split_method, split_host };
+enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32
 struct bind_s
 {
 	char bindaddr[64],bindiface[IF_NAMESIZE];
 	bool bind_if6;
-	bool bindll,bindll_force;
+	enum bindll bindll;
 	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 };
 
