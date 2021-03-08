@@ -24,7 +24,8 @@ HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
 TPWS_OPT_BASE="--user=$WS_USER --port=$TPPORT"
 TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
 TPWS_OPT_BASE6="--bind-addr=::1"
-TPWS_WAIT="--bind-wait-ip=60"
+TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
+TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 # first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
 TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
 
@@ -436,7 +437,7 @@ tpws_apply_socks_binds()
 	}
 	[ "$DISABLE_IPV6" = "1" ] || {
 		o="$o --bind-addr=::1"
-		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN $TPWS_WAIT"
+		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
 	}
 	eval $1="\"\$$1 $o\""
 }

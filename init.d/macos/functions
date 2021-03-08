@@ -10,7 +10,8 @@ HOSTLIST="$ZHOSTLIST.gz"
 PIDDIR=/var/run
 [ -n "$TPPORT" ] || TPPORT=988
 TPWS_USER=daemon
-TPWS_WAIT="--bind-wait-ip=60"
+TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
+TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 TPWS="$ZAPRET_BASE/tpws/tpws"
 
 PF_MAIN="/etc/pf.conf"
@@ -108,7 +109,7 @@ tpws_apply_socks_binds()
 	}
 	[ "$DISABLE_IPV6" = "1" ] || {
 		o="$o --bind-addr=::1"
-		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN $TPWS_WAIT"
+		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
 	}
 	eval $1="\"\$$1 $o\""
 }
