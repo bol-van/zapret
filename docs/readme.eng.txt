@@ -310,10 +310,12 @@ Other parameters --bind-* are related to the last bind.
 --bind-iface6 with --bind-linklocal=prefer first selects link local then a private address fd00::/8 then a global address.
 To bind to all ipv4 specify --bind-addr "0.0.0.0", all ipv6 - "::". --bind-addr="" - mean bind to all ipv4 and ipv6.
 If no binds are specified default bind to all ipv4 and ipv6 addresses is created.
+To bind to a specific link local address do : --bind-iface6=fe80::aaaa:bbbb:cccc:dddd%iface-name
 The --bind-wait* parameters can help in situations where you need to get IP from the interface, but it is not there yet, it is not raised
 or not configured.
 In different systems, ifup events are caught in different ways and do not guarantee that the interface has already received an IP address of a certain type.
 In the general case, there is no single mechanism to hang oneself on an event of the type "link local address appeared on the X interface."
+To bind to a specific ip when its interface may not be up yet do : --bind-addr=192.168.5.3%eth0 --bind-wait-ifup=20
 
 in socks proxy mode no additional system privileges are required
 connection to local IPs of the system where tpws runs are prohibited
