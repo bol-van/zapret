@@ -801,7 +801,7 @@ check_dns_spoof()
 {
 	# $1 - domain
 	# $2 - public DNS
-	echo $1 | "$EXEDIR/mdig/mdig" --family=4 >"$DNSCHECK_DIG1"
+	echo $1 | "$EXEDIR/mdig/mdig" --threads=10 --family=4 >"$DNSCHECK_DIG1"
 	nslookup $1 $2 | sed -n '/Name:/,$p' | grep ^Address | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' >"$DNSCHECK_DIG2"
 	# check whether system resolver returns anything other than public DNS
 	grep -qvFf "$DNSCHECK_DIG2" "$DNSCHECK_DIG1"
@@ -837,13 +837,19 @@ check_dns()
 		done
 	else
 		echo no working public DNS was found. looks like public DNS blocked.
-		for dom in $DNSCHECK_DOM; do echo $dom; done | "$EXEDIR/mdig/mdig" --family=4 >"$DNSCHECK_DIGS"
+		for dom in $DNSCHECK_DOM; do echo $dom; done | "$EXEDIR/mdig/mdig" --threads=10 --family=4 >"$DNSCHECK_DIGS"
 	fi
 
 	echo checking resolved IP uniqueness for : $DNSCHECK_DOM
 	echo censor\'s DNS can return equal result for multiple blocked domains.
 	C1=$(wc -l <"$DNSCHECK_DIGS")
 	C2=$(sort -u "$DNSCHECK_DIGS" | wc -l)
+	[ "$C1" -eq 0 ] &&
+	{
+		echo -- DNS is not working. It's either misconfigured or blocked or you don't have inet access.
+		check_dns_cleanup
+		return 1
+	}
 	[ "$C1" = "$C2" ] ||
 	{
 		echo system dns resolver has returned equal IPs for some domains checked above \($C1 total, $C2 unique\)
