@@ -310,7 +310,7 @@ tpws can bind to multiple interfaces and IP addresses (up to 32).
 Port number is always the same.
 Parameters --bind-iface* и --bind-addr create new bind.
 Other parameters --bind-* are related to the last bind.
-Выбор режима использования link local ipv6 адресов (fe80:://8) :
+Выбор режима использования link local ipv6 адресов (fe80::/8) :
 ipv6 link local usage modes :
 --bind-iface6 --bind-linklocal=no : first selects private address fd00::/8, then global address
 --bind-iface6 --bind-linklocal=unwanted : first selects private address fd00::/8, then global address, then LL
