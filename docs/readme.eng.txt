@@ -315,7 +315,7 @@ The --bind-wait* parameters can help in situations where you need to get IP from
 or not configured.
 In different systems, ifup events are caught in different ways and do not guarantee that the interface has already received an IP address of a certain type.
 In the general case, there is no single mechanism to hang oneself on an event of the type "link local address appeared on the X interface."
-To bind to a specific ip when its interface may not be up yet do : --bind-addr=192.168.5.3%eth0 --bind-wait-ifup=20
+To bind to a specific ip when its interface may not be configured yet do : --bind-addr=192.168.5.3%eth0 --bind-wait-ip=20
 
 in socks proxy mode no additional system privileges are required
 connection to local IPs of the system where tpws runs are prohibited
