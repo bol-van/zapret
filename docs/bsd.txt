@@ -17,7 +17,7 @@ FreeBSD 11.x+ , OpenBSD 6.x+, частично MacOS Sierra+
 Из каталога "nfq" под BSD собирается dvtws вместо nfqws.
 Он разделяет с nfqws большую часть кода и почти совпадает по параметрам командной строки.
 
-FreeBSD содержит 2 фаервола : IPFilter (ipfw) и Packet Filter (PF). OpenBSD содержит только PF.
+FreeBSD содержит 3 фаервола : IPFilter, ipfw и Packet Filter (PF). OpenBSD содержит только PF.
 
 Под FreeBSD tpws и dvtws собираются через "make", под OpenBSD - "make bsd", под MacOS - "make mac".
 FreeBSD make распознает BSDmakefile , OpenBSD и MacOS - нет. Поэтому там используется отдельный target в Makefile.
