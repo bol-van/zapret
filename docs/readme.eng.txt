@@ -142,7 +142,7 @@ nfqws takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync[=<mode>][,<mode2>]	; try to desync dpi state. modes : fake rst rstack disorder disorder2 split split2
+ --dpi-desync=<mode>[,<mode2>]		; desync dpi state. modes : fake rst rstack disorder disorder2 split split2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; can take multiple comma separated values

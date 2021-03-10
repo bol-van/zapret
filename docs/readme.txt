@@ -183,7 +183,7 @@ nfqws
  --hostnospace				; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
  --hostspell=HoST			; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
  --domcase				; домен после Host: сделать таким : TeSt.cOm
- --dpi-desync[=<mode>][,<mode2]		; атака по десинхронизации DPI. mode : fake rst rstack disorder disorder2 split split2
+ --dpi-desync=<mode>[,<mode2]		; атака по десинхронизации DPI. mode : fake rst rstack disorder disorder2 split split2
  --dpi-desync-fwmark=<int|0xHEX>        ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; установить ttl для десинхронизирующих пакетов
  --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера
