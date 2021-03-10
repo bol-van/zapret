@@ -53,7 +53,7 @@ You need to run them with the necessary parameters and redirect certain traffic 
 
 To redirect a TCP connection to a transparent proxy, the following commands are used:
 
-forwarded fraffic :
+forwarded traffic :
 iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988
 outgoing traffic :
 iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988
@@ -172,12 +172,12 @@ add tcp option "MD5 signature". All of them have their own disadvantages :
 * md5sig does not work on all servers
 * badsum doesn't work if your device is behind NAT which does not pass invalid packets.
   Linux NAT by default does not pass them without special setting "sysctl -w net.netfilter.nf_conntrack_checksum=0"
-  Openwrt sets it from the box, other routers in most cases dont, and its not always possible to change it.
-  If nfqws is on the router, its not neccessary to switch of "net.netfilter.nf_conntrack_checksum".
+  Openwrt sets it from the box, other routers in most cases don't, and its not always possible to change it.
+  If nfqws is on the router, its not necessary to switch of "net.netfilter.nf_conntrack_checksum".
   Fake packet doesn't go through FORWARD chain, it goes through OUTPUT. But if your router is behind another NAT, for example ISP NAT,
   and that NAT does not pass invalid packets, you cant do anything.
 * badseq packets will be dropped by server, but DPI also can ignore them
-* TTL looks like the best option, but it requires special tuning for earch ISP. If DPI is further than local ISP websites
+* TTL looks like the best option, but it requires special tuning for each ISP. If DPI is further than local ISP websites
   you can cut access to them. Manual IP exclude list is required. Its possible to use md5sig with ttl.
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
   If automatic solution cannot be found then use zapret-hosts-user-exclude.txt.
@@ -223,7 +223,7 @@ doing something about it is hardly possible without the help of the server.
 The best solution is to enable TLS 1.3 support on the server. TLS 1.3 sends the server certificate in encrypted form.
 This is recommendation to all admins of blocked sites. Enable TLS 1.3. You will give more opportunities to overcome DPI.
 
-Hosts are extracted from plain http request Host: header and SNI of ClientHelllo TLS message.
+Hosts are extracted from plain http request Host: header and SNI of ClientHello TLS message.
 Subdomains are applied automatically. gzip lists are supported.
 
 iptables for performing the attack on the first packet :
@@ -300,7 +300,7 @@ tpws is transparent proxy.
  --pidfile=<filename>           ; write pid to file
  --user=<username>              ; drop root privs
  --uid=uid[:gid]		; drop root privs
- 
+
 The manipulation parameters can be combined in any way.
 
 split-http-req takes precedence over split-pos for http reqs.
@@ -523,13 +523,13 @@ The following calls allow you to apply or remove iptables rules separately:
 
  /opt/zapret/init.d/sysv/zapret start-fw
  /opt/zapret/init.d/sysv/zapret stop-fw
- 
+
 And you can start or stop the demons separately from the firewall:
 
  /opt/zapret/init.d/sysv/zapret start-daemons
  /opt/zapret/init.d/sysv/zapret stop-daemons
 
- 
+
 Simple install to desktop linux system
 --------------------------------------
 
