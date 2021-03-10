@@ -286,7 +286,7 @@ Link locals периодически меняются. Смена завязан
 выберите любой с длиной префикса 128. Это можно сделать в системных настройках, создав дополнительный адаптер на базе
 того же сетевого интерфейса, отключить в нем ipv4 и вписать статический ipv6. Он добавится к автоматически настраеваемым.
 
-Настройка tpws на macos в прозрачном режиме только для исходящих запросов, где en0 - WAN :
+Настройка tpws на macos в прозрачном режиме только для исходящих запросов :
 
 /etc/pf.conf
 ------------
@@ -296,10 +296,10 @@ pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} u
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
 ------------
 pfctl -ef /etc/pf.conf
-/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=en0 --bind-linklocal=force
+/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force
 
 
-Настройка tpws на macos роутере в прозрачном режиме, где en0 - WAN, en1 - LAN.
+Настройка tpws на macos роутере в прозрачном режиме, где en1 - LAN.
 
 ifconfig en1 | grep fe80
         inet6 fe80::bbbb:bbbb:bbbb:bbbb%en1 prefixlen 64 scopeid 0x8 
@@ -313,7 +313,7 @@ pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} u
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
 ------------
 pfctl -ef /etc/pf.conf
-/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=en0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
+/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
 
 
 Сборка : make -C /opt/zapret mac

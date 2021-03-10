@@ -259,7 +259,7 @@ Then reboot the system.
 If you dont like this solution you can assign an additional static ipv6 address from fd00::/8 range with /128 prefix
 to your LAN interface and use it as the gateway address.
 
-tpws transparent mode only for outgoing connections. en0 - WAN.
+tpws transparent mode only for outgoing connections.
 
 /etc/pf.conf
 ------------
@@ -269,10 +269,10 @@ pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} u
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
 ------------
 pfctl -ef /etc/pf.conf
-/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=en0 --bind-linklocal=force
+/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force
 
 
-tpws transparent mode for both passthrough and outgoing connections. en0 - WAN, en1 - WAN.
+tpws transparent mode for both passthrough and outgoing connections. en1 - LAN.
 
 ifconfig en1 | grep fe80
         inet6 fe80::bbbb:bbbb:bbbb:bbbb%en1 prefixlen 64 scopeid 0x8 
@@ -286,7 +286,7 @@ pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} u
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
 ------------
 pfctl -ef /etc/pf.conf
-/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=en0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
+/opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
 
 
 Build from source : make -C /opt/zapret mac
