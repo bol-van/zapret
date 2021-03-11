@@ -176,7 +176,6 @@ hup_zapret_daemons()
 {
  echo forcing zapret daemons to reload their hostlist
  if exists killall; then
-  kcmd=killall
   killall -HUP tpws nfqws dvtws 2>/dev/null
  elif exists pkill; then
   pkill -HUP ^tpws$ ^nfqws$ ^dvtws$
