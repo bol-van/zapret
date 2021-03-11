@@ -862,7 +862,7 @@ check_dns()
 	}
 	echo all resolved IPs are unique
 	echo -- DNS looks good
-	echo -- NOTE this check is Russia targeted. In your country other domains can be blocked.
+	echo -- NOTE this check is Russia targeted. In your country other domains may be blocked.
 	check_dns_cleanup
 	return 0
 }
