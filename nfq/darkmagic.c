@@ -675,8 +675,7 @@ void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
 			else
 			{
 				scale[2]=scale_factor;
-				if (scale_factor_old!=scale_factor)
-					DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
+				DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
 			}
 		}
 	}
