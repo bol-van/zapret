@@ -669,9 +669,15 @@ void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
 		if (scale && scale[1]==3) // length should be 3
 		{
 			scale_factor_old=scale[2];
-			scale[2]=scale_factor;
-			if (scale_factor_old!=scale_factor)
-				DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
+			// do not allow increasing scale factor
+			if (scale_factor>=scale_factor_old)
+				DLOG("Scale factor %u unchanged\n", scale_factor_old)
+			else
+			{
+				scale[2]=scale_factor;
+				if (scale_factor_old!=scale_factor)
+					DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
+			}
 		}
 	}
 }
