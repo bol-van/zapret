@@ -66,28 +66,6 @@ static void dohup()
 }
 
 
-
-static void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize)
-{
-	uint16_t winsize_old;
-	winsize_old = htons(tcp->th_win); // << scale_factor;
-	tcp->th_win = htons(winsize);
-	DLOG("Window size change %u => %u\n", winsize_old, winsize)
-}
-
-// data/len points to data payload
-static bool modify_tcp_packet(uint8_t *data, size_t len, struct tcphdr *tcphdr)
-{
-	if (tcp_synack_segment(tcphdr) && params.wsize)
-	{
-		tcp_rewrite_winsize(tcphdr, (uint16_t)params.wsize);
-		return true;
-	}
-	return false;
-}
-
-
-
 #ifdef __linux__
 static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt, uint32_t *mark)
 #else
@@ -99,7 +77,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 	struct tcphdr *tcphdr = NULL;
 	size_t len = len_pkt, len_tcp;
 	uint8_t *data = data_pkt;
-	packet_process_result res = pass, res2;
+	packet_process_result res = pass;
 	uint8_t proto;
 
 #ifdef __linux__
@@ -152,11 +130,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 
 		if (len) { DLOG("TCP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
 
-		if (modify_tcp_packet(data, len, tcphdr))
-			res = modify;
-
-		res2 = dpi_desync_packet(data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_tcp, data, len);
-		res = (res2==pass && res==modify) ? modify : res2;
+		res = dpi_desync_packet(data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_tcp, data, len);
 		// in my FreeBSD divert tests only ipv4 packets were reinjected with correct checksum
 		// ipv6 packets were with incorrect checksum
 #ifdef __FreeBSD__
@@ -444,6 +418,33 @@ exiterr:
 
 
 
+static bool parse_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
+{
+	int v;
+	char *p;
+
+	if ((p = strchr(s,':'))) *p++=0;
+	v = atoi(s);
+	if (v < 0 || v>65535)
+	{
+		fprintf(stderr, "bad wsize\n");
+		return false;
+	}
+	*wsize=(uint16_t)v;
+	if (p && *p)
+	{
+		v = atoi(p);
+		if (v < 0 || v>255)
+		{
+			fprintf(stderr, "bad wscale\n");
+			return false;
+		}
+		*wscale = (uint8_t)v;
+	}
+	return true;
+}
+
+
 static void exithelp()
 {
 	printf(
@@ -457,7 +458,8 @@ static void exithelp()
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
 		" --user=<username>\t\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t\t; drop root privs\n"
-		" --wsize=<window_size>\t\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
+		" --wsize=<window_size>[:<scale_factor>]\t; set window size. 0 = do not modify. OBSOLETE !\n"
+		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify.\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
@@ -528,6 +530,8 @@ int main(int argc, char **argv)
 	memcpy(params.fake_tls,fake_tls_clienthello_default,params.fake_tls_size);
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
+	params.wscale=-1; // default - dont change scale factor (client)
+
 	if (can_drop_root()) // are we root ?
 	{
 		params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
@@ -548,28 +552,29 @@ int main(int argc, char **argv)
 		{"user",required_argument,0,0 },	// optidx=4
 		{"uid",required_argument,0,0 },		// optidx=5
 		{"wsize",required_argument,0,0},	// optidx=6
-		{"hostcase",no_argument,0,0},		// optidx=7
-		{"hostspell",required_argument,0,0},	// optidx=8
-		{"hostnospace",no_argument,0,0},	// optidx=9
-		{"domcase",no_argument,0,0 },		// optidx=10
-		{"dpi-desync",required_argument,0,0},		// optidx=11
+		{"wssize",required_argument,0,0},	// optidx=7
+		{"hostcase",no_argument,0,0},		// optidx=8
+		{"hostspell",required_argument,0,0},	// optidx=9
+		{"hostnospace",no_argument,0,0},	// optidx=10
+		{"domcase",no_argument,0,0 },		// optidx=11
+		{"dpi-desync",required_argument,0,0},		// optidx=12
 #ifdef __linux__
-		{"dpi-desync-fwmark",required_argument,0,0},	// optidx=12
+		{"dpi-desync-fwmark",required_argument,0,0},	// optidx=13
 #elif defined(SO_USER_COOKIE)
-		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=12
+		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=13
 #else
-		{"disabled_argument_2",no_argument,0,0},	// optidx=12
+		{"disabled_argument_2",no_argument,0,0},	// optidx=13
 #endif
-		{"dpi-desync-ttl",required_argument,0,0},	// optidx=13
-		{"dpi-desync-fooling",required_argument,0,0},	// optidx=14
-		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=15
-		{"dpi-desync-repeats",required_argument,0,0},	// optidx=16
-		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=17
-		{"dpi-desync-split-pos",required_argument,0,0},// optidx=18
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=19
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=20
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=21
-		{"hostlist",required_argument,0,0},		// optidx=22
+		{"dpi-desync-ttl",required_argument,0,0},	// optidx=14
+		{"dpi-desync-fooling",required_argument,0,0},	// optidx=15
+		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=16
+		{"dpi-desync-repeats",required_argument,0,0},	// optidx=17
+		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=18
+		{"dpi-desync-split-pos",required_argument,0,0},// optidx=19
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=20
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=21
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=22
+		{"hostlist",required_argument,0,0},		// optidx=23
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -631,17 +636,17 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 6: /* wsize */
-			params.wsize = atoi(optarg);
-			if (params.wsize < 0 || params.wsize>65535)
-			{
-				fprintf(stderr, "bad wsize\n");
+			if (!parse_scale_factor(optarg,&params.wsize,&params.wscale))
 				exit_clean(1);
-			}
 			break;
-		case 7: /* hostcase */
+		case 7: /* wssize */
+			if (!parse_scale_factor(optarg,&params.wssize,&params.wsscale))
+				exit_clean(1);
+			break;
+		case 8: /* hostcase */
 			params.hostcase = true;
 			break;
-		case 8: /* hostspell */
+		case 9: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
 				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
@@ -650,13 +655,13 @@ int main(int argc, char **argv)
 			params.hostcase = true;
 			memcpy(params.hostspell, optarg, 4);
 			break;
-		case 9: /* hostnospace */
+		case 10: /* hostnospace */
 			params.hostnospace = true;
 			break;
-		case 10: /* domcase */
+		case 11: /* domcase */
 			params.domcase = true;
 			break;
-		case 11: /* dpi-desync */
+		case 12: /* dpi-desync */
 			{
 				char *mode2;
 				mode2 = optarg ? strchr(optarg,',') : NULL;
@@ -676,7 +681,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 12: /* dpi-desync-fwmark/dpi-desync-sockarg */
+		case 13: /* dpi-desync-fwmark/dpi-desync-sockarg */
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 			params.desync_fwmark = 0;
 			if (!sscanf(optarg, "0x%X", &params.desync_fwmark)) sscanf(optarg, "%u", &params.desync_fwmark);
@@ -690,10 +695,10 @@ int main(int argc, char **argv)
 			exit_clean(1);
 #endif
 			break;
-		case 13: /* dpi-desync-ttl */
+		case 14: /* dpi-desync-ttl */
 			params.desync_ttl = (uint8_t)atoi(optarg);
 			break;
-		case 14: /* dpi-desync-fooling */
+		case 15: /* dpi-desync-fooling */
 			{
 				char *e,*p = optarg;
 				while (p)
@@ -722,7 +727,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 15: /* dpi-desync-retrans */
+		case 16: /* dpi-desync-retrans */
 #ifdef __linux__
 			params.desync_retrans = !optarg || atoi(optarg);
 #else
@@ -730,7 +735,7 @@ int main(int argc, char **argv)
 			exit_clean(1);
 #endif
 			break;
-		case 16: /* dpi-desync-repeats */
+		case 17: /* dpi-desync-repeats */
 			params.desync_repeats = atoi(optarg);
 			if (params.desync_repeats<=0 || params.desync_repeats>20)
 			{
@@ -738,10 +743,10 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 17: /* dpi-desync-skip-nosni */
+		case 18: /* dpi-desync-skip-nosni */
 			params.desync_skip_nosni = !optarg || atoi(optarg);
 			break;
-		case 18: /* dpi-desync-split-pos */
+		case 19: /* dpi-desync-split-pos */
 			params.desync_split_pos = atoi(optarg);
 			if (params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
 			{
@@ -749,10 +754,10 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 19: /* dpi-desync-any-protocol */
+		case 20: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 20: /* dpi-desync-fake-http */
+		case 21: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
 			if (!load_file_nonempty(optarg,params.fake_http,&params.fake_http_size))
 			{
@@ -760,7 +765,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 21: /* dpi-desync-fake-tls */
+		case 22: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
 			if (!load_file_nonempty(optarg,params.fake_tls,&params.fake_tls_size))
 			{
@@ -768,7 +773,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 22: /* hostlist */
+		case 23: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

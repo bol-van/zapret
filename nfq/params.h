@@ -26,7 +26,8 @@
 struct params_s
 {
 	bool debug;
-	int wsize;
+	uint16_t wsize,wssize;
+	uint8_t wscale,wsscale;
 #ifdef __linux__
 	int qnum;
 #elif defined(BSD)

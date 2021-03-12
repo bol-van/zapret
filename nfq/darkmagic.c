@@ -648,3 +648,42 @@ bool tcp_synack_segment(const struct tcphdr *tcphdr)
 	/* check for set bits in TCP hdr */
 	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == (TH_ACK|TH_SYN));
 }
+bool tcp_syn_segment(const struct tcphdr *tcphdr)
+{
+	/* check for set bits in TCP hdr */
+	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == TH_SYN);
+}
+bool tcp_ack_segment(const struct tcphdr *tcphdr)
+{
+	/* check for set bits in TCP hdr */
+	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == TH_ACK);
+}
+
+void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
+{
+	uint8_t *scale,scale_factor_old;
+
+	if (scale_factor!=(uint8_t)-1)
+	{
+		scale = tcp_find_option(tcp,3); // tcp option 3 - scale factor
+		if (scale && scale[1]==3) // length should be 3
+		{
+			scale_factor_old=scale[2];
+			scale[2]=scale_factor;
+			if (scale_factor_old!=scale_factor)
+				DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
+		}
+	}
+}
+// scale_factor=-1 - do not change
+void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor)
+{
+	uint16_t winsize_old;
+	uint8_t *scale,scale_factor_old;
+
+	winsize_old = htons(tcp->th_win); // << scale_factor;
+	tcp->th_win = htons(winsize);
+	DLOG("Window size change %u => %u\n", winsize_old, winsize)
+
+	tcp_rewrite_wscale(tcp, scale_factor);
+}

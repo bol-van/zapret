@@ -371,7 +371,7 @@ flow_offloading_exempt()
 
 zapret_apply_firewall()
 {
-	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 2:4"
+	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
 	local f4 f6
 

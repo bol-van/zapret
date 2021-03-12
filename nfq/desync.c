@@ -105,6 +105,18 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 	packet_process_result res=pass;
 
 	if (!!ip == !!ip6hdr) return res; // one and only one must be present
+
+	if (params.wsize && tcp_synack_segment(tcphdr))
+	{
+		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
+		res=modify;
+	}
+	if (params.wssize && !tcp_synack_segment(tcphdr))
+	{
+		tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
+		res=modify;
+	}
+
 	if (params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
 
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)

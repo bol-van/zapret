@@ -73,4 +73,10 @@ bool proto_check_tcp(uint8_t *data, size_t len);
 void proto_skip_tcp(uint8_t **data, size_t *len);
 bool proto_check_ipv6(uint8_t *data, size_t len);
 void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type);
+
 bool tcp_synack_segment(const struct tcphdr *tcphdr);
+bool tcp_syn_segment(const struct tcphdr *tcphdr);
+bool tcp_ack_segment(const struct tcphdr *tcphdr);
+// scale_factor=-1 - do not change
+void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor);
+void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor);
