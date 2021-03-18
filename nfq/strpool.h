@@ -5,6 +5,7 @@
 
 //#define HASH_BLOOM 20
 #define HASH_NONFATAL_OOM 1
+#undef HASH_FUNCTION
 #define HASH_FUNCTION HASH_BER
 #include "uthash.h"
 

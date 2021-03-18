@@ -513,7 +513,7 @@ static void str_srcdst_ip(char *s, size_t s_len, const void *saddr,const void *d
 }
 static void str_ip(char *s, size_t s_len, const struct ip *ip)
 {
-	char ss[64],s_proto[16];
+	char ss[35],s_proto[16];
 	str_srcdst_ip(ss,sizeof(ss),&ip->ip_src,&ip->ip_dst);
 	str_proto_name(s_proto,sizeof(s_proto),ip->ip_p);
 	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
@@ -534,7 +534,7 @@ static void str_srcdst_ip6(char *s, size_t s_len, const void *saddr,const void *
 }
 static void str_ip6hdr(char *s, size_t s_len, const struct ip6_hdr *ip6hdr, uint8_t proto)
 {
-	char ss[128],s_proto[16];
+	char ss[83],s_proto[16];
 	str_srcdst_ip6(ss,sizeof(ss),&ip6hdr->ip6_src,&ip6hdr->ip6_dst);
 	str_proto_name(s_proto,sizeof(s_proto),proto);
 	snprintf(s,s_len,"%s proto=%s",ss,s_proto);

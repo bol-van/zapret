@@ -189,3 +189,7 @@ limited MacOS support
 v38
 
 MacOS easy install
+
+v39
+
+nfqws: conntrack, wssize

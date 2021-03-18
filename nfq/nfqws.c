@@ -36,6 +36,9 @@
 #define IPPROTO_DIVERT 258
 #endif
 
+#define CTRACK_T_SYN	60
+#define CTRACK_T_EST	300
+#define CTRACK_T_FIN	60
 
 struct params_s params;
 
@@ -64,6 +67,14 @@ static void dohup()
 		bHup = false;
 	}
 }
+
+static void onusr1(int sig)
+{
+	printf("\nCONNTRACK DUMP\n");
+	ConntrackPoolDump(&params.conntrack);
+	printf("\n");
+}
+
 
 
 #ifdef __linux__
@@ -234,6 +245,7 @@ static int nfq_main()
 	print_id();
 
 	signal(SIGHUP, onhup);
+	signal(SIGUSR1, onusr1);
 
 	desync_init();
 
@@ -349,6 +361,7 @@ static int dvt_main()
 	print_id();
 
 	signal(SIGHUP, onhup);
+	signal(SIGUSR1, onusr1);
 
 	desync_init();
 
@@ -459,7 +472,9 @@ static void exithelp()
 		" --user=<username>\t\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t\t; drop root privs\n"
 		" --wsize=<window_size>[:<scale_factor>]\t; set window size. 0 = do not modify. OBSOLETE !\n"
-		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify.\n"
+		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
+		" --wssize-cutoff=N\t\t\t; apply server wsize only to packet numbers less than N\n"
+		" --ctrack-timeouts=S:E:F\t\t; internal conntrack timeouts for SYN, ESTABLISHED and FIN stage. default %u:%u:%u\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
@@ -482,6 +497,7 @@ static void exithelp()
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
+		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
@@ -497,6 +513,7 @@ static void cleanup_params()
 		StrPoolDestroy(&params.hostlist);
 		params.hostlist = NULL;
 	}
+	ConntrackPoolDestroy(&params.conntrack);
 }
 static void exithelp_clean()
 {
@@ -531,6 +548,9 @@ int main(int argc, char **argv)
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
 	params.wscale=-1; // default - dont change scale factor (client)
+	params.ctrack_t_syn = CTRACK_T_SYN;
+	params.ctrack_t_est = CTRACK_T_EST;
+	params.ctrack_t_fin = CTRACK_T_FIN;
 
 	if (can_drop_root()) // are we root ?
 	{
@@ -553,28 +573,30 @@ int main(int argc, char **argv)
 		{"uid",required_argument,0,0 },		// optidx=5
 		{"wsize",required_argument,0,0},	// optidx=6
 		{"wssize",required_argument,0,0},	// optidx=7
-		{"hostcase",no_argument,0,0},		// optidx=8
-		{"hostspell",required_argument,0,0},	// optidx=9
-		{"hostnospace",no_argument,0,0},	// optidx=10
-		{"domcase",no_argument,0,0 },		// optidx=11
-		{"dpi-desync",required_argument,0,0},		// optidx=12
+		{"wssize-cutoff",required_argument,0,0},// optidx=8
+		{"ctrack-timeouts",required_argument,0,0},// optidx=9
+		{"hostcase",no_argument,0,0},		// optidx=10
+		{"hostspell",required_argument,0,0},	// optidx=11
+		{"hostnospace",no_argument,0,0},	// optidx=12
+		{"domcase",no_argument,0,0 },		// optidx=13
+		{"dpi-desync",required_argument,0,0},		// optidx=14
 #ifdef __linux__
-		{"dpi-desync-fwmark",required_argument,0,0},	// optidx=13
+		{"dpi-desync-fwmark",required_argument,0,0},	// optidx=15
 #elif defined(SO_USER_COOKIE)
-		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=13
+		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=15
 #else
-		{"disabled_argument_2",no_argument,0,0},	// optidx=13
+		{"disabled_argument_2",no_argument,0,0},	// optidx=15
 #endif
-		{"dpi-desync-ttl",required_argument,0,0},	// optidx=14
-		{"dpi-desync-fooling",required_argument,0,0},	// optidx=15
-		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=16
-		{"dpi-desync-repeats",required_argument,0,0},	// optidx=17
-		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=18
-		{"dpi-desync-split-pos",required_argument,0,0},// optidx=19
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=20
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=21
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=22
-		{"hostlist",required_argument,0,0},		// optidx=23
+		{"dpi-desync-ttl",required_argument,0,0},	// optidx=16
+		{"dpi-desync-fooling",required_argument,0,0},	// optidx=17
+		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=18
+		{"dpi-desync-repeats",required_argument,0,0},	// optidx=19
+		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=20
+		{"dpi-desync-split-pos",required_argument,0,0},// optidx=21
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=22
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=23
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=24
+		{"hostlist",required_argument,0,0},		// optidx=25
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -643,10 +665,24 @@ int main(int argc, char **argv)
 			if (!parse_scale_factor(optarg,&params.wssize,&params.wsscale))
 				exit_clean(1);
 			break;
-		case 8: /* hostcase */
+		case 8: /* wssize-cutoff */
+			if (!sscanf(optarg, "%u", &params.wssize_cutoff))
+			{
+				fprintf(stderr, "invalid wssize-cutoff value\n");
+				exit_clean(1);
+			}
+			break;
+		case 9: /* ctrack-timeouts */
+			if (sscanf(optarg, "%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin)!=3)
+			{
+				fprintf(stderr, "invalid ctrack-timeouts value\n");
+				exit_clean(1);
+			}
+			break;
+		case 10: /* hostcase */
 			params.hostcase = true;
 			break;
-		case 9: /* hostspell */
+		case 11: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
 				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
@@ -655,13 +691,13 @@ int main(int argc, char **argv)
 			params.hostcase = true;
 			memcpy(params.hostspell, optarg, 4);
 			break;
-		case 10: /* hostnospace */
+		case 12: /* hostnospace */
 			params.hostnospace = true;
 			break;
-		case 11: /* domcase */
+		case 13: /* domcase */
 			params.domcase = true;
 			break;
-		case 12: /* dpi-desync */
+		case 14: /* dpi-desync */
 			{
 				char *mode2;
 				mode2 = optarg ? strchr(optarg,',') : NULL;
@@ -681,7 +717,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 13: /* dpi-desync-fwmark/dpi-desync-sockarg */
+		case 15: /* dpi-desync-fwmark/dpi-desync-sockarg */
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 			params.desync_fwmark = 0;
 			if (!sscanf(optarg, "0x%X", &params.desync_fwmark)) sscanf(optarg, "%u", &params.desync_fwmark);
@@ -695,10 +731,10 @@ int main(int argc, char **argv)
 			exit_clean(1);
 #endif
 			break;
-		case 14: /* dpi-desync-ttl */
+		case 16: /* dpi-desync-ttl */
 			params.desync_ttl = (uint8_t)atoi(optarg);
 			break;
-		case 15: /* dpi-desync-fooling */
+		case 17: /* dpi-desync-fooling */
 			{
 				char *e,*p = optarg;
 				while (p)
@@ -727,7 +763,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 16: /* dpi-desync-retrans */
+		case 18: /* dpi-desync-retrans */
 #ifdef __linux__
 			params.desync_retrans = !optarg || atoi(optarg);
 #else
@@ -735,7 +771,7 @@ int main(int argc, char **argv)
 			exit_clean(1);
 #endif
 			break;
-		case 17: /* dpi-desync-repeats */
+		case 19: /* dpi-desync-repeats */
 			params.desync_repeats = atoi(optarg);
 			if (params.desync_repeats<=0 || params.desync_repeats>20)
 			{
@@ -743,10 +779,10 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 18: /* dpi-desync-skip-nosni */
+		case 20: /* dpi-desync-skip-nosni */
 			params.desync_skip_nosni = !optarg || atoi(optarg);
 			break;
-		case 19: /* dpi-desync-split-pos */
+		case 21: /* dpi-desync-split-pos */
 			params.desync_split_pos = atoi(optarg);
 			if (params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
 			{
@@ -754,10 +790,10 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 20: /* dpi-desync-any-protocol */
+		case 22: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 21: /* dpi-desync-fake-http */
+		case 23: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
 			if (!load_file_nonempty(optarg,params.fake_http,&params.fake_http_size))
 			{
@@ -765,7 +801,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 22: /* dpi-desync-fake-tls */
+		case 24: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
 			if (!load_file_nonempty(optarg,params.fake_tls,&params.fake_tls_size))
 			{
@@ -773,7 +809,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 23: /* hostlist */
+		case 25: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
@@ -796,6 +832,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "could not write pidfile\n");
 		goto exiterr;
 	}
+
+	DLOG("initializing conntrack with timeouts %u:%u:%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin)
+	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin);
 
 #ifdef __linux__
 	result = nfq_main();

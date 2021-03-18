@@ -135,7 +135,9 @@ nfqws takes the following parameters:
  --qnum=<nfqueue_number>
  --wsize=<window_size> 			; set window size. 0 = do not modify (obsolete !)
  --wsize=<winsize>[:<scale_factor>]	; change window size in SYN,ACK packets. default is not to change scale factor (OBSOLETE !)
- --wssize=<winsize>[:<scale_factor>]	; change window size in all packets except SYN,ACK. default scale factor is 0.
+ --wssize=<winsize>[:<scale_factor>]	; change window size in outgoing packets. default scale factor is 0. (see CONNTRACK)
+ --wssize-cutoff=N                      ; apply server wsize only to packet numbers less than N
+ --ctrack-timeouts=S:E:F                ; internal conntrack timeouts for SYN, ESTABLISHED and FIN stages. default 60:300:60
  --hostcase           			; change Host: => host:
  --hostspell=HoSt      			; exact spelling of the "Host" header. must be 4 chars. default is "host"
  --hostnospace         			; remove space after Host: and add it to User-Agent: to preserve packet size
@@ -220,8 +222,8 @@ If, instead of ACK or SACK, there is an RST packet with minimal delay, DPI cuts 
 If the RST is after a full ACK after a delay of about ping to the server, then probably DPI acts
 on the server response. The DPI may be satisfied with good ClientHello and stop monitoring the TCP session
 without checking ServerHello. Then you were lucky. 'fake' option could work.
-If it does not stop monitoring and persistently checks the ServerHello, also performing reconstruction of TCP segments,
-doing something about it is hardly possible without the help of the server.
+If it does not stop monitoring and persistently checks the ServerHello, --wssize parameter may help (see CONNTRACK).
+Otherwise it is hardly possible to overcome this without the help of the server.
 The best solution is to enable TLS 1.3 support on the server. TLS 1.3 sends the server certificate in encrypted form.
 This is recommendation to all admins of blocked sites. Enable TLS 1.3. You will give more opportunities to overcome DPI.
 
@@ -252,6 +254,37 @@ Most of nfqws packet magic does not work from VMs powered by virtualbox and vmwa
 Hypervisor forcibly changes ttl and does not forward fake packets.
 Set up bridge networking.
 
+
+CONNTRACK
+nfqws is equipped with minimalicstic connection tracking system (conntrack)
+It's enabled if some specific DPI circumvention methods are involved. At the moment it's --wssize parameter.
+Conntrack can track connection phase : SYN,ESTABLISHED,FIN , packet counts in both directions , sequence numbers.
+It can be fed with unidirectional or bidirectional packets.
+A SYN or SYN,ACK packet creates an entry in the conntrack table.
+That's why iptables redirection must start with the first packet although can be cut later using connbytes filter.
+A connection is deleted from the table as soon as it's no more required to satisfy nfqws needs or when a timeout happens.
+There're 3 timeouts for each connection state. They can be changed in --ctrack-timeouts parameter.
+
+--wssize changes tcp window size for the server to force it to send split replies.
+In order for this to affect all server operating systems, it is necessary to change the window size in each outgoing packet
+before sending the message, the answer to which must be split (for example, TLS ClientHello).
+That's why conntrack is required to know when to stop applying low window size.
+If you do not stop and set the low wssize all the time, the speed will drop catastrophically.
+Linux can overcome this using connbytes filter but other OS may not include similar filter.
+In http(s) case wssize stops after the first http request or TLS ClientHello.
+If you deal with a non-http(s) protocol you need --wssize-cutoff. It sets the number of the outgoing packet where wssize stops.
+If your protocol is prone to long inactivity, you should increase ESTABLISHED phase timeout using --ctrack-timeouts.
+Default timeout is low - only 5 mins.
+Don't forget that nfqws feeds with redirected packets. If you have limited redirection with connbytes
+ESTABLISHED entries can remain in the table until dropped by timeout.
+To diagnose conntrack state send SIGUSR1 signal to nfqws : killall -SIGUSR1 nfqws.
+nfqws will dump current conntrack table to stdout.
+
+Typically, in a SYN packet, client sends TCP extension "scaling factor" in addition to window size.
+scaling factor is the power of two by which the window size is multiplied : 0=>1, 1=>2, 2=>4, ..., 8=>256, ...
+The wssize parameter specifies the scaling factor after a colon.
+Scaling factor can only decrease, increase is blocked to prevent the server from exceeding client's window size.
+To force a TLS server to fragment ServerHello message to avoid hostname detection on DPI use --wssize=1:6
 
 tpws
 -----

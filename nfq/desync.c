@@ -5,6 +5,7 @@
 #include "params.h"
 #include "helpers.h"
 #include "hostlist.h"
+#include "conntrack.h"
 
 #include <string.h>
 
@@ -103,21 +104,30 @@ static bool rawsend_rep(const struct sockaddr* dst,uint32_t fwmark,const void *d
 packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {
 	packet_process_result res=pass;
+	t_ctrack *ctrack=NULL;
+	bool bReverse=false;
 
 	if (!!ip == !!ip6hdr) return res; // one and only one must be present
 
+	if (params.wssize)
+	{
+		ConntrackPoolPurge(&params.conntrack);
+		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, len_payload, &ctrack, &bReverse))
+			if (params.wssize_cutoff && ctrack->pcounter_orig>=params.wssize_cutoff)
+				ctrack->b_cutoff=true;
+	}
 	if (params.wsize && tcp_synack_segment(tcphdr))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
 		res=modify;
 	}
-	if (params.wssize && !tcp_synack_segment(tcphdr))
+	if (params.wssize && !bReverse && (ctrack && !ctrack->b_cutoff))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
 		res=modify;
 	}
 
-	if (params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
+	if (bReverse || !params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
 
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)
 	{
@@ -132,6 +142,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		if ((bIsHttp = IsHttp(data_payload,len_payload)))
 		{
 			DLOG("packet contains HTTP request\n")
+			if (ctrack && !params.wssize_cutoff) ctrack->b_cutoff = true;
 			fake = params.fake_http;
 			fake_size = params.fake_http_size;
 			if (params.hostlist || params.debug) bHaveHost=HttpExtractHost(data_payload,len_payload,host,sizeof(host));
@@ -144,6 +155,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		else if (IsTLSClientHello(data_payload,len_payload))
 		{
 			DLOG("packet contains TLS ClientHello\n")
+			if (ctrack && !params.wssize_cutoff) ctrack->b_cutoff = true;
 			fake = params.fake_tls;
 			fake_size = params.fake_tls_size;
 			if (params.hostlist || params.desync_skip_nosni || params.debug)

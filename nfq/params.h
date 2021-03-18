@@ -2,6 +2,7 @@
 
 #include "params.h"
 #include "strpool.h"
+#include "conntrack.h"
 #include "desync.h"
 
 #include <sys/param.h>
@@ -28,6 +29,7 @@ struct params_s
 	bool debug;
 	uint16_t wsize,wssize;
 	uint8_t wscale,wsscale;
+	unsigned int wssize_cutoff;
 #ifdef __linux__
 	int qnum;
 #elif defined(BSD)
@@ -48,6 +50,9 @@ struct params_s
 	bool droproot;
 	uid_t uid;
 	gid_t gid;
+
+	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin;
+	t_conntrack conntrack;
 };
 
 extern struct params_s params;
