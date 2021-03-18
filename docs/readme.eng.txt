@@ -286,6 +286,11 @@ The wssize parameter specifies the scaling factor after a colon.
 Scaling factor can only decrease, increase is blocked to prevent the server from exceeding client's window size.
 To force a TLS server to fragment ServerHello message to avoid hostname detection on DPI use --wssize=1:6
 
+Hostlist filter does not affect --wssize because it works since the connection initiation when it's not yet possible
+to extract the host name.
+--wssize may slow down sites and/or increase response time. It's desired to use another methods if possible.
+
+
 tpws
 -----
 
