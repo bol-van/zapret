@@ -76,7 +76,7 @@ bool check_local_ip(const struct sockaddr *saddr)
 {
 	struct ifaddrs *addrs,*a;
 
-	if (saddr->sa_family==AF_INET && is_localnet((struct sockaddr_in *)saddr))
+	if (is_localnet(saddr))
 		return true;
 
 	if (getifaddrs(&addrs)<0) return false;
@@ -153,9 +153,10 @@ bool saconvmapped(struct sockaddr_storage *a)
 	return false;
 }
 
-bool is_localnet(const struct sockaddr_in *a)
+bool is_localnet(const struct sockaddr *a)
 {
-	return (htonl(a->sin_addr.s_addr)>>24)==127;
+	return a->sa_family==AF_INET && *(char*)&((struct sockaddr_in *)a)->sin_addr.s_addr==127 ||
+		a->sa_family==AF_INET6 && saismapped((struct sockaddr_in6 *)a) && ((struct sockaddr_in6 *)a)->sin6_addr.s6_addr[12]==127;
 }
 bool is_linklocal(const struct sockaddr_in6 *a)
 {

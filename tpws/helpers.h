@@ -21,7 +21,7 @@ uint16_t saport(const struct sockaddr *sa);
 // true = was converted
 bool saconvmapped(struct sockaddr_storage *a);
 
-bool is_localnet(const struct sockaddr_in *a);
+bool is_localnet(const struct sockaddr *a);
 bool is_linklocal(const struct sockaddr_in6* a);
 bool is_private6(const struct sockaddr_in6* a);
 
