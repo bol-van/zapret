@@ -16,7 +16,7 @@
 #define DPI_DESYNC_FWMARK_DEFAULT 512
 #endif
 
-#define DPI_DESYNC_MAX_FAKE_LEN 1500
+#define DPI_DESYNC_MAX_FAKE_LEN 9216
 
 enum dpi_desync_mode {
 	DESYNC_NONE=0,
