@@ -46,8 +46,14 @@ uint32_t *tcp_find_timestamps(struct tcphdr *tcp)
 	uint8_t *t = tcp_find_option(tcp,8);
 	return (t && t[1]==10) ? (uint32_t*)(t+2) : NULL;
 }
+uint8_t tcp_find_scale_factor(const struct tcphdr *tcp)
+{
+	uint8_t *scale = tcp_find_option((struct tcphdr*)tcp,3); // tcp option 3 - scale factor
+	if (scale && scale[1]==3) return scale[2];
+	return SCALE_NONE;
+}
 
-static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uint32_t ack_seq, uint8_t fooling, uint16_t nsport, uint16_t ndport, uint16_t nwsize, uint32_t *timestamps)
+static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uint32_t ack_seq, uint8_t fooling, uint16_t nsport, uint16_t ndport, uint16_t nwsize, uint8_t scale_factor, uint32_t *timestamps)
 {
 	char *tcpopt = (char*)(tcp+1);
 	uint8_t t=0;
@@ -87,14 +93,21 @@ static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uin
 		*(uint32_t*)(tcpopt+t+6) = (timestamps && !(fooling & TCP_FOOL_TS)) ? timestamps[1] : -1;
 		t+=10;
 	}
+	if (scale_factor!=SCALE_NONE)
+	{
+		tcpopt[t++]=3;
+		tcpopt[t++]=3;
+		tcpopt[t++]=scale_factor;
+	}
 	while (t&3) tcpopt[t++]=1; // noop
 	tcp->th_off += t>>2;
 }
-static uint16_t tcpopt_len(uint8_t fooling, uint32_t *timestamps)
+static uint16_t tcpopt_len(uint8_t fooling, uint32_t *timestamps, uint8_t scale_factor)
 {
 	uint16_t t=0;
 	if (fooling & TCP_FOOL_MD5SIG) t=18;
 	if ((fooling & TCP_FOOL_TS) || timestamps) t+=10;
+	if (scale_factor!=SCALE_NONE) t+=3;
 	return (t+3)&~3;
 }
 
@@ -253,6 +266,7 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 {
 	int sock=rawsend_socket(dst->sa_family,fwmark);
 	if (sock==-1) return false;
+
 	int salen = dst->sa_family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 	struct sockaddr_storage dst2;
 	memcpy(&dst2,dst,salen);
@@ -323,13 +337,14 @@ bool prepare_tcp_segment4(
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
 	uint16_t wsize,
+	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps);
+	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps, scale_factor);
 	uint16_t pktlen = sizeof(struct ip) + sizeof(struct tcphdr) + tcpoptlen  + len;
 	if (pktlen>*buflen)
 	{
@@ -350,7 +365,7 @@ bool prepare_tcp_segment4(
 	ip->ip_src = src->sin_addr;
 	ip->ip_dst = dst->sin_addr;
 
-	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin_port,dst->sin_port,wsize,timestamps);
+	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin_port,dst->sin_port,wsize,scale_factor,timestamps);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
 	tcp4_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip->ip_src,&ip->ip_dst);
@@ -366,13 +381,14 @@ bool prepare_tcp_segment6(
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
 	uint16_t wsize,
+	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps);
+	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps, scale_factor);
 	uint16_t payloadlen = sizeof(struct tcphdr) + tcpoptlen + len;
 	uint16_t pktlen = sizeof(struct ip6_hdr) + payloadlen;
 	if (pktlen>*buflen)
@@ -391,7 +407,7 @@ bool prepare_tcp_segment6(
 	ip6->ip6_src = src->sin6_addr;
 	ip6->ip6_dst = dst->sin6_addr;
 
-	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin6_port,dst->sin6_port,wsize,timestamps);
+	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin6_port,dst->sin6_port,wsize,scale_factor,timestamps);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
 	tcp6_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip6->ip6_src,&ip6->ip6_dst);
@@ -406,6 +422,7 @@ bool prepare_tcp_segment(
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
 	uint16_t wsize,
+	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
@@ -413,9 +430,9 @@ bool prepare_tcp_segment(
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,seq,ack_seq,wsize,timestamps,ttl,fooling,data,len,buf,buflen) :
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,seq,ack_seq,wsize,scale_factor,timestamps,ttl,fooling,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,seq,ack_seq,wsize,timestamps,ttl,fooling,data,len,buf,buflen) :
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,seq,ack_seq,wsize,scale_factor,timestamps,ttl,fooling,data,len,buf,buflen) :
 		false;
 }
 
@@ -663,7 +680,7 @@ void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
 {
 	uint8_t *scale,scale_factor_old;
 
-	if (scale_factor!=(uint8_t)-1)
+	if (scale_factor!=SCALE_NONE)
 	{
 		scale = tcp_find_option(tcp,3); // tcp option 3 - scale factor
 		if (scale && scale[1]==3) // length should be 3
@@ -680,7 +697,7 @@ void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
 		}
 	}
 }
-// scale_factor=-1 - do not change
+// scale_factor=SCALE_NONE - do not change
 void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor)
 {
 	uint16_t winsize_old;

@@ -98,6 +98,7 @@ t_conntrack6 *ConntrackPoolSearch6(t_conntrack6 *p, const t_conn6 *c)
 static void ConntrackInitTrack(t_ctrack *t)
 {
 	memset(t,0,sizeof(*t));
+	t->scale_orig = t->scale_reply = SCALE_NONE;
 	time(&t->t_start);
 }
 
@@ -122,6 +123,7 @@ static t_conntrack6 *ConntrackNew6(t_conntrack6 **pp, const t_conn6 *c)
 
 static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr *tcphdr, uint32_t len_payload)
 {
+	uint8_t scale;
 	if (tcp_syn_segment(tcphdr))
 	{
 		if (t->state==FIN) ConntrackInitTrack(t); // erase current entry
@@ -148,17 +150,23 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 			if (!bReverse && !t->ack0) t->ack0 = htonl(tcphdr->th_ack)-1;
 		}
 	}
+	scale = tcp_find_scale_factor(tcphdr);
 	if (bReverse)
 	{
 		t->seq_last = htonl(tcphdr->th_ack);
 		t->ack_last = htonl(tcphdr->th_seq) + len_payload;
 		t->pcounter_reply++;
+		t->winsize_reply = htons(tcphdr->th_win);
+		if (scale!=SCALE_NONE) t->scale_reply = scale;
+		
 	}
 	else
 	{
 		t->seq_last = htonl(tcphdr->th_seq) + len_payload;
 		t->ack_last = htonl(tcphdr->th_ack);
 		t->pcounter_orig++;
+		t->winsize_orig = htons(tcphdr->th_win);
+		if (scale!=SCALE_NONE) t->scale_orig = scale;
 	}
 	time(&t->t_last);
 }
@@ -271,13 +279,15 @@ void ConntrackPoolPurge(t_conntrack *p)
 	HASH_ITER(hh, p, t, tmp) { \
 		*sa1=0; inet_ntop(AF_INET##f, &t->conn.e1.adr, sa1, sizeof(sa1)); \
 		*sa2=0; inet_ntop(AF_INET##f, &t->conn.e2.adr, sa2, sizeof(sa2)); \
-		printf("[%s]:%u => [%s]:%u : %s : t0=%lld last=t0+%lld now=last+%lld cutoff=%u packets_orig=%llu packets_reply=%llu seq0=%u rseq=%u ack0=%u rack=%u\n", \
+		printf("[%s]:%u => [%s]:%u : %s : t0=%lld last=t0+%lld now=last+%lld cutoff=%u packets_orig=%llu packets_reply=%llu seq0=%u rseq=%u ack0=%u rack=%u wsize_orig=%u:%d wsize_reply=%u:%d\n", \
 			sa1, t->conn.e1.port, sa2, t->conn.e2.port, \
 			connstate_s[t->track.state], \
 			(unsigned long long)t->track.t_start, (unsigned long long)(t->track.t_last - t->track.t_start), (unsigned long long)(tnow - t->track.t_last), \
 			t->track.b_cutoff, \
 			(unsigned long long)t->track.pcounter_orig, (unsigned long long)t->track.pcounter_reply, \
-			t->track.seq0, t->track.seq_last - t->track.seq0, t->track.ack0, t->track.ack_last - t->track.ack0); \
+			t->track.seq0, t->track.seq_last - t->track.seq0, t->track.ack0, t->track.ack_last - t->track.ack0, \
+			t->track.winsize_orig, t->track.scale_orig==SCALE_NONE ? -1 : t->track.scale_orig, \
+			t->track.winsize_reply, t->track.scale_reply==SCALE_NONE ? -1 : t->track.scale_reply ); \
 	};
 void ConntrackPoolDump4(t_conntrack4 *p)
 {

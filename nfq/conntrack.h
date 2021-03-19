@@ -51,6 +51,8 @@ typedef struct
 	uint32_t seq0, ack0;			// starting seq and ack
 	uint32_t seq_last, ack_last;		// current seq and ack
 	uint64_t pcounter_orig, pcounter_reply;	// packet counter
+	uint16_t winsize_orig, winsize_reply;	// last seen window size
+	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
 
 	bool b_cutoff;				// mark for deletion
 } t_ctrack;

@@ -19,12 +19,15 @@ uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 #define TCP_FOOL_TS	4
 #define TCP_FOOL_BADSEQ	8
 
+#define SCALE_NONE ((uint8_t)-1)
+
 // seq and wsize have network byte order
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
 	uint16_t wsize,
+	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
@@ -35,6 +38,7 @@ bool prepare_tcp_segment6(
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
 	uint16_t wsize,
+	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
@@ -45,6 +49,7 @@ bool prepare_tcp_segment(
 	uint8_t tcp_flags,
 	uint32_t seq, uint32_t ack_seq,
 	uint16_t wsize,
+	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
@@ -54,6 +59,7 @@ bool prepare_tcp_segment(
 void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
 uint8_t *tcp_find_option(struct tcphdr *tcp, uint8_t kind);
 uint32_t *tcp_find_timestamps(struct tcphdr *tcp);
+uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
 
 // auto creates internal socket and uses it for subsequent calls
 bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t len);
@@ -77,6 +83,6 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type);
 bool tcp_synack_segment(const struct tcphdr *tcphdr);
 bool tcp_syn_segment(const struct tcphdr *tcphdr);
 bool tcp_ack_segment(const struct tcphdr *tcphdr);
-// scale_factor=-1 - do not change
+// scale_factor=SCALE_NONE - do not change
 void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor);
 void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor);
