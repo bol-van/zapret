@@ -6,13 +6,13 @@ zapret_custom_daemons()
 	local opt
 
 	[ "$MODE_HTTP" = "1" ] && {
-		opt="$TPWS_OPT"
+		opt="--port=$TPPORT $TPWS_OPT"
 		filter_apply_hostlist_target opt
 		do_tpws $1 1 "$opt"
 	}
 
 	[ "$MODE_HTTPS" = "1" ] && {
-		opt="$NFQWS_OPT_DESYNC"
+		opt="--qnum=$QNUM $NFQWS_OPT_DESYNC"
 		filter_apply_hostlist_target opt
 		do_nfqws $1 2 "$opt"
 	}

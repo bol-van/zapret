@@ -20,6 +20,9 @@ CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/openwrt/custom"
 IPSET_EXCLUDE="-m set ! --match-set nozapret"
 IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
 
+NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
+NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
+
 exists()
 {
  which "$1" >/dev/null 2>/dev/null
@@ -307,7 +310,8 @@ is_flow_offload_avail()
 list_nfqws_rules()
 {
 	# $1 = '' for ipv4, '6' for ipv6
-	ip$1tables -S POSTROUTING -t mangle  | grep "NFQUEUE --queue-num $QNUM --queue-bypass"  | sed -re 's/^-A POSTROUTING (.*) -j NFQUEUE.*$/\1/' -e "s/-m mark ! --mark $DESYNC_MARK\/$DESYNC_MARK//"
+	ip$1tables -S POSTROUTING -t mangle  | grep -E "NFQUEUE --queue-num $QNUM --queue-bypass|NFQUEUE --queue-num $(($QNUM+1)) --queue-bypass"  | \
+	sed -re 's/^-A POSTROUTING (.*) -j NFQUEUE.*$/\1/' -e "s/-m mark ! --mark $DESYNC_MARK\/$DESYNC_MARK//"
 }
 reverse_nfqws_rule()
 {
@@ -374,6 +378,7 @@ zapret_apply_firewall()
 	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
 	local f4 f6
+	local qn
 
 	# always create ipsets. ip_exclude ipset is required
 	create_ipset no-update
@@ -394,9 +399,16 @@ zapret_apply_firewall()
 			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
 				echo both http and https are disabled. not applying redirection.
 			else
-				if [ "$MODE_HTTP_KEEPALIVE" = "1" ]; then
+				if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ]; then
+					filter_apply_port_target f4
+					f4="$f4 $first_packet_only"
+					f6=$f4
+					filter_apply_ipset_target f4 f6
+					fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM
+				else
 					if [ "$MODE_HTTP" = "1" ]; then
 						f4="--dport 80"
+						[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
 						f6=$f4
 						filter_apply_ipset_target f4 f6
 						fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM
@@ -405,14 +417,10 @@ zapret_apply_firewall()
 						f4="--dport 443 $first_packet_only"
 						f6=$f4
 						filter_apply_ipset_target f4 f6
-						fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM
+						qn=$QNUM
+						[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || qn=$(($QNUM+1))
+						fw_nfqws_post "$f4 $desync" "$f6 $desync" $qn
 					fi
-				else
-					filter_apply_port_target f4
-					f4="$f4 $first_packet_only"
-					f6=$f4
-					filter_apply_ipset_target f4 f6
-					fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM
 				fi
 			fi
 			;;

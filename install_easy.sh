@@ -306,8 +306,10 @@ select_mode_mode()
 			;;
 		nfqws)
 			echo
-			echo nfqws options : $NFQWS_OPT_DESYNC
-			echo to change : edit NFQWS_OPT_DESYNC in $ZAPRET_CONFIG
+			echo "nfqws options (default) : $NFQWS_OPT_DESYNC"
+			echo "nfqws options (http)    : $NFQWS_OPT_DESYNC_HTTP"
+			echo "nfqws options (https)   : $NFQWS_OPT_DESYNC_HTTPS"
+			echo to change : edit NFQWS_OPT_DESYNC, NFQWS_OPT_DESYNC_HTTP, NFQWS_OPT_DESYNC_HTTPS in $ZAPRET_CONFIG
 			;;
 	esac
 }

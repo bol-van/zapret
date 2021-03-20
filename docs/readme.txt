@@ -720,7 +720,14 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"
 Опции nfqws для атаки десинхронизации DPI :
 
 DESYNC_MARK=0x40000000
-NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
+NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
+
+Задание раздельных опций nfqws для http и https :
+
+NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
+NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
+
+Если какая-то из переменных не определена, берется значение NFQWS_OPT_DESYNC.
 
 Настройка системы управления выборочным traffic offload (только openwrt)
 donttouch : выборочное управление отключено, используется системная настройка, простой инсталятор выключает системную настройку, если она не совместима с выбранным режимом

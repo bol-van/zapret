@@ -492,6 +492,13 @@ nfqws options for DPI desync attack:
 DESYNC_MARK=0x40000000
 NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
 
+Separate nfqws options for http and https :
+
+NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
+NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
+
+If a variable is not defined, the value NFQWS_OPT_DESYNC is taken.
+
 flow offloading control (openwrt only)
 donttouch : disable system flow offloading setting if selected mode is incompatible with it, dont touch it otherwise and dont configure selective flow offloading
 none : always disable system flow offloading setting and dont configure selective flow offloading
