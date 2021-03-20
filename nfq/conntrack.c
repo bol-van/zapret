@@ -126,17 +126,14 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 	uint8_t scale;
 	if (tcp_syn_segment(tcphdr))
 	{
-		if (t->state==FIN) ConntrackInitTrack(t); // erase current entry
-		if (t->state==SYN) t->seq0 = htonl(tcphdr->th_seq);
+		ConntrackInitTrack(t); // erase current entry
+		t->seq0 = htonl(tcphdr->th_seq);
 	}
 	else if (tcp_synack_segment(tcphdr))
 	{
-		if (t->state==FIN) ConntrackInitTrack(t); // erase current entry
-		if (t->state==SYN) 
-		{
-			if (!t->seq0) t->seq0 = htonl(tcphdr->th_ack)-1;
-			t->ack0 = htonl(tcphdr->th_seq);
-		}
+		ConntrackInitTrack(t); // erase current entry
+		if (!t->seq0) t->seq0 = htonl(tcphdr->th_ack)-1;
+		t->ack0 = htonl(tcphdr->th_seq);
 	}
 	else if (tcphdr->th_flags & (TH_FIN|TH_RST))
 	{
