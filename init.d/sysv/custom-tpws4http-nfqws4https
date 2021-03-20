@@ -1,5 +1,5 @@
 # this custom script demonstrates how to apply tpws to http and nfqws to https
-# it preserves config settings : MODE_HTTP, MODE_HTTPS, MODE_FILTER, TPWS_OPT, NFQWS_OPT_DESYNC
+# it preserves config settings : MODE_HTTP, MODE_HTTPS, MODE_FILTER, TPWS_OPT, NFQWS_OPT_DESYNC, NFQWS_OPT_DESYNC_HTTPS
 
 zapret_custom_daemons()
 {
@@ -12,7 +12,7 @@ zapret_custom_daemons()
 	}
 
 	[ "$MODE_HTTPS" = "1" ] && {
-		opt="--qnum=$QNUM $NFQWS_OPT_DESYNC"
+		opt="--qnum=$QNUM $NFQWS_OPT_DESYNC_HTTPS"
 		filter_apply_hostlist_target opt
 		do_nfqws $1 2 "$opt"
 	}
