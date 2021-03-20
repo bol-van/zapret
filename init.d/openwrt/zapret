@@ -114,7 +114,7 @@ start_service() {
 			filter_apply_hostlist_target opt
 			run_daemon 1 "$NFQWS" "$opt"
 			[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || {
-				opt="--qnum=$(($QNUM+1)) $NFQWS_OPT_BASE2 $NFQWS_OPT_DESYNC_HTTPS"
+				opt="--qnum=$(($QNUM+1)) $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
 				filter_apply_hostlist_target opt
 				run_daemon 2 "$NFQWS" "$opt"
 			}
