@@ -100,6 +100,33 @@ static bool rawsend_rep(const struct sockaddr* dst,uint32_t fwmark,const void *d
 }
 
 
+static void maybe_cutoff(t_ctrack *ctrack)
+{
+	if (ctrack)
+	{
+		ctrack->b_wssize_cutoff |= params.wssize_cutoff && ctrack->pcounter_orig>=params.wssize_cutoff;
+		ctrack->b_desync_cutoff |= params.desync_cutoff && ctrack->pcounter_orig>=params.desync_cutoff;
+		
+		// do not cut off in OpenBSD. It looks like it's not possible to divert-packet only outgoing part of the connection
+		// It's better to destinguish outgoings using conntrack
+#ifndef __OpenBSD__
+		ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && !params.desync_cutoff;
+#endif
+	}
+}
+static void wssize_cutoff(t_ctrack *ctrack)
+{
+	if (ctrack)
+	{
+		ctrack->b_wssize_cutoff = true;
+		maybe_cutoff(ctrack);
+	}
+}
+#ifdef __OpenBSD__
+#define CONNTRACK_REQUIRED true
+#else
+#define CONNTRACK_REQUIRED (params.wssize || params.desync_cutoff)
+#endif
 // result : true - drop original packet, false = dont drop
 packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {
@@ -109,19 +136,18 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 
 	if (!!ip == !!ip6hdr) return res; // one and only one must be present
 
-	if (params.wssize)
+	if (CONNTRACK_REQUIRED)
 	{
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, len_payload, &ctrack, &bReverse))
-			if (params.wssize_cutoff && ctrack->pcounter_orig>=params.wssize_cutoff)
-				ctrack->b_cutoff=true;
+			maybe_cutoff(ctrack);
 	}
 	if (params.wsize && tcp_synack_segment(tcphdr))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
 		res=modify;
 	}
-	if (params.wssize && !bReverse && (ctrack && !ctrack->b_cutoff))
+	if (params.wssize && !bReverse && (ctrack && !ctrack->b_wssize_cutoff))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
 		res=modify;
@@ -142,7 +168,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		if ((bIsHttp = IsHttp(data_payload,len_payload)))
 		{
 			DLOG("packet contains HTTP request\n")
-			if (ctrack && !params.wssize_cutoff) ctrack->b_cutoff = true;
+			wssize_cutoff(ctrack);
 			fake = params.fake_http;
 			fake_size = params.fake_http_size;
 			if (params.hostlist || params.debug) bHaveHost=HttpExtractHost(data_payload,len_payload,host,sizeof(host));
@@ -155,7 +181,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		else if (IsTLSClientHello(data_payload,len_payload))
 		{
 			DLOG("packet contains TLS ClientHello\n")
-			if (ctrack && !params.wssize_cutoff) ctrack->b_cutoff = true;
+			wssize_cutoff(ctrack);
 			fake = params.fake_tls;
 			fake_size = params.fake_tls_size;
 			if (params.hostlist || params.desync_skip_nosni || params.debug)
@@ -222,6 +248,16 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		}
 
 		if (params.desync_mode==DESYNC_NONE) return res;
+		if (ctrack && ctrack->b_desync_cutoff)
+		{
+			DLOG("not desyncing. cutoff reached : %llu/%u\n", (unsigned long long)ctrack->pcounter_orig, params.desync_cutoff);
+			return res;
+		}
+		if (!ctrack && params.desync_cutoff)
+		{
+			DLOG("not desyncing. desync_cutoff is set but conntrack entry is missing\n");
+			return res;
+		}
 
 		extract_endpoints(ip, ip6hdr, tcphdr, &src, &dst);
 		if (params.debug)

@@ -276,15 +276,15 @@ void ConntrackPoolPurge(t_conntrack *p)
 	HASH_ITER(hh, p, t, tmp) { \
 		*sa1=0; inet_ntop(AF_INET##f, &t->conn.e1.adr, sa1, sizeof(sa1)); \
 		*sa2=0; inet_ntop(AF_INET##f, &t->conn.e2.adr, sa2, sizeof(sa2)); \
-		printf("[%s]:%u => [%s]:%u : %s : t0=%lld last=t0+%lld now=last+%lld cutoff=%u packets_orig=%llu packets_reply=%llu seq0=%u rseq=%u ack0=%u rack=%u wsize_orig=%u:%d wsize_reply=%u:%d\n", \
+		printf("[%s]:%u => [%s]:%u : %s : t0=%lld last=t0+%lld now=last+%lld packets_orig=%llu packets_reply=%llu seq0=%u rseq=%u ack0=%u rack=%u wsize_orig=%u:%d wsize_reply=%u:%d  cutoff=%u wss_cutoff=%u d_cutoff=%u\n", \
 			sa1, t->conn.e1.port, sa2, t->conn.e2.port, \
 			connstate_s[t->track.state], \
 			(unsigned long long)t->track.t_start, (unsigned long long)(t->track.t_last - t->track.t_start), (unsigned long long)(tnow - t->track.t_last), \
-			t->track.b_cutoff, \
 			(unsigned long long)t->track.pcounter_orig, (unsigned long long)t->track.pcounter_reply, \
 			t->track.seq0, t->track.seq_last - t->track.seq0, t->track.ack0, t->track.ack_last - t->track.ack0, \
 			t->track.winsize_orig, t->track.scale_orig==SCALE_NONE ? -1 : t->track.scale_orig, \
-			t->track.winsize_reply, t->track.scale_reply==SCALE_NONE ? -1 : t->track.scale_reply ); \
+			t->track.winsize_reply, t->track.scale_reply==SCALE_NONE ? -1 : t->track.scale_reply, \
+			t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff); \
 	};
 void ConntrackPoolDump4(t_conntrack4 *p)
 {

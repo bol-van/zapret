@@ -37,8 +37,14 @@
 #endif
 
 #define CTRACK_T_SYN	60
-#define CTRACK_T_EST	300
 #define CTRACK_T_FIN	60
+#ifdef __OpenBSD__
+// It looks like it's not possible to divert-packet only outgoing part of the connection
+// It's better to destinguish outgoings using conntrack. Do not purge conntrack entry too early
+#define CTRACK_T_EST	7200
+#else
+#define CTRACK_T_EST	300
+#endif
 
 struct params_s params;
 
@@ -496,6 +502,7 @@ static void exithelp()
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-cutoff=N\t\t\t; apply dpi desync only to packet numbers less than N\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
@@ -596,7 +603,8 @@ int main(int argc, char **argv)
 		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=22
 		{"dpi-desync-fake-http",required_argument,0,0},// optidx=23
 		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=24
-		{"hostlist",required_argument,0,0},		// optidx=25
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=25
+		{"hostlist",required_argument,0,0},		// optidx=26
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -809,7 +817,14 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 25: /* hostlist */
+		case 25: /* desync-cutoff */
+			if (!sscanf(optarg, "%u", &params.desync_cutoff))
+			{
+				fprintf(stderr, "invalid desync-cutoff value\n");
+				exit_clean(1);
+			}
+			break;
+		case 26: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

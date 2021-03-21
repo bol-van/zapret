@@ -157,6 +157,7 @@ nfqws takes the following parameters:
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
  --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
+ --dpi-desync-cutoff=N                  ; apply dpi desync only to packet numbers less than N
  --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
 
 The manipulation parameters can be combined in any way.
@@ -273,6 +274,8 @@ If you do not stop and set the low wssize all the time, the speed will drop cata
 Linux can overcome this using connbytes filter but other OS may not include similar filter.
 In http(s) case wssize stops after the first http request or TLS ClientHello.
 If you deal with a non-http(s) protocol you need --wssize-cutoff. It sets the number of the outgoing packet where wssize stops.
+(numbering starts from 1). 
+If a http request or TLS ClientHello packet is detected wssize stops immediately ignoring wssize-cutoff option.
 If your protocol is prone to long inactivity, you should increase ESTABLISHED phase timeout using --ctrack-timeouts.
 Default timeout is low - only 5 mins.
 Don't forget that nfqws feeds with redirected packets. If you have limited redirection with connbytes
@@ -292,6 +295,11 @@ On the other hand, the server response must not be large enough for the DPI to f
 Hostlist filter does not affect --wssize because it works since the connection initiation when it's not yet possible
 to extract the host name.
 --wssize may slow down sites and/or increase response time. It's desired to use another methods if possible.
+
+--dpi-desync-cutoff allows you to set the limit on the number of the outgoing packet, at which it stops
+applying dpi-desync. Useful with --dpi-desync-any-protocol=1.
+If the connection falls out of the conntrack and --dpi-desync-cutoff is set, dpi desync will not be applied.
+Set conntrack timeouts appropriately.
 
 
 tpws
