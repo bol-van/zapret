@@ -25,8 +25,8 @@ uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t tcp_flags,
-	uint32_t seq, uint32_t ack_seq,
-	uint16_t wsize,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
@@ -36,8 +36,8 @@ bool prepare_tcp_segment4(
 bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t tcp_flags,
-	uint32_t seq, uint32_t ack_seq,
-	uint16_t wsize,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
@@ -47,8 +47,8 @@ bool prepare_tcp_segment6(
 bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t tcp_flags,
-	uint32_t seq, uint32_t ack_seq,
-	uint16_t wsize,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,

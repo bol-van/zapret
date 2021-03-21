@@ -53,7 +53,8 @@ uint8_t tcp_find_scale_factor(const struct tcphdr *tcp)
 	return SCALE_NONE;
 }
 
-static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uint32_t ack_seq, uint8_t fooling, uint16_t nsport, uint16_t ndport, uint16_t nwsize, uint8_t scale_factor, uint32_t *timestamps)
+// n prefix (nsport, nwsize) means network byte order
+static void fill_tcphdr(struct tcphdr *tcp, uint8_t fooling, uint8_t tcp_flags, uint32_t nseq, uint32_t nack_seq, uint16_t nsport, uint16_t ndport, uint16_t nwsize, uint8_t scale_factor, uint32_t *timestamps)
 {
 	char *tcpopt = (char*)(tcp+1);
 	uint8_t t=0;
@@ -63,13 +64,13 @@ static void fill_tcphdr(struct tcphdr *tcp, uint8_t tcp_flags, uint32_t seq, uin
 	tcp->th_dport       = ndport;
 	if (fooling & TCP_FOOL_BADSEQ)
 	{
-		tcp->th_seq        = net32_add(seq,0x80000000);
-		tcp->th_ack    = net32_add(ack_seq,0x80000000);
+		tcp->th_seq        = net32_add(nseq,0x80000000);
+		tcp->th_ack    = net32_add(nack_seq,0x80000000);
 	}
 	else
 	{
-		tcp->th_seq        = seq;
-		tcp->th_ack    = ack_seq;
+		tcp->th_seq        = nseq;
+		tcp->th_ack    = nack_seq;
 	}
 	tcp->th_off       = 5;
 	*((uint8_t*)tcp+13)= tcp_flags;
@@ -335,8 +336,8 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t tcp_flags,
-	uint32_t seq, uint32_t ack_seq,
-	uint16_t wsize,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
@@ -365,7 +366,7 @@ bool prepare_tcp_segment4(
 	ip->ip_src = src->sin_addr;
 	ip->ip_dst = dst->sin_addr;
 
-	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin_port,dst->sin_port,wsize,scale_factor,timestamps);
+	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
 	tcp4_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip->ip_src,&ip->ip_dst);
@@ -379,8 +380,8 @@ bool prepare_tcp_segment4(
 bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t tcp_flags,
-	uint32_t seq, uint32_t ack_seq,
-	uint16_t wsize,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
@@ -407,7 +408,7 @@ bool prepare_tcp_segment6(
 	ip6->ip6_src = src->sin6_addr;
 	ip6->ip6_dst = dst->sin6_addr;
 
-	fill_tcphdr(tcp,tcp_flags,seq,ack_seq,fooling,src->sin6_port,dst->sin6_port,wsize,scale_factor,timestamps);
+	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps);
 
 	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
 	tcp6_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip6->ip6_src,&ip6->ip6_dst);
@@ -420,8 +421,8 @@ bool prepare_tcp_segment6(
 bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t tcp_flags,
-	uint32_t seq, uint32_t ack_seq,
-	uint16_t wsize,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
@@ -430,9 +431,9 @@ bool prepare_tcp_segment(
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,seq,ack_seq,wsize,scale_factor,timestamps,ttl,fooling,data,len,buf,buflen) :
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,seq,ack_seq,wsize,scale_factor,timestamps,ttl,fooling,data,len,buf,buflen) :
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,data,len,buf,buflen) :
 		false;
 }
 
