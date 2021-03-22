@@ -1,15 +1,14 @@
 What is it for
 --------------
 
-Bypass the blocking of http/https web sites on DPI without the use of third-party servers.
+A stand-alone (without 3rd party servers) DPI cirtumvention tool.
+May allow to bypass http(s) website blocking or speed shaping, resist signature tcp protocol discovery.
 
 The project is mainly aimed at the Russian audience to fight russian regulator named "Roskomnadzor".
 Some features of the project are russian reality specific (such as getting list of sites
 blocked by Roskomnadzor), but most others are common.
 
-(EXPERIMENTAL) FreeBSD and OpenBSD are also supported.
-(EXPERIMENTAL, PARTIAL) MacOS limited support.
-see docs/bsd.eng.txt
+Mainly OpenWRT targeted but also supports traditional Linux, FreeBSD, OpenBSD, partially MacOS.
 
 How it works
 ------------
