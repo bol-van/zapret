@@ -258,7 +258,8 @@ Set up bridge networking.
 
 CONNTRACK
 nfqws is equipped with minimalistic connection tracking system (conntrack)
-It's enabled if some specific DPI circumvention methods are involved. At the moment it's --wssize parameter.
+It's enabled if some specific DPI circumvention methods are involved.
+Currently these are --wssize and --dpi-desync-cutoff  options.
 Conntrack can track connection phase : SYN,ESTABLISHED,FIN , packet counts in both directions , sequence numbers.
 It can be fed with unidirectional or bidirectional packets.
 A SYN or SYN,ACK packet creates an entry in the conntrack table.
