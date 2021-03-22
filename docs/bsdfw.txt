@@ -68,7 +68,8 @@ pfctl -f /etc/pf.conf
 
 ; dvtws works both for routed and local
 
-pass out quick on em0 proto tcp to port {80,443} divert-packet port 989
+pass in  quick on em0 proto tcp from port {80,443} no state
+pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989 no state
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
 
@@ -78,12 +79,16 @@ set limit table-entries 2000000
 table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
 table <zapret-user> file "/opt/zapret/ipset/zapret-ip-user.txt"
 table <nozapret> file "/opt/zapret/ipset/zapret-ip-exclude.txt"
-pass out quick on em0 inet  proto tcp to <nozapret> port {80,443}
-pass out quick on em0 inet  proto tcp to <zapret>  port {80,443} divert-packet port 989
-pass out quick on em0 inet  proto tcp to <zapret-user>  port {80,443} divert-packet port 989
+pass out quick on em0 inet  proto tcp to   <nozapret> port {80,443}
+pass in  quick on em0 inet  proto tcp from <zapret>  port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret>  port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet  proto tcp from <zapret-user>  port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret-user>  port {80,443} divert-packet port 989 no state
 table <zapret6> file "/opt/zapret/ipset/zapret-ip6.txt"
 table <zapret6-user> file "/opt/zapret/ipset/zapret-ip-user6.txt"
 table <nozapret6> file "/opt/zapret/ipset/zapret-ip-exclude6.txt"
-pass out quick on em0 inet6 proto tcp to <nozapret6> port {80,443}
-pass out quick on em0 inet6 proto tcp to <zapret6> port {80,443} divert-packet port 989
-pass out quick on em0 inet6 proto tcp to <zapret6-user> port {80,443} divert-packet port 989
+pass out quick on em0 inet6 proto tcp to   <nozapret6> port {80,443}
+pass in  quick on em0 inet6 proto tcp from <zapret6>  port {80,443} no state
+pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet6 proto tcp from <zapret6-user>  port {80,443} no state
+pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-packet port 989 no state
