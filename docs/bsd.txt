@@ -188,7 +188,8 @@ dvtws для всего трафика :
 
 /etc/pf.conf
 ------------
-pass out quick on em0 proto tcp to port {80,443} divert-packet port 989
+pass in  quick on em0 proto tcp from port {80,443} no state
+pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989 no state
 ------------
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
@@ -201,28 +202,28 @@ set limit table-entries 2000000
 table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
 table <zapret-user> file "/opt/zapret/ipset/zapret-ip-user.txt"
 table <nozapret> file "/opt/zapret/ipset/zapret-ip-exclude.txt"
-pass out quick on em0 inet  proto tcp to <nozapret> port {80,443}
-pass out quick on em0 inet  proto tcp to <zapret>  port {80,443} divert-packet port 989
-pass out quick on em0 inet  proto tcp to <zapret-user>  port {80,443} divert-packet port 989
+pass out quick on em0 inet  proto tcp to   <nozapret> port {80,443}
+pass in  quick on em0 inet  proto tcp from <zapret>  port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret>  port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet  proto tcp from <zapret-user>  port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret-user>  port {80,443} divert-packet port 989 no state
 table <zapret6> file "/opt/zapret/ipset/zapret-ip6.txt"
 table <zapret6-user> file "/opt/zapret/ipset/zapret-ip-user6.txt"
 table <nozapret6> file "/opt/zapret/ipset/zapret-ip-exclude6.txt"
-pass out quick on em0 inet6 proto tcp to <nozapret6> port {80,443}
-pass out quick on em0 inet6 proto tcp to <zapret6> port {80,443} divert-packet port 989
-pass out quick on em0 inet6 proto tcp to <zapret6-user> port {80,443} divert-packet port 989
+pass out quick on em0 inet6 proto tcp to   <nozapret6> port {80,443}
+pass in  quick on em0 inet6 proto tcp from <zapret6>  port {80,443} no state
+pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet6 proto tcp from <zapret6-user>  port {80,443} no state
+pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-packet port 989 no state
 ------------
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
 
+divert-packet автоматически вносит обратное правило для перенаправления.
+Трюк с no state и in правилом позволяет обойти эту проблему, чтобы напрасно не гнать массивный трафик через dvtws.
 
 В OpenBSD dvtws все фейки отсылает через divert socket, поскольку эта возможность через raw sockets заблокирована.
 Видимо pf автоматически предотвращает повторный заворот diverted фреймов, поэтому проблемы зацикливания нет.
-
-К сожалению, в PF присутствует "удобная" функция, которая автоматически применяет к правилу divert-packet
-обратный трафик. Через divert пойдет все соединение, а не только исходящие пакеты.
-Это добавит огромный ненужный overhead по процессингу входящих пакетов в dvtws, который будет наиболее заметен
-на скачивании по http/https. Мне не удалось понять как этого избежать.
-Поэтому использование фильтр-таблиц крайне рекомендовано !
 
 OpenBSD принудительно пересчитывает tcp checksum после divert, поэтому скорее всего
 dpi-desync-fooling=badsum у вас не заработает. При использовании этого параметра

@@ -170,7 +170,8 @@ dvtws for all traffic:
 
 /etc/pf.conf
 ------------
-pass out quick on em0 proto tcp to port {80,443} divert-packet port 989
+pass in  quick on em0 proto tcp from port {80,443} no state
+pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989
 ------------
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
@@ -179,31 +180,33 @@ dwtws only for table zapret with the exception of table nozapret :
 
 /etc/pf.conf
 ------------
+set limit table-entries 2000000
 table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
 table <zapret-user> file "/opt/zapret/ipset/zapret-ip-user.txt"
 table <nozapret> file "/opt/zapret/ipset/zapret-ip-exclude.txt"
-pass out quick on em0 inet  proto tcp to <nozapret> port {80,443}
-pass out quick on em0 inet  proto tcp to <zapret>  port {80,443} divert-packet port 989
-pass out quick on em0 inet  proto tcp to <zapret-user>  port {80,443} divert-packet port 989
+pass out quick on em0 inet  proto tcp to   <nozapret> port {80,443}
+pass in  quick on em0 inet  proto tcp from <zapret>  port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret>  port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet  proto tcp from <zapret-user>  port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret-user>  port {80,443} divert-packet port 989 no state
 table <zapret6> file "/opt/zapret/ipset/zapret-ip6.txt"
 table <zapret6-user> file "/opt/zapret/ipset/zapret-ip-user6.txt"
 table <nozapret6> file "/opt/zapret/ipset/zapret-ip-exclude6.txt"
-pass out quick on em0 inet6 proto tcp to <nozapret6> port {80,443}
-pass out quick on em0 inet6 proto tcp to <zapret6> port {80,443} divert-packet port 989
-pass out quick on em0 inet6 proto tcp to <zapret6-user> port {80,443} divert-packet port 989
+pass out quick on em0 inet6 proto tcp to   <nozapret6> port {80,443}
+pass in  quick on em0 inet6 proto tcp from <zapret6>  port {80,443} no state
+pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet6 proto tcp from <zapret6-user>  port {80,443} no state
+pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-packet port 989 no state
 ------------
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
 
+divert-packet automatically adds the reverse rule. By default also incoming traffic will be passwed to dvtws.
+This is highly undesired because it is waste of cpu resources and speed limiter.
+The trick with "no state" and "in" rules allows to bypass auto reverse rule.
 
 dvtws in OpenBSD sends all fakes through a divert socket because raw sockets have critical artificial limitations.
 Looks like pf automatically prevent reinsertion of diverted frames. Loop problem does not exist.
-
-Sadly PF auto applies return rule to divert-packet.
-Not only outgoing packets go through dvtws but also incoming.
-This adds great unneeded overhead that will be the most noticable on http/https downloads.
-I could not figure out how to disable this feature.
-Thats why you are encouraged to use table filters with your personal blocked site lists.
 
 OpenBSD forcibly recomputes tcp checksum after divert. Thats why most likely
 dpi-desync-fooling=badsum will not work. dvtws will warn if you specify this parameter.

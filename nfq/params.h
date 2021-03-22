@@ -11,16 +11,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#if defined(__OpenBSD__) || defined (__APPLE__)
-// divert-packet also diverts return traffic. sockets will experience high load
-#define Q_RCVBUF	(256*1024)	// in bytes
-#define Q_SNDBUF	(256*1024)	// in bytes
-#define RAW_SNDBUF	(64*1024)	// in bytes
-#else
 #define Q_RCVBUF	(128*1024)	// in bytes
 #define Q_SNDBUF	(64*1024)	// in bytes
 #define RAW_SNDBUF	(64*1024)	// in bytes
-#endif
 
 #define Q_MAXLEN	1024		// in packets
 
@@ -40,6 +33,7 @@ struct params_s
 	enum dpi_desync_mode desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	int desync_repeats,desync_split_pos;
+	unsigned int desync_cutoff;
 	uint8_t desync_ttl;
 	uint8_t desync_tcp_fooling_mode;
 	uint32_t desync_fwmark; // unused in BSD

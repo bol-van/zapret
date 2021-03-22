@@ -38,13 +38,7 @@
 
 #define CTRACK_T_SYN	60
 #define CTRACK_T_FIN	60
-#ifdef __OpenBSD__
-// It looks like it's not possible to divert-packet only outgoing part of the connection
-// It's better to destinguish outgoings using conntrack. Do not purge conntrack entry too early
-#define CTRACK_T_EST	7200
-#else
 #define CTRACK_T_EST	300
-#endif
 
 struct params_s params;
 

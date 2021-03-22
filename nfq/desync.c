@@ -107,11 +107,7 @@ static void maybe_cutoff(t_ctrack *ctrack)
 		ctrack->b_wssize_cutoff |= params.wssize_cutoff && ctrack->pcounter_orig>=params.wssize_cutoff;
 		ctrack->b_desync_cutoff |= params.desync_cutoff && ctrack->pcounter_orig>=params.desync_cutoff;
 		
-		// do not cut off in OpenBSD. It looks like it's not possible to divert-packet only outgoing part of the connection
-		// It's better to destinguish outgoings using conntrack
-#ifndef __OpenBSD__
 		ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && !params.desync_cutoff;
-#endif
 	}
 }
 static void wssize_cutoff(t_ctrack *ctrack)
@@ -122,11 +118,7 @@ static void wssize_cutoff(t_ctrack *ctrack)
 		maybe_cutoff(ctrack);
 	}
 }
-#ifdef __OpenBSD__
-#define CONNTRACK_REQUIRED true
-#else
 #define CONNTRACK_REQUIRED (params.wssize || params.desync_cutoff)
-#endif
 // result : true - drop original packet, false = dont drop
 packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {

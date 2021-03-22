@@ -55,6 +55,8 @@ typedef struct
 	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
 
 	bool b_cutoff;				// mark for deletion
+
+	bool b_wssize_cutoff, b_desync_cutoff;
 } t_ctrack;
 
 // use separate pools for ipv4 and ipv6 to save RAM. otherwise could use union key
