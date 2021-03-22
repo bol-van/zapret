@@ -1,7 +1,7 @@
 What is it for
 --------------
 
-A stand-alone (without 3rd party servers) DPI cirtumvention tool.
+A stand-alone (without 3rd party servers) DPI circumvention tool.
 May allow to bypass http(s) website blocking or speed shaping, resist signature tcp protocol discovery.
 
 The project is mainly aimed at the Russian audience to fight russian regulator named "Roskomnadzor".
