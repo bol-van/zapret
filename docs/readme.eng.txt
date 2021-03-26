@@ -699,18 +699,3 @@ Find manual or reverse engineer yourself.
 Check for race conditions. Firmware can clear or modify iptables after your startup script.
 If this is the case then run another script in background and add some delay there.
 
-
-Https blocking bypass
-----------------------
-
-SOMETIMES (but not often) a tls handshake split trick works.
-Try MODE=..._https
-May be you're lucky.
-
-MORE OFTEN DPI desync attack work, but it may require some manual tuning.
-
-OTHERWISE you have to redirect traffic through a third-party host.
-It is proposed to use transparent redirect through socks5 using iptables + redsocks, or iptables + iproute + vpn.
-Redsocks variant is described in https.txt.
-iproute + wireguard - in wireguard_iproute_openwrt.txt.
-(they are russian)
