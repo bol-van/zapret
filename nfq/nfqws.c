@@ -492,7 +492,7 @@ static void exithelp()
 #endif
 		" --dpi-desync-repeats=<N>\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=<1..%u>\t; (for disorder only) split TCP packet at specified position\n"
+		" --dpi-desync-split-pos=<1..%u>\t; TCP packet split position\n"
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
