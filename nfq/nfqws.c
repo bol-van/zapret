@@ -479,7 +479,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=<mode>[,<mode2>]\t\t; try to desync dpi state. modes : fake rst rstack disorder disorder2 split split2\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -701,20 +701,30 @@ int main(int argc, char **argv)
 			break;
 		case 14: /* dpi-desync */
 			{
-				char *mode2;
-				mode2 = optarg ? strchr(optarg,',') : NULL;
+				char *mode=optarg,*mode2,*mode3;
+				mode2 = mode ? strchr(mode,',') : NULL;
 				if (mode2) *mode2++=0;
+				mode3 = mode2 ? strchr(mode2,',') : NULL;
+				if (mode3) *mode3++=0;
 
-				params.desync_mode = desync_mode_from_string(optarg);
+				params.desync_mode0 = desync_mode_from_string(mode);
+				if (desync_valid_zero_stage(params.desync_mode0))
+				{
+					mode = mode2;
+					mode2 = mode3;
+				}
+				else
+					params.desync_mode0 = DESYNC_NONE;
+				params.desync_mode = desync_mode_from_string(mode);
 				params.desync_mode2 = desync_mode_from_string(mode2);
-				if (params.desync_mode==DESYNC_NONE || params.desync_mode==DESYNC_INVALID || params.desync_mode2==DESYNC_INVALID)
+				if (params.desync_mode0==DESYNC_INVALID || params.desync_mode==DESYNC_INVALID || params.desync_mode2==DESYNC_INVALID)
 				{
 					fprintf(stderr, "invalid dpi-desync mode\n");
 					exit_clean(1);
 				}
 				if (params.desync_mode2 && !(desync_valid_first_stage(params.desync_mode) && desync_valid_second_stage(params.desync_mode2)))
 				{
-					fprintf(stderr, "invalid desync combo : %s+%s\n", optarg,mode2);
+					fprintf(stderr, "invalid desync combo : %s+%s\n", mode,mode2);
 					exit_clean(1);
 				}
 			}

@@ -60,6 +60,10 @@ void desync_init()
 }
 
 
+bool desync_valid_zero_stage(enum dpi_desync_mode mode)
+{
+	return mode==DESYNC_SYNACK;
+}
 bool desync_valid_first_stage(enum dpi_desync_mode mode)
 {
 	return mode==DESYNC_FAKE || mode==DESYNC_RST || mode==DESYNC_RSTACK;
@@ -78,6 +82,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_RST;
 	else if (!strcmp(s,"rstack"))
 		return DESYNC_RSTACK;
+	else if (!strcmp(s,"synack"))
+		return DESYNC_SYNACK;
 	else if (!strcmp(s,"disorder"))
 		return DESYNC_DISORDER;
 	else if (!strcmp(s,"disorder2"))
@@ -126,6 +132,12 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 	t_ctrack *ctrack=NULL;
 	bool bReverse=false;
 
+	struct sockaddr_storage src, dst;
+	uint8_t newdata[DPI_DESYNC_MAX_FAKE_LEN+100];
+	size_t newlen;
+	uint8_t ttl_orig,ttl_fake,flags_orig,scale_factor;
+	uint32_t *timestamps;
+
 	if (!!ip == !!ip6hdr) return res; // one and only one must be present
 
 	if (CONNTRACK_REQUIRED)
@@ -139,17 +151,44 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
 		res=modify;
 	}
-	if (params.wssize && !bReverse && (ctrack && !ctrack->b_wssize_cutoff))
+
+	if (bReverse) return res; // nothing to do. do not waste cpu
+
+	if (params.wssize && (ctrack && !ctrack->b_wssize_cutoff))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
 		res=modify;
 	}
 
-	if (bReverse || !params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
+	if (params.desync_mode0!=DESYNC_NONE || params.desync_mode!=DESYNC_NONE) // save some cpu
+	{
+		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
+		ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+		flags_orig = *((uint8_t*)tcphdr+13);
+		scale_factor = tcp_find_scale_factor(tcphdr);
+		timestamps = tcp_find_timestamps(tcphdr);
+
+		extract_endpoints(ip, ip6hdr, tcphdr, &src, &dst);
+	}
+
+	if (params.desync_mode0==DESYNC_SYNACK && tcp_syn_segment(tcphdr))
+	{
+		newlen = sizeof(newdata);
+		if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+			ttl_fake,params.desync_tcp_fooling_mode,
+			NULL, 0, newdata, &newlen))
+		{
+			return res;
+		}
+		DLOG("sending fake SYNACK\n");
+		if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+			return res;
+	}
+
+	if (!params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
 
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)
 	{
-		struct sockaddr_storage src, dst;
 		const uint8_t *fake;
 		size_t fake_size;
 		char host[256];
@@ -251,7 +290,6 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 			return res;
 		}
 
-		extract_endpoints(ip, ip6hdr, tcphdr, &src, &dst);
 		if (params.debug)
 		{
 			printf("dpi desync src=");
@@ -261,14 +299,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 			printf("\n");
 		}
 
-		uint8_t newdata[DPI_DESYNC_MAX_FAKE_LEN+100];
-		size_t newlen;
-		uint8_t ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-		uint8_t ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
-		uint8_t flags_orig = *((uint8_t*)tcphdr+13);
-		uint32_t *timestamps = tcp_find_timestamps(tcphdr);
 		enum dpi_desync_mode desync_mode = params.desync_mode;
-		uint8_t scale_factor = tcp_find_scale_factor(tcphdr);
 		bool b;
 
 		newlen = sizeof(newdata);

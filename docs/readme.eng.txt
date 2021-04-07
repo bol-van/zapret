@@ -244,10 +244,26 @@ mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark wh
 nfqws can internally filter marked packets. but when connbytes filter is used without mark filter
 packet ordering can be changed breaking the whole idea of desync attack.
 
-DESYNC COMBOS
-dpi-desync parameter can take 2 comma separated arguments.
+DPI DESYNC COMBOS
+dpi-desync parameter takes up to 3 comma separated arguments.
+zero phase means tcp connection establishement (before sending data payload). Mode can be "synack".
+Hostlist filter is not applicable to the zero phase.
+Next phases work on packets with data payload.
 1st phase mode can be fake,rst,rstack, 2nd phase mode - disorder,disorder2,split,split2.
 Can be useful for ISPs with more than one DPI.
+
+SYNACK MODE
+In geneva docs it's called "TCP turnaround". Attempt to make the DPI believe the roles of client and server are reversed.
+!!! This mode breaks NAT operation and can be used only from devices with external IP address !
+In linux it's required to remove standard firewall rule dropping INVALID packets, for example :
+-A FORWARD -m state --state INVALID -j DROP
+In openwrt it can be done in /etc/config/firewall :
+config zone
+	option name 'wan'
+	.........
+	option masq_allow_invalid '1'
+Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
+If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
 
 VIRTUAL MACHINES
 Most of nfqws packet magic does not work from VMs powered by virtualbox and vmware when network is NATed.

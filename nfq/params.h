@@ -30,7 +30,7 @@ struct params_s
 #endif
 	bool hostcase, hostnospace, domcase;
 	char hostspell[4];
-	enum dpi_desync_mode desync_mode,desync_mode2;
+	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	int desync_repeats,desync_split_pos;
 	unsigned int desync_cutoff;

@@ -24,6 +24,7 @@ enum dpi_desync_mode {
 	DESYNC_FAKE,
 	DESYNC_RST,
 	DESYNC_RSTACK,
+	DESYNC_SYNACK,
 	DESYNC_DISORDER,
 	DESYNC_DISORDER2,
 	DESYNC_SPLIT,
@@ -34,6 +35,7 @@ extern const char *fake_http_request_default;
 extern const uint8_t fake_tls_clienthello_default[517];
 
 enum dpi_desync_mode desync_mode_from_string(const char *s);
+bool desync_valid_zero_stage(enum dpi_desync_mode mode);
 bool desync_valid_first_stage(enum dpi_desync_mode mode);
 bool desync_valid_second_stage(enum dpi_desync_mode mode);
 
