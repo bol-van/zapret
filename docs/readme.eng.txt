@@ -254,7 +254,7 @@ Can be useful for ISPs with more than one DPI.
 
 SYNACK MODE
 In geneva docs it's called "TCP turnaround". Attempt to make the DPI believe the roles of client and server are reversed.
-!!! This mode breaks NAT operation and can be used only from devices with external IP address !
+!!! This mode breaks NAT operation and can be used only if there's no NAT between the attacker's device and the DPI !
 In linux it's required to remove standard firewall rule dropping INVALID packets in the OUTPUT chain,
 for example : -A OUTPUT -m state --state INVALID -j DROP
 In openwrt it's possible to disable the rule for both FORWARD and OUTPUT chains in /etc/config/firewall :
