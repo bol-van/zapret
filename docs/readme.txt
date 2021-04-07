@@ -315,13 +315,21 @@ mark нужен, чтобы сгенерированный поддельный 
 ролей клиента и сервера.
 !!! Поскольку режим нарушает работу NAT, техника может сработать только с устройства с внешним IP адресом.
 Для реализации атаки в linux обязательно требуется отключить стандартное правило firewall,
-дропающие инвалидные пакеты. Например : -A FORWARD -m state --state INVALID -j DROP
-В openwrt это делается через опцию в /etc/config/firewall :
+дропающее инвалидные пакеты в цепочке OUTPUT. Например : -A OUTPUT -m state --state INVALID -j DROP
+В openwrt можно отключить drop INVALID в OUTPUT и FORWARD через опцию в /etc/config/firewall :
+
 config zone
 	option name 'wan'
 	.........
 	option masq_allow_invalid '1'
-В противном случае попытка отослать SYN,ACK сегмент вызовет ошибку и операция будет прервана.
+
+К сожалению, отключить только в OUTPUT такии образом нельзя. Но можно сделать иначе. Вписать в /etc/firewall.user :
+
+iptables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
+ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
+
+Лучше делать так, потому что отсутствие дропа INVALID в FORWARD может привести к нежелательным утечкам пакетов из LAN.
+Если не принять эти меры, отсылка SYN,ACK сегмент вызовет ошибку и операция будет прервана.
 Остальные режимы тоже не сработают. Если поймете, что вам synack не нужен, обязательно верните правило дропа INVALID.
 
 ВИРТУАЛЬНЫЕ МАШИНЫ

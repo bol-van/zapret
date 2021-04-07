@@ -255,13 +255,21 @@ Can be useful for ISPs with more than one DPI.
 SYNACK MODE
 In geneva docs it's called "TCP turnaround". Attempt to make the DPI believe the roles of client and server are reversed.
 !!! This mode breaks NAT operation and can be used only from devices with external IP address !
-In linux it's required to remove standard firewall rule dropping INVALID packets, for example :
--A FORWARD -m state --state INVALID -j DROP
-In openwrt it can be done in /etc/config/firewall :
+In linux it's required to remove standard firewall rule dropping INVALID packets in the OUTPUT chain,
+for example : -A OUTPUT -m state --state INVALID -j DROP
+In openwrt it's possible to disable the rule for both FORWARD and OUTPUT chains in /etc/config/firewall :
 config zone
 	option name 'wan'
 	.........
 	option masq_allow_invalid '1'
+Unfortunately there's no OUTPUT only switch. It's not desired to remove the rule from the FORWARD chain.
+Add the following lines to /etc/firewall.user :
+
+iptables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
+ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
+
+then /etc/init.d/firewall restart
+
 Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
 If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
 
