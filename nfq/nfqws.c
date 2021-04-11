@@ -712,14 +712,22 @@ int main(int argc, char **argv)
 				{
 					mode = mode2;
 					mode2 = mode3;
+					mode3 = NULL;
 				}
 				else
+				{
 					params.desync_mode0 = DESYNC_NONE;
+				}
 				params.desync_mode = desync_mode_from_string(mode);
 				params.desync_mode2 = desync_mode_from_string(mode2);
 				if (params.desync_mode0==DESYNC_INVALID || params.desync_mode==DESYNC_INVALID || params.desync_mode2==DESYNC_INVALID)
 				{
 					fprintf(stderr, "invalid dpi-desync mode\n");
+					exit_clean(1);
+				}
+				if (mode3)
+				{
+					fprintf(stderr, "invalid desync combo : %s+%s+%s\n",mode,mode2,mode3);
 					exit_clean(1);
 				}
 				if (params.desync_mode2 && !(desync_valid_first_stage(params.desync_mode) && desync_valid_second_stage(params.desync_mode2)))
