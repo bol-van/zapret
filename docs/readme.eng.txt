@@ -132,7 +132,6 @@ nfqws takes the following parameters:
 
  --debug=0|1				; 1=print debug info
  --qnum=<nfqueue_number>
- --wsize=<window_size> 			; set window size. 0 = do not modify (obsolete !)
  --wsize=<winsize>[:<scale_factor>]	; change window size in SYN,ACK packets. default is not to change scale factor (OBSOLETE !)
  --wssize=<winsize>[:<scale_factor>]	; change window size in outgoing packets. default scale factor is 0. (see CONNTRACK)
  --wssize-cutoff=N                      ; apply server wsize only to packet numbers less than N
