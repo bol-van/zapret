@@ -174,6 +174,17 @@ add tcp option "MD5 signature". All of them have their own disadvantages :
 
 * md5sig does not work on all servers
 * badsum doesn't work if your device is behind NAT which does not pass invalid packets.
+  The most common Linux NAT router configuration does not pass them. Most home routers are Linux based.
+  The default sysctl configuration net.netfilter.nf_conntrack_checksum=1 causes contrack to verify tcp and udp checksums
+  and set INVALID state for packets with invalid checksum.
+  Typically, iptables rules include a rule for dropping packets with INVALID state, either only in FORWARD chain,
+  or both in FORWARD and OUTPUT chains. The combination of these factors does not allow badsum packets to pass through the router.
+  Presence of a drop INVALID rule in the OUTPUT chain blocks nfqws running on the router from using badsum option.
+  In openwrt mentioned sysctl is set to 0 from the box, in other routers its often left in the default "1" state.
+  For nfqws to work properly set net.netfilter.nf_conntrack_checksum=0 on the router.
+  If you are behind another NAT, such as a ISP, and it does not pass invalid packages, there is nothing you can do about it.
+  But usually ISPs pass badsum.
+* badsum doesn't work if your device is behind NAT which does not pass invalid packets.
   Linux NAT by default does not pass them without special setting "sysctl -w net.netfilter.nf_conntrack_checksum=0"
   Openwrt sets it from the box, other routers in most cases don't, and its not always possible to change it.
   If nfqws is on the router, its not necessary to switch of "net.netfilter.nf_conntrack_checksum".
