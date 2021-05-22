@@ -335,7 +335,7 @@ config zone
 	.........
 	option masq_allow_invalid '1'
 
-К сожалению, отключить только в OUTPUT такии образом нельзя. Но можно сделать иначе. Вписать в /etc/firewall.user :
+К сожалению, отключить только в OUTPUT таким образом нельзя. Но можно сделать иначе. Вписать в /etc/firewall.user :
 
 iptables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
 ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
