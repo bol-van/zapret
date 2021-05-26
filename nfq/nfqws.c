@@ -257,7 +257,7 @@ static int nfq_main()
 		goto exiterr;
 	do
 	{
-		while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0)
+		while ((rv = recv(fd, buf, sizeof(buf), 0)) > 0)
 		{
 			dohup();
 			int r = nfq_handle_packet(h, buf, rv);
@@ -268,7 +268,7 @@ static int nfq_main()
 		// do not fail on ENOBUFS
 	} while(errno==ENOBUFS);
 
-	printf("unbinding from queue 0\n");
+	printf("unbinding from queue %u\n", params.qnum);
 	nfq_destroy_queue(qh);
 
 #ifdef INSANE
@@ -431,7 +431,7 @@ exiterr:
 
 
 
-static bool parse_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
+static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 {
 	int v;
 	char *p;
@@ -660,11 +660,11 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 6: /* wsize */
-			if (!parse_scale_factor(optarg,&params.wsize,&params.wscale))
+			if (!parse_ws_scale_factor(optarg,&params.wsize,&params.wscale))
 				exit_clean(1);
 			break;
 		case 7: /* wssize */
-			if (!parse_scale_factor(optarg,&params.wssize,&params.wsscale))
+			if (!parse_ws_scale_factor(optarg,&params.wssize,&params.wsscale))
 				exit_clean(1);
 			break;
 		case 8: /* wssize-cutoff */
