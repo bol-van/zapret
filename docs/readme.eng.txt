@@ -89,7 +89,7 @@ iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m s
 Some DPIs catch only the first http request, ignoring subsequent requests in a keep-alive session.
 Then we can reduce CPU load, refusing to process unnecessary packets.
 
-iptables -t mangle -I POSTROUTING -o <внешний_интерфейс> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
+iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
 
 Mark filter does not allow nfqws-generated packets to enter the queue again.
 Its necessary to use this filter when also using "connbytes 1:4". Without it packet ordering can be changed breaking the whole idea.
@@ -393,10 +393,9 @@ split-pos works by default only on http and TLS ClientHello. use --split-any-pro
 
 tpws can bind to multiple interfaces and IP addresses (up to 32).
 Port number is always the same.
-Parameters --bind-iface* и --bind-addr create new bind.
+Parameters --bind-iface* and --bind-addr create new bind.
 Other parameters --bind-* are related to the last bind.
-Выбор режима использования link local ipv6 адресов (fe80::/8) :
-ipv6 link local usage modes :
+link local ipv6 (fe80::/8) mode selection :
 --bind-iface6 --bind-linklocal=no : first selects private address fd00::/8, then global address
 --bind-iface6 --bind-linklocal=unwanted : first selects private address fd00::/8, then global address, then LL
 --bind-iface6 --bind-linklocal=prefer : first selects LL, then private address fd00::/8, then global address
