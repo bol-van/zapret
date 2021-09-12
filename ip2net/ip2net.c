@@ -94,8 +94,16 @@ static void mask_from_bitcount6(uint32_t zct, struct in6_addr *a)
 // result = a & b
 static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct in6_addr *result)
 {
+	// POSSIBLE GCC COMPILER BUG . when using uint64_t and -O2/-O3 optimizations this function gets inlined with the wrong code and produces wrong results
+#if defined(__GNUC__) && !defined(__llvm__) && !defined(__NO_INLINE__)
+	((uint32_t*)result->s6_addr)[0] = ((uint32_t*)a->s6_addr)[0] & ((uint32_t*)b->s6_addr)[0];
+	((uint32_t*)result->s6_addr)[1] = ((uint32_t*)a->s6_addr)[1] & ((uint32_t*)b->s6_addr)[1];
+	((uint32_t*)result->s6_addr)[2] = ((uint32_t*)a->s6_addr)[2] & ((uint32_t*)b->s6_addr)[2];
+	((uint32_t*)result->s6_addr)[3] = ((uint32_t*)a->s6_addr)[3] & ((uint32_t*)b->s6_addr)[3];
+#else
 	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
 	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
+#endif
 }
 
 static void rtrim(char *s)
@@ -259,7 +267,7 @@ int main(int argc, char **argv)
 
 		/*
 		for(uint32_t i=0;i<ipct;i++)
-		 if (inet_ntop(AF_INET6,iplist+i,str,256))
+		 if (inet_ntop(AF_INET6,iplist+i,str,sizeof(str)))
 		  printf("%s\n",str);
 		printf("\n");
 		*/
@@ -294,7 +302,14 @@ int main(int argc, char **argv)
 						break;
 				}
 			}
-			if (!zct_best) ip_start = iplist[pos], pos_end = pos + 1; // network not found, use single ip
+			if (zct_best)
+			{
+				// network was found
+				mask_from_bitcount6(zct_best, &mask);
+				ip6_and(iplist + pos, &mask, &ip_start);
+			}
+			else
+				ip_start = iplist[pos], pos_end = pos + 1; // network not found, use single ip
 			inet_ntop(AF_INET6, &ip_start, str, sizeof(str));
 			printf(zct_best ? "%s/%u\n" : "%s\n", str, 128 - zct_best);
 
@@ -379,7 +394,10 @@ int main(int argc, char **argv)
 						break;
 				}
 			}
-			if (!zct_best) ip_start = iplist[pos], pos_end = pos + 1; // network not found, use single ip
+			if (zct_best)
+				ip_start = iplist[pos] & mask_from_bitcount(zct_best);
+			else
+				ip_start = iplist[pos], pos_end = pos + 1; // network not found, use single ip
 
 			u1 = ip_start >> 24;
 			u2 = (ip_start >> 16) & 0xFF;
