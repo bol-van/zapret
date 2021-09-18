@@ -79,7 +79,7 @@ static uint32_t unique6(struct in6_addr *pu, uint32_t ct)
 	}
 	return i;
 }
-static void mask_from_bitcount6(uint32_t zct, struct in6_addr *a)
+static void mask_from_bitcount6_make(uint32_t zct, struct in6_addr *a)
 {
 	if (zct >= 128)
 		memset(a->s6_addr,0x00,16);
@@ -91,6 +91,17 @@ static void mask_from_bitcount6(uint32_t zct, struct in6_addr *a)
 		a->s6_addr[n] = ~((1 << (zct & 7)) - 1);
 	}
 }
+static struct in6_addr ip6_mask[129];
+static void mask_from_bitcount6_prepare()
+{
+	for (int zct=0;zct<=128;zct++) mask_from_bitcount6_make(zct, ip6_mask+zct);
+}
+static inline const struct in6_addr *mask_from_bitcount6(uint32_t zct)
+{
+	return ip6_mask+zct;
+}
+
+
 // result = a & b
 static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct in6_addr *result)
 {
@@ -264,6 +275,7 @@ int main(int argc, char **argv)
 		}
 		gnu_quicksort(iplist, ipct, sizeof(*iplist), cmp6, NULL);
 		ipct = unique6(iplist, ipct);
+		mask_from_bitcount6_prepare();
 
 		/*
 		for(uint32_t i=0;i<ipct;i++)
@@ -273,18 +285,19 @@ int main(int argc, char **argv)
 		*/
 		while (pos < ipct)
 		{
-			struct in6_addr mask, ip_start, ip;
+			const struct in6_addr *mask;
+			struct in6_addr ip_start, ip;
 			uint32_t ip_ct_best = 0, zct_best = 0;
 
 			pos_end = pos + 1;
 			// find smallest network with maximum ip coverage with no less than ip6_subnet_threshold addresses
 			for (zct = params.zct_max; zct >= params.zct_min; zct--)
 			{
-				mask_from_bitcount6(zct, &mask);
-				ip6_and(iplist + pos, &mask, &ip_start);
+				mask = mask_from_bitcount6(zct);
+				ip6_and(iplist + pos, mask, &ip_start);
 				for (p = pos + 1, ip_ct = 1; p < ipct; p++, ip_ct++)
 				{
-					ip6_and(iplist + p, &mask, &ip);
+					ip6_and(iplist + p, mask, &ip);
 					if (memcmp(&ip_start, &ip, sizeof(ip)))
 						break;
 				}
@@ -303,11 +316,8 @@ int main(int argc, char **argv)
 				}
 			}
 			if (zct_best)
-			{
 				// network was found
-				mask_from_bitcount6(zct_best, &mask);
-				ip6_and(iplist + pos, &mask, &ip_start);
-			}
+				ip6_and(iplist + pos, mask_from_bitcount6(zct_best), &ip_start);
 			else
 				ip_start = iplist[pos], pos_end = pos + 1; // network not found, use single ip
 			inet_ntop(AF_INET6, &ip_start, str, sizeof(str));
