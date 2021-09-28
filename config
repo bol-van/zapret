@@ -51,7 +51,7 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"
 FLOWOFFLOAD=donttouch
 
 # openwrt: specify networks to be treated as LAN. default is "lan"
-# OPENWRT_LAN="lan lan2 lan3"
+#OPENWRT_LAN="lan lan2 lan3"
 
 # for routers based on desktop linux and macos. has no effect in openwrt.
 # CHOOSE LAN and optinally WAN NETWORK INTERFACES
