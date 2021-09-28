@@ -590,6 +590,10 @@ Newer FreeBSD versions support table only reloading : pfctl -Tl -f /etc/pf.conf
 Set to "-" to disable reload.
 LISTS_RELOAD="pfctl -f /etc/pf.conf"
 
+In openwrt there's default network 'lan'. Only traffic coming from this network is redirected to tpws by default.
+To override this behaviour set the following variable :
+OPENWRT_LAN="lan lan2 lan3"
+
 The following settings are not relevant for openwrt :
 
 If your system works as a router, then you need to enter the names of the internal and external interfaces:
@@ -597,6 +601,7 @@ IFACE_LAN = eth0
 IFACE_WAN = eth1
 IMPORTANT: configuring routing, masquerade, etc. not a zapret task.
 Only modes that intercept transit traffic are enabled.
+It's possible to specify multiple interfaces like this : IFACE_LAN="eth0 eth1 eth2"
 
 The INIT_APPLY_FW=1 parameter enables the init script to independently apply iptables rules.
 With other values or if the parameter is commented out, the rules will not be applied.

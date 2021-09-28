@@ -20,8 +20,6 @@ PF_ANCHOR_ZAPRET="$PF_ANCHOR_DIR/zapret"
 PF_ANCHOR_ZAPRET_V4="$PF_ANCHOR_DIR/zapret-v4"
 PF_ANCHOR_ZAPRET_V6="$PF_ANCHOR_DIR/zapret-v6"
 
-[ -n "$IFACE_WAN" ] && OWAN=" on $IFACE_WAN"
-
 CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/macos/custom"
 [ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
 
@@ -103,14 +101,13 @@ tpws_apply_socks_binds()
 {
 	local o
 
-	[ "$DISABLE_IPV4" = "1" ] || {
-		o="--bind-addr=127.0.0.1"
-		[ -n "$IFACE_LAN" ] && o="$o --bind-iface4=$IFACE_LAN $TPWS_WAIT"
-	}
-	[ "$DISABLE_IPV6" = "1" ] || {
-		o="$o --bind-addr=::1"
-		[ -n "$IFACE_LAN" ] && o="$o --bind-iface6=$IFACE_LAN --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
-	}
+	[ "$DISABLE_IPV4" = "1" ] || o="--bind-addr=127.0.0.1"
+	[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-addr=::1"
+	
+	for lan in $IFACE_LAN; do
+	    [ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$lan $TPWS_WAIT"
+	    [ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$lan --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
+	done
 	eval $1="\"\$$1 $o\""
 }
 
@@ -121,11 +118,13 @@ wait_interface_ll()
 }
 wait_lan_ll()
 {
-	[ "$DISABLE_IPV6" != "1" ] && [ -n "$IFACE_LAN" ] && {
-		wait_interface_ll $IFACE_LAN >&2 || {
-			echo "wait interface failed"
-			return 1
-		}
+	[ "$DISABLE_IPV6" != "1" ] && {
+		for lan in $IFACE_LAN; do
+			wait_interface_ll $lan >&2 || {
+				echo "wait interface failed on $lan"
+				return 1
+			}
+		done
 	}
 	return 0
 }
@@ -249,15 +248,22 @@ pf_anchor_zapret_v4_tpws()
 {
 	# $1 - port
 
-	local port=$(pf_anchor_port_target)
-	[ -n "$IFACE_LAN" ] && {
+	local rule port=$(pf_anchor_port_target)
+	for lan in $IFACE_LAN; do
 		for t in $tbl; do
-			 echo "rdr on $IFACE_LAN inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
+			 echo "rdr on $lan inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
 		done
-	}
+	done
 	echo "rdr on lo0 inet proto tcp from !127.0.0.0/8 to any port $port -> 127.0.0.1 port $1"
 	for t in $tbl; do
-		echo "pass out$OWAN route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
+		rule="route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
+		if [ -n "$IFACE_WAN" ] ; then
+			for wan in $IFACE_WAN; do
+				echo "pass out on $wan $rule"
+			done
+		else
+			echo "pass out $rule"
+		fi
 	done
 }
 
@@ -282,22 +288,31 @@ pf_anchor_zapret_v6_tpws()
 {
 	# $1 - port
 
-	local port=$(pf_anchor_port_target)
+	local LL_LAN rule port=$(pf_anchor_port_target)
 	# LAN link local is only for router
-	[ -n "$IFACE_LAN" ] && LL_LAN=$(get_ipv6_linklocal $IFACE_LAN)
-	[ -n "$LL_LAN" ] && {
-		for t in $tbl; do
-			echo "rdr on $IFACE_LAN inet6 proto tcp from any to $t port $port -> $LL_LAN port $1"
-		done
-	}
+	for lan in $IFACE_LAN; do
+		LL_LAN=$(get_ipv6_linklocal $lan)
+		[ -n "$LL_LAN" ] && {
+			for t in $tbl; do
+				echo "rdr on $lan inet6 proto tcp from any to $t port $port -> $LL_LAN port $1"
+			done
+		}
+	done
 	echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $1"
 	for t in $tbl; do
-		echo "pass out$OWAN route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
+		rule="route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
+		if [ -n "$IFACE_WAN" ] ; then
+			for wan in $IFACE_WAN; do
+				echo "pass out on $wan $rule"
+			done
+		else
+			echo "pass out $rule"
+		fi
 	done
 }
 pf_anchor_zapret_v6()
 {
-	local tbl port LL_LAN
+	local tbl port
 
 	[ "$DISABLE_IPV6" = "1" ] || {
 		case $MODE in

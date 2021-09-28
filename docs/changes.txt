@@ -193,3 +193,8 @@ MacOS easy install
 v39
 
 nfqws: conntrack, wssize
+
+v40
+
+init scripts : IFACE_LAN, IFACE_WAN now accept multiple interfaces
+init scripts : openwrt uses now OPENWRT_LAN parameter to override incoming interfaces for tpws

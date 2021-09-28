@@ -257,7 +257,7 @@ ask_list()
 	[ -n "$m" ] && M=$(echo $2 | cut -d ' ' -f$m 2>/dev/null)
 	[ -z "$M" ] && M="$M_DEFAULT"
 	echo selected : $M
-	eval $1="$M"
+	eval $1="\"$M\""
 	
 	[ "$M" != "$M_OLD" ]
 }

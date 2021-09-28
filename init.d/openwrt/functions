@@ -8,6 +8,7 @@
 TPWS_USER=daemon
 TPWS_LOCALHOST4=127.0.0.127
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
+[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
 
 # max wait time for the link local ipv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
@@ -54,19 +55,19 @@ network_find_wan6_all()
 
 ipt()
 {
-	iptables -C "$@" 2>/dev/null || iptables -I "$@"
+	iptables -C "$@" >/dev/null 2>/dev/null || iptables -I "$@"
 }
 ipt_del()
 {
-	iptables -C "$@" 2>/dev/null && iptables -D "$@"
+	iptables -C "$@" >/dev/null 2>/dev/null && iptables -D "$@"
 }
 ipt6()
 {
-	ip6tables -C "$@" 2>/dev/null || ip6tables -I "$@"
+	ip6tables -C "$@" >/dev/null 2>/dev/null || ip6tables -I "$@"
 }
 ipt6_del()
 {
-	ip6tables -C "$@" 2>/dev/null && ip6tables -D "$@"
+	ip6tables -C "$@" >/dev/null 2>/dev/null && ip6tables -D "$@"
 }
 
 # there's no route_localnet for ipv6
@@ -100,38 +101,46 @@ get_ipv6_global()
 
 dnat6_target()
 {
+ # $1 - lan network name
+ # $2 - var to store target ip6
  # get target ip address for DNAT. prefer link locals
  # tpws should be as inaccessible from outside as possible
  # link local address can appear not immediately after ifup
- 
  # DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
 
+ local DNAT6_TARGET DVAR=DNAT6_TARGET_$1
+ DVAR=$(echo $DVAR | sed 's/[^a-zA-Z0-9_]/_/g')
+ eval DNAT6_TARGET="\$$DVAR"
+ [ -n "$2" ] && eval $2=''
+ 
  [ -n "$DNAT6_TARGET" ] || {
     # no reason to query if its down
-    network_is_up lan || return
+    network_is_up $1 || return
 
     local DEVICE
-    network_get_device DEVICE lan
+    network_get_device DEVICE $1
 
     local ct=0
     while 
       DNAT6_TARGET=$(get_ipv6_linklocal $DEVICE)
       [ -n "$DNAT6_TARGET" ] && break
       [ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
-      echo waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
+      echo $DEVICE: waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
       ct=$(($ct+1))
       sleep 1
     do :; done
 
     [ -n "$DNAT6_TARGET" ] || {
-      echo no link local. getting global
+      echo $DEVICE: no link local. getting global
       DNAT6_TARGET=$(get_ipv6_global $DEVICE)
       [ -n "$DNAT6_TARGET" ] || {
-        echo could not get any address
+        echo $DEVICE: could not get any address
         DNAT6_TARGET=-
       }
     }
+    eval $DVAR="$DNAT6_TARGET"
  }
+ [ -n "$2" ] && eval $2="$DNAT6_TARGET"
 }
 
 
@@ -229,16 +238,19 @@ fw_tpws4()
        network_get_device DEVICE $ext_iface
        ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $1 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$2
     done
-    ipt prerouting_lan_rule -t nat -p tcp $1 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$2
-    network_get_device DEVICE lan
-    [ -n "$DEVICE" ] && {
-	    # allow localnet route only to special tpws IP
-	    iptables -N input_lan_rule_zapret 2>/dev/null
-	    ipt input_lan_rule_zapret -d 127.0.0.0/8 -j DROP
-	    ipt input_lan_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
-	    ipt input_lan_rule -j input_lan_rule_zapret
-	    sysctl -qw net.ipv4.conf.$DEVICE.route_localnet=1
-    }
+    
+    # allow localnet route only to special tpws IP
+    iptables -N input_rule_zapret 2>/dev/null
+    ipt input_rule_zapret -d 127.0.0.0/8 -j DROP
+    ipt input_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
+
+    for lan in $OPENWRT_LAN; do
+	network_get_device DEVICE $lan
+	[ -n "$DEVICE" ] || continue
+	ipt prerouting_rule -t nat -i $DEVICE -p tcp $1 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$2
+	ipt input_rule -i $DEVICE -j input_rule_zapret
+	sysctl -qw net.ipv4.conf.$DEVICE.route_localnet=1
+    done
  }
 }
 fw_tpws6()
@@ -246,7 +258,7 @@ fw_tpws6()
  # $1 - filter ipv6
  # $2 - tpws port
 
- local DEVICE wan_iface
+ local DEVICE wan_iface DNAT6
  
  [ "$DISABLE_IPV6" = "1" ] || {
     network_find_wan6_all wan_iface
@@ -254,9 +266,12 @@ fw_tpws6()
        network_get_device DEVICE $ext_iface
        ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $1 $IPSET_EXCLUDE6 dst -j DNAT --to [::1]:$2
     done
-    network_get_device DEVICE lan
-    dnat6_target
-    [ "$DNAT6_TARGET" != "-" ] && ipt6 PREROUTING -t nat -i $DEVICE -p tcp $1 $IPSET_EXCLUDE6 dst -j DNAT --to [$DNAT6_TARGET]:$2
+    for lan in $OPENWRT_LAN; do
+	network_get_device DEVICE $lan
+	[ -n "$DEVICE" ] || continue
+	dnat6_target $lan DNAT6
+	[ "$DNAT6" != '-' ] && ipt6 PREROUTING -t nat -i $DEVICE -p tcp $1 $IPSET_EXCLUDE6 dst -j DNAT --to [$DNAT6]:$2
+    done
  }
 }
 fw_tpws()
