@@ -5,6 +5,7 @@ ZAPRET=/etc/init.d/zapret
 [ "$ACTION" = "ifup" ] && [ -x "$ZAPRET" ] && "$ZAPRET" enabled && {
 	[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
 	. "$ZAPRET_BASE/config"
+	[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
 	for lan in $OPENWRT_LAN; do
 		[ "$INTERFACE" = "$lan" ] && {
 			"$ZAPRET" restart
