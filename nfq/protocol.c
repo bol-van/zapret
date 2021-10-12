@@ -45,7 +45,7 @@ bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_hos
 }
 bool IsTLSClientHello(const uint8_t *data, size_t len)
 {
-	return len>=6 && data[0]==0x16 && data[1]==0x03 && data[2]==0x01 && data[5]==0x01 && (ntohs(*(uint16_t*)(data+3))+5)<=len;
+	return len>=6 && data[0]==0x16 && data[1]==0x03 && data[2]>=0x01 && data[2]<=0x03 && data[5]==0x01 && (ntohs(*(uint16_t*)(data+3))+5)<=len;
 }
 bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
 {
