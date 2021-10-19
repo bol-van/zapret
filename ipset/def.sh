@@ -146,10 +146,46 @@ filedigger()
  >&2 echo digging $(wc -l <"$1" | xargs) ipv$2 domains : "$1"
  zzcat "$1" | digger $2 s
 }
+flush_dns_cache()
+{
+ echo clearing all known DNS caches
+
+ if exists killall; then
+  killall -HUP dnsmasq 2>/dev/null
+ elif exists pkill; then
+  pkill -HUP ^dnsmasq$
+ else
+  echo no mass killer available ! cant flush dnsmasq
+ fi
+ 
+ if exists rndc; then
+  rndc flush
+ fi
+
+ if exists systemd-resolve; then
+  systemd-resolve --flush-caches
+ fi
+
+ # MacOS
+ if exists pgrep && pgrep -q ^mDNSResponder$; then
+  killall -HUP mDNSResponder
+ fi
+}
 dnstest()
 {
  local ip=$(echo w3.org | digger 46)
  [ -n "$ip" ]
+}
+dnstest_with_cache_clear()
+{
+ flush_dns_cache
+ if dnstest ; then
+    echo DNS is working
+    return 0
+ else
+    echo "! DNS is not working"
+    return 1
+ fi
 }
 
 
@@ -173,10 +209,7 @@ oom_adjust_high()
 getexclude()
 {
  oom_adjust_high
- dnstest || {
-    echo "! DNS is not working. list processing aborted."
-    return 1
- }
+ dnstest_with_cache_clear || return
  [ -f "$ZUSERLIST_EXCLUDE" ] && {
   [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST_EXCLUDE" 4 | sort -u > "$ZIPLIST_EXCLUDE"
   [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST_EXCLUDE" 6 | sort -u > "$ZIPLIST_EXCLUDE6"
@@ -209,3 +242,4 @@ hup_zapret_daemons()
   echo no mass killer available ! cant HUP zapret daemons
  fi
 }
+
