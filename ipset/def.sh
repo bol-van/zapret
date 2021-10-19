@@ -1,8 +1,3 @@
-[ -n "$IPSET_DIR" ] || {
- IPSET_DIR="$(dirname "$0")"
- IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
-}
-
 . "$IPSET_DIR/../config"
 
 [ -z "$TMPDIR" ] && TMPDIR=/tmp
@@ -52,14 +47,11 @@ exists()
 # MacoS in cron does not include /usr/local/bin to PATH
 if [ -x /usr/local/bin/ggrep ] ; then
  GREP=/usr/local/bin/ggrep
-elif [ -x /usr/local/bin/grep ] ; then
- GREP=/usr/local/bin/grep
 elif exists ggrep; then
  GREP=$(which ggrep)
 else
  GREP=$(which grep)
 fi
-
 
 grep_supports_b()
 {
@@ -127,31 +119,18 @@ zzsize()
 
 digger()
 {
- # $1 - family (4|6)
- # $2 - s=enable mdig stats
- if [ -x "$MDIG" ]; then
-  local cmd
-  [ "$2" == "s" ] && cmd=--stats=1000
-  "$MDIG" --family=$1 --threads=$MDIG_THREADS $1 
- else
-  local A=A
-  [ "$1" = "6" ] && A=AAAA
-  dig $A +short +time=8 +tries=2 -f - | $GREP -E '^[^;].*[^\.]$'
- fi
-}
-filedigger()
-{
  # $1 - hostlist
  # $2 - family (4|6)
  >&2 echo digging $(wc -l <"$1" | xargs) ipv$2 domains : "$1"
- zzcat "$1" | digger $2 s
-}
-dnstest()
-{
- local ip=$(echo w3.org | digger 46)
- [ -n "$ip" ]
-}
 
+ if [ -x "$MDIG" ]; then
+  zzcat "$1" | "$MDIG" --family=$2 --threads=$MDIG_THREADS --stats=1000
+ else
+  local A=A
+  [ "$2" = "6" ] && A=AAAA
+  zzcat "$1" | dig $A +short +time=8 +tries=2 -f - | $GREP -E '^[^;].*[^\.]$'
+ fi
+}
 
 cut_local()
 {
@@ -173,29 +152,24 @@ oom_adjust_high()
 getexclude()
 {
  oom_adjust_high
- dnstest || {
-    echo "! DNS is not working. list processing aborted."
-    return 1
- }
+
  [ -f "$ZUSERLIST_EXCLUDE" ] && {
-  [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST_EXCLUDE" 4 | sort -u > "$ZIPLIST_EXCLUDE"
-  [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST_EXCLUDE" 6 | sort -u > "$ZIPLIST_EXCLUDE6"
+  [ "$DISABLE_IPV4" != "1" ] && digger "$ZUSERLIST_EXCLUDE" 4 | sort -u > "$ZIPLIST_EXCLUDE"
+  [ "$DISABLE_IPV6" != "1" ] && digger "$ZUSERLIST_EXCLUDE" 6 | sort -u > "$ZIPLIST_EXCLUDE6"
  }
- return 0
 }
 
 getuser()
 {
- getexclude || return
+ getexclude
  [ -f "$ZUSERLIST" ] && {
-  [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST" 4 | cut_local | sort -u > "$ZIPLIST_USER"
-  [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST" 6 | cut_local6 | sort -u > "$ZIPLIST_USER6"
+  [ "$DISABLE_IPV4" != "1" ] && digger "$ZUSERLIST" 4 | cut_local | sort -u > "$ZIPLIST_USER"
+  [ "$DISABLE_IPV6" != "1" ] && digger "$ZUSERLIST" 6 | cut_local6 | sort -u > "$ZIPLIST_USER6"
  }
  [ -f "$ZUSERLIST_IPBAN" ] && {
-  [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST_IPBAN" 4 | cut_local | sort -u > "$ZIPLIST_USER_IPBAN"
-  [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST_IPBAN" 6 | cut_local6 | sort -u > "$ZIPLIST_USER_IPBAN6"
+  [ "$DISABLE_IPV4" != "1" ] && digger "$ZUSERLIST_IPBAN" 4 | cut_local | sort -u > "$ZIPLIST_USER_IPBAN"
+  [ "$DISABLE_IPV6" != "1" ] && digger "$ZUSERLIST_IPBAN" 6 | cut_local6 | sort -u > "$ZIPLIST_USER_IPBAN6"
  }
- return 0
 }
 
 hup_zapret_daemons()
