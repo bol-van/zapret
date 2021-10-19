@@ -6,8 +6,10 @@ IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
 . "$IPSET_DIR/def.sh"
 
 # useful in case ipban set is used in custom scripts
-getuser
+FAIL=
+getuser || FAIL=1
 "$IPSET_DIR/create_ipset.sh"
+[ -n "$FAIL" ] && exit
 
 ZREESTR="$TMPDIR/zapret.txt"
 #ZURL=https://reestr.rublacklist.net/api/current
