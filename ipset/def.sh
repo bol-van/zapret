@@ -152,6 +152,8 @@ flush_dns_cache()
 
  if exists killall; then
   killall -HUP dnsmasq 2>/dev/null
+  # MacOS
+  killall -HUP mDNSResponder 2>/dev/null
  elif exists pkill; then
   pkill -HUP ^dnsmasq$
  else
@@ -166,8 +168,6 @@ flush_dns_cache()
   systemd-resolve --flush-caches
  fi
 
- # MacOS
- killall -HUP mDNSResponder 2>/dev/null
 }
 dnstest()
 {
