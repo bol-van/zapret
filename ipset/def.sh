@@ -167,9 +167,7 @@ flush_dns_cache()
  fi
 
  # MacOS
- if exists pgrep && pgrep ^mDNSResponder$ >/dev/null; then
-  killall -HUP mDNSResponder
- fi
+ killall -HUP mDNSResponder 2>/dev/null
 }
 dnstest()
 {
