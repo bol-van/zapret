@@ -171,7 +171,7 @@ flush_dns_cache()
 }
 dnstest()
 {
- local ip=$(echo w3.org | digger 46)
+ local ip="$(echo w3.org | digger 46)"
  [ -n "$ip" ]
 }
 dnstest_with_cache_clear()
