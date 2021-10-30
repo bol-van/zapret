@@ -409,7 +409,6 @@ is_linked_to_busybox()
 	IFS=:
 	for path in $PATH; do
 		F=$path/$1
-		echo F=$F
 		P="$(readlink $F)"
 		if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
 		[ "${P%busybox*}" != "$P" ] && return
