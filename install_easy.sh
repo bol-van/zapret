@@ -915,15 +915,15 @@ check_packages_openwrt()
 
 is_linked_to_busybox()
 {
-	local F P
-	F=/usr/bin/$1
-	P="$(readlink $F)"
-	if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
-	[ "${P%busybox*}" != "$P" ] && return
-	F=/bin/$1
-	P="$(readlink $F)"
-	if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
-	[ "${P%busybox*}" != "$P" ]
+	local IFS F P
+	
+	IFS=:
+	for path in $PATH; do
+		F=$path/$1
+		P="$(readlink $F)"
+		if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
+		[ "${P%busybox*}" != "$P" ] && return
+	done
 }
 
 check_prerequisites_openwrt()
