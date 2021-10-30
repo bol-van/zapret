@@ -402,12 +402,37 @@ do_daemon()
 }
 
 
+is_linked_to_busybox()
+{
+	local IFS F P
+	
+	IFS=:
+	for path in $PATH; do
+		F=$path/$1
+		echo F=$F
+		P="$(readlink $F)"
+		if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
+		[ "${P%busybox*}" != "$P" ] && return
+	done
+}
+useradd_compat()
+{
+	# $1 - username
+	if exists useradd ; then
+		useradd --no-create-home --system --shell /bin/false $1
+	elif is_linked_to_busybox adduser ; then
+		# busybox has special adduser syntax
+		adduser -S -H -D $1
+	elif exists adduser; then
+		adduser --system --no-create-home --disabled-login $1
+	fi
+}
 prepare_user()
 {
 	# $WS_USER is required to prevent redirection of the traffic originating from TPWS itself
 	# otherwise infinite loop will occur
 	# also its good idea not to run tpws as root
-	id -u $WS_USER >/dev/null 2>/dev/null || useradd --no-create-home --system --shell /bin/false $WS_USER
+	id -u $WS_USER >/dev/null 2>/dev/null || useradd_compat $WS_USER
 }
 do_tpws()
 {
