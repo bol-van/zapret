@@ -593,6 +593,8 @@ zapret_do_firewall()
 			;;
 	esac
 	[ "$1" = 0 ] && unprepare_tpws_fw
+
+	return 0
 }
 zapret_apply_firewall()
 {
@@ -634,6 +636,8 @@ zapret_do_daemons()
 	    		existf zapret_custom_daemons && zapret_custom_daemons $1
 			;;
 	esac
+
+	return 0
 }
 
 zapret_run_daemons()

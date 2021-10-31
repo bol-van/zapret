@@ -445,4 +445,6 @@ zapret_apply_firewall()
 	esac
 
 	flow_offloading_exempt
+
+	return 0
 }

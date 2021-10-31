@@ -413,6 +413,7 @@ zapret_do_firewall()
 			return 1
 			;;
 	esac
+
 	return 0
 }
 zapret_apply_firewall()
@@ -471,6 +472,8 @@ zapret_do_daemons()
 			return 1
 			;;
 	esac
+
+	return 0
 }
 zapret_run_daemons()
 {
