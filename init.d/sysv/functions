@@ -11,13 +11,13 @@ IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 WS_USER=tpws
 
 [ -n "$QNUM" ] || QNUM=200
-NFQWS="$ZAPRET_BASE/nfq/nfqws"
+[ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
 NFQWS_OPT_BASE="--user=$WS_USER --dpi-desync-fwmark=$DESYNC_MARK"
 NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
 NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
 
 [ -n "$TPPORT" ] || TPPORT=988
-TPWS="$ZAPRET_BASE/tpws/tpws"
+[ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 TPWS_LOCALHOST4=127.0.0.127
 HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
 [ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"

@@ -12,7 +12,7 @@ PIDDIR=/var/run
 TPWS_USER=daemon
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
-TPWS="$ZAPRET_BASE/tpws/tpws"
+[ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 
 PF_MAIN="/etc/pf.conf"
 PF_ANCHOR_DIR=/etc/pf.anchors

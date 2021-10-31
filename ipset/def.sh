@@ -38,8 +38,8 @@ ZUSERLIST_IPBAN="$IPSET_DIR/zapret-hosts-user-ipban.txt"
 ZUSERLIST_EXCLUDE="$IPSET_DIR/zapret-hosts-user-exclude.txt"
 
 
-IP2NET="$IPSET_DIR/../ip2net/ip2net"
-MDIG="$IPSET_DIR/../mdig/mdig"
+[ -n "$IP2NET" ] || IP2NET="$IPSET_DIR/../ip2net/ip2net"
+[ -n "$MDIG" ] || MDIG="$IPSET_DIR/../mdig/mdig"
 [ -z "$MDIG_THREADS" ] && MDIG_THREADS=30
 
 

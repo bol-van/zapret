@@ -20,10 +20,10 @@ fi
 PIDDIR=/var/run
 
 NFQWS_USER=daemon
-NFQWS="$ZAPRET_BASE/nfq/nfqws"
+[ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
 NFQWS_OPT_BASE="--user=$NFQWS_USER --dpi-desync-fwmark=$DESYNC_MARK"
 
-TPWS="$ZAPRET_BASE/tpws/tpws"
+[ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 TPWS_LOCALHOST4=127.0.0.127
 HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
 [ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"

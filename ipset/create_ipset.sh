@@ -63,9 +63,9 @@ ipset_restore()
  # do not saveram small files. file can also be gzipped
  [ "$SAVERAM" = "1" ] && [ "$fsize" -ge "$IPSET_SAVERAM_MIN_FILESIZE" ] && svram=1
 
- local T="Adding to ipset $2 ($IPSTYPE"
- [ "$svram" = "1" ] && T="$T, saveram"
- T="$T) : $f"
+ local T="Adding to ipset $2 "
+ [ "$svram" = "1" ] && T="$T (saveram)"
+ T="$T : $f"
  echo $T
 
  if [ "$svram" = "1" ]; then
