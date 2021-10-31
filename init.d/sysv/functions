@@ -168,7 +168,7 @@ dnat6_target()
 		}
 		eval $DVAR="$DNAT6_TARGET"
 	}
-	[ -n "$2" ] && eval $2="$DNAT6_TARGET"
+	[ -z "$2" ] || eval $2="$DNAT6_TARGET"
 }
 
 prepare_tpws_fw4()
@@ -592,7 +592,7 @@ zapret_do_firewall()
 	    		existf zapret_custom_firewall && zapret_custom_firewall $1
 			;;
 	esac
-	[ "$1" = 0 ] && unprepare_tpws_fw
+	[ "$1" != 0 ] || unprepare_tpws_fw
 }
 zapret_apply_firewall()
 {
