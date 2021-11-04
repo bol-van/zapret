@@ -9,6 +9,11 @@ ZREESTR="$TMPDIR/reestr.txt"
 #ZURL_REESTR=https://reestr.rublacklist.net/api/current
 ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
+awkgrep()
+{ 
+ # $1 - pattern
+ nice -n 5 $AWK "{while ( match(\$0,/($1[ |;])/) ) { print substr(\$0,RSTART,RLENGTH-1); \$0=substr(\$0,RSTART+RLENGTH) } }"
+}
 
 dig_reestr()
 {
@@ -25,12 +30,12 @@ dig_reestr()
  # find entries with https or without domain name - they should be banned by IP
  # 2971-18 is TELEGRAM. lots of proxy IPs banned, list grows very large
  (nice -n 5 $GREP -avE "$DOMMASK" "$ZREESTR" ; $GREP -a "https://" "$ZREESTR") |
-  nice -n 5 $GREP -oE "$1" | cut_local | sort -u >$TMP
+  awkgrep "$1" | cut_local | sort -u >$TMP
 
  ip2net$4 <"$TMP" | zz "$3" 
 
  # other IPs go to regular zapret list
- tail -n +2 "$ZREESTR"  |  nice -n 5 $GREP -oE "$1" | cut_local | nice -n 5 $GREP -xvFf "$TMP" | ip2net$4 | zz "$2"
+ tail -n +2 "$ZREESTR"  | awkgrep "$1" | cut_local | nice -n 5 $GREP -xvFf "$TMP" | ip2net$4 | zz "$2"
 
  rm -f "$TMP"
 }

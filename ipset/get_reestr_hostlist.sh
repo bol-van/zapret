@@ -25,7 +25,7 @@ if test $dlsize -lt 204800; then
  echo list file is too small. can be bad.
  exit 2
 fi
-(LANG=C cut -s -f2 -d';' "$ZREESTR" | LANG=C sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p' | awk '{ print tolower($0) }' ; cat "$ZUSERLIST" ) | sort -u | zz "$ZHOSTLIST"
+(LANG=C cut -s -f2 -d';' "$ZREESTR" | LANG=C sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p' | $AWK '{ print tolower($0) }' ; cat "$ZUSERLIST" ) | sort -u | zz "$ZHOSTLIST"
 rm -f "$ZREESTR"
 
 hup_zapret_daemons

@@ -10,6 +10,12 @@ ZREESTR="$TMPDIR/reestr.txt"
 ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
 
+awkgrep()
+{ 
+ # $1 - pattern
+ nice -n 5 $AWK "{while ( match(\$0,/($1[ |;])/) ) { print substr(\$0,RSTART,RLENGTH-1); \$0=substr(\$0,RSTART+RLENGTH) } }"
+}
+
 dig_reestr()
 {
  # $1 - grep ipmask
@@ -18,9 +24,8 @@ dig_reestr()
 
  echo processing reestr list $2
 
- tail -n +2 "$ZREESTR" | nice -n 5 $GREP -oE "$1" | cut_local | ip2net$3 | zz "$2"
+ tail -n +2 "$ZREESTR" | awkgrep "$1" | cut_local | ip2net$3 | zz "$2"
 }
-
 
 getuser && {
  # assume all https banned by ip

@@ -26,7 +26,7 @@ file_extract_lines()
  # $2 - from line (starting with 0)
  # $3 - line count
  # awk "{ err=1 } NR < $(($2+1)) { next } { print; err=0 } NR == $(($2+$3)) { exit err } END {exit err}" "$1"
- awk "NR < $(($2+1)) { next } { print } NR == $(($2+$3)) { exit }" "$1"
+ $AWK "NR < $(($2+1)) { next } { print } NR == $(($2+$3)) { exit }" "$1"
 }
 ipset_restore_chunked()
 {
@@ -160,7 +160,7 @@ elif exists ipset; then
  # only /tmp is considered tmpfs. other locations mean tmpdir was redirected to a disk
  SAVERAM=0
  [ "$TMPDIR" = "/tmp" ] && {
-  RAMSIZE=$($GREP MemTotal /proc/meminfo | awk '{print $2}')
+  RAMSIZE=$($GREP MemTotal /proc/meminfo | $AWK '{print $2}')
   [ "$RAMSIZE" -lt "110000" ] && SAVERAM=1
  }
  print_reloading_backend ipset
