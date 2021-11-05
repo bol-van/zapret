@@ -12,7 +12,7 @@ ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 awkgrep()
 { 
  # $1 - pattern
- nice -n 5 $AWK "{while ( match(\$0,/($1[ |;])/) ) { print substr(\$0,RSTART,RLENGTH-1); \$0=substr(\$0,RSTART+RLENGTH) } }"
+ nice -n 5 $AWK "{while ( match(\$0,/$1[ |;]/) ) { print substr(\$0,RSTART,RLENGTH-1); \$0=substr(\$0,RSTART+RLENGTH) } }"
 }
 
 dig_reestr()
