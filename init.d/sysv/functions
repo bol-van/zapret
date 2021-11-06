@@ -31,14 +31,18 @@ user_exists()
 useradd_compat()
 {
 	# $1 - username
-	if exists useradd ; then
-		useradd --no-create-home --system --shell /bin/false $1
-	elif is_linked_to_busybox adduser ; then
-		# busybox has special adduser syntax
-		adduser -S -H -D $1
-	elif exists adduser; then
-		adduser --no-create-home --system --disabled-login $1
-	fi
+
+	# skip for readonly systems
+	[ -w "/etc" ] && {
+		if exists useradd ; then
+			useradd --no-create-home --system --shell /bin/false $1
+		elif is_linked_to_busybox adduser ; then
+			# busybox has special adduser syntax
+			adduser -S -H -D $1
+		elif exists adduser; then
+			adduser --no-create-home --system --disabled-login $1
+		fi
+	}
 	user_exists $1
 }
 prepare_user()
