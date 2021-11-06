@@ -53,13 +53,13 @@ prepare_user()
 	user_exists $WS_USER || {
 		# fallback to daemon if we cant add WS_USER
 		useradd_compat $WS_USER || {
-		    for user in daemon nobody; do
-			user_exists $user && {
-			    WS_USER=$user
-			    return 0
-			}
-		    done
-		    return 1
+			for user in daemon nobody; do
+				user_exists $user && {
+					WS_USER=$user
+					return 0
+				}
+			done
+			return 1
 		}
 	}
 }
