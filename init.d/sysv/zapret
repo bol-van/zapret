@@ -15,15 +15,29 @@ ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
 NAME=zapret
 DESC=anti-zapret
 
+do_start()
+{
+	zapret_run_daemons
+	[ "$INIT_APPLY_FW" != "1" ] || zapret_apply_firewall
+}
+do_stop()
+{
+	zapret_stop_daemons
+	[ "$INIT_APPLY_FW" != "1" ] || zapret_unapply_firewall
+}
+
 case "$1" in
 	start)
-		zapret_run_daemons
-		[ "$INIT_APPLY_FW" != "1" ] || zapret_apply_firewall
+		do_start
 		;;
 
 	stop)
-		zapret_stop_daemons
-		[ "$INIT_APPLY_FW" != "1" ] || zapret_unapply_firewall
+		do_stop
+		;;
+
+	restart)
+		do_stop
+		do_start
 		;;
 
 	start-fw)
@@ -32,6 +46,11 @@ case "$1" in
 	stop-fw)
 		zapret_unapply_firewall
 		;;
+
+	restart-fw)
+		zapret_unapply_firewall
+		zapret_apply_firewall
+		;;
 	
 	start-daemons)
 		zapret_run_daemons
@@ -39,10 +58,14 @@ case "$1" in
 	stop-daemons)
 		zapret_stop_daemons
 		;;
+	restart-daemons)
+		zapret_stop_daemons
+		zapret_run_daemons
+		;;
 		
   *)
 	N=/etc/init.d/$NAME
-	echo "Usage: $N {start|stop|start-fw|stop-fw|start-daemons|stop-daemons}" >&2
+	echo "Usage: $N {start|stop|restart|start-fw|stop-fw|restart-fw|start-daemons|stop-daemons|restart-daemons}" >&2
 	exit 1
 	;;
 esac
