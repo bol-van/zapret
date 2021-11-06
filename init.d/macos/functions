@@ -9,7 +9,7 @@ HOSTLIST="$ZHOSTLIST.gz"
 
 PIDDIR=/var/run
 [ -n "$TPPORT" ] || TPPORT=988
-[ -n "$TPWS_USER" ] || TPWS_USER=daemon
+[ -n "$WS_USER" ] || WS_USER=daemon
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
@@ -456,7 +456,7 @@ zapret_do_daemons()
 				echo "both ipv4 and ipv6 are disabled. nothing to do"
 				return 0
 			}
-			opt="--socks --user=$TPWS_USER --port=$TPPORT"
+			opt="--socks --user=$WS_USER --port=$TPPORT"
 			tpws_apply_socks_binds opt
 			filter_apply_hostlist_target opt
 			opt="$opt $TPWS_OPT"
