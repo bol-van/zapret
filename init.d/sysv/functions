@@ -52,7 +52,7 @@ prepare_user()
 	}
 }
 
-WS_USER=tpws
+[ -n "$WS_USER" ] || WS_USER=tpws
 prepare_user
 
 PIDDIR=/var/run

@@ -9,7 +9,7 @@ HOSTLIST="$ZHOSTLIST.gz"
 
 PIDDIR=/var/run
 [ -n "$TPPORT" ] || TPPORT=988
-TPWS_USER=daemon
+[ -n "$TPWS_USER" ] || TPWS_USER=daemon
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
