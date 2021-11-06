@@ -448,8 +448,6 @@ do_tpws()
 	# $2 : daemon number
 	# $3 : daemon args
 
-	[ "$1" = "1" ] && prepare_user
-
 	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
 
 	local OPT="$TPWS_OPT_BASE"
