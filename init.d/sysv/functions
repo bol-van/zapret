@@ -4,11 +4,59 @@
 # SHOULD EDIT config
 . "$ZAPRET_BASE/config"
 
-PIDDIR=/var/run
-
-IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
+exists()
+{
+	which "$1" >/dev/null 2>/dev/null
+}
+existf()
+{
+	type "$1" >/dev/null 2>/dev/null
+}
+is_linked_to_busybox()
+{
+	local IFS F P
+	
+	IFS=:
+	for path in $PATH; do
+		F=$path/$1
+		P="$(readlink $F)"
+		if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
+		[ "${P%busybox*}" != "$P" ] && return
+	done
+}
+user_exists()
+{
+	id -u $1 >/dev/null 2>/dev/null
+}
+useradd_compat()
+{
+	# $1 - username
+	if exists useradd ; then
+		useradd --no-create-home --system --shell /bin/false $1
+	elif is_linked_to_busybox adduser ; then
+		# busybox has special adduser syntax
+		adduser -S -H -D $1
+	elif exists adduser; then
+		adduser --no-create-home --system --disabled-login $1
+	fi
+	user_exists $1
+}
+prepare_user()
+{
+	# $WS_USER is required to prevent redirection of the traffic originating from TPWS itself
+	# otherwise infinite loop will occur
+	# also its good idea not to run tpws as root
+	user_exists $WS_USER || {
+		# fallback to daemon if we cant add WS_USER
+		useradd_compat $WS_USER || WS_USER=daemon
+	}
+}
 
 WS_USER=tpws
+prepare_user
+
+PIDDIR=/var/run
+IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
@@ -42,14 +90,6 @@ CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/sysv/custom"
 IPSET_EXCLUDE="-m set ! --match-set nozapret"
 IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
 
-exists()
-{
-	which "$1" >/dev/null 2>/dev/null
-}
-existf()
-{
-	type "$1" >/dev/null 2>/dev/null
-}
 
 on_off_function()
 {
@@ -359,7 +399,7 @@ run_daemon()
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
 	if exists start-stop-daemon ; then
-		start-stop-daemon --start --pidfile "$PIDFILE" --background --make-pidfile --exec "$2" -- $3
+		start-stop-daemon -S -p "$PIDFILE" -m -b -x "$2" -- $3
 	else
 		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
 			echo already running
@@ -384,7 +424,7 @@ stop_daemon()
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
 	if exists start-stop-daemon ; then
-		start-stop-daemon --stop --pidfile "$PIDFILE" --exec "$2"
+		start-stop-daemon -K -p "$PIDFILE" -x "$2"
 	else
 		if [ -f "$PIDFILE" ]; then
 			read PID <"$PIDFILE"
@@ -402,37 +442,6 @@ do_daemon()
 }
 
 
-is_linked_to_busybox()
-{
-	local IFS F P
-	
-	IFS=:
-	for path in $PATH; do
-		F=$path/$1
-		P="$(readlink $F)"
-		if [ -z "$P" ] && [ -x $F ] && [ ! -L $F ]; then return 1; fi
-		[ "${P%busybox*}" != "$P" ] && return
-	done
-}
-useradd_compat()
-{
-	# $1 - username
-	if exists useradd ; then
-		useradd --no-create-home --system --shell /bin/false $1
-	elif is_linked_to_busybox adduser ; then
-		# busybox has special adduser syntax
-		adduser -S -H -D $1
-	elif exists adduser; then
-		adduser --system --no-create-home --disabled-login $1
-	fi
-}
-prepare_user()
-{
-	# $WS_USER is required to prevent redirection of the traffic originating from TPWS itself
-	# otherwise infinite loop will occur
-	# also its good idea not to run tpws as root
-	id -u $WS_USER >/dev/null 2>/dev/null || useradd_compat $WS_USER
-}
 do_tpws()
 {
 	# $1 : 1 - run, 0 - stop
@@ -461,8 +470,6 @@ do_tpws_socks()
 	# $2 : daemon number
 	# $3 : daemon args
 
-	[ "$1" = "1" ] && prepare_user
-
 	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
 
 	local opt="$TPWS_OPT_BASE --socks"
@@ -478,7 +485,6 @@ do_nfqws()
 	# $2 : daemon number
 	# $3 : daemon args
 
-	[ "$1" = "1" ] && prepare_user
 	do_daemon $1 $2 "$NFQWS" "$NFQWS_OPT_BASE $3"
 }
 
