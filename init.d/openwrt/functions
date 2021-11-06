@@ -241,7 +241,6 @@ fw_tpws4()
     
     # allow localnet route only to special tpws IP
     iptables -N input_rule_zapret 2>/dev/null
-    iptables -F input_rule_zapret
     ipt input_rule_zapret -d 127.0.0.0/8 -j DROP
     ipt input_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
 
