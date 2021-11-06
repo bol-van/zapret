@@ -52,19 +52,33 @@ prepare_user()
 	# also its good idea not to run tpws as root
 	user_exists $WS_USER || {
 		# fallback to daemon if we cant add WS_USER
-		useradd_compat $WS_USER || WS_USER=daemon
+		useradd_compat $WS_USER || {
+		    for user in daemon nobody; do
+			user_exists $user && {
+			    WS_USER=$user
+			    return 0
+			}
+		    done
+		    return 1
+		}
 	}
 }
 
+# this complex user selection allows to survive in any locked/readonly/minimalistic environment
 [ -n "$WS_USER" ] || WS_USER=tpws
-prepare_user
+if prepare_user; then
+ USEROPT="--user=$WS_USER"
+else
+ WS_USER=1
+ USEROPT="--uid $WS_USER:$WS_USER"
+fi
 
 PIDDIR=/var/run
 IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
-NFQWS_OPT_BASE="--user=$WS_USER --dpi-desync-fwmark=$DESYNC_MARK"
+NFQWS_OPT_BASE="$USEROPT --dpi-desync-fwmark=$DESYNC_MARK"
 NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
 NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
 
@@ -75,7 +89,7 @@ HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
 [ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"
 [ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts-user.txt"
 
-TPWS_OPT_BASE="--user=$WS_USER"
+TPWS_OPT_BASE="$USEROPT"
 TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
 TPWS_OPT_BASE6="--bind-addr=::1"
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
