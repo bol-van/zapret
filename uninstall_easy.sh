@@ -159,8 +159,6 @@ service_remove_openrc()
 
 remove_openrc()
 {
-	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
-
 	service_remove_openrc
 	crontab_del
 }
