@@ -16,7 +16,7 @@ bool find_host(char **pHost,char *buf,size_t bs)
 		if (*pHost)
 		{
 			(*pHost)++;
-			VPRINT("Found Host: at pos %zu",*pHost - buf)
+			VPRINT("Found Host: at pos %td",*pHost - buf)
 		}
 	}
 	return !!*pHost;
@@ -73,7 +73,7 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 					if (pp == (p - 1))
 					{
 						// probably end of http headers
-						VPRINT("Found double EOL at pos %zu. Stop replacing.", pp - segment)
+						VPRINT("Found double EOL at pos %td. Stop replacing.", pp - segment)
 						break;
 					}
 					pp = p;
@@ -141,7 +141,7 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 			}
 			if (params.hostcase && find_host(&pHost,segment,*size))
 			{
-				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %zu", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment)
+				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment)
 				memcpy(pHost, params.hostspell, 4);
 			}
 			if (params.hostpad && find_host(&pHost,segment,*size))

@@ -178,7 +178,7 @@ static ssize_t send_buffer_send(send_buffer_t *sb, int fd)
 }
 static ssize_t send_buffers_send(send_buffer_t *sb_array, int count, int fd, size_t *real_wr)
 {
-	ssize_t wr=0,twr=0;
+	ssize_t wr,twr=0;
 
 	for (int i=0;i<count;i++)
 	{
@@ -596,7 +596,7 @@ static bool epoll_set_flow_pair(tproxy_conn_t *conn)
 
 static bool handle_unsent(tproxy_conn_t *conn)
 {
-	ssize_t wr=0,twr=0;
+	ssize_t wr;
 
 	DBGPRINT("+handle_unsent, fd=%d has_unsent=%d has_unsent_partner=%d",conn->fd,conn_has_unsent(conn),conn_partner_alive(conn) ? conn_has_unsent(conn->partner) : false)
 	
@@ -610,7 +610,6 @@ static bool handle_unsent(tproxy_conn_t *conn)
 			if (errno==EAGAIN) wr=0;
 			else return false;
 		}
-		twr += wr;
 		conn->twr += wr;
 		conn->wr_unsent -= wr;
 	}
@@ -620,7 +619,6 @@ static bool handle_unsent(tproxy_conn_t *conn)
 		wr=conn_buffers_send(conn);
 		DBGPRINT("conn_buffers_send wr=%zd",wr)
 		if (wr<0) return false;
-		twr += wr;
 	}
 	return epoll_set_flow_pair(conn);
 }
@@ -1006,7 +1004,7 @@ static bool remove_closed_connections(int efd, struct tailhead *close_list)
 
 		shutdown(conn->fd,SHUT_RDWR);
 		epoll_del(conn);
-		VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) closed, connection removed. total_read=%zu total_write=%zu event_count=%d",
+		VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) closed, connection removed. total_read=%zu total_write=%zu event_count=%u",
 			conn->fd, conn->partner ? conn->partner->fd : 0, conn->remote, conn->trd, conn->twr, conn->event_count)
 		if (conn->remote) legs_remote--; else legs_local--;
 		free_conn(conn);
@@ -1102,7 +1100,7 @@ static void conn_close_with_partner_check(struct tailhead *conn_list, struct tai
 	}
 }
 
-int event_loop(int *listen_fd, size_t listen_fd_ct)
+int event_loop(const int *listen_fd, size_t listen_fd_ct)
 {
 	int retval = 0, num_events = 0;
 	int tmp_fd = 0; //Used to temporarily hold the accepted file descriptor

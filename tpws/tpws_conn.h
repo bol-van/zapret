@@ -11,7 +11,7 @@
 #define DEFAULT_MAX_CONN	512
 #define DEFAULT_MAX_ORPHAN_TIME	5
 
-int event_loop(int *listen_fd, size_t listen_fd_ct);
+int event_loop(const int *listen_fd, size_t listen_fd_ct);
 
 //Three different states of a connection
 enum{

@@ -73,11 +73,11 @@ void print_ip6hdr(const struct ip6_hdr *ip6hdr, uint8_t proto);
 void print_tcphdr(const struct tcphdr *tcphdr);
 
 
-bool proto_check_ipv4(uint8_t *data, size_t len);
+bool proto_check_ipv4(const uint8_t *data, size_t len);
 void proto_skip_ipv4(uint8_t **data, size_t *len);
-bool proto_check_tcp(uint8_t *data, size_t len);
+bool proto_check_tcp(const uint8_t *data, size_t len);
 void proto_skip_tcp(uint8_t **data, size_t *len);
-bool proto_check_ipv6(uint8_t *data, size_t len);
+bool proto_check_ipv6(const uint8_t *data, size_t len);
 void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type);
 
 bool tcp_synack_segment(const struct tcphdr *tcphdr);

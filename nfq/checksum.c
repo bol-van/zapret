@@ -18,7 +18,7 @@ static uint16_t do_csum(const uint8_t * buff, size_t len)
 	uint64_t result,w,carry=0;
 	uint16_t u16;
 
-	if (len <= 0) return 0;
+	if (!len) return 0;
 	odd = (uint8_t)(1 & (size_t)buff);
 	if (odd)
 	{

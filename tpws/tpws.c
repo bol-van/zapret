@@ -629,7 +629,7 @@ static bool set_ulimit()
 	DBGPRINT("set_ulimit : current system file-max=%ju",(uintmax_t)cur_lim)
 	if (cur_lim<fdmin_system)
 	{
-		DBGPRINT("set_ulimit : system fd limit is too low. trying to increase to %jd",(uintmax_t)fdmin_system)
+		DBGPRINT("set_ulimit : system fd limit is too low. trying to increase to %ju",(uintmax_t)fdmin_system)
 		if (!write_system_maxfiles(fdmin_system))
 		{
 			fprintf(stderr,"could not set system-wide max file descriptors\n");

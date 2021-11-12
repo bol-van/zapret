@@ -103,7 +103,7 @@ static void fill_tcphdr(struct tcphdr *tcp, uint8_t fooling, uint8_t tcp_flags, 
 	while (t&3) tcpopt[t++]=1; // noop
 	tcp->th_off += t>>2;
 }
-static uint16_t tcpopt_len(uint8_t fooling, uint32_t *timestamps, uint8_t scale_factor)
+static uint16_t tcpopt_len(uint8_t fooling, const uint32_t *timestamps, uint8_t scale_factor)
 {
 	uint16_t t=0;
 	if (fooling & TCP_FOOL_MD5SIG) t=18;
@@ -586,7 +586,7 @@ void print_tcphdr(const struct tcphdr *tcphdr)
 
 
 
-bool proto_check_ipv4(uint8_t *data, size_t len)
+bool proto_check_ipv4(const uint8_t *data, size_t len)
 {
 	return 	len >= 20 && (data[0] & 0xF0) == 0x40 &&
 		len >= ((data[0] & 0x0F) << 2);
@@ -600,7 +600,7 @@ void proto_skip_ipv4(uint8_t **data, size_t *len)
 	*data += l;
 	*len -= l;
 }
-bool proto_check_tcp(uint8_t *data, size_t len)
+bool proto_check_tcp(const uint8_t *data, size_t len)
 {
 	return	len >= 20 && len >= ((data[12] & 0xF0) >> 2);
 }
@@ -612,7 +612,7 @@ void proto_skip_tcp(uint8_t **data, size_t *len)
 	*len -= l;
 }
 
-bool proto_check_ipv6(uint8_t *data, size_t len)
+bool proto_check_ipv6(const uint8_t *data, size_t len)
 {
 	return 	len >= 40 && (data[0] & 0xF0) == 0x60 &&
 		(len - 40) >= htons(*(uint16_t*)(data + 4)); // payload length
@@ -702,7 +702,6 @@ void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
 void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor)
 {
 	uint16_t winsize_old;
-	uint8_t *scale,scale_factor_old;
 
 	winsize_old = htons(tcp->th_win); // << scale_factor;
 	tcp->th_win = htons(winsize);

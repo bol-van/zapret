@@ -3,7 +3,7 @@
 #include "gzip.h"
 
 
-static bool addpool(strpool **hostlist, char **s, char *end)
+static bool addpool(strpool **hostlist, char **s, const char *end)
 {
 	char *p;
 	

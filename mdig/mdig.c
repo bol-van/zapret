@@ -354,7 +354,6 @@ int main(int argc, char **argv)
 		case 2: /* verbose */
 			glob.verbose = '\1';
 			break;
-			glob.threads = optarg ? atoi(optarg) : 0;
 		case 3: /* stats */
 			glob.stats_every = optarg ? atoi(optarg) : 0;
 			break;

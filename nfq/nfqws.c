@@ -166,7 +166,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 	struct nfq_data *nfa, void *cookie)
 {
 	int id;
-	size_t len;
+	int len;
 	struct nfqnl_msg_packet_hdr *ph;
 	uint8_t *data;
 
