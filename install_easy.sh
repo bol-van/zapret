@@ -25,8 +25,9 @@ DNSCHECK_DIGS=/tmp/digs.txt
 
 [ -n "$TPPORT" ] || TPPORT=988
 
-SYSTEMD_SYSTEM_DIR=/lib/systemd/system
-[ -d "$SYSTEMD_SYSTEM_DIR" ] || SYSTEMD_SYSTEM_DIR=/usr/lib/systemd/system
+SYSTEMD_DIR=/lib/systemd
+[ -d "$SYSTEMD_DIR" ] || SYSTEMD_DIR=/usr/lib/systemd
+[ -d "$SYSTEMD_DIR" ] && SYSTEMD_SYSTEM_DIR="$SYSTEMD_DIR/system"
 
 ECHON="echo -n"
 
@@ -155,7 +156,8 @@ check_system()
 
 	local UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
-		if [ -x "$SYSTEMCTL" ] ; then
+		# some distros include systemctl without systemd
+		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMD_DIR/systemd" ] && [ -x "$SYSTEMCTL" ]; then
 			SYSTEM=systemd
 		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
 			SYSTEM=openwrt
