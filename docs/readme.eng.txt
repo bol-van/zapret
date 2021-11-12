@@ -629,7 +629,7 @@ And you can start or stop the demons separately from the firewall:
 Simple install to desktop linux system
 --------------------------------------
 
-Simple install works on most modern linux distributions with systemd, OpenWRT and MacOS.
+Simple install works on most modern linux distributions with systemd or openrc, OpenWRT and MacOS.
 Run install_easy.sh and answer its questions.
 
 Simple install to openwrt

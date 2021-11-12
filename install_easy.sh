@@ -161,8 +161,11 @@ check_system()
 			SYSTEM=systemd
 		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
 			SYSTEM=openwrt
+		elif exists /sbin/openrc-run || exists /usr/sbin/openrc-run ; then
+			SYSTEM=openrc
 		else
-			echo system is not either systemd based or openwrt. check readme.txt for manual setup info.
+			echo system is not either systemd, openrc or openwrt based
+			echo check readme.txt for manual setup info.
 			exitp 5
 		fi
 	elif [ "$UNAME" = "Darwin" ]; then
@@ -625,8 +628,16 @@ check_prerequisites_linux()
 {
 	echo \* checking prerequisites
 
+	if exists iptables && exists ip6tables ; then
+		echo iptables present
+	else
+		# looks like it's a limited system. will not guess how to install base tools
+		echo '! iptables/ip6tables NOT present.  you must install them manually.'
+		exitp 5
+	fi
+
 	if exists ipset && exists curl ; then
-		echo everything is present
+		echo ipset and curl are present
 	else
 		echo \* installing prerequisites
 
@@ -635,6 +646,7 @@ check_prerequisites_linux()
 		PACMAN=$(whichq pacman)
 		ZYPPER=$(whichq zypper)
 		EOPKG=$(whichq eopkg)
+		APK=$(whichq apk)
 		if [ -x "$APTGET" ] ; then
 			"$APTGET" update
 			"$APTGET" install -y --no-install-recommends ipset curl dnsutils || {
@@ -659,6 +671,11 @@ check_prerequisites_linux()
 			}
 		elif [ -x "$EOPKG" ] ; then
 			"$EOPKG" -y install ipset curl || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$APK" ] ; then
+			"$APK" add ipset curl || {
 				echo could not install prerequisites
 				exitp 6
 			}
@@ -894,6 +911,82 @@ install_systemd()
 }
 
 
+
+install_sysv_init()
+{
+	# $1 - "0"=disable
+	echo \* installing init script
+
+	[ -x "$INIT_SCRIPT" ] && {
+		"$INIT_SCRIPT" stop
+		"$INIT_SCRIPT" disable
+	}
+	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
+	[ "$1" != "0" ] && "$INIT_SCRIPT" enable
+}
+
+install_openrc_init()
+{
+	# $1 - "0"=disable
+	echo \* installing init script
+
+	[ -x "$INIT_SCRIPT" ] && {
+		"$INIT_SCRIPT" stop
+		rc-update del zapret
+	}
+	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
+	[ "$1" != "0" ] && rc-update add zapret
+}
+
+service_start_sysv()
+{
+	echo \* starting zapret service
+
+	"$INIT_SCRIPT" start || {
+		echo could not start zapret service
+		exitp 30
+	}
+}
+
+service_stop_sysv()
+{
+	[ -x "$INIT_SCRIPT" ] && {
+		echo \* stopping zapret service
+		"$INIT_SCRIPT" stop
+	}
+}
+
+_install_sysv()
+{
+	# $1 - install init script
+	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
+
+	check_bins
+	require_root
+	check_location copy_all
+	check_prerequisites_linux
+	service_stop_sysv
+	install_binaries
+	check_dns
+	select_ipv6
+	ask_config
+	$1
+	download_list
+	crontab_del_quiet
+	# desktop system. more likely up at daytime
+	crontab_add 10 22
+	service_start_sysv
+}
+
+install_sysv()
+{
+	_install_sysv install_sysv_init
+}
+
+install_openrc()
+{
+	_install_sysv install_openrc_init
+}
 
 
 check_kmod()
@@ -1134,29 +1227,6 @@ deoffload_openwrt_firewall()
 			
 }
 
-install_sysv_init()
-{
-	# $1 - "0"=disable
-	echo \* installing init script
-
-	[ -x "$INIT_SCRIPT" ] && {
-		"$INIT_SCRIPT" stop
-		"$INIT_SCRIPT" disable
-	}
-	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
-	[ "$1" != "0" ] && "$INIT_SCRIPT" enable
-}
-
-service_start_sysv()
-{
-	echo \* starting zapret service
-
-	"$INIT_SCRIPT" start || {
-		echo could not start zapret service
-		exitp 30
-	}
-}
-
 
 
 install_openwrt()
@@ -1274,6 +1344,9 @@ check_system
 case $SYSTEM in
 	systemd)
 		install_systemd
+		;;
+	openrc)
+		install_openrc
 		;;
 	openwrt)
 		install_openwrt

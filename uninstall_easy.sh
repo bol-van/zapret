@@ -7,8 +7,12 @@ EXEDIR="$(cd "$EXEDIR"; pwd)"
 IPSET_DIR="$EXEDIR/ipset"
 
 GET_LIST_PREFIX=/ipset/get_
-SYSTEMD_SYSTEM_DIR=/lib/systemd/system
-[ -d "$SYSTEMD_SYSTEM_DIR" ] || SYSTEMD_SYSTEM_DIR=/usr/lib/systemd/system
+
+SYSTEMD_DIR=/lib/systemd
+[ -d "$SYSTEMD_DIR" ] || SYSTEMD_DIR=/usr/lib/systemd
+[ -d "$SYSTEMD_DIR" ] && SYSTEMD_SYSTEM_DIR="$SYSTEMD_DIR/system"
+
+INIT_SCRIPT=/etc/init.d/zapret
 
 exists()
 {
@@ -48,16 +52,22 @@ check_system()
 
 	local UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
-		if [ -x "$SYSTEMCTL" ] ; then
+		# some distros include systemctl without systemd
+		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMD_DIR/systemd" ] && [ -x "$SYSTEMCTL" ]; then
 			SYSTEM=systemd
 		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
 			SYSTEM=openwrt
+		elif exists /sbin/openrc-run || exists /usr/sbin/openrc-run ; then
+			SYSTEM=openrc
 		else
-			echo system is not either systemd based or openwrt. check readme.txt for manual setup info.
+			echo system is not either systemd, openrc or openwrt based
+			echo check readme.txt for manual setup info.
 			exitp 5
 		fi
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
+		# MacOS echo from /bin/sh does not support -n
+		ECHON=printf
 	else
 		echo easy installer only supports Linux and MacOS. check readme.txt for supported systems and manual setup info.
 		exitp 5
@@ -117,8 +127,6 @@ timer_remove_systemd()
 
 remove_systemd()
 {
-	INIT_SCRIPT=/etc/init.d/zapret
-	
 	service_stop_systemd
 	service_remove_systemd
 	timer_remove_systemd
@@ -126,6 +134,36 @@ remove_systemd()
 }
 
 
+service_remove_sysv()
+{
+	echo \* removing zapret service
+
+	[ -x "$INIT_SCRIPT" ] && {
+		"$INIT_SCRIPT" disable
+		"$INIT_SCRIPT" stop
+	}
+	rm -f "$INIT_SCRIPT"
+}
+
+service_remove_openrc()
+{
+	echo \* removing zapret service
+
+	[ -x "$INIT_SCRIPT" ] && {
+		rc-update del zapret
+		"$INIT_SCRIPT" stop
+	}
+	rm -f "$INIT_SCRIPT"
+}
+
+
+remove_openrc()
+{
+	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
+
+	service_remove_openrc
+	crontab_del
+}
 
 
 
@@ -188,20 +226,9 @@ remove_openwrt_iface_hook()
 }
 
 
-service_remove_sysv()
-{
-	echo \* removing zapret service
-
-	[ -x "$INIT_SCRIPT" ] && {
-		"$INIT_SCRIPT" disable
-		"$INIT_SCRIPT" stop
-	}
-	rm -f "$INIT_SCRIPT"
-}
 
 remove_openwrt()
 {
-	INIT_SCRIPT=/etc/init.d/zapret
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 
 	remove_openwrt_firewall
@@ -246,6 +273,9 @@ require_root
 case $SYSTEM in
 	systemd)
 		remove_systemd
+		;;
+	openrc)
+		remove_openrc
 		;;
 	openwrt)
 		remove_openwrt
