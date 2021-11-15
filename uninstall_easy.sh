@@ -62,7 +62,7 @@ check_system()
 		else
 			echo system is not either systemd, openrc or openwrt based
 			echo check readme.txt for manual setup info.
-			exitp 5
+			SYSTEM=linux
 		fi
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
@@ -163,6 +163,14 @@ remove_openrc()
 	crontab_del
 }
 
+remove_linux()
+{
+	crontab_del
+	
+	echo
+	echo '!!! WARNING. YOUR UNINSTALL IS INCOMPLETE !!!'
+	echo 'you must manually remove zapret auto start from your system'
+}
 
 
 openwrt_fw_section_find()
@@ -274,6 +282,9 @@ case $SYSTEM in
 		;;
 	openrc)
 		remove_openrc
+		;;
+	linux)
+		remove_linux
 		;;
 	openwrt)
 		remove_openwrt
