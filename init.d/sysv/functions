@@ -240,7 +240,7 @@ prepare_tpws_fw4()
 		iptables -A input_rule_zapret -d 127.0.0.0/8 -j DROP
 		for lan in $IFACE_LAN ; do
 			ipt INPUT -i $lan -j input_rule_zapret
-			sysctl -qw net.ipv4.conf.$lan.route_localnet=1
+			sysctl -q -w net.ipv4.conf.$lan.route_localnet=1
 		done
 	}
 }
@@ -249,7 +249,7 @@ unprepare_tpws_fw4()
 	[ -n "$IFACE_LAN" ] && {
 		for lan in $IFACE_LAN ; do
 			ipt_del INPUT -i $lan -j input_rule_zapret
-			sysctl -qw net.ipv4.conf.$lan.route_localnet=0
+			sysctl -q -w net.ipv4.conf.$lan.route_localnet=0
 		done
 		iptables -F input_rule_zapret 2>/dev/null
 		iptables -X input_rule_zapret 2>/dev/null
