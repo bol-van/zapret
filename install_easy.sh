@@ -165,8 +165,13 @@ check_system()
 			SYSTEM=openrc
 		else
 			echo system is not either systemd, openrc or openwrt based
-			echo check readme.txt for manual setup info.
-			exitp 5
+			echo easy installer can set up config settings but can\'t configure auto start
+			echo you have to do it manually. check readme.txt for manual setup info.
+			if ask_yes_no N "do you want to continue"; then
+			    SYSTEM=linux
+			else
+			    exitp 5
+			fi
 		fi
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
@@ -989,6 +994,31 @@ install_openrc()
 }
 
 
+install_linux()
+{
+	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
+
+	check_bins
+	require_root
+	check_location copy_all
+	check_prerequisites_linux
+	install_binaries
+	check_dns
+	select_ipv6
+	ask_config
+	download_list
+	crontab_del_quiet
+	# desktop system. more likely up at daytime
+	crontab_add 10 22
+	
+	echo
+	echo '!!! WARNING. YOUR SETUP IS INCOMPLETE !!!'
+	echo you must manually add to auto start : $INIT_SCRIPT_SRC start
+	echo make sure it\'s executed after your custom/firewall iptables configuration
+	echo "if your system uses sysv init : ln -fs $INIT_SCRIPT_SRC /etc/init.d/zapret ; chkconfig zapret on"
+}
+
+
 check_kmod()
 {
 	[ -f "/lib/modules/$(uname -r)/$1.ko" ]
@@ -1347,6 +1377,9 @@ case $SYSTEM in
 		;;
 	openrc)
 		install_openrc
+		;;
+	linux)
+		install_linux
 		;;
 	openwrt)
 		install_openwrt
