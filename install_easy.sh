@@ -977,11 +977,12 @@ install_openrc_init()
 
 service_start_sysv()
 {
-	echo \* starting zapret service
-
-	"$INIT_SCRIPT" start || {
-		echo could not start zapret service
-		exitp 30
+	[ -x "$INIT_SCRIPT" ] && {
+		echo \* starting zapret service
+		"$INIT_SCRIPT" start || {
+			echo could not start zapret service
+			exitp 30
+		}
 	}
 }
 
