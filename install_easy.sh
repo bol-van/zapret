@@ -184,6 +184,26 @@ check_system()
 	echo system is based on $SYSTEM
 }
 
+check_readonly_system()
+{
+	local RO
+	echo \* checking readonly system
+        case $SYSTEM in
+		systemd)
+			[ -w "$SYSTEMD_SYSTEM_DIR" ] || RO=1
+			;;
+		openrc)
+			[ -w "$(dirname "$INIT_SCRIPT")" ] || RO=1
+			;;
+	esac
+	[ -z "$RO" ] || {
+		echo '!!! READONLY SYSTEM DETECTED !!!'
+		echo '!!! WILL NOT BE ABLE TO CONFIGURE STARTUP !!!'
+		echo '!!! MANUAL STARTUP CONFIGURATION IS REQUIRED !!!'
+		ask_yes_no N "do you want to continue" || exitp 5
+	}
+}
+
 check_bins()
 {
 	echo \* checking executables
@@ -697,13 +717,17 @@ service_install_systemd()
 {
 	echo \* installing zapret service
 
-	rm -f "$INIT_SCRIPT"
-	ln -fs "$EXEDIR/init.d/systemd/zapret.service" "$SYSTEMD_SYSTEM_DIR"
-	"$SYSTEMCTL" daemon-reload
-	"$SYSTEMCTL" enable zapret || {
-		echo could not enable systemd service
-		exitp 20
-	}
+	if [ -w "$SYSTEMD_SYSTEM_DIR" ] ; then
+		rm -f "$INIT_SCRIPT"
+		ln -fs "$EXEDIR/init.d/systemd/zapret.service" "$SYSTEMD_SYSTEM_DIR"
+		"$SYSTEMCTL" daemon-reload
+		"$SYSTEMCTL" enable zapret || {
+			echo could not enable systemd service
+			exitp 20
+		}
+	else
+		echo '!!! READONLY SYSTEM DETECTED !!! CANNOT INSTALL SYSTEMD UNITS !!!'
+	fi
 }
 
 service_stop_systemd()
@@ -729,19 +753,23 @@ timer_install_systemd()
 {
 	echo \* installing zapret-list-update timer
 
-	"$SYSTEMCTL" disable zapret-list-update.timer
-	"$SYSTEMCTL" stop zapret-list-update.timer
-	ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR"
-	ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.timer" "$SYSTEMD_SYSTEM_DIR"
-	"$SYSTEMCTL" daemon-reload
-	"$SYSTEMCTL" enable zapret-list-update.timer || {
-		echo could not enable zapret-list-update.timer
-		exitp 20
-	}
-	"$SYSTEMCTL" start zapret-list-update.timer || {
-		echo could not start zapret-list-update.timer
-		exitp 30
-	}
+	if [ -w "$SYSTEMD_SYSTEM_DIR" ] ; then
+		"$SYSTEMCTL" disable zapret-list-update.timer
+		"$SYSTEMCTL" stop zapret-list-update.timer
+		ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR"
+		ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.timer" "$SYSTEMD_SYSTEM_DIR"
+		"$SYSTEMCTL" daemon-reload
+		"$SYSTEMCTL" enable zapret-list-update.timer || {
+			echo could not enable zapret-list-update.timer
+			exitp 20
+		}
+		"$SYSTEMCTL" start zapret-list-update.timer || {
+			echo could not start zapret-list-update.timer
+			exitp 30
+		}
+	else
+		echo '!!! READONLY SYSTEM DETECTED !!! CANNOT INSTALL SYSTEMD UNITS !!!'
+	fi
 }
 
 download_list()
@@ -785,18 +813,21 @@ crontab_add()
 	[ -x "$GET_LIST" ] &&	{
 		echo \* adding crontab entry
 
-		CRONTMP=/tmp/cron.tmp
-		crontab -l >$CRONTMP 2>/dev/null
-		if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
-			echo some entries already exist in crontab. check if this is corrent :
-			grep "$GET_LIST_PREFIX" $CRONTMP
+		if exists crontab; then
+			CRONTMP=/tmp/cron.tmp
+			crontab -l >$CRONTMP 2>/dev/null
+			if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
+				echo some entries already exist in crontab. check if this is corrent :
+				grep "$GET_LIST_PREFIX" $CRONTMP
+			else
+				end_with_newline <"$CRONTMP" || echo >>"$CRONTMP"
+				echo "$(random 0 59) $(random $1 $2) */2 * * $GET_LIST" >>$CRONTMP
+				crontab $CRONTMP
+			fi
+			rm -f $CRONTMP
 		else
-			end_with_newline <"$CRONTMP" || echo >>"$CRONTMP"
-			echo "$(random 0 59) $(random $1 $2) */2 * * $GET_LIST" >>$CRONTMP
-			crontab $CRONTMP
+			echo '!!! CRON IS ABSENT !!! LISTS AUTO UPDATE WILL NOT WORK !!!'
 		fi
-
-		rm -f $CRONTMP
 	}
 }
 cron_ensure_running()
@@ -899,6 +930,7 @@ install_systemd()
 
 	check_bins
 	require_root
+	check_readonly_system
 	check_location copy_all
 	check_prerequisites_linux
 	service_stop_systemd
@@ -968,6 +1000,7 @@ _install_sysv()
 
 	check_bins
 	require_root
+	check_readonly_system
 	check_location copy_all
 	check_prerequisites_linux
 	service_stop_sysv
