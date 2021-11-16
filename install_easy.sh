@@ -61,6 +61,7 @@ exitp()
 
 require_root()
 {
+	echo \* checking privileges
 	[ $(id -u) -ne "0" ] && {
 		echo root is required
 		exists sudo && exec sudo "$0"
