@@ -158,7 +158,7 @@ check_system()
 	local UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
 		# some distros include systemctl without systemd
-		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMD_DIR/systemd" ] && [ -x "$SYSTEMCTL" ]; then
+		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$(basename $(readlink /proc/1/exe))" = "systemd" ]; then
 			SYSTEM=systemd
 		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
 			SYSTEM=openwrt
