@@ -153,7 +153,7 @@ parse_var_checked()
 	# $1 - file name
 	# $2 - var name
 	local sed="sed -nre s/^[[:space:]]*$2=[\\\"|\']?([^\\\"|\']*)[\\\"|\']?/\1/p"
-	local v="$($sed <"$1" | head -n 1)"
+	local v="$($sed <"$1" | tail -n 1)"
 	eval $2=\"$v\"
 }
 parse_vars_checked()
