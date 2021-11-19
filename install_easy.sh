@@ -389,6 +389,7 @@ select_mode_mode()
 			;;
 	esac
 	[ -n "$vars" ] && {
+		echo
 		while [ 1=1 ]; do
 			for var in $vars; do
 				eval v="\$$var"
