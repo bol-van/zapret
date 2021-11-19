@@ -148,6 +148,56 @@ random()
 	echo $(( ($r % ($2-$1+1)) + $1 ))
 }
 
+parse_var_checked()
+{
+	# $1 - file name
+	# $2 - var name
+	local sed="sed -nre s/^[[:space:]]*$2=[\\\"|\']?([^\\\"|\']*)[\\\"|\']?/\1/p"
+	local v="$($sed <"$1" | head -n 1)"
+	eval $2=\"$v\"
+}
+parse_vars_checked()
+{
+	# $1 - file name
+	# $2,$3,... - var names
+	local f="$1"
+	shift
+	while [ -n "$1" ]; do
+
+		parse_var_checked "$f" $1
+		shift
+	done	
+}
+edit_file()
+{
+	# $1 - file name
+	local ed="$EDITOR"
+	[ -n "$ed" ] || {
+		for e in mcedit nano vi; do
+			exists "$e" && {
+				ed="$e"
+				break
+			}
+		done
+	}
+	[ -n "$ed" ] && "$ed" "$1"
+}
+edit_vars()
+{
+	# $1,$2,... - var names
+	local n=1 var v tmp="/tmp/zvars"
+	rm -f "$tmp"
+	while [ 1=1 ]; do
+		eval var="\$$n"
+		[ -n "$var" ] || break
+		eval v="\$$var"
+		echo $var=\"$v\" >>"$tmp"
+		n=$(($n+1))
+	done
+	edit_file "$tmp" && parse_vars_checked "$tmp" "$@"
+	rm -f "$tmp"
+}
+
 check_system()
 {
 	echo \* checking system
@@ -324,25 +374,36 @@ write_config_var()
 
 select_mode_mode()
 {
-	local MODES="tpws tpws-socks nfqws filter custom"
+	local v vars MODES="tpws tpws-socks nfqws filter custom"
 	[ "$SYSTEM" = "macos" ] && MODES="tpws tpws-socks filter custom"
 	echo
 	echo select MODE :
 	ask_list MODE "$MODES" tpws && write_config_var MODE
+
 	case $MODE in
 		tpws)
-			echo
-			echo tpws options : $TPWS_OPT
-			echo to change : edit TPWS_OPT in $ZAPRET_CONFIG
+			vars="TPWS_OPT"
 			;;
 		nfqws)
-			echo
-			echo "nfqws options (default) : $NFQWS_OPT_DESYNC"
-			echo "nfqws options (http)    : $NFQWS_OPT_DESYNC_HTTP"
-			echo "nfqws options (https)   : $NFQWS_OPT_DESYNC_HTTPS"
-			echo to change : edit NFQWS_OPT_DESYNC, NFQWS_OPT_DESYNC_HTTP, NFQWS_OPT_DESYNC_HTTPS in $ZAPRET_CONFIG
+			vars="NFQWS_OPT_DESYNC NFQWS_OPT_DESYNC_HTTP NFQWS_OPT_DESYNC_HTTPS"
 			;;
 	esac
+	[ -n "$vars" ] && {
+		while [ 1=1 ]; do
+			for var in $vars; do
+				eval v="\$$var"
+				echo $var=\"$v\"
+			done
+			ask_yes_no N "do you want to edit the options" || {
+				for var in $vars; do
+					write_config_var $var
+				done
+				break
+			}
+			edit_vars $vars
+			echo ..edited..
+		done
+	}
 }
 select_mode_http()
 {
