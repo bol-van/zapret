@@ -163,7 +163,6 @@ parse_vars_checked()
 	local f="$1"
 	shift
 	while [ -n "$1" ]; do
-
 		parse_var_checked "$f" $1
 		shift
 	done	
@@ -374,7 +373,7 @@ write_config_var()
 
 select_mode_mode()
 {
-	local v vars MODES="tpws tpws-socks nfqws filter custom"
+	local edited v vars MODES="tpws tpws-socks nfqws filter custom"
 	[ "$SYSTEM" = "macos" ] && MODES="tpws tpws-socks filter custom"
 	echo
 	echo select MODE :
@@ -396,12 +395,15 @@ select_mode_mode()
 				echo $var=\"$v\"
 			done
 			ask_yes_no N "do you want to edit the options" || {
-				for var in $vars; do
-					write_config_var $var
-				done
+				[ -n "$edited" ] && {
+					for var in $vars; do
+						write_config_var $var
+					done
+				}
 				break
 			}
 			edit_vars $vars
+			edited=1
 			echo ..edited..
 		done
 	}
