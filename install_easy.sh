@@ -206,12 +206,13 @@ check_system()
 
 	local UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
+		local INIT="$(basename $(readlink /proc/1/exe))"
 		# some distros include systemctl without systemd
-		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$(basename $(readlink /proc/1/exe))" = "systemd" ]; then
+		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd
-		elif exists rc-update && [ "$(basename $(readlink /proc/1/exe))" = "openrc-init" ]; then
+		elif exists rc-update && [ "$INIT" = "openrc-init" ]; then
 			SYSTEM=openrc
-		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
+		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] ; then
 			SYSTEM=openwrt
 		else
 			echo system is not either systemd, openrc or openwrt based
