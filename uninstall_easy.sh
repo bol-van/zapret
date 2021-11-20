@@ -56,10 +56,10 @@ check_system()
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$(basename $(readlink /proc/1/exe))" = "systemd" ]; then
 			SYSTEM=systemd
+		elif exists rc-update && [ "$(basename $(readlink /proc/1/exe))" = "openrc-init" ]; then
+			SYSTEM=openrc
 		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci ; then
 			SYSTEM=openwrt
-		elif exists /sbin/openrc-run || exists /usr/sbin/openrc-run ; then
-			SYSTEM=openrc
 		else
 			echo system is not either systemd, openrc or openwrt based
 			echo check readme.txt for manual setup info.
