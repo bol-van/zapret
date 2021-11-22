@@ -137,7 +137,7 @@ digger()
  if [ -x "$MDIG" ]; then
   local cmd
   [ "$2" = "s" ] && cmd=--stats=1000
-  "$MDIG" --family=$1 --threads=$MDIG_THREADS $1 
+  "$MDIG" --family=$1 --threads=$MDIG_THREADS $cmd $1
  else
   local A=A
   [ "$1" = "6" ] && A=AAAA
