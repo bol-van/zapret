@@ -13,6 +13,9 @@ IPSET_OPT="hashsize 262144 maxelem 2097152"
 IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
 IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
 
+# number of parallel threads for domain list resolves
+MDIG_THREADS=30
+
 # ipset/*.sh can compress large lists
 GZIP_LISTS=1
 # command to reload ip/host lists after update
