@@ -18,7 +18,7 @@ GET_LIST_PREFIX=/ipset/get_
 INIT_SCRIPT=/etc/init.d/zapret
 
 DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.8"
-DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to kinozal.tv"
+DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to protonmail.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -207,7 +207,9 @@ check_system()
 	local UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
 		# do not use 'exe' because it requires root
-		local INIT="$(basename $(sed 's/\x0/\n/g' /proc/1/cmdline  | head -n 1))"
+		local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
+		[ -L "$INIT" ] && INIT=$(readlink "$INIT")
+		INIT=$(basename "$INIT")
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd

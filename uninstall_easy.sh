@@ -54,7 +54,9 @@ check_system()
 	local UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
 		# do not use 'exe' because it requires root
-		local INIT="$(basename $(sed 's/\x0/\n/g' /proc/1/cmdline  | head -n 1))"
+		local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
+		[ -L "$INIT" ] && INIT=$(readlink "$INIT")
+		INIT=$(basename "$INIT")
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd
