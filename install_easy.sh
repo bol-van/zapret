@@ -913,10 +913,15 @@ pingtest()
 {
 	ping -c 1 -W 1 $1 >/dev/null
 }
+dnstest()
+{
+	# $1 - dns server. empty for system resolver
+	nslookup w3.org $1 >/dev/null 2>/dev/null
+}
 find_working_public_dns()
 {
 	for dns in $DNSCHECK_DNS; do
-		pingtest $dns && nslookup w3.org $dns >/dev/null 2>/dev/null && {
+		pingtest $dns && dnstest $dns && {
 			PUBDNS=$dns
 			return 0
 		}
@@ -943,6 +948,13 @@ check_dns()
 	echo \* checking DNS
 
 	[ -f "$DNSCHECK_DIGS" ] && rm -f "$DNSCHECK_DIGS"
+
+	dnstest || {
+		echo -- DNS is not working. It's either misconfigured or blocked or you don't have inet access.
+		return 1
+	}
+	echo system DNS is working
+
 	if find_working_public_dns ; then
 		echo comparing system resolver to public DNS : $PUBDNS
 		for dom in $DNSCHECK_DOM; do
