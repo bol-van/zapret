@@ -40,7 +40,7 @@ int getmaxcap()
 	FILE *F = fopen("/proc/sys/kernel/cap_last_cap", "r");
 	if (F)
 	{
-		fscanf(F, "%d", &maxcap);
+		int n = fscanf(F, "%d", &maxcap);
 		fclose(F);
 	}
 	return maxcap;

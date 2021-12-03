@@ -175,7 +175,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 
 	uint32_t mark = nfq_get_nfmark(nfa);
 	len = nfq_get_payload(nfa, &data);
-	DLOG("packet: id=%d len=%zu\n", id, len)
+	DLOG("packet: id=%d len=%d\n", id, len)
 	if (len >= 0)
 	{
 		switch (processPacketData(data, len, &mark))
