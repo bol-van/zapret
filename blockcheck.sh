@@ -438,7 +438,7 @@ sigint()
 	nfqws_ipt_unprepare 80
 	nfqws_ipt_unprepare 443
 	killall nfqws 2>/dev/null
-	exit 1
+	exitp 1
 }
 
 trap 'sigint' 2
