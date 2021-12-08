@@ -224,7 +224,7 @@ check_domain_bypass()
 	# $1 - test function
 	# $2 - domain
 
-	local pid strategy tests='fake'
+	local pid strategy tests='fake' ttls
 
 	if nfqws_curl_test $1 $2 --dpi-desync=split2; then
 		strategy='--dpi-desync=split2'
@@ -237,7 +237,7 @@ check_domain_bypass()
 		tests="$tests disorder fake,disorder"
 	fi
 
-	local ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
+	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
 	for desync in $tests; do
 		for ttl in $ttls; do
 			nfqws_curl_test $1 $2 --dpi-desync=$desync --dpi-desync-ttl=$ttl && {
