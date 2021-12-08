@@ -264,6 +264,8 @@ check_domain()
 	# $2 - port
 	# $3 - domain
 
+	local code
+
 	echo
 	echo \* $1 $3
 
@@ -272,7 +274,11 @@ check_domain()
 	killall nfqws 2>/dev/null
 
 	echo "- checking without DPI bypass"
-	curl_test $1 $3 && return 0
+	curl_test $1 $3 && return
+	code=$?
+	for c in 1 2 3 4 6 27 ; do
+		[ $code = $c ] && return
+	done
 
 	echo preparing nfqws redirection
 	nfqws_ipt_prepare $2
