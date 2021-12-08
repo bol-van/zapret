@@ -154,7 +154,8 @@ curl_test_http()
 	code=$(hdrfile_http_code "$HDRTEMP")
 	[ "$code" = 301 -o "$code" = 302 -o "$code" = 307 -o "$code" = 308 ] && {
 		loc=$(hdrfile_location "$HDRTEMP")
-		[ "${loc#*$2}" = "$loc" ] && {
+		echo "$loc" | grep -qE "^https?://.*$2(/|$)" ||
+		echo "$loc" | grep -vqE '^https?://' || {
 			echo suspicious redirection to : $loc
 			rm -f "$HDRTEMP"
 			return 254
