@@ -451,3 +451,5 @@ ask_params
 
 [ "$ENABLE_HTTP" = 1 ] && check_domain_http $DOMAIN
 [ "$ENABLE_HTTPS" = 1 ] && check_domain_https $DOMAIN
+
+exitp 0
