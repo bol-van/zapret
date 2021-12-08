@@ -17,12 +17,6 @@ GET_LIST="$IPSET_DIR/get_config.sh"
 GET_LIST_PREFIX=/ipset/get_
 INIT_SCRIPT=/etc/init.d/zapret
 
-DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.8"
-DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to protonmail.com"
-DNSCHECK_DIG1=/tmp/dig1.txt
-DNSCHECK_DIG2=/tmp/dig2.txt
-DNSCHECK_DIGS=/tmp/digs.txt
-
 [ -n "$TPPORT" ] || TPPORT=988
 
 SYSTEMD_DIR=/lib/systemd
@@ -649,7 +643,7 @@ copy_openwrt()
 	mkdir "$2/tpws" "$2/nfq" "$2/ip2net" "$2/mdig" "$2/binaries" "$2/binaries/$ARCH" "$2/init.d" "$2/tmp"
 	cp -R "$1/ipset" "$2"
 	cp -R "$1/init.d/openwrt" "$2/init.d"
-	cp "$1/config" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$2"
+	cp "$1/config" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$1/blockcheck.sh" "$2"
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
 
@@ -909,99 +903,20 @@ cron_ensure_running()
 }
 
 
-pingtest()
-{
-	ping -c 1 -W 1 $1 >/dev/null
-}
 dnstest()
 {
 	# $1 - dns server. empty for system resolver
 	nslookup w3.org $1 >/dev/null 2>/dev/null
 }
-find_working_public_dns()
-{
-	for dns in $DNSCHECK_DNS; do
-		pingtest $dns && dnstest $dns && {
-			PUBDNS=$dns
-			return 0
-		}
-	done
-	return 1
-}
-check_dns_spoof()
-{
-	# $1 - domain
-	# $2 - public DNS
-	echo $1 | "$EXEDIR/mdig/mdig" --family=4 >"$DNSCHECK_DIG1"
-	nslookup $1 $2 | sed -n '/Name:/,$p' | grep ^Address | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' >"$DNSCHECK_DIG2"
-	# check whether system resolver returns anything other than public DNS
-	grep -qvFf "$DNSCHECK_DIG2" "$DNSCHECK_DIG1"
-}
-check_dns_cleanup()
-{
-	rm -f "$DNSCHECK_DIG1" "$DNSCHECK_DIG2" "$DNSCHECK_DIGS" 2>/dev/null
-}
 check_dns()
 {
-	local C1 C2
-
 	echo \* checking DNS
-
-	[ -f "$DNSCHECK_DIGS" ] && rm -f "$DNSCHECK_DIGS"
 
 	dnstest || {
 		echo -- DNS is not working. It's either misconfigured or blocked or you don't have inet access.
 		return 1
 	}
 	echo system DNS is working
-
-	if find_working_public_dns ; then
-		echo comparing system resolver to public DNS : $PUBDNS
-		for dom in $DNSCHECK_DOM; do
-			if check_dns_spoof $dom $PUBDNS ; then
-				echo $dom : MISMATCH
-				echo -- system resolver :
-				cat "$DNSCHECK_DIG1"
-				echo -- $PUBDNS :
-				cat "$DNSCHECK_DIG2"
-				check_dns_cleanup
-				echo -- POSSIBLE DNS HIJACK DETECTED. ZAPRET WILL NOT HELP YOU IN CASE DNS IS SPOOFED !!!
-				echo -- DNS CHANGE OR DNSCRYPT MAY BE REQUIRED
-				return 1
-			else
-				echo $dom : OK
-				cat "$DNSCHECK_DIG1" >>"$DNSCHECK_DIGS"
-			fi
-		done
-	else
-		echo no working public DNS was found. looks like public DNS blocked.
-		for dom in $DNSCHECK_DOM; do echo $dom; done | "$EXEDIR/mdig/mdig" --threads=10 --family=4 >"$DNSCHECK_DIGS"
-	fi
-
-	echo checking resolved IP uniqueness for : $DNSCHECK_DOM
-	echo censor\'s DNS can return equal result for multiple blocked domains.
-	C1=$(wc -l <"$DNSCHECK_DIGS")
-	C2=$(sort -u "$DNSCHECK_DIGS" | wc -l)
-	[ "$C1" -eq 0 ] &&
-	{
-		echo -- DNS is not working. It's either misconfigured or blocked or you don't have inet access.
-		check_dns_cleanup
-		return 1
-	}
-	[ "$C1" = "$C2" ] ||
-	{
-		echo system dns resolver has returned equal IPs for some domains checked above \($C1 total, $C2 unique\)
-		echo non-unique IPs :
-		sort "$DNSCHECK_DIGS" | uniq -d
-		echo -- POSSIBLE DNS HIJACK DETECTED. ZAPRET WILL NOT HELP YOU IN CASE DNS IS SPOOFED !!!
-		echo -- DNSCRYPT MAY BE REQUIRED
-		check_dns_cleanup
-		return 1
-	}
-	echo all resolved IPs are unique
-	echo -- DNS looks good
-	echo -- NOTE this check is Russia targeted. In your country other domains may be blocked.
-	check_dns_cleanup
 	return 0
 }
 
