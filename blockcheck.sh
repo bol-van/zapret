@@ -5,7 +5,10 @@ EXEDIR="$(cd "$EXEDIR"; pwd)"
 ZAPRET_BASE="$EXEDIR"
 
 [ -n "$QNUM" ] || QNUM=59780
+[ -n "$TPPORT" ] || TPPORT=993
+[ -n "$TPWS_UID" ] || TPWS_UID=1
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
+[ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 [ -n "$MDIG" ] || MDIG="$ZAPRET_BASE/mdig/mdig"
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
 DOMAIN=rutracker.org
@@ -115,8 +118,8 @@ check_prerequisites()
 {
 	echo \* checking prerequisites
 
-	[ -x "$NFQWS" ] && [ -x "$MDIG" ] || {
-		echo $NFQWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh
+	[ -x "$NFQWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
+		echo $NFQWS or $MDIG or $TPWS is not available. run $ZAPRET_BASE/install_bin.sh
 		exitp 6
 	}
 
@@ -183,9 +186,23 @@ nfqws_ipt_unprepare()
 	# $1 - port
 	IPT_DEL POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
 }
+tpws_ipt_prepare()
+{
+	# $1 - port
+	IPT OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
+}
+tpws_ipt_unprepare()
+{
+	# $1 - port
+	IPT_DEL OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
+}
 nfqws_start()
 {
 	"$NFQWS" --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
+}
+tpws_start()
+{
+	"$TPWS" --uid $TPWS_UID:$TPWS_UID --bind-addr=$LOCALHOST --port=$TPPORT "$@" >/dev/null &
 }
 
 curl_test()
@@ -204,32 +221,51 @@ curl_test()
 	fi
 	return $code
 }
-nfqws_curl_test()
+ws_curl_test()
 {
-	# $1 - test function
-	# $2 - domain
-	# $3,$4,$5, ... - nfqws params
-	local code pid testf=$1 dom=$2
+	# $1 - ws start function
+	# $2 - test function
+	# $3 - domain
+	# $4,$5,$6, ... - ws params
+	local code pid ws_start=$1 testf=$2 dom=$3
 	shift
 	shift
-	echo - checking nfqws "$@"
-	nfqws_start "$@"
+	shift
+	$ws_start "$@"
 	pid=$!
+	# let some time for tpws to initialize
+sleep 1
 	curl_test $testf $dom
 	code=$?
 	killwait -9 $pid
 	return $code
 }
-check_domain_bypass()
+tpws_curl_test()
+{
+	# $1 - test function
+	# $2 - domain
+	# $3,$4,$5, ... - tpws params
+	echo - checking tpws $3 $4 $5 $6 $7 $8 $9
+	ws_curl_test tpws_start "$@"
+}
+nfqws_curl_test()
+{
+	# $1 - test function
+	# $2 - domain
+	# $3,$4,$5, ... - nfqws params
+	echo - checking nfqws $3 $4 $5 $6 $7 $8 $9
+	ws_curl_test nfqws_start "$@"
+}
+nfqws_check_domain_bypass()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local pid strategy tests='fake' ttls s sec="$2" found
+	local strategy tests='fake' ttls s sec="$2" found
 
 	[ "$sec" = 0 ] && {
-		for s in '--hostcase' '--hostnospace' '--domcase'; do
+		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
 			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		done
 	}
@@ -238,18 +274,30 @@ check_domain_bypass()
 	if nfqws_curl_test $1 $3 $s; then
 		strategy="${strategy:-$s}"
 	else
-		tests="$tests split fake,split"
+		tests="$tests split fake,split2 fake,split"
 		[ "$sec" = 0 ] && {
 			s="$s --hostcase"
 			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		}
+		for pos in 1 2 4 5 10 50 100; do
+			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
+			if nfqws_curl_test $1 $3 $s; then
+				strategy="${strategy:-$s}"
+				break
+			else
+				[ "$sec" = 0 ] && {
+					s="$s --hostcase"
+					nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+				}
+			fi
+		done
 	fi
 
 	s="--dpi-desync=disorder2"
 	if nfqws_curl_test $1 $3 $s; then
 		strategy="${strategy:-$s}" 
 	else
-		tests="$tests disorder fake,disorder"
+		tests="$tests disorder fake,disorder2 fake,disorder"
 	fi
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
@@ -299,6 +347,36 @@ check_domain_bypass()
 		return 1
 	fi
 }
+tpws_check_domain_bypass()
+{
+	# $1 - test function
+	# $2 - encrypted test : 1/0
+	# $3 - domain
+	local s strategy sec="$2"
+	if [ "$sec" = 0 ]; then
+		for s in '--hostcase' '--hostspell=hoSt' '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' \
+			'--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
+			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384'; do
+			tpws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+		done
+	else
+		for pos in 1 2 3 4 5 10 50 100; do
+			s="--split-pos=$pos"
+			tpws_curl_test $1 $3 $s && {
+				strategy="${strategy:-$s}"
+				break
+			}
+		done
+	fi
+	echo
+	if [ -n "$strategy" ]; then
+		echo "!!!!! working strategy found : tpws $strategy !!!!!"
+		return 0
+	else
+		echo 'working strategy not found'
+		return 1
+	fi
+}
 
 check_domain()
 {
@@ -314,7 +392,7 @@ check_domain()
 
 	# in case was interrupted before
 	nfqws_ipt_unprepare $2
-	killall nfqws 2>/dev/null
+	killall nfqws tpws 2>/dev/null
 
 	echo "- checking without DPI bypass"
 	curl_test $1 $4 && return
@@ -323,10 +401,20 @@ check_domain()
 		[ $code = $c ] && return
 	done
 
+	echo preparing tpws redirection
+	tpws_ipt_prepare $2
+
+	tpws_check_domain_bypass $1 $3 $4
+
+	echo clearing tpws redirection
+	tpws_ipt_unprepare $2
+
+	echo
+
 	echo preparing nfqws redirection
 	nfqws_ipt_prepare $2
 
-	check_domain_bypass $1 $3 $4
+	nfqws_check_domain_bypass $1 $3 $4
 
 	echo clearing nfqws redirection
 	nfqws_ipt_unprepare $2
@@ -346,7 +434,7 @@ ask_params()
 {
 	echo
 	echo NOTE ! this test should be run with zapret or any other bypass software disabled, without VPN
-	echo NOTE ! this test will kill all nfqws processes. if you have already set up zapret you will need to restart it after test is complete.
+	echo NOTE ! this test will kill all nfqws and tpws processes. if you have already set up zapret you will need to restart it after test is complete.
 
 	$ECHON "test this domain (default: $DOMAIN) : "
 	local dom
@@ -361,7 +449,9 @@ ask_params()
 		exitp 1
 	}
 	IPTABLES=iptables
-	[ "$IPV" = 6 ] && IPTABLES=ip6tables
+	LOCALHOST=127.0.0.1
+	LOCALHOST_IPT=127.0.0.1
+	[ "$IPV" = 6 ] && { IPTABLES=ip6tables; LOCALHOST=::1; LOCALHOST_IPT=[::1]; }
 
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
@@ -484,9 +574,11 @@ sigint()
 	# make sure we are not in a middle state that impacts connectivity
 	echo
 	echo terminating...
+	tpws_ipt_unprepare 80
+	tpws_ipt_unprepare 443
 	nfqws_ipt_unprepare 80
 	nfqws_ipt_unprepare 443
-	killall nfqws 2>/dev/null
+	killall nfqws tpws 2>/dev/null
 	exitp 1
 }
 
