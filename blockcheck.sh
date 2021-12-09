@@ -109,7 +109,7 @@ check_system()
 
 	local UNAME=$(uname)
 	[ "$UNAME" = "Linux" ] || {
-		echo not supported
+		echo $UNAME not supported
 		exitp 5
 	}
 }
@@ -199,10 +199,14 @@ tpws_ipt_unprepare()
 nfqws_start()
 {
 	"$NFQWS" --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
+	PID=$!
 }
 tpws_start()
 {
 	"$TPWS" --uid $TPWS_UID:$TPWS_UID --bind-addr=$LOCALHOST --port=$TPPORT "$@" >/dev/null &
+	PID=$!
+	# give some time to initialize
+	sleep 1
 }
 
 curl_test()
@@ -227,17 +231,15 @@ ws_curl_test()
 	# $2 - test function
 	# $3 - domain
 	# $4,$5,$6, ... - ws params
-	local code pid ws_start=$1 testf=$2 dom=$3
+	local code ws_start=$1 testf=$2 dom=$3
 	shift
 	shift
 	shift
 	$ws_start "$@"
-	pid=$!
 	# let some time for tpws to initialize
-sleep 1
 	curl_test $testf $dom
 	code=$?
-	killwait -9 $pid
+	killwait -9 $PID
 	return $code
 }
 tpws_curl_test()
