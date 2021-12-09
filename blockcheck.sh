@@ -229,12 +229,9 @@ check_domain_bypass()
 	local pid strategy tests='fake' ttls s sec="$2" found
 
 	[ "$sec" = 0 ] && {
-		s="--hostcase"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
-		s="--hostnospace"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
-		s="--domcase"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+		for s in '--hostcase' '--hostnospace' '--domcase'; do
+			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+		done
 	}
 
 	s="--dpi-desync=split2"
