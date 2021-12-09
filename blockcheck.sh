@@ -394,6 +394,7 @@ check_domain()
 
 	# in case was interrupted before
 	nfqws_ipt_unprepare $2
+	tpws_ipt_unprepare $2
 	killall nfqws tpws 2>/dev/null
 
 	echo "- checking without DPI bypass"
@@ -432,6 +433,19 @@ check_domain_https()
 	check_domain curl_test_https 443 1 $1
 }
 
+configure_ip_version()
+{
+	if [ "$IPV" = 6 ]; then
+		IPTABLES=ip6tables;
+		LOCALHOST=::1;
+		LOCALHOST_IPT=[::1];
+	else
+		IPTABLES=iptables
+		LOCALHOST=127.0.0.1
+		LOCALHOST_IPT=127.0.0.1
+	fi
+}
+
 ask_params()
 {
 	echo
@@ -450,10 +464,7 @@ ask_params()
 		echo invalid ip version. should be 4 or 6.
 		exitp 1
 	}
-	IPTABLES=iptables
-	LOCALHOST=127.0.0.1
-	LOCALHOST_IPT=127.0.0.1
-	[ "$IPV" = 6 ] && { IPTABLES=ip6tables; LOCALHOST=::1; LOCALHOST_IPT=[::1]; }
+	configure_ip_version
 
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
@@ -576,10 +587,12 @@ sigint()
 	# make sure we are not in a middle state that impacts connectivity
 	echo
 	echo terminating...
-	tpws_ipt_unprepare 80
-	tpws_ipt_unprepare 443
-	nfqws_ipt_unprepare 80
-	nfqws_ipt_unprepare 443
+	[ -n "$IPV" ] && {
+		tpws_ipt_unprepare 80
+		tpws_ipt_unprepare 443
+		nfqws_ipt_unprepare 80
+		nfqws_ipt_unprepare 443
+	}
 	killall nfqws tpws 2>/dev/null
 	exitp 1
 }
