@@ -436,9 +436,9 @@ check_domain_https()
 configure_ip_version()
 {
 	if [ "$IPV" = 6 ]; then
-		IPTABLES=ip6tables;
-		LOCALHOST=::1;
-		LOCALHOST_IPT=[::1];
+		IPTABLES=ip6tables
+		LOCALHOST=::1
+		LOCALHOST_IPT=[::1]
 	else
 		IPTABLES=iptables
 		LOCALHOST=127.0.0.1
