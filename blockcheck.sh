@@ -230,21 +230,21 @@ check_domain_bypass()
 
 	[ "$sec" = 0 ] && {
 		s="--hostcase"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		s="--hostnospace"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		s="--domcase"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 	}
 
 	s="--dpi-desync=split2"
 	if nfqws_curl_test $1 $3 $s; then
-		strategy="${strategy:-$s}" 
+		strategy="${strategy:-$s}"
 	else
 		tests="$tests split fake,split"
 		[ "$sec" = 0 ] && {
 			s="$s --hostcase"
-			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		}
 	fi
 
@@ -276,18 +276,21 @@ check_domain_bypass()
 				}
 			done
 		}
-
-		s="--dpi-desync=$desync --dpi-desync-fooling=badsum"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
-
-		s="--dpi-desync=$desync --dpi-desync-fooling=md5sig"
-		nfqws_curl_test $1 $3 $s && {
-			strategy="${strategy:-$s}" 
-			echo WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.
-		}
-
-		s="--dpi-desync=$desync --dpi-desync-fooling=badseq"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		for fooling in badsum md5sig badseq; do
+			s="--dpi-desync=$desync --dpi-desync-fooling=$fooling"
+			if nfqws_curl_test $1 $3 $s ; then
+				strategy="${strategy:-$s}"
+				[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
+			else
+				[ "$sec" = 1 ] && {
+					s="$s --wssize 1:6"
+					nfqws_curl_test $1 $3 $s && {
+						strategy="${strategy:-$s}"
+						[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
+					}
+				}
+			fi
+		done
 	done
 
 	echo
