@@ -223,29 +223,71 @@ nfqws_curl_test()
 check_domain_bypass()
 {
 	# $1 - test function
-	# $2 - domain
+	# $2 - encrypted test : 1/0
+	# $3 - domain
 
-	local pid strategy tests='fake' ttls
+	local pid strategy tests='fake' ttls s sec="$2" found
 
-	if nfqws_curl_test $1 $2 --dpi-desync=split2; then
-		strategy='--dpi-desync=split2'
+	[ "$sec" = 0 ] && {
+		s="--hostcase"
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		s="--hostnospace"
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		s="--domcase"
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+	}
+
+	s="--dpi-desync=split2"
+	if nfqws_curl_test $1 $3 $s; then
+		strategy="${strategy:-$s}" 
 	else
 		tests="$tests split fake,split"
+		[ "$sec" = 0 ] && {
+			s="$s --hostcase"
+			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+		}
 	fi
-	if nfqws_curl_test $1 $2 --dpi-desync=disorder2; then
-		[ -n "$strategy" ] || strategy='--dpi-desync=disorder2'
+
+	s="--dpi-desync=disorder2"
+	if nfqws_curl_test $1 $3 $s; then
+		strategy="${strategy:-$s}" 
 	else
 		tests="$tests disorder fake,disorder"
 	fi
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
 	for desync in $tests; do
+		found=0
 		for ttl in $ttls; do
-			nfqws_curl_test $1 $2 --dpi-desync=$desync --dpi-desync-ttl=$ttl && {
-				[ -n "$strategy" ] || strategy="--dpi-desync=$desync --dpi-desync-ttl=$ttl"
+			s="--dpi-desync=$desync --dpi-desync-ttl=$ttl"
+			nfqws_curl_test $1 $3 $s && {
+				found=1
+				strategy="${strategy:-$s}"
 				break
 			}
 		done
+		[ "$sec" = 1 ] && [ "$found" = 0 ] && {
+			for ttl in $ttls; do
+				s="--dpi-desync=$desync --dpi-desync-ttl=$ttl --wssize 1:6"
+				nfqws_curl_test $1 $3 $s && {
+					found=1
+					strategy="${strategy:-$s}"
+					break
+				}
+			done
+		}
+
+		s="--dpi-desync=$desync --dpi-desync-fooling=badsum"
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
+
+		s="--dpi-desync=$desync --dpi-desync-fooling=md5sig"
+		nfqws_curl_test $1 $3 $s && {
+			strategy="${strategy:-$s}" 
+			echo WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.
+		}
+
+		s="--dpi-desync=$desync --dpi-desync-fooling=badseq"
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}" 
 	done
 
 	echo
@@ -262,19 +304,20 @@ check_domain()
 {
 	# $1 - test function
 	# $2 - port
-	# $3 - domain
+	# $3 - encrypted test : 1/0
+	# $4 - domain
 
 	local code
 
 	echo
-	echo \* $1 $3
+	echo \* $1 $4
 
 	# in case was interrupted before
 	nfqws_ipt_unprepare $2
 	killall nfqws 2>/dev/null
 
 	echo "- checking without DPI bypass"
-	curl_test $1 $3 && return
+	curl_test $1 $4 && return
 	code=$?
 	for c in 1 2 3 4 6 27 ; do
 		[ $code = $c ] && return
@@ -283,7 +326,7 @@ check_domain()
 	echo preparing nfqws redirection
 	nfqws_ipt_prepare $2
 
-	check_domain_bypass $1 $3
+	check_domain_bypass $1 $3 $4
 
 	echo clearing nfqws redirection
 	nfqws_ipt_unprepare $2
@@ -291,12 +334,12 @@ check_domain()
 check_domain_http()
 {
 	# $1 - domain
-	check_domain curl_test_http 80 $1
+	check_domain curl_test_http 80 0 $1
 }
 check_domain_https()
 {
 	# $1 - domain
-	check_domain curl_test_https 443 $1
+	check_domain curl_test_https 443 1 $1
 }
 
 ask_params()
@@ -305,12 +348,12 @@ ask_params()
 	echo NOTE ! this test should be run with zapret or any other bypass software disabled, without VPN
 	echo NOTE ! this test will kill all nfqws processes. if you have already set up zapret you will need to restart it after test is complete.
 
-	$ECHON "test this domain [ $DOMAIN ] : "
+	$ECHON "test this domain (default: $DOMAIN) : "
 	local dom
 	read dom
 	[ -n "$dom" ] && DOMAIN=$dom
 
-	$ECHON "ip protocol version [ 4 ] : "
+	$ECHON "ip protocol version - 4 or 6 (default: 4) : "
 	read IPV
 	[ -n "$IPV" ] || IPV=4
 	[ "$IPV" = 4 -o "$IPV" = 6 ] || {
