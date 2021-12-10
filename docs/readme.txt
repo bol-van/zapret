@@ -776,10 +776,12 @@ TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"
 DESYNC_MARK=0x40000000
 NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 
-Задание раздельных опций nfqws для http и https :
+Задание раздельных опций nfqws для http и https и для версий ip протоколов 4,6 :
 
 NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
+NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
+NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 
 Если какая-то из переменных не определена, берется значение NFQWS_OPT_DESYNC.
 

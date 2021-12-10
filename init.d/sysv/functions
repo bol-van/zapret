@@ -81,6 +81,8 @@ IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 NFQWS_OPT_BASE="$USEROPT --dpi-desync-fwmark=$DESYNC_MARK"
 NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
 NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
+NFQWS_OPT_DESYNC_HTTP6="${NFQWS_OPT_DESYNC_HTTP6:-$NFQWS_OPT_DESYNC_HTTP}"
+NFQWS_OPT_DESYNC_HTTPS6="${NFQWS_OPT_DESYNC_HTTPS6:-$NFQWS_OPT_DESYNC_HTTPS}"
 
 [ -n "$TPPORT" ] || TPPORT=988
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
@@ -520,20 +522,70 @@ filter_apply_port_target()
 	fi
 	eval $1="\"\$$1 $f\""
 }
+
+filter_apply_ipset_target4()
+{
+	# $1 - var name of ipv4 iptables filter
+	if [ "$MODE_FILTER" = "ipset" ]; then
+		eval $1="\"\$$1 -m set --match-set zapret dst\""
+	fi
+}
+filter_apply_ipset_target6()
+{
+	# $1 - var name of ipv4 iptables filter
+	if [ "$MODE_FILTER" = "ipset" ]; then
+		eval $1="\"\$$1 -m set --match-set zapret6 dst\""
+	fi
+}
 filter_apply_ipset_target()
 {
 	# $1 - var name of ipv4 iptables filter
 	# $2 - var name of ipv6 iptables filter
-	if [ "$MODE_FILTER" = "ipset" ]; then
-		eval $1="\"\$$1 -m set --match-set zapret dst\""
-		eval $2="\"\$$2 -m set --match-set zapret6 dst\""
-	fi
+	filter_apply_ipset_target4 $1
+	filter_apply_ipset_target6 $2
 }
 filter_apply_hostlist_target()
 {
 	# $1 - var name of tpws or nfqws params
 	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
 }
+
+get_nfqws_qnums()
+{
+	# $1 - var name for ipv4 http
+	# $2 - var name for ipv4 https
+	# $3 - var name for ipv6 http
+	# $4 - var name for ipv6 https
+	local _qn=x _qns=x _qn6=x _qns6=x
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		_qn=$QNUM
+		_qns=$_qn
+		[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || _qns=$(($QNUM+1))
+	}
+	[ "$DISABLE_IPV6" = "1" ] || {
+		_qn6=$(($QNUM+2))
+		_qns6=$(($QNUM+3))
+		[ "$DISABLE_IPV4" = "1" ] || {
+			if [ "$NFQWS_OPT_DESYNC_HTTP6" = "$NFQWS_OPT_DESYNC_HTTP" ]; then
+				_qn6=$_qn;
+			elif [ "$NFQWS_OPT_DESYNC_HTTP6" = "$NFQWS_OPT_DESYNC_HTTPS" ]; then
+				_qn6=$_qns;
+			fi
+			if [ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTP" ]; then
+				_qns6=$_qn;
+			elif [ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTPS" ]; then
+				_qns6=$_qns;
+			fi
+		}
+		[ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTP6" ] && _qns6=$_qn6;
+	}
+	eval $1=$_qn
+	eval $2=$_qns
+	eval $3=$_qn6
+	eval $4=$_qns6
+}
+
 tpws_apply_socks_binds()
 {
 	local o
@@ -563,8 +615,7 @@ zapret_do_firewall()
 
 	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	local f4 f6
-	local qn
+	local f4 f6 qn qns qn6 qns6
 
 	# always create ipsets. ip_exclude ipset is required
 	[ "$1" != "1" ] || create_ipset no-update
@@ -585,27 +636,41 @@ zapret_do_firewall()
 			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
 				echo both http and https are disabled. not applying redirection.
 			else
-				if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ]; then
+				get_nfqws_qnums qn qns qn6 qns6
+				if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ $qn = $qns ]; then
 					filter_apply_port_target f4
 					f4="$f4 $first_packet_only"
-					f6=$f4
-					filter_apply_ipset_target f4 f6
-					fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+					filter_apply_ipset_target4 f4
+					fw_nfqws_post4 $1 "$f4 $desync" $qn
 				else
 					if [ "$MODE_HTTP" = "1" ]; then
 						f4="--dport 80"
 						[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
-						f6=$f4
-						filter_apply_ipset_target f4 f6
-						fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+						filter_apply_ipset_target4 f4
+						fw_nfqws_post4 $1 "$f4 $desync" $qn
 					fi
 					if [ "$MODE_HTTPS" = "1" ]; then
 						f4="--dport 443 $first_packet_only"
-						f6=$f4
-						filter_apply_ipset_target f4 f6
-						qn=$QNUM
-						[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || qn=$(($QNUM+1))
-						fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $qn
+						filter_apply_ipset_target4 f4
+						fw_nfqws_post4 $1 "$f4 $desync" $qns
+					fi
+				fi
+				if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ $qn6 = $qns6 ]; then
+					filter_apply_port_target f6
+					f6="$f6 $first_packet_only"
+					filter_apply_ipset_target6 f6
+					fw_nfqws_post6 $1 "$f6 $desync" $qn6
+				else
+					if [ "$MODE_HTTP" = "1" ]; then
+						f6="--dport 80"
+						[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
+						filter_apply_ipset_target6 f6
+						fw_nfqws_post6 $1 "$f6 $desync" $qn6
+					fi
+					if [ "$MODE_HTTPS" = "1" ]; then
+						f6="--dport 443 $first_packet_only"
+						filter_apply_ipset_target6 f6
+						fw_nfqws_post6 $1 "$f6 $desync" $qns6
 					fi
 				fi
 			fi
@@ -631,7 +696,7 @@ zapret_do_daemons()
 {
 	# $1 - 1 - run, 0 - stop
 
-	local opt
+	local opt qn qns qn6 qns6
 
 	case "${MODE}" in
 		tpws)
@@ -645,13 +710,28 @@ zapret_do_daemons()
 			do_tpws_socks $1 1 "$opt"
 			;;
 		nfqws)
-			opt="--qnum=$QNUM $NFQWS_OPT_DESYNC_HTTP"
-			filter_apply_hostlist_target opt
-			do_nfqws $1 1 "$opt"
-			[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || {
-				opt="--qnum=$(($QNUM+1)) $NFQWS_OPT_DESYNC_HTTPS"
+			get_nfqws_qnums qn qns qn6 qns6
+			[ "$DISABLE_IPV4" = "1" ] || {
+				opt="--qnum=$qn $NFQWS_OPT_DESYNC_HTTP"
 				filter_apply_hostlist_target opt
-				do_nfqws $1 2 "$opt"
+				do_nfqws $1 1 "$opt"
+				[ "$qns" = "$qn" ] || {
+					opt="--qnum=$qns $NFQWS_OPT_DESYNC_HTTPS"
+					filter_apply_hostlist_target opt
+					do_nfqws $1 2 "$opt"
+				}
+			}
+			[ "$DISABLE_IPV6" = "1" ] || {
+				[ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
+					opt="--qnum=$qn6 $NFQWS_OPT_DESYNC_HTTP6"
+					filter_apply_hostlist_target opt
+					do_nfqws $1 3 "$opt"
+				}
+				[ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
+					opt="--qnum=$qns6 $NFQWS_OPT_DESYNC_HTTPS6"
+					filter_apply_hostlist_target opt
+					do_nfqws $1 4 "$opt"
+				}
 			}
 			;;
 		custom)

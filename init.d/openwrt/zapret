@@ -105,7 +105,7 @@ tpws_apply_socks_binds()
 
 
 start_service() {
-	local opt
+	local opt qn qns qn6 qns6
 
 	case "${MODE}" in
 		tpws)
@@ -119,17 +119,35 @@ start_service() {
 			run_tpws_socks 1 "$opt"
 			;;
 		nfqws)
-			opt="--qnum=$QNUM $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP"
-			filter_apply_hostlist_target opt
-			run_daemon 1 "$NFQWS" "$opt"
-			[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || {
-				opt="--qnum=$(($QNUM+1)) $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
+			# quite complex but we need to minimize nfqws processes to save RAM
+			get_nfqws_qnums qn qns qn6 qns6
+			[ "$DISABLE_IPV4" = "1" ] || {
+				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP"
 				filter_apply_hostlist_target opt
-				run_daemon 2 "$NFQWS" "$opt"
+				run_daemon 1 "$NFQWS" "$opt"
+				[ "$qns" = "$qn" ] || {
+					opt="--qnum=$qns $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
+					filter_apply_hostlist_target opt
+					run_daemon 2 "$NFQWS" "$opt"
+				}
+			}
+			[ "$DISABLE_IPV6" = "1" ] || {
+				[ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
+					opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP6"
+					filter_apply_hostlist_target opt
+					run_daemon 3 "$NFQWS" "$opt"
+				}
+				[ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
+					opt="--qnum=$qns6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS6"
+					filter_apply_hostlist_target opt
+					run_daemon 4 "$NFQWS" "$opt"
+				}
 			}
 			;;
 		custom)
 	    		existf zapret_custom_daemons && zapret_custom_daemons $1
 			;;
 	esac
+
+	return 0
 }
