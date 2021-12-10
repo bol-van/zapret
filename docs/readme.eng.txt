@@ -540,6 +540,11 @@ NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi
 NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 
+If one of NFQWS_OPT_DESYNC_HTTP/NFQWS_OPT_DESYNC_HTTPS is not defined it takes value of NFQWS_OPT_DESYNC.
+If one of NFQWS_OPT_DESYNC_HTTP6/NFQWS_OPT_DESYNC_HTTPS6 is not defined it takes value from
+NFQWS_OPT_DESYNC_HTTP/NFQWS_OPT_DESYNC_HTTPS.
+It means if only NFQWS_OPT_DESYNC is defined all four take its value.
+
 If a variable is not defined, the value NFQWS_OPT_DESYNC is taken.
 
 flow offloading control (openwrt only)

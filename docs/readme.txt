@@ -783,7 +783,10 @@ NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi
 NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 
-Если какая-то из переменных не определена, берется значение NFQWS_OPT_DESYNC.
+Если какая-то из переменных NFQWS_OPT_DESYNC_HTTP/NFQWS_OPT_DESYNC_HTTPS не определена,
+берется значение NFQWS_OPT_DESYNC.
+Если какая-то из переменных NFQWS_OPT_DESYNC_HTTP6/NFQWS_OPT_DESYNC_HTTPS6 не определена,
+берется значение NFQWS_OPT_DESYNC_HTTP/NFQWS_OPT_DESYNC_HTTPS.
 
 Настройка системы управления выборочным traffic offload (только openwrt)
 donttouch : выборочное управление отключено, используется системная настройка, простой инсталятор выключает системную настройку, если она не совместима с выбранным режимом
