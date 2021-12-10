@@ -508,7 +508,7 @@ ask_params()
 	if curl_supports_tls13; then
 		echo
 		echo "TLS 1.3 is the new standard for encrypted communications over TCP"
-		echo "its the most important feature for DPI bypass is encrypted server TLS ClientHello"
+		echo "its the most important feature for DPI bypass is encrypted TLS ServerHello"
 		echo "more and more sites enable TLS 1.3 but still there're many sites with only TLS 1.2 support"
 		echo "with TLS 1.3 more DPI bypass strategies can work but they may not apply to all sites"
 		echo "if a strategy works with TLS 1.2 it will also work with TLS 1.3"
