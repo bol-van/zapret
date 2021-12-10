@@ -147,6 +147,7 @@ nfqws takes the following parameters:
  --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
+ --dpi-desync-ttl6=<int>                ; set ipv6 hop limit for desync packet. by default ttl value is used
  --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; can take multiple comma separated values
  --dpi-desync-retrans=0|1               ; (fake,rst,rstack only) 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
  --dpi-desync-repeats=<N>               ; send every desync packet N times

@@ -190,6 +190,7 @@ nfqws
  --dpi-desync=[<mode0>,]<mode>[,<mode2]	; атака по десинхронизации DPI. mode : synack fake rst rstack disorder disorder2 split split2
  --dpi-desync-fwmark=<int|0xHEX>        ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; установить ttl для десинхронизирующих пакетов
+ --dpi-desync-ttl6=<int>                ; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение ttl
  --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера
  --dpi-desync-retrans=0|1               ; (только для fake,rst,rstack) 0(default)=отправлять оригинал следом за фейком  1=дропать оригинал, заставляя ОС выполнять ретрансмиссию через 0.2 сек
  --dpi-desync-repeats=<N>               ; посылать каждый генерируемый в nfqws пакет N раз (не влияет на остальные пакеты)
