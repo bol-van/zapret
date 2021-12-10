@@ -510,7 +510,7 @@ ask_params()
 		echo "TLS 1.3 is the new standard for encrypted communications over TCP"
 		echo "its the most important feature for DPI bypass is encrypted server TLS ClientHello"
 		echo "more and more sites enable TLS 1.3 but still there're many sites with only TLS 1.2 support"
-		echo "with TLS 1.3 more DPI bypass strategy can work but they may not apply to all sites"
+		echo "with TLS 1.3 more DPI bypass strategies can work but they may not apply to all sites"
 		echo "if a strategy works with TLS 1.2 it will also work with TLS 1.3"
 		echo "if nothing works with TLS 1.2 this test may find TLS1.3 only strategies"
 		echo "make sure that $DOMAIN supports TLS 1.3 otherwise all test will return an error"
