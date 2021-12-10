@@ -131,6 +131,12 @@ check_prerequisites()
 	done
 }
 
+curl_supports_tls13()
+{
+	curl --tlsv1.3 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
+	# return code 2 = init failed. likely bad command line options
+	[ $? != 2 ]
+}
 
 hdrfile_http_code()
 {
@@ -167,13 +173,23 @@ curl_test_http()
 	rm -f "$HDRTEMP"
 	return 0
 }
-curl_test_https()
+curl_test_https_tls12()
 {
 	# $1 - ip version : 4/6
 	# $2 - domain name
 
 	# prevent using QUIC if available in curl
-	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 "https://$2" -o /dev/null 2>&1 
+	# do not use tls 1.3 to make sure server certificate is not encrypted
+	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tls-max 1.2 "https://$2" -o /dev/null 2>&1 
+}
+curl_test_https_tls13()
+{
+	# $1 - ip version : 4/6
+	# $2 - domain name
+
+	# prevent using QUIC if available in curl
+	# force TLS1.3 mode
+	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tlsv1.3 "https://$2" -o /dev/null 2>&1 
 }
 
 nfqws_ipt_prepare()
@@ -208,6 +224,13 @@ tpws_start()
 	# give some time to initialize
 	sleep 1
 }
+ws_kill()
+{
+	[ -z "$PID" ] || {
+		killwait -9 $PID 2>/dev/null
+		PID=
+	}
+}
 
 curl_test()
 {
@@ -239,7 +262,7 @@ ws_curl_test()
 	# let some time for tpws to initialize
 	curl_test $testf $dom
 	code=$?
-	killwait -9 $PID
+	ws_kill
 	return $code
 }
 tpws_curl_test()
@@ -340,6 +363,11 @@ nfqws_check_domain_bypass()
 		done
 	done
 
+	[ "$sec" = 1 ] && {
+		s="--wssize 1:6"
+		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+	}
+
 	echo
 	if [ -n "$strategy" ]; then
 		echo "!!!!! working strategy found : nfqws $strategy !!!!!"
@@ -395,7 +423,7 @@ check_domain()
 	# in case was interrupted before
 	nfqws_ipt_unprepare $2
 	tpws_ipt_unprepare $2
-	killall nfqws tpws 2>/dev/null
+	ws_kill
 
 	echo "- checking without DPI bypass"
 	curl_test $1 $4 && return
@@ -427,10 +455,15 @@ check_domain_http()
 	# $1 - domain
 	check_domain curl_test_http 80 0 $1
 }
-check_domain_https()
+check_domain_https_tls12()
 {
 	# $1 - domain
-	check_domain curl_test_https 443 1 $1
+	check_domain curl_test_https_tls12 443 1 $1
+}
+check_domain_https_tls13()
+{
+	# $1 - domain
+	check_domain curl_test_https_tls13 443 1 $1
 }
 
 configure_ip_version()
@@ -450,7 +483,6 @@ ask_params()
 {
 	echo
 	echo NOTE ! this test should be run with zapret or any other bypass software disabled, without VPN
-	echo NOTE ! this test will kill all nfqws and tpws processes. if you have already set up zapret you will need to restart it after test is complete.
 
 	$ECHON "test this domain (default: $DOMAIN) : "
 	local dom
@@ -469,12 +501,28 @@ ask_params()
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
 
-	ENABLE_HTTPS=1
-	ask_yes_no_var ENABLE_HTTPS "check https"
+	ENABLE_HTTPS_TLS12=1
+	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
+
+	ENABLE_HTTPS_TLS13=0
+	if curl_supports_tls13; then
+		echo
+		echo "TLS 1.3 is the new standard for encrypted communications over TCP"
+		echo "its the most important feature for DPI bypass is encrypted server TLS ClientHello"
+		echo "more and more sites enable TLS 1.3 but still there're many sites with only TLS 1.2 support"
+		echo "with TLS 1.3 more DPI bypass strategy can work but they may not apply to all sites"
+		echo "if a strategy works with TLS 1.2 it will also work with TLS 1.3"
+		echo "if nothing works with TLS 1.2 this test may find TLS1.3 only strategies"
+		echo "make sure that $DOMAIN supports TLS 1.3 otherwise all test will return an error"
+		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
+	else
+		echo "installed curl version does not support TLS 1.3 . tests disabled."
+	fi
 
 	IGNORE_CA=0
 	CURL_OPT=
-	[ "$ENABLE_HTTPS" = "1" ] && {
+	[ $ENABLE_HTTPS_TLS13 = 1 -o $ENABLE_HTTPS_TLS12 = 1 ] && {
+		echo
 		echo on limited systems like openwrt CA certificates might not be installed to preserve space
 		echo in such a case curl cannot verify server certificate and you should either install ca-bundle or disable verification
 		echo however disabling verification will break https check if ISP does MitM attack and substitutes server certificate
@@ -593,11 +641,9 @@ sigint()
 		nfqws_ipt_unprepare 80
 		nfqws_ipt_unprepare 443
 	}
-	killall nfqws tpws 2>/dev/null
+	ws_kill
 	exitp 1
 }
-
-trap 'sigint' 2
 
 check_system
 check_prerequisites
@@ -605,7 +651,11 @@ require_root
 check_dns
 ask_params
 
+trap 'sigint' 2
+PID=
 [ "$ENABLE_HTTP" = 1 ] && check_domain_http $DOMAIN
-[ "$ENABLE_HTTPS" = 1 ] && check_domain_https $DOMAIN
+[ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $DOMAIN
+[ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $DOMAIN
+trap - 2
 
 exitp 0
