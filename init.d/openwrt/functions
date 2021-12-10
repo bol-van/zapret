@@ -329,7 +329,7 @@ get_nfqws_qnums()
 	# $2 - var name for ipv4 https
 	# $3 - var name for ipv6 http
 	# $4 - var name for ipv6 https
-	local _qn=x _qns=x _qn6=x _qns6=x
+	local _qn _qns _qn6 _qns6
 
 	[ "$DISABLE_IPV4" = "1" ] || {
 		_qn=$QNUM
@@ -353,10 +353,14 @@ get_nfqws_qnums()
 		}
 		[ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTP6" ] && _qns6=$_qn6;
 	}
-	eval $1=$_qn
-	eval $2=$_qns
-	eval $3=$_qn6
-	eval $4=$_qns6
+	[ "$MODE_HTTP" = 1 ] && {
+		eval $1=$_qn
+		eval $3=$_qn6
+	}
+	[ "$MODE_HTTPS" = 1 ] && {
+		eval $2=$_qns
+		eval $4=$_qns6
+	}
 }
 
 create_ipset()
@@ -461,45 +465,41 @@ zapret_apply_firewall()
 	
 		nfqws)
 			# quite complex but we need to minimize nfqws processes to save RAM
-			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
-				echo both http and https are disabled. not applying redirection.
+			get_nfqws_qnums qn qns qn6 qns6
+			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn" ] && [ "$qn" = "$qns" ]; then
+				filter_apply_port_target f4
+				f4="$f4 $first_packet_only"
+				filter_apply_ipset_target4 f4
+				fw_nfqws_post4 "$f4 $desync" $qn
 			else
-				get_nfqws_qnums qn qns qn6 qns6
-				if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ $qn = $qns ]; then
-					filter_apply_port_target f4
-					f4="$f4 $first_packet_only"
+				if [ -n "$qn" ]; then
+					f4="--dport 80"
+					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
 					filter_apply_ipset_target4 f4
 					fw_nfqws_post4 "$f4 $desync" $qn
-				else
-					if [ "$MODE_HTTP" = "1" ]; then
-						f4="--dport 80"
-						[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
-						filter_apply_ipset_target4 f4
-						fw_nfqws_post4 "$f4 $desync" $qn
-					fi
-					if [ "$MODE_HTTPS" = "1" ]; then
-						f4="--dport 443 $first_packet_only"
-						filter_apply_ipset_target4 f4
-						fw_nfqws_post4 "$f4 $desync" $qns
-					fi
 				fi
-				if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ $qn6 = $qns6 ]; then
-					filter_apply_port_target f6
-					f6="$f6 $first_packet_only"
+				if [ -n "$qns" ]; then
+					f4="--dport 443 $first_packet_only"
+					filter_apply_ipset_target4 f4
+					fw_nfqws_post4 "$f4 $desync" $qns
+				fi
+			fi
+			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn6" ] && [ "$qn6" = "$qns6" ]; then
+				filter_apply_port_target f6
+				f6="$f6 $first_packet_only"
+				filter_apply_ipset_target6 f6
+				fw_nfqws_post6 "$f6 $desync" $qn6
+			else
+				if [ -n "$qn6" ]; then
+					f6="--dport 80"
+					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
 					filter_apply_ipset_target6 f6
 					fw_nfqws_post6 "$f6 $desync" $qn6
-				else
-					if [ "$MODE_HTTP" = "1" ]; then
-						f6="--dport 80"
-						[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
-						filter_apply_ipset_target6 f6
-						fw_nfqws_post6 "$f6 $desync" $qn6
-					fi
-					if [ "$MODE_HTTPS" = "1" ]; then
-						f6="--dport 443 $first_packet_only"
-						filter_apply_ipset_target6 f6
-						fw_nfqws_post6 "$f6 $desync" $qns6
-					fi
+				fi
+				if [ -n "$qns6" ]; then
+					f6="--dport 443 $first_packet_only"
+					filter_apply_ipset_target6 f6
+					fw_nfqws_post6 "$f6 $desync" $qns6
 				fi
 			fi
 			;;

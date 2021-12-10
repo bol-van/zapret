@@ -121,27 +121,25 @@ start_service() {
 		nfqws)
 			# quite complex but we need to minimize nfqws processes to save RAM
 			get_nfqws_qnums qn qns qn6 qns6
-			[ "$DISABLE_IPV4" = "1" ] || {
+			[ -z "$qn" ] || {
 				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP"
 				filter_apply_hostlist_target opt
 				run_daemon 1 "$NFQWS" "$opt"
-				[ "$qns" = "$qn" ] || {
-					opt="--qnum=$qns $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
-					filter_apply_hostlist_target opt
-					run_daemon 2 "$NFQWS" "$opt"
-				}
 			}
-			[ "$DISABLE_IPV6" = "1" ] || {
-				[ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
-					opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP6"
-					filter_apply_hostlist_target opt
-					run_daemon 3 "$NFQWS" "$opt"
-				}
-				[ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
-					opt="--qnum=$qns6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS6"
-					filter_apply_hostlist_target opt
-					run_daemon 4 "$NFQWS" "$opt"
-				}
+			[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
+				opt="--qnum=$qns $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
+				filter_apply_hostlist_target opt
+				run_daemon 2 "$NFQWS" "$opt"
+			}
+			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
+				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP6"
+				filter_apply_hostlist_target opt
+				run_daemon 3 "$NFQWS" "$opt"
+			}
+			[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
+				opt="--qnum=$qns6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS6"
+				filter_apply_hostlist_target opt
+				run_daemon 4 "$NFQWS" "$opt"
 			}
 			;;
 		custom)
