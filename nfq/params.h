@@ -34,7 +34,7 @@ struct params_s
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	int desync_repeats,desync_split_pos;
 	unsigned int desync_cutoff;
-	uint8_t desync_ttl;
+	uint8_t desync_ttl, desync_ttl6;
 	uint8_t desync_tcp_fooling_mode;
 	uint32_t desync_fwmark; // unused in BSD
 	char hostfile[256];

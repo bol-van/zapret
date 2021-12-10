@@ -163,7 +163,8 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 	if (params.desync_mode0!=DESYNC_NONE || params.desync_mode!=DESYNC_NONE) // save some cpu
 	{
 		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-		ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
+		else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
 		flags_orig = *((uint8_t*)tcphdr+13);
 		scale_factor = tcp_find_scale_factor(tcphdr);
 		timestamps = tcp_find_timestamps(tcphdr);
