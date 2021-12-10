@@ -651,8 +651,8 @@ require_root
 check_dns
 ask_params
 
-trap 'sigint' 2
 PID=
+trap 'sigint' 2
 [ "$ENABLE_HTTP" = 1 ] && check_domain_http $DOMAIN
 [ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $DOMAIN
 [ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $DOMAIN
