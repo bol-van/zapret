@@ -189,7 +189,7 @@ curl_test_https_tls13()
 
 	# prevent using QUIC if available in curl
 	# force TLS1.3 mode
-	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tlsv1.3 "https://$2" -o /dev/null 2>&1 
+	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tlsv1.3 --tls-max 1.3 "https://$2" -o /dev/null 2>&1 
 }
 
 nfqws_ipt_prepare()
@@ -432,6 +432,8 @@ check_domain()
 		[ $code = $c ] && return
 	done
 
+	echo
+
 	echo preparing tpws redirection
 	tpws_ipt_prepare $2
 
@@ -505,8 +507,8 @@ ask_params()
 	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
 
 	ENABLE_HTTPS_TLS13=0
+	echo
 	if curl_supports_tls13; then
-		echo
 		echo "TLS 1.3 is the new standard for encrypted communications over TCP"
 		echo "its the most important feature for DPI bypass is encrypted TLS ServerHello"
 		echo "more and more sites enable TLS 1.3 but still there're many sites with only TLS 1.2 support"
