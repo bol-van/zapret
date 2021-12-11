@@ -143,6 +143,8 @@ curl_supports_tls13()
 }
 curl_supports_tlsmax()
 {
+	# supported only in OpenSSL
+	curl --version | grep -q OpenSSL || return 1
 	# supported since curl 7.54
 	curl --tls-max 1.2 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
@@ -525,6 +527,8 @@ ask_params()
 
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
+
+	[ -n "$TLSMAX12" ] || echo "WARNING ! your curl version or TLS library does not support tls-max option. TLS 1.2 tests may use TLS 1.3+ protocols"
 
 	ENABLE_HTTPS_TLS12=1
 	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
