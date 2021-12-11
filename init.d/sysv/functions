@@ -580,14 +580,20 @@ get_nfqws_qnums()
 		}
 		[ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTP6" ] && _qns6=$_qn6;
 	}
-	[ "$MODE_HTTP" = 1 ] && {
+	if [ "$MODE_HTTP" = 1 ]; then
 		eval $1=$_qn
 		eval $3=$_qn6
-	}
-	[ "$MODE_HTTPS" = 1 ] && {
+	else
+		eval $1=
+		eval $3=
+	fi
+	if [ "$MODE_HTTPS" = 1 ]; then
 		eval $2=$_qns
 		eval $4=$_qns6
-	}
+	else
+		eval $2=
+		eval $4=
+	fi
 }
 
 tpws_apply_socks_binds()
