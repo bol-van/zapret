@@ -141,6 +141,13 @@ curl_supports_tls13()
 	curl --tlsv1.3 -Is -o /dev/null https://w3.org 2>/dev/null
 	[ $? != 4 ]
 }
+curl_supports_tlsmax()
+{
+	# supported since curl 7.54
+	curl --tls-max 1.2 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
+	# return code 2 = init failed. likely bad command line options
+	[ $? != 2 ]
+}
 
 hdrfile_http_code()
 {
@@ -184,7 +191,7 @@ curl_test_https_tls12()
 
 	# prevent using QUIC if available in curl
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tls-max 1.2 "https://$2" -o /dev/null 2>&1 
+	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
@@ -193,7 +200,7 @@ curl_test_https_tls13()
 
 	# prevent using QUIC if available in curl
 	# force TLS1.3 mode
-	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tlsv1.3 --tls-max 1.3 "https://$2" -o /dev/null 2>&1 
+	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
 }
 
 nfqws_ipt_prepare()
@@ -484,6 +491,17 @@ configure_ip_version()
 		LOCALHOST_IPT=127.0.0.1
 	fi
 }
+configure_curl_opt()
+{
+	TLSMAX12=
+	TLSMAX13=
+	curl_supports_tlsmax && {
+		TLSMAX12="--tls-max 1.2"
+		TLSMAX13="--tls-max 1.3"
+	}
+	TLS13=
+	curl_supports_tls13 && TLS13=1
+}
 
 ask_params()
 {
@@ -503,6 +521,7 @@ ask_params()
 		exitp 1
 	}
 	configure_ip_version
+	configure_curl_opt
 
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
@@ -512,7 +531,7 @@ ask_params()
 
 	ENABLE_HTTPS_TLS13=0
 	echo
-	if curl_supports_tls13; then
+	if [ -n "$TLS13" ]; then
 		echo "TLS 1.3 is the new standard for encrypted communications over TCP"
 		echo "its the most important feature for DPI bypass is encrypted TLS ServerHello"
 		echo "more and more sites enable TLS 1.3 but still there're many sites with only TLS 1.2 support"
