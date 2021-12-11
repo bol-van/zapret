@@ -119,7 +119,7 @@ check_prerequisites()
 	echo \* checking prerequisites
 
 	[ -x "$NFQWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
-		echo $NFQWS or $MDIG or $TPWS is not available. run $ZAPRET_BASE/install_bin.sh
+		echo $NFQWS or $TPWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh
 		exitp 6
 	}
 
@@ -135,7 +135,11 @@ curl_supports_tls13()
 {
 	curl --tlsv1.3 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
-	[ $? != 2 ]
+	[ $? = 2 ] && return 1
+	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
+	# this is online test because there's no other way to trigger library incompatibility case
+	curl --tlsv1.3 -Is -o /dev/null https://w3.org 2>/dev/null
+	[ $? != 4 ]
 }
 
 hdrfile_http_code()
