@@ -371,7 +371,6 @@ ws_curl_test()
 	shift
 	shift
 	$ws_start "$@"
-	# let some time for tpws to initialize
 	curl_test $testf $dom
 	code=$?
 	ws_kill
