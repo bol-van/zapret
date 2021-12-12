@@ -20,12 +20,31 @@ curl -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 25165
  echo reestr list download failed   
  exit 2
 }
+
+reestr_list()
+{
+ LANG=C cut -s -f2 -d';' "$ZREESTR" | LANG=C nice -n 5 sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p' | $AWK '{ print tolower($0) }'
+}
+
+composite_list()
+{
+ # combine reestr and user list
+ if [ -f "$ZUSERLIST_EXCLUDE" ]; then
+	reestr_list | nice -n 5 $GREP -xvFf "$ZUSERLIST_EXCLUDE"
+ else
+	reestr_list
+ fi
+ [ -f "$ZUSERLIST" ] && $AWK '{ print tolower($0) }' <"$ZUSERLIST"
+}
+
 dlsize=$(LANG=C wc -c "$ZREESTR" | xargs | cut -f 1 -d ' ')
 if test $dlsize -lt 204800; then
  echo list file is too small. can be bad.
  exit 2
 fi
-(LANG=C cut -s -f2 -d';' "$ZREESTR" | LANG=C sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p' | $AWK '{ print tolower($0) }' ; cat "$ZUSERLIST" ) | sort -u | zz "$ZHOSTLIST"
+
+composite_list | sort -u | zz "$ZHOSTLIST"
+
 rm -f "$ZREESTR"
 
 hup_zapret_daemons

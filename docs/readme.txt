@@ -702,7 +702,7 @@ ip2net фильтрует входные данные, выкидывая неп
 Тогда init скрипт будет запускать tpws с листом zapret-hosts-users.txt.
 
 2) Список доменов РКН может быть получен скриптом ipset/get_reestr_hostlist.sh - кладется в ipset/zapret-hosts.txt.gz.
-Этот скрипт автоматически добавляет к списку РКН домены из zapret-hosts-user.txt.
+Этот скрипт автоматически добавляет к списку РКН домены из zapret-hosts-user.txt и исключает zapret-hosts-exclude.txt.
 init скрипт будет запускать tpws с листом zapret-hosts.txt.gz.
 
 При фильтрации по именам доменов демон должен запускаться без фильтрации по ipset.
