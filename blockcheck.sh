@@ -156,7 +156,7 @@ check_prerequisites()
 
 	
 	[ -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
-		echo $PKTWS or $TPWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh or make -C \"$ZAPRET_BASE\"
+		echo $PKTWS or $TPWS or $MDIG is not available. run \"$ZAPRET_BASE/install_bin.sh\" or make -C \"$ZAPRET_BASE\"
 		exitp 6
 	}
 
@@ -169,6 +169,10 @@ check_prerequisites()
 			progs="$progs ipfw"
 			freebsd_modules_loaded ipfw ipdivert || {
 				echo ipfw or ipdivert kernel module not loaded
+				exitp 6
+			}
+			[ "$(sysctl -qn net.inet.ip.fw.enable)" = 0 -o "$(sysctl -qn net.inet6.ip6.fw.enable)" = 0 ] && {
+				echo ipfw is disabled. use : ipfw enable firewall
 				exitp 6
 			}
 			;;
