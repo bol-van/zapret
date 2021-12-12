@@ -156,7 +156,7 @@ check_prerequisites()
 
 	
 	[ -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
-		echo $PKTWS or $TPWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh
+		echo $PKTWS or $TPWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh or make -C \"$ZAPRET_BASE\"
 		exitp 6
 	}
 
