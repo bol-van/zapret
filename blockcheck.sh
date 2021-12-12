@@ -8,6 +8,7 @@ ZAPRET_BASE="$EXEDIR"
 [ -n "$TPPORT" ] || TPPORT=993
 [ -n "$TPWS_UID" ] || TPWS_UID=1
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
+[ -n "$DVTWS" ] || DVTWS="$ZAPRET_BASE/nfq/dvtws"
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 [ -n "$MDIG" ] || MDIG="$ZAPRET_BASE/mdig/mdig"
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
@@ -17,6 +18,9 @@ MIN_TTL=1
 MAX_TTL=12
 HDRTEMP=/tmp/zapret-hdr.txt
 ECHON="echo -n"
+
+IPFW_RULE_NUM=1
+IPFW_DIVERT_PORT=59780
 
 DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.8"
 DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to protonmail.com"
@@ -101,34 +105,90 @@ IPT_DEL()
 {
 	$IPTABLES -C "$@" >/dev/null 2>/dev/null && $IPTABLES -D "$@"
 }
+IPFW_ADD()
+{
+	ipfw -qf add $IPFW_RULE_NUM "$@"
+}
+IPFW_DEL()
+{
+	ipfw -qf delete $IPFW_RULE_NUM
+}
 
 
 check_system()
 {
 	echo \* checking system
 
-	local UNAME=$(uname)
-	[ "$UNAME" = "Linux" ] || {
-		echo $UNAME not supported
-		exitp 5
-	}
+	UNAME=$(uname)
+	case "$UNAME" in
+		Linux)
+			PKTWS="$NFQWS"
+			PKTWSD=nfqws
+			;;
+		FreeBSD)
+			PKTWS="$DVTWS"
+			PKTWSD=dvtws
+			;;
+		*)
+			echo $UNAME not supported
+			exitp 5
+	esac
+}
+
+freebsd_module_loaded()
+{
+	# $1 - module name
+	kldstat | grep -q "${1}.ko"
+}
+freebsd_modules_loaded()
+{
+	# $1,$2,$3, ... - module names
+	while [ -n "$1" ]; do
+		freebsd_module_loaded $1 || return 1
+		shift
+	done
+	return 0
 }
 
 check_prerequisites()
 {
 	echo \* checking prerequisites
 
-	[ -x "$NFQWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
-		echo $NFQWS or $TPWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh
+	
+	[ -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
+		echo $PKTWS or $TPWS or $MDIG is not available. run $ZAPRET_BASE/install_bin.sh
 		exitp 6
 	}
 
-	for prog in iptables ip6tables curl; do
+	local progs='curl'
+	case "$UNAME" in
+		Linux)
+			progs="$progs iptables ip6tables"
+			;;
+		FreeBSD)
+			progs="$progs ipfw"
+			freebsd_modules_loaded ipfw ipdivert || {
+				echo ipfw or ipdivert kernel module not loaded
+				exitp 6
+			}
+			;;
+	esac
+
+	for prog in $progs; do
 		exists $prog || {
 			echo $prog does not exist. please install
 			exitp 6
 		}
 	done
+
+	if exists nslookup; then
+		LOOKUP=nslookup
+	elif exists host; then
+		LOOKUP=host
+	else
+		echo nslookup or host does not exist. please install
+		exitp 6
+	fi
 }
 
 curl_supports_tls13()
@@ -205,29 +265,68 @@ curl_test_https_tls13()
 	curl -${1}Ss --max-time $CURL_MAX_TIME $CURL_OPT --http1.1 --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
 }
 
-nfqws_ipt_prepare()
+pktws_ipt_prepare()
 {
 	# $1 - port
-	IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+	case "$UNAME" in
+		Linux)
+			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+			;;
+		FreeBSD)
+			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any to any 80,443 out not diverted not sockarg
+			;;
+	esac
 }
-nfqws_ipt_unprepare()
+pktws_ipt_unprepare()
 {
 	# $1 - port
-	IPT_DEL POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+	case "$UNAME" in
+		Linux)
+			IPT_DEL POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+			;;
+		FreeBSD)
+			IPFW_DEL
+			;;
+	esac
 }
 tpws_ipt_prepare()
 {
 	# $1 - port
-	IPT OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
+	case "$UNAME" in
+		Linux)
+			IPT OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
+			;;
+		FreeBSD)
+			if [ "$IPV" = 4 ]; then
+				IPFW_ADD fwd 127.0.0.1,$TPPORT tcp from me to any 80,443 proto ip4 not uid $TPWS_UID
+			else
+				IPFW_ADD fwd ::1,$TPPORT tcp from me to any 80,443 proto ip6 not uid $TPWS_UID
+			fi
+			;;
+	esac
 }
 tpws_ipt_unprepare()
 {
 	# $1 - port
-	IPT_DEL OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
+	case "$UNAME" in
+		Linux)
+			IPT_DEL OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
+			;;
+		FreeBSD)
+			IPFW_DEL
+			;;
+	esac
 }
-nfqws_start()
+pktws_start()
 {
-	"$NFQWS" --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
+	case "$UNAME" in
+		Linux)
+			"$NFQWS" --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
+			;;
+		FreeBSD)
+			"$DVTWS" --port=$IPFW_DIVERT_PORT "$@" >/dev/null &
+			;;
+	esac
 	PID=$!
 }
 tpws_start()
@@ -286,15 +385,15 @@ tpws_curl_test()
 	echo - checking tpws $3 $4 $5 $6 $7 $8 $9
 	ws_curl_test tpws_start "$@"
 }
-nfqws_curl_test()
+pktws_curl_test()
 {
 	# $1 - test function
 	# $2 - domain
-	# $3,$4,$5, ... - nfqws params
-	echo - checking nfqws $3 $4 $5 $6 $7 $8 $9
-	ws_curl_test nfqws_start "$@"
+	# $3,$4,$5, ... - nfqws/dvtws params
+	echo - checking $PKTWSD $3 $4 $5 $6 $7 $8 $9
+	ws_curl_test pktws_start "$@"
 }
-nfqws_check_domain_bypass()
+pktws_check_domain_bypass()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
@@ -304,35 +403,35 @@ nfqws_check_domain_bypass()
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
-			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+			pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		done
 	}
 
 	s="--dpi-desync=split2"
-	if nfqws_curl_test $1 $3 $s; then
+	if pktws_curl_test $1 $3 $s; then
 		strategy="${strategy:-$s}"
 	else
 		tests="$tests split fake,split2 fake,split"
 		[ "$sec" = 0 ] && {
 			s="$s --hostcase"
-			nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+			pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		}
 		for pos in 1 2 4 5 10 50 100; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
-			if nfqws_curl_test $1 $3 $s; then
+			if pktws_curl_test $1 $3 $s; then
 				strategy="${strategy:-$s}"
 				break
 			else
 				[ "$sec" = 0 ] && {
 					s="$s --hostcase"
-					nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+					pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 				}
 			fi
 		done
 	fi
 
 	s="--dpi-desync=disorder2"
-	if nfqws_curl_test $1 $3 $s; then
+	if pktws_curl_test $1 $3 $s; then
 		strategy="${strategy:-$s}" 
 	else
 		tests="$tests disorder fake,disorder2 fake,disorder"
@@ -343,7 +442,7 @@ nfqws_check_domain_bypass()
 		found=0
 		for ttl in $ttls; do
 			s="--dpi-desync=$desync --dpi-desync-ttl=$ttl"
-			nfqws_curl_test $1 $3 $s && {
+			pktws_curl_test $1 $3 $s && {
 				found=1
 				strategy="${strategy:-$s}"
 				break
@@ -352,7 +451,7 @@ nfqws_check_domain_bypass()
 		[ "$sec" = 1 ] && [ "$found" = 0 ] && {
 			for ttl in $ttls; do
 				s="--dpi-desync=$desync --dpi-desync-ttl=$ttl --wssize 1:6"
-				nfqws_curl_test $1 $3 $s && {
+				pktws_curl_test $1 $3 $s && {
 					found=1
 					strategy="${strategy:-$s}"
 					break
@@ -361,13 +460,13 @@ nfqws_check_domain_bypass()
 		}
 		for fooling in badsum md5sig badseq; do
 			s="--dpi-desync=$desync --dpi-desync-fooling=$fooling"
-			if nfqws_curl_test $1 $3 $s ; then
+			if pktws_curl_test $1 $3 $s ; then
 				strategy="${strategy:-$s}"
 				[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
 			else
 				[ "$sec" = 1 ] && {
 					s="$s --wssize 1:6"
-					nfqws_curl_test $1 $3 $s && {
+					pktws_curl_test $1 $3 $s && {
 						strategy="${strategy:-$s}"
 						[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
 					}
@@ -378,12 +477,12 @@ nfqws_check_domain_bypass()
 
 	[ "$sec" = 1 ] && {
 		s="--wssize 1:6"
-		nfqws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+		pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 	}
 
 	echo
 	if [ -n "$strategy" ]; then
-		echo "!!!!! working strategy found : nfqws $strategy !!!!!"
+		echo "!!!!! working strategy found : $PKTWSD $strategy !!!!!"
 		return 0
 	else
 		echo 'working strategy not found'
@@ -434,7 +533,7 @@ check_domain()
 	echo \* $1 $4
 
 	# in case was interrupted before
-	nfqws_ipt_unprepare $2
+	pktws_ipt_unprepare $2
 	tpws_ipt_unprepare $2
 	ws_kill
 
@@ -457,13 +556,13 @@ check_domain()
 
 	echo
 
-	echo preparing nfqws redirection
-	nfqws_ipt_prepare $2
+	echo preparing $PKTWSD redirection
+	pktws_ipt_prepare $2
 
-	nfqws_check_domain_bypass $1 $3 $4
+	pktws_check_domain_bypass $1 $3 $4
 
-	echo clearing nfqws redirection
-	nfqws_ipt_unprepare $2
+	echo clearing $PKTWSD redirection
+	pktws_ipt_unprepare $2
 }
 check_domain_http()
 {
@@ -569,7 +668,7 @@ pingtest()
 dnstest()
 {
 	# $1 - dns server. empty for system resolver
-	nslookup w3.org $1 >/dev/null 2>/dev/null
+	"$LOOKUP" w3.org $1 >/dev/null 2>/dev/null
 }
 find_working_public_dns()
 {
@@ -581,12 +680,25 @@ find_working_public_dns()
 	done
 	return 1
 }
+lookup4()
+{
+	# $1 - domain
+	# $2 - DNS
+	case "$LOOKUP" in
+		nslookup)
+			nslookup $1 $2 | sed -n '/Name:/,$p' | grep ^Address | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
+			;;
+		host)
+			host -t A $1 $2 | grep "has address" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
+			;;
+	esac
+}
 check_dns_spoof()
 {
 	# $1 - domain
 	# $2 - public DNS
-	echo $1 | "$EXEDIR/mdig/mdig" --family=4 >"$DNSCHECK_DIG1"
-	nslookup $1 $2 | sed -n '/Name:/,$p' | grep ^Address | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' >"$DNSCHECK_DIG2"
+	echo $1 | "$MDIG" --family=4 >"$DNSCHECK_DIG1"
+	lookup4 $1 $2 >"$DNSCHECK_DIG2"
 	# check whether system resolver returns anything other than public DNS
 	grep -qvFf "$DNSCHECK_DIG2" "$DNSCHECK_DIG1"
 }
@@ -628,7 +740,7 @@ check_dns()
 		done
 	else
 		echo no working public DNS was found. looks like public DNS blocked.
-		for dom in $DNSCHECK_DOM; do echo $dom; done | "$EXEDIR/mdig/mdig" --threads=10 --family=4 >"$DNSCHECK_DIGS"
+		for dom in $DNSCHECK_DOM; do echo $dom; done | "$MDIG" --threads=10 --family=4 >"$DNSCHECK_DIGS"
 	fi
 
 	echo checking resolved IP uniqueness for : $DNSCHECK_DOM
@@ -667,8 +779,8 @@ sigint()
 	[ -n "$IPV" ] && {
 		tpws_ipt_unprepare 80
 		tpws_ipt_unprepare 443
-		nfqws_ipt_unprepare 80
-		nfqws_ipt_unprepare 443
+		pktws_ipt_unprepare 80
+		pktws_ipt_unprepare 443
 	}
 	ws_kill
 	exitp 1
