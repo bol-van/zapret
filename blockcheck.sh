@@ -277,7 +277,7 @@ pktws_ipt_prepare()
 			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
 			;;
 		FreeBSD)
-			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any to any 80,443 out not diverted not sockarg
+			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any 80,443 out not diverted not sockarg
 			;;
 	esac
 }
@@ -424,11 +424,9 @@ pktws_check_domain_bypass()
 			if pktws_curl_test $1 $3 $s; then
 				strategy="${strategy:-$s}"
 				break
-			else
-				[ "$sec" = 0 ] && {
-					s="$s --hostcase"
-					pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
-				}
+			elif [ "$sec" = 0 ]; then
+				s="$s --hostcase"
+				pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 			fi
 		done
 	fi
