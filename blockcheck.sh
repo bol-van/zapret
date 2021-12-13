@@ -12,15 +12,15 @@ ZAPRET_BASE="$EXEDIR"
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 [ -n "$MDIG" ] || MDIG="$ZAPRET_BASE/mdig/mdig"
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
-DOMAIN=rutracker.org
-CURL_MAX_TIME=5
-MIN_TTL=1
-MAX_TTL=12
+[ -n "$IPFW_RULE_NUM" ] || IPFW_RULE_NUM=1
+[ -n "$IPFW_DIVERT_PORT" ] || IPFW_DIVERT_PORT=59780
+[ -n "$DOMAIN" ] || DOMAIN=rutracker.org
+[ -n "$CURL_MAX_TIME" ] || CURL_MAX_TIME=5
+[ -n "$MIN_TTL" ] || MIN_TTL=1
+[ -n "$MAX_TTL" ] || MAX_TTL=12
+
 HDRTEMP=/tmp/zapret-hdr.txt
 ECHON="echo -n"
-
-IPFW_RULE_NUM=1
-IPFW_DIVERT_PORT=59780
 
 DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.8"
 DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to protonmail.com"
