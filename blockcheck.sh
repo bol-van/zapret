@@ -23,7 +23,7 @@ HDRTEMP=/tmp/zapret-hdr.txt
 ECHON="echo -n"
 
 DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.8"
-DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to protonmail.com"
+DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to startmail.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -402,7 +402,7 @@ pktws_check_domain_bypass()
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local strategy tests='fake' ttls s sec="$2" found
+	local strategy tests='fake' ttls s sec="$2"
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -441,47 +441,33 @@ pktws_check_domain_bypass()
 	fi
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
-	for desync in $tests; do
-		found=0
-		for ttl in $ttls; do
-			s="--dpi-desync=$desync --dpi-desync-ttl=$ttl"
-			pktws_curl_test $1 $3 $s && {
-				found=1
-				strategy="${strategy:-$s}"
-				break
-			}
-		done
-		[ "$sec" = 1 ] && [ "$found" = 0 ] && {
+	for e in '' '--wssize 1:6'; do
+		[ -n "$e" ] && {
+			pktws_curl_test $1 $3 $e && strategy="${strategy:-$e}"
+			for desync in split2 disorder2; do
+				s="--dpi-desync=$desync $e"
+				pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+			done
+		}
+		for desync in $tests; do
 			for ttl in $ttls; do
-				s="--dpi-desync=$desync --dpi-desync-ttl=$ttl --wssize 1:6"
+				s="--dpi-desync=$desync --dpi-desync-ttl=$ttl $e"
 				pktws_curl_test $1 $3 $s && {
-					found=1
 					strategy="${strategy:-$s}"
 					break
 				}
 			done
-		}
-		for fooling in badsum md5sig badseq; do
-			s="--dpi-desync=$desync --dpi-desync-fooling=$fooling"
-			if pktws_curl_test $1 $3 $s ; then
-				strategy="${strategy:-$s}"
-				[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
-			else
-				[ "$sec" = 1 ] && {
-					s="$s --wssize 1:6"
-					pktws_curl_test $1 $3 $s && {
-						strategy="${strategy:-$s}"
-						[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
-					}
-				}
-			fi
+			for fooling in badsum md5sig badseq; do
+				s="--dpi-desync=$desync --dpi-desync-fooling=$fooling $e"
+				if pktws_curl_test $1 $3 $s ; then
+					strategy="${strategy:-$s}"
+					[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
+				fi
+			done
 		done
+		# do not do wssize test for http. it's useless
+		[ "$sec" = 1 ] || break
 	done
-
-	[ "$sec" = 1 ] && {
-		s="--wssize 1:6"
-		pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
-	}
 
 	echo
 	if [ -n "$strategy" ]; then
@@ -660,6 +646,7 @@ ask_params()
 		ask_yes_no_var IGNORE_CA "do not verify server certificate"
 		[ "$IGNORE_CA" = 1 ] && CURL_OPT=-k
 	}
+	echo
 }
 
 
