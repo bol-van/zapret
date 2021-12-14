@@ -86,14 +86,17 @@ Assume LAN='em1', WAN="em0".
 tpws transparent mode quick start.
 
 For all traffic:
+```
 ipfw delete 100
 ipfw add 100 fwd 127.0.0.1,988 tcp from me to any 80,443 proto ip4 xmit em0 not uid daemon
 ipfw add 100 fwd ::1,988 tcp from me to any 80,443 proto ip6 xmit em0 not uid daemon
 ipfw add 100 fwd 127.0.0.1,988 tcp from any to any 80,443 proto ip4 recv em1
 ipfw add 100 fwd ::1,988 tcp from any to any 80,443 proto ip6 recv em1
 /opt/zapret/tpws/tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
+```
 
 Process only table zapret with the exception of table nozapret :
+```
 ipfw delete 100
 ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
 ipfw add 100 fwd 127.0.0.1,988 tcp from me to table\(zapret\) 80,443 proto ip4 xmit em0 not uid daemon
@@ -102,11 +105,14 @@ ipfw add 100 allow tcp from any to table\(nozapret\) 80,443 recv em1
 ipfw add 100 fwd 127.0.0.1,988 tcp from any to any 80,443 proto ip4 recv em1
 ipfw add 100 fwd ::1,988 tcp from any to any 80,443 proto ip6 recv em1
 /opt/zapret/tpws/tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
+```
 
 Tables zapret, nozapret, ipban are created by ipset/*.sh scripts the same way as in Linux.
 Its a good idea to update tables periodically :
+```
  crontab -e
- write the line : 0 12 */2 * * /opt/zapret/ipset/get_config.sh
+```
+ write the line : `0 12 */2 * * /opt/zapret/ipset/get_config.sh`
 
 When using ipfw tpws does not require special permissions for transparent mode.
 However without root its not possible to bind to ports <1024 and change UID/GID. Without changing UID tpws
@@ -153,8 +159,10 @@ Look for fe80:... address in ifconfig and use it for redirection target.
 rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::31c:29ff:dee2:1c4d port 988
 rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
 ```
-
-`/opt/zapret/tpws/tpws --port=988 --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force`
+then
+```
+/opt/zapret/tpws/tpws --port=988 --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force
+```
 
 Its not clear how to do rdr-to outgoing traffic. I could not make route-to scheme work.
 
@@ -171,9 +179,11 @@ tpws for forwarded traffic only :
 pass in quick on em1 inet  proto tcp to port {80,443} rdr-to 127.0.0.1 port 988 
 pass in quick on em1 inet6 proto tcp to port {80,443} rdr-to ::1 port 988 
 ```
-
+then
+```
 pfctl -f /etc/pf.conf
 tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
+```
 
 Its not clear how to do rdr-to outgoing traffic. I could not make route-to scheme work.
 rdr-to support is done using /dev/pf, that's why transparent mode requires root.
@@ -185,9 +195,11 @@ dvtws for all traffic:
 pass in  quick on em0 proto tcp from port {80,443} no state
 pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989
 ```
-
+then
+```
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
+```
 
 dwtws only for table zapret with the exception of table nozapret :
 
@@ -211,8 +223,11 @@ pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet
 pass in  quick on em0 inet6 proto tcp from <zapret6-user>  port {80,443} no state
 pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-packet port 989 no state
 ```
+then
+```
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
+```
 
 divert-packet automatically adds the reverse rule. By default also incoming traffic will be passwed to dvtws.
 This is highly undesired because it is waste of cpu resources and speed limiter.
@@ -224,18 +239,28 @@ Looks like pf automatically prevent reinsertion of diverted frames. Loop problem
 OpenBSD forcibly recomputes tcp checksum after divert. Thats why most likely
 dpi-desync-fooling=badsum will not work. dvtws will warn if you specify this parameter.
 
-ipset scripts do not reload PF by default. To enable reload specify command in /opt/zapret/config :
+ipset scripts do not reload PF by default. To enable reload specify command in `/opt/zapret/config` :
+```
 LISTS_RELOAD="pfctl -f /etc/pf.conf"
-Newer pfctl versions can reload tables only : pfctl -Tl -f /etc/pf.conf
+```
+
+Newer pfctl versions can reload tables only : 
+```
+pfctl -Tl -f /etc/pf.conf
+```
 But OpenBSD 6.8 pfctl is old enough and does not support that. Newer FreeBSD do.
+
 Don't forget to disable gzip compression :
+```
 GZIP_LISTS=0
+```
 If some list files do not exist and have references in pf.conf it leads to error.
 You need to exclude those tables from pf.conf and referencing them rules.
 After configuration is done you can put ipset script :
+```
  crontab -e
- write the line : 0 12 */2 * * /opt/zapret/ipset/get_config.sh
-
+```
+ then write the line : `0 12 */2 * * /opt/zapret/ipset/get_config.sh`
 
 ## MacOS
 
@@ -283,9 +308,11 @@ rdr pass on lo0 inet6 proto tcp from !::1 to any port {80,443} -> fe80::1 port 9
 pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} user { >root }
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
 ```
+then
+```
 pfctl -ef /etc/pf.conf
 /opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force
-
+```
 
 tpws transparent mode for both passthrough and outgoing connections. en1 - LAN.
 
@@ -300,9 +327,11 @@ rdr pass on lo0 inet6 proto tcp from !::1 to any port {80,443} -> fe80::1 port 9
 pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} user { >root }
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
 ```
+then
+```
 pfctl -ef /etc/pf.conf
 /opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
-
+```
 
 Build from source : `make -C /opt/zapret mac`
 
@@ -311,7 +340,7 @@ Build from source : `make -C /opt/zapret mac`
 
 ### MacOS easy install
 
-`install_easy.sh' supports MacOS
+`install_easy.sh` supports MacOS
 
 Shipped precompiled binaries are built for 64-bit MacOS with -mmacosx-version-min=10.8 option.
 They should run on all supported MacOS versions.
@@ -349,10 +378,10 @@ Reloading PF tables :
 /opt/zapret/init.d/macos/zapret reload-fw-tables
 ```
 
-Installer configures LISTS_RELOAD in the config so ipset/*.sh scripts automatically reload PF tables.
-Installer creates cron job for ipset/get_config.sh, as in OpenWRT.
+Installer configures LISTS_RELOAD in the config so `ipset/*.sh` scripts automatically reload PF tables.
+Installer creates cron job for `ipset/get_config.sh`, as in OpenWRT.
 
-start-fw script automatically patches /etc/pf.conf inserting there "zapret" anchors.
+start-fw script automatically patches `/etc/pf.conf` inserting there "zapret" anchors.
 Auto patching requires pf.conf with apple anchors preserved.
 If your pf.conf is highly customized and patching fails you will see the warning. Do not ignore it.
 In that case you need to manually insert "zapret" anchors to your pf.conf (keeping the right rule type ordering) :
