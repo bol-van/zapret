@@ -220,7 +220,7 @@ Split mode is very similar to disorder but without segment reordering :
 2. 1st segment
 3. fake 1st segment, data filled with zeroes (2nd copy)
 4. 2nd segment
-5. 
+
 Mode `split2` disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
 In `disorder2` and 'split2` modes no fake packets are sent, so ttl and fooling options are not required.
@@ -260,10 +260,10 @@ packet ordering can be changed breaking the whole idea of desync attack.
 ### DPI deync combos
 
 dpi-desync parameter takes up to 3 comma separated arguments.
-zero phase means tcp connection establishement (before sending data payload). Mode can be `synack'.
+zero phase means tcp connection establishement (before sending data payload). Mode can be `synack`.
 Hostlist filter is not applicable to the zero phase.
 Next phases work on packets with data payload.
-1st phase mode can be fake,rst,rstack, 2nd phase mode - `disorder`,`disorder2`,`split`,`split2`.
+1st phase mode can be `fake`,`rst`,`rstack`, 2nd phase mode - `disorder`,`disorder2`,`split`,`split2`.
 Can be useful for ISPs with more than one DPI.
 
 ### SYNACK mode
@@ -297,7 +297,7 @@ If you realize you don't need the synack mode it's highly suggested to restore d
 
 ### Virtual Machines
 
-Most of nfqws packet magic does not work from VMs powered byvirtualbox and vmware when network is NATed.
+Most of nfqws packet magic does not work from VMs powered by virtualbox and vmware when network is NATed.
 Hypervisor forcibly changes ttl and does not forward fake packets.
 Set up bridge networking.
 
@@ -483,9 +483,9 @@ At the output, you get ipset/zapret-ip-user.txt with IP addresses.
 
 2. `ipset/get_reestr_*.sh`. Russian specific
 
-3, `ipset/get_antifilter_*.sh`. Russian specific
+3. `ipset/get_antifilter_*.sh`. Russian specific
 
-4, `ipset/get_config.sh`. This script calls what is written into the GETLIST variable from the config file.
+4. `ipset/get_config.sh`. This script calls what is written into the GETLIST variable from the config file.
 
 If the variable is not defined, then only lists for ipsets nozapret/nozapret6 are resolved.
 
@@ -568,7 +568,7 @@ filter - only fill ipset or load hostlist
 custom - use custom script for running daemons and establishing firewall rules
 ```
 
-MODE=tpws
+`MODE=tpws`
 
 Enable http fooling :
 
