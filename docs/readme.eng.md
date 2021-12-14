@@ -38,14 +38,6 @@ or adding a dot at the end of the host name: `Host: kinozal.tv.`
 
 There is also more advanced magic for bypassing DPI at the packet level.
 
-## When it will not work
-
-* If DNS server returns false responses. ISP can return false IP addresses or not return anything
-when blocked domains are queried. If this is the case change DNS to public ones, such as 8.8.8.8 or 1.1.1.1.Sometimes ISP hijacks queries to any DNS server. Dnscrypt or dns-over-tls help.
-* If blocking is done by IP.
-* If a connection passes through a filter capable of reconstructing a TCP connection, and which
-follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack, fragmentation disappears immediately as a means of circumvention. Squid is correct, it will find everything as it should, it is useless to deceive him. BUT. Only small providers can afford using squid, since it is very resource intensive. Large companies usually use DPI, which is designed for much greater bandwidth.
-
 ## How to put this into practice in the linux system
 
 In short, the options can be classified according to the following scheme:
@@ -117,6 +109,14 @@ DNAT to localhost (:: 1) is possible only in the OUTPUT chain.
 In the PREROUTING DNAT chain, it is possible to any global address or to the link local address of the same interface
 the packet came from.
 NFQUEUE works without changes.
+
+## When it will not work
+
+* If DNS server returns false responses. ISP can return false IP addresses or not return anything
+when blocked domains are queried. If this is the case change DNS to public ones, such as 8.8.8.8 or 1.1.1.1.Sometimes ISP hijacks queries to any DNS server. Dnscrypt or dns-over-tls help.
+* If blocking is done by IP.
+* If a connection passes through a filter capable of reconstructing a TCP connection, and which
+follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack, fragmentation disappears immediately as a means of circumvention. Squid is correct, it will find everything as it should, it is useless to deceive him. BUT. Only small providers can afford using squid, since it is very resource intensive. Large companies usually use DPI, which is designed for much greater bandwidth.
 
 ## nfqws
 
