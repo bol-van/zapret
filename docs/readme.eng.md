@@ -69,7 +69,6 @@ After installation remove /tmp/zapret to free RAM.
 
 The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extroot is recommended.
 
-
 ### Android
 
 Its not possible to use nfqws and tpws in transparent proxy mode without root privileges.
@@ -106,11 +105,9 @@ chmod 755 /data/local/tmp/zapret /data/local/tmp/zapret/tpws
 chcon u:object_r:system_file:s0 /data/local/tmp/zapret/tpws
 Now its possible to run /data/local/tmp/zapret/tpws from any app such as tasker.
 
-
 ### FreeBSD, OpenBSD, MacOS
 
 see docs/bsd.eng.txt
-
 
 ### Windows (WSL)
 
@@ -120,8 +117,10 @@ Its not required to install any linux distributions as suggested in most article
 tpws is static binary. It doesn't need a distribution.
 
 Install WSL : `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all`
+
 Copy binaries/x86_64/tpws_wsl.tgz to the target system.
 Run : `wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz`
+
 Run tpws : `wsl --exec /tpws --uid=1 --no-resolve --socks --bind-addr=127.0.0.1 --port=1080 <fooling_options>`
 Configure socks as 127.0.0.1:1080 in a browser or another program.
 
