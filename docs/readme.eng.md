@@ -33,16 +33,15 @@ or adding a dot at the end of the host name: `Host: kinozal.tv.`
 
 There is also more advanced magic for bypassing DPI at the packet level.
 
-
 ## How to put this into practice in the linux system
 
 In short, the options can be classified according to the following scheme:
 
-1) Passive DPI not sending RST to the server. ISP tuned iptables commands can help.
+1. Passive DPI not sending RST to the server. ISP tuned iptables commands can help.
 This option is out of the scope of the project. If you do not allow ban trigger to fire, then you won’t have to
 deal with its consequences.
-2) Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
-3) Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
+2. Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
+3. Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
 
 For options 2 and 3, tpws and nfqws programs are implemented, respectively.
 You need to run them with the necessary parameters and redirect certain traffic with iptables.
@@ -59,7 +58,7 @@ DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING
 
 `sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1`
 
-You can use `-j REDIRECT --to-port 988` instead of DNAT, but in this case the transparent proxy process
+You can use `-j REDIRECT --to-port 988` instead of DNAT, but in this case the transparent proxy process 
 should listen on the ip address of the incoming interface or on all addresses. Listen all - not good
 in terms of security. Listening one (local) is possible, but automated scripts will have to recognize it,
 then dynamically enter it into the command. In any case, additional efforts are required.
@@ -74,7 +73,6 @@ iptables -A INPUT ! -i lo -d 127.0.0.0/8 -j DROP
 
 Owner filter is necessary to prevent recursive redirection of connections from tpws itself.
 tpws must be started under OS user "tpws".
-
 
 NFQUEUE redirection of the outgoing traffic and forwarded traffic going towards the external interface,
 can be done with the following commands:
@@ -93,7 +91,6 @@ Then we can reduce CPU load, refusing to process unnecessary packets.
 
 Mark filter does not allow nfqws-generated packets to enter the queue again.
 Its necessary to use this filter when also using "connbytes 1:4". Without it packet ordering can be changed breaking the whole idea.
-
 
 ## ip6tables
 
@@ -217,6 +214,7 @@ algorithms are used.
 Mode 'disorder2' disables sending of fake segments.
 
 Split mode is very similar to disorder but without segment reordering :
+
 1. fake 1st segment, data filled with zeroes
 2. 1st segment
 3. fake 1st segment, data filled with zeroes (2nd copy)
@@ -243,13 +241,15 @@ Subdomains are applied automatically. gzip lists are supported.
 
 iptables for performing the attack on the first packet :
 
-iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass`
 
 This is good if DPI does not track all requests in http keep-alive session.
 If it does, then pass all outgoing packets for http and only first data packet for https :
 
+```
 iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
 iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+```
 
 mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark when it sends generated packets.
 nfqws can internally filter marked packets. but when connbytes filter is used without mark filter
@@ -271,17 +271,21 @@ In geneva docs it's called "TCP turnaround". Attempt to make the DPI believe the
 In linux it's required to remove standard firewall rule dropping INVALID packets in the OUTPUT chain,
 for example : -A OUTPUT -m state --state INVALID -j DROP
 In openwrt it's possible to disable the rule for both FORWARD and OUTPUT chains in /etc/config/firewall :
+```
 config zone
 	option name 'wan'
 	.........
 	option masq_allow_invalid '1'
+```
 Unfortunately there's no OUTPUT only switch. It's not desired to remove the rule from the FORWARD chain.
 Add the following lines to /etc/firewall.user :
 
+```
 iptables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
 ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
+```
 
-then /etc/init.d/firewall restart
+then `/etc/init.d/firewall restart`
 
 Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
 If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
@@ -314,7 +318,7 @@ In http(s) case wssize stops after the first http request or TLS ClientHello.
 If you deal with a non-http(s) protocol you need --wssize-cutoff. It sets the number of the outgoing packet where wssize stops.
 (numbering starts from 1). 
 If a http request or TLS ClientHello packet is detected wssize stops immediately ignoring wssize-cutoff option.
-If your protocol is prone to long inactivity, you should increase ESTABLISHED phase timeout using --ctrack-timeouts.
+If your protocol is prone to long inactivity, you should increase ESTABLISHED phase timeout using `--ctrack-timeouts`.
 Default timeout is low - only 5 mins.
 Don't forget that nfqws feeds with redirected packets. If you have limited redirection with connbytes
 ESTABLISHED entries can remain in the table until dropped by timeout.
@@ -495,7 +499,7 @@ When using large regulator lists estimate the amount of RAM on the router !
 
 ## Choosing parameters
 
-The file /opt/zapret/config is used by various components of the system and contains basic settings.
+The file `/opt/zapret/config` is used by various components of the system and contains basic settings.
 It needs to be viewed and edited if necessary.
 
 Main mode :
@@ -510,32 +514,34 @@ MODE=tpws
 
 Enable http fooling :
 
-MODE_HTTP=1
+`MODE_HTTP=1`
 
 Apply fooling to keep alive http sessions. Only applicable to nfqws. Tpws always fool keepalives.
 Not enabling this can save CPU time.
 
-MODE_HTTP_KEEPALIVE=0
+`MODE_HTTP_KEEPALIVE=0`
 
 Enable https fooling :
 
-MODE_HTTPS=1
+`MODE_HTTPS=1`
 
 Host filtering mode :
 none - apply fooling to all hosts
 ipset - limit fooling to hosts from ipset zapret/zapret6
 hostlist - limit fooling to hosts from hostlist
 
-MODE_FILTER=none
+`MODE_FILTER=none`
 
 Its possible to change manipulation options used by tpws :
 
-TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"
+`TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"`
 
 nfqws options for DPI desync attack:
 
+```
 DESYNC_MARK=0x40000000
 NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
+```
 
 Separate nfqws options for http and https and ip protocol versions 4,6:
 
@@ -553,13 +559,13 @@ It means if only NFQWS_OPT_DESYNC is defined all four take its value.
 
 If a variable is not defined, the value NFQWS_OPT_DESYNC is taken.
 
-flow offloading control (openwrt only)
+flow offloading control (OpenWRT only)
 donttouch : disable system flow offloading setting if selected mode is incompatible with it, dont touch it otherwise and dont configure selective flow offloading
 none : always disable system flow offloading setting and dont configure selective flow offloading
 software : always disable system flow offloading setting and configure selective software flow offloading
 hardware : always disable system flow offloading setting and configure selective hardware flow offloading
 
-FLOWOFFLOAD=donttouch
+`FLOWOFFLOAD=donttouch`
 
 The GETLIST parameter tells the install_easy.sh installer which script to call
 to update the list of blocked ip or hosts.
@@ -586,7 +592,7 @@ TMPDIR=/opt/zapret/tmp
 
 ipset options :
 
-IPSET_OPT="hashsize 262144 maxelem 2097152"
+`IPSET_OPT="hashsize 262144 maxelem 2097152`
 
 Kernel automatically increases hashsize if ipset is too large for the current hashsize.
 This procedure requires internal reallocation and may require additional memory.
