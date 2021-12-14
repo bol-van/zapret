@@ -33,6 +33,20 @@ or adding a dot at the end of the host name: `Host: kinozal.tv.`
 
 There is also more advanced magic for bypassing DPI at the packet level.
 
+
+## When it will not work
+
+* If DNS server returns false responses. ISP can return false IP addresses or not return anything
+when blocked domains are queried. If this is the case change DNS to public ones, such as 8.8.8.8 or 1.1.1.1.
+Sometimes ISP hijacks queries to any DNS server. Dnscrypt or dns-over-tls help.
+* If blocking is done by IP.
+* If a connection passes through a filter capable of reconstructing a TCP connection, and which
+follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack,
+fragmentation disappears immediately as a means of circumvention. Squid is correct, it will find everything
+as it should, it is useless to deceive him.
+BUT. Only small providers can afford using squid, since it is very resource intensive.
+Large companies usually use DPI, which is designed for much greater bandwidth.
+
 ## How to put this into practice in the linux system
 
 In short, the options can be classified according to the following scheme:
@@ -105,19 +119,6 @@ In the PREROUTING DNAT chain, it is possible to any global address or to the lin
 the packet came from.
 NFQUEUE works without changes.
 
-## When it will not work
-
-* If DNS server returns false responses. ISP can return false IP addresses or not return anything
-when blocked domains are queried. If this is the case change DNS to public ones, such as 8.8.8.8 or 1.1.1.1.
-Sometimes ISP hijacks queries to any DNS server. Dnscrypt or dns-over-tls help.
-* If blocking is done by IP.
-* If a connection passes through a filter capable of reconstructing a TCP connection, and which
-follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack,
-fragmentation disappears immediately as a means of circumvention. Squid is correct, it will find everything
-as it should, it is useless to deceive him.
-BUT. Only small providers can afford using squid, since it is very resource intensive.
-Large companies usually use DPI, which is designed for much greater bandwidth.
-
 ## nfqws
 
 This program is a packet modifier and a NFQUEUE queue handler.
@@ -159,7 +160,7 @@ The manipulation parameters can be combined in any way.
 
 WARNING. `--wsize` parameter is now not used anymore in scripts. TCP split can be achieved using DPI desync attack.
 
-### DPI DESYNC ATTACK
+### DPI desync attack
 
 After completion of the tcp 3-way handshake, the first data packet from the client goes.
 It usually has "GET / ..." or TLS ClientHello. We drop this packet, replacing with something else.
@@ -255,7 +256,7 @@ mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark wh
 nfqws can internally filter marked packets. but when connbytes filter is used without mark filter
 packet ordering can be changed breaking the whole idea of desync attack.
 
-### DPI DESYNC COMBOS
+### DPI deync combos
 
 dpi-desync parameter takes up to 3 comma separated arguments.
 zero phase means tcp connection establishement (before sending data payload). Mode can be "synack".
@@ -264,7 +265,7 @@ Next phases work on packets with data payload.
 1st phase mode can be fake,rst,rstack, 2nd phase mode - disorder,disorder2,split,split2.
 Can be useful for ISPs with more than one DPI.
 
-### SYNACK MODE
+### SYNACK mode
 
 In geneva docs it's called "TCP turnaround". Attempt to make the DPI believe the roles of client and server are reversed.
 !!! This mode breaks NAT operation and can be used only if there's no NAT between the attacker's device and the DPI !
@@ -290,7 +291,7 @@ then `/etc/init.d/firewall restart`
 Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
 If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
 
-### VIRTUAL MACHINES
+### Virtual Machines
 
 Most of nfqws packet magic does not work from VMs powered byvirtualbox and vmware when network is NATed.
 Hypervisor forcibly changes ttl and does not forward fake packets.
@@ -300,13 +301,13 @@ Set up bridge networking.
 
 nfqws is equipped with minimalistic connection tracking system (conntrack)
 It's enabled if some specific DPI circumvention methods are involved.
-Currently these are --wssize and --dpi-desync-cutoff  options.
+Currently these are `--wssize` and `--dpi-desync-cutoff`  options.
 Conntrack can track connection phase : SYN,ESTABLISHED,FIN , packet counts in both directions , sequence numbers.
 It can be fed with unidirectional or bidirectional packets.
 A SYN or SYN,ACK packet creates an entry in the conntrack table.
 That's why iptables redirection must start with the first packet although can be cut later using connbytes filter.
 A connection is deleted from the table as soon as it's no more required to satisfy nfqws needs or when a timeout happens.
-There're 3 timeouts for each connection state. They can be changed in --ctrack-timeouts parameter.
+There're 3 timeouts for each connection state. They can be changed in `--ctrack-timeouts` parameter.
 
 `--wssize` changes tcp window size for the server to force it to send split replies.
 In order for this to affect all server operating systems, it is necessary to change the window size in each outgoing packet
@@ -481,7 +482,6 @@ ipfw tables can store both ipv4 and ipv6 addresses and subnets. There's no 4 and
 LISTS_RELOAD config parameter defines a custom lists reloading command.
 Its useful on BSD systems with PF.
 LISTS_RELOAD=-  disables reloading ip list backend.
-
 
 ## Domain name filtering
 
