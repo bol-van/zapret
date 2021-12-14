@@ -47,6 +47,113 @@ as it should, it is useless to deceive him.
 BUT. Only small providers can afford using squid, since it is very resource intensive.
 Large companies usually use DPI, which is designed for much greater bandwidth.
 
+## Installation
+
+### desktop linux system
+
+Simple install works on most modern linux distributions with systemd or openrc, OpenWRT and MacOS.
+Run install_easy.sh and answer its questions.
+
+### OpenWRT
+
+install_easy.sh works on openwrt but there're additional challenges.
+They are mainly about possibly low flash free space.
+Simple install will not work if it has no space to install itself and required packages from the repo.
+
+Another challenge would be to bring zapret to the router. You can download zip from github and use it.
+Do not repack zip contents in Windows, because this way you break chmod and links.
+Install openssh-sftp-server and unzip to openwrt and use sftp to transfer the file.
+
+The best way to start is to put zapret dir to /tmp and run /tmp/zapret/install_easy.sh from there.
+After installation remove /tmp/zapret to free RAM.
+
+The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extroot is recommended.
+
+
+### Android
+
+Its not possible to use nfqws and tpws in transparent proxy mode without root privileges.
+Without root tpws can run in --socks mode.
+
+I have no NFQUEUE presence statistics in stock android kernels, but its present on my MTK device.
+If NFQUEUE is present nfqws works.
+
+There's no ipset support unless you run custom kernel. In common case task of bringing up ipset
+on android is ranging from "not easy" to "almost impossible", unless you find working kernel
+image for your device.
+
+Android does not use /etc/passwd, tpws --user won't work. There's replacement.
+Use numeric uids in --uid option.
+Its recommended to use gid 3003 (AID_INET), otherwise tpws will not have inet access.
+Example : --uid 1:3003
+In iptables use : "! --uid-owner 1" instead of "! --uid-owner tpws".
+
+Write your own shell script with iptables and tpws, run it using your root manager.
+Autorun scripts are here :
+magisk  : /data/adb/service.d
+supersu : /system/su.d
+
+I haven't checked whether android can kill iptable rules at its own will during wifi connection/disconnection,
+mobile data on/off, ...
+
+How to run tpws on root-less android.
+You can't write to /system, /data, can't run from sd card.
+Selinux prevents running executables in /data/local/tmp from apps.
+Use adb and adb shell.
+mkdir /data/local/tmp/zapret
+adb push tpws /data/local/tmp/zapret
+chmod 755 /data/local/tmp/zapret /data/local/tmp/zapret/tpws
+chcon u:object_r:system_file:s0 /data/local/tmp/zapret/tpws
+Now its possible to run /data/local/tmp/zapret/tpws from any app such as tasker.
+
+
+### FreeBSD, OpenBSD, MacOS
+
+see docs/bsd.eng.txt
+
+
+### Windows (WSL)
+
+Using WSL (Windows subsystem for Linux) it's possible to run tpws in socks mode under rather new builds of
+windows 10 and windows server.
+Its not required to install any linux distributions as suggested in most articles.
+tpws is static binary. It doesn't need a distribution.
+
+Install WSL : dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all
+Copy binaries/x86_64/tpws_wsl.tgz to the target system.
+Run : wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz
+Run tpws : wsl --exec /tpws --uid=1 --no-resolve --socks --bind-addr=127.0.0.1 --port=1080 <fooling_options>
+Configure socks as 127.0.0.1:1080 in a browser or another program.
+
+Cleanup : wsl --unregister tpws
+
+Tested in windows 10 build 19041 (20.04).
+
+NOTICE. There is native windows solution GoodByeDPI. It works on packet level like nfqws.
+
+
+### Other devices
+
+Author's goal does not include easy supporting as much devices as possibles.
+Please do not ask for easy supporting firmwares. It requires a lot of work and owning lots of devices. Its counterproductive.
+As a devices owner its easier for you and should not be too hard if firmware is open.
+Most closed stock firmwares are not designed for custom usage and sometimes actively prevent it.
+In the latter case you have to hack into it and reverse engineer. Its not easy.
+Binaries are universal. They can run on almost all firmwares.
+You will need :
+ * root shell access. true sh shell, not microtik-like console
+ * startup hook
+ * r/w partition to store binaries and startup script with executable permission (+x)
+ * tpws can be run almost anywhere but nfqws require kernel support for NFQUEUE. Its missing in most firmwares.
+ * too old 2.6 kernels are unsupported and can cause errors
+If binaries crash with segfault (rare but happens on some kernels) try to unpack upx like this : upx -d tpws.
+First manually debug your scenario. Run iptables + daemon and check if its what you want.
+Write your own script with iptables magic and run required daemon from there. Put it to startup.
+Dont ask me how to do it. Its different for all firmwares and requires studying.
+Find manual or reverse engineer yourself.
+Check for race conditions. Firmware can clear or modify iptables after your startup script.
+If this is the case then run another script in background and add some delay there.
+
 ## How to put this into practice in the linux system
 
 In short, the options can be classified according to the following scheme:
@@ -656,111 +763,3 @@ And you can start or stop the demons separately from the firewall:
  /opt/zapret/init.d/sysv/zapret start-daemons
  /opt/zapret/init.d/sysv/zapret stop-daemons
 ```
-
-## Installation
-
-### desktop linux system
-
-Simple install works on most modern linux distributions with systemd or openrc, OpenWRT and MacOS.
-Run install_easy.sh and answer its questions.
-
-### OpenWRT
-
-install_easy.sh works on openwrt but there're additional challenges.
-They are mainly about possibly low flash free space.
-Simple install will not work if it has no space to install itself and required packages from the repo.
-
-Another challenge would be to bring zapret to the router. You can download zip from github and use it.
-Do not repack zip contents in Windows, because this way you break chmod and links.
-Install openssh-sftp-server and unzip to openwrt and use sftp to transfer the file.
-
-The best way to start is to put zapret dir to /tmp and run /tmp/zapret/install_easy.sh from there.
-After installation remove /tmp/zapret to free RAM.
-
-The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extroot is recommended.
-
-
-### Android
-
-Its not possible to use nfqws and tpws in transparent proxy mode without root privileges.
-Without root tpws can run in --socks mode.
-
-I have no NFQUEUE presence statistics in stock android kernels, but its present on my MTK device.
-If NFQUEUE is present nfqws works.
-
-There's no ipset support unless you run custom kernel. In common case task of bringing up ipset
-on android is ranging from "not easy" to "almost impossible", unless you find working kernel
-image for your device.
-
-Android does not use /etc/passwd, tpws --user won't work. There's replacement.
-Use numeric uids in --uid option.
-Its recommended to use gid 3003 (AID_INET), otherwise tpws will not have inet access.
-Example : --uid 1:3003
-In iptables use : "! --uid-owner 1" instead of "! --uid-owner tpws".
-
-Write your own shell script with iptables and tpws, run it using your root manager.
-Autorun scripts are here :
-magisk  : /data/adb/service.d
-supersu : /system/su.d
-
-I haven't checked whether android can kill iptable rules at its own will during wifi connection/disconnection,
-mobile data on/off, ...
-
-How to run tpws on root-less android.
-You can't write to /system, /data, can't run from sd card.
-Selinux prevents running executables in /data/local/tmp from apps.
-Use adb and adb shell.
-mkdir /data/local/tmp/zapret
-adb push tpws /data/local/tmp/zapret
-chmod 755 /data/local/tmp/zapret /data/local/tmp/zapret/tpws
-chcon u:object_r:system_file:s0 /data/local/tmp/zapret/tpws
-Now its possible to run /data/local/tmp/zapret/tpws from any app such as tasker.
-
-
-### FreeBSD, OpenBSD, MacOS
-
-see docs/bsd.eng.txt
-
-
-### Windows (WSL)
-
-Using WSL (Windows subsystem for Linux) it's possible to run tpws in socks mode under rather new builds of
-windows 10 and windows server.
-Its not required to install any linux distributions as suggested in most articles.
-tpws is static binary. It doesn't need a distribution.
-
-Install WSL : dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all
-Copy binaries/x86_64/tpws_wsl.tgz to the target system.
-Run : wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz
-Run tpws : wsl --exec /tpws --uid=1 --no-resolve --socks --bind-addr=127.0.0.1 --port=1080 <fooling_options>
-Configure socks as 127.0.0.1:1080 in a browser or another program.
-
-Cleanup : wsl --unregister tpws
-
-Tested in windows 10 build 19041 (20.04).
-
-NOTICE. There is native windows solution GoodByeDPI. It works on packet level like nfqws.
-
-
-### Other devices
-
-Author's goal does not include easy supporting as much devices as possibles.
-Please do not ask for easy supporting firmwares. It requires a lot of work and owning lots of devices. Its counterproductive.
-As a devices owner its easier for you and should not be too hard if firmware is open.
-Most closed stock firmwares are not designed for custom usage and sometimes actively prevent it.
-In the latter case you have to hack into it and reverse engineer. Its not easy.
-Binaries are universal. They can run on almost all firmwares.
-You will need :
- * root shell access. true sh shell, not microtik-like console
- * startup hook
- * r/w partition to store binaries and startup script with executable permission (+x)
- * tpws can be run almost anywhere but nfqws require kernel support for NFQUEUE. Its missing in most firmwares.
- * too old 2.6 kernels are unsupported and can cause errors
-If binaries crash with segfault (rare but happens on some kernels) try to unpack upx like this : upx -d tpws.
-First manually debug your scenario. Run iptables + daemon and check if its what you want.
-Write your own script with iptables magic and run required daemon from there. Put it to startup.
-Dont ask me how to do it. Its different for all firmwares and requires studying.
-Find manual or reverse engineer yourself.
-Check for race conditions. Firmware can clear or modify iptables after your startup script.
-If this is the case then run another script in background and add some delay there.
-
