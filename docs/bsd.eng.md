@@ -12,7 +12,7 @@ dvtws shares most of the code with nfqws and offers almost identical parameters.
 
 FreeBSD has 3 firewalls : IPFilter, ipfw and Packet Filter (PF). OpenBSD has only PF.
 
-To compile sources in FreeBSD use `make`, in OpenBSD - use `make bsd`, in MacOS - use 'make mac`.
+To compile sources in FreeBSD use `make`, in OpenBSD - use `make bsd`, in MacOS - use `make mac`.
 
 Compile all programs : `make -C /opt/zapret`
 
