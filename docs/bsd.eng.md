@@ -22,16 +22,17 @@ In FreeBSD enable PF only if you use it. Its undesirable if you don't.
 PF is enabled automatically in OpenBSD and MacOS.
 
 Divert sockets are internal type sockets in the BSD kernel. They have no relation to network addresses
-or network packet exchange. They are identified by a port number 1..65535. Its like queue number in NFQUEUE.
+or network packet exchange. They are identified by a port number `1..65535`. Its like queue number in NFQUEUE.
 Traffic can be diverted to a divert socket using firewall rule.
 If nobody listens on the specified divert port packets are dropped. Its similar to NFQUEUE without `--queue-bypass`.
 
 `ipset/*.sh` scripts work with ipfw lookup tables if ipfw is present.
 
 ipfw table is analog to linux ipset. Unlike ipsets ipfw tables share v4 an v6 addresses and subnets.
-If ipfw is absent scripts check LISTS_RELOAD config variable.
-If its present then scripts execute a command from LISTS_RELOAD.
-If LISTS_RELOAD=- scripts do not load tables even if ipfw exists.
+
+- If ipfw is absent scripts check LISTS_RELOAD config variable.
+- If its present then scripts execute a command from LISTS_RELOAD.
+- If LISTS_RELOAD=- scripts do not load tables even if ipfw exists.
 
 PF can load ip tables from a file. To use this feature with ipset/*.sh scripts disable gzip file creation
 using `GZIP_LISTS=0` directive in the `/opt/zapret/config' file.
@@ -81,7 +82,7 @@ pkill ^dvtws$
 
 To restart firewall and daemons run : `/etc/rc.d/ipfw restart`
 
-Assume LAN='em1', WAN="em0".
+Assume `LAN=em1`, `WAN="em0"`.
 
 tpws transparent mode quick start.
 
@@ -272,14 +273,20 @@ What everyone have updated long ago they keep old like a mammoth. But who cares 
 MacOS used to have ipfw but it was removed later and replaced by PF.
 It looks like divert sockets are internally replaced with raw. Its possible to request a divert socket
 but it behaves exactly as raw socket with all its BSD inherited + apple specific bugs and feature.
-The fact is that divert-packet in /etc/pf.conf does not work. pfctl binary does not contain the word 'divert'.
+The fact is that divert-packet in `/etc/pf.conf` does not work. pfctl binary does not contain the word `divert`.
+
 dvtws does compile but is useless.
 
 After some efforts tpws works. Apple has removed some important stuff from their newer SDKs (DIOCNATLOOK) making
-them undocumented and unsupported. With important definitions copied from an older SDK it was possible to make
+them undocumented and unsupported.
+
+With important definitions copied from an older SDK it was possible to make
 transparent mode working again. But this is not guaranteed to work in the future versions.
-Another MacOS unique feature is root requirement while polling /dev/pf.
-By default tpws drops root. Its necessary to specify --user=root to stay with root.
+
+Another MacOS unique feature is root requirement while polling `/dev/pf`.
+
+By default tpws drops root. Its necessary to specify `--user=root` to stay with root.
+
 In other aspects PF behaves very similar to FreeBSD and shares the same pf.conf syntax.
 
 In MacOS redirection works both for passthrough and outgoing traffic. Outgoing redirection requires route-to rule.
@@ -287,15 +294,24 @@ Because tpws is forced to run as root to avoid loop its necessary to exempt root
 That's why DPI bypass will not work for local requests from root.
 
 If you do ipv6 routing you have to get rid of "secured" ipv6 address assignment.
+
 "secured" addresses are designed to be permanent and not related to the MAC address.
+
 And they really are. Except for link-locals.
-If you just reboot the system link-locals will not change. But next day they will change. Not necessary to wait so long.
+
+If you just reboot the system link-locals will not change. But next day they will change.Not necessary to wait so long.
+
 Just change the system time to tomorrow and reboot. Link-locals will change. (at least they change in vmware guest)
 Looks like its a kernel bug. Link locals should not change. Its useless and can be harmful. Cant use LL as a gateway.
+
 The easiest solution is to disable "secured" addresses.
+
 Outgoing connections prefer randomly generated temporary addressesas like in other systems. 
-Put the string "net.inet6.send.opmode=0" to /etc/sysctl.conf.  If not present - create it.
+
+Put the string `net.inet6.send.opmode=0` to `/etc/sysctl.conf`.  If not present - create it.
+
 Then reboot the system.
+
 If you dont like this solution you can assign an additional static ipv6 address from fd00::/8 range with /128 prefix
 to your LAN interface and use it as the gateway address.
 
@@ -316,8 +332,10 @@ pfctl -ef /etc/pf.conf
 
 tpws transparent mode for both passthrough and outgoing connections. en1 - LAN.
 
+```
 ifconfig en1 | grep fe80
         inet6 fe80::bbbb:bbbb:bbbb:bbbb%en1 prefixlen 64 scopeid 0x8 
+```
 /etc/pf.conf
 ```
 rdr pass on en1 inet  proto tcp from any to any port {80,443} -> 127.0.0.1 port 988
@@ -342,13 +360,14 @@ Build from source : `make -C /opt/zapret mac`
 
 `install_easy.sh` supports MacOS
 
-Shipped precompiled binaries are built for 64-bit MacOS with -mmacosx-version-min=10.8 option.
+Shipped precompiled binaries are built for 64-bit MacOS with `-mmacosx-version-min=10.8` option.
 They should run on all supported MacOS versions.
-If no - its easy to build your own. Running 'make' automatically installs developer tools.
+If no - its easy to build your own. Running `make` automatically installs developer tools.
 
-!! Internet sharing is not supported !!
+!! **Internet sharing is not supported** !!
 Routing is supported but only manually configured through PF.
 If you enable internet sharing tpws stops functioning. When you disable internet sharing you may lose web site access.
+
 To fix : `pfctl -f /etc/pf.conf`
 
 If you need internet sharing use tpws socks mode.
@@ -378,21 +397,24 @@ Reloading PF tables :
 /opt/zapret/init.d/macos/zapret reload-fw-tables
 ```
 
-Installer configures LISTS_RELOAD in the config so `ipset/*.sh` scripts automatically reload PF tables.
+Installer configures `LISTS_RELOAD` in the config so `ipset/*.sh` scripts automatically reload PF tables.
 Installer creates cron job for `ipset/get_config.sh`, as in OpenWRT.
 
-start-fw script automatically patches `/etc/pf.conf` inserting there "zapret" anchors.
+start-fw script automatically patches `/etc/pf.conf` inserting there `zapret` anchors.
 Auto patching requires pf.conf with apple anchors preserved.
-If your pf.conf is highly customized and patching fails you will see the warning. Do not ignore it.
-In that case you need to manually insert "zapret" anchors to your pf.conf (keeping the right rule type ordering) :
+If your `pf.conf` is highly customized and patching fails you will see the warning. Do not ignore it.
+In that case you need to manually insert "zapret" anchors to your `pf.conf` (keeping the right rule type ordering) :
+```
 rdr-anchor "zapret"
 anchor "zapret"
 unistall_easy.sh unpatches pf.conf
+```
+start-fw creates 3 anchor files in `/etc/pf.anchors` : zapret,zapret-v4,zapret-v6.
 
-start-fw creates 3 anchor files in /etc/pf.anchors : zapret,zapret-v4,zapret-v6.
-Last 2 are referenced by anchor "zapret".
-Tables nozapret,nozapret6 belong to anchor "zapret".
-Tables zapret,zapret-user belong to anchor "zapret-v4".
-Tables zapret6,zapret6-user belong to anchor "zapret-v6".
-If an ip version is disabled then corresponding anchor is empty and is not referenced from the anchor "zapret".
+- Last 2 are referenced by anchor `zapret`.
+- Tables `nozapret`,`nozapret6` belong to anchor `zapret`.
+- Tables `zapret`,`zapret-user` belong to anchor `zapret-v4`.
+- Tables `zapret6`,`apret6-user` belong to anchor `zapret-v6`.
+
+If an ip version is disabled then corresponding anchor is empty and is not referenced from the anchor `zapret`.
 Tables are only created for existing list files in the ipset directory.
