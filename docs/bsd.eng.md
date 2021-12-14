@@ -1,12 +1,10 @@
-Supported versions
-------------------
+## Supported versions
 
 FreeBSD 11.x+ , OpenBSD 6.x+, partially MacOS Sierra+
 
 Older versions may work or not. pfSense is not supported.
 
-BSD features
-------------
+## BSD features
 
 BSD does not have NFQUEUE. Similar mechanism - divert sockets.
 In BSD compiling the source from nfq directory result in dvtws binary instead of nfqws.
@@ -14,25 +12,29 @@ dvtws shares most of the code with nfqws and offers almost identical parameters.
 
 FreeBSD has 3 firewalls : IPFilter, ipfw and Packet Filter (PF). OpenBSD has only PF.
 
-To compile sources in FreeBSD use 'make', in OpenBSD - use 'make bsd', in MacOS - use 'make mac'.
-Compile all programs : make -C /opt/zapret
-Compile all programs with PF support : make -C /opt/zapret CFLAGS=-DUSE_PF
+To compile sources in FreeBSD use `make`, in OpenBSD - use `make bsd`, in MacOS - use 'make mac`.
+
+Compile all programs : `make -C /opt/zapret`
+
+Compile all programs with PF support : `make -C /opt/zapret CFLAGS=-DUSE_PF`
+
 In FreeBSD enable PF only if you use it. Its undesirable if you don't.
 PF is enabled automatically in OpenBSD and MacOS.
 
 Divert sockets are internal type sockets in the BSD kernel. They have no relation to network addresses
 or network packet exchange. They are identified by a port number 1..65535. Its like queue number in NFQUEUE.
 Traffic can be diverted to a divert socket using firewall rule.
-If nobody listens on the specified divert port packets are dropped. Its similar to NFQUEUE without --queue-bypass.
+If nobody listens on the specified divert port packets are dropped. Its similar to NFQUEUE without `--queue-bypass`.
 
-ipset/*.sh scripts work with ipfw lookup tables if ipfw is present.
+`ipset/*.sh` scripts work with ipfw lookup tables if ipfw is present.
+
 ipfw table is analog to linux ipset. Unlike ipsets ipfw tables share v4 an v6 addresses and subnets.
 If ipfw is absent scripts check LISTS_RELOAD config variable.
 If its present then scripts execute a command from LISTS_RELOAD.
 If LISTS_RELOAD=- scripts do not load tables even if ipfw exists.
 
 PF can load ip tables from a file. To use this feature with ipset/*.sh scripts disable gzip file creation
-using "GZIP_LISTS=0" directive in the /opt/zapret/config file.
+using `GZIP_LISTS=0` directive in the `/opt/zapret/config' file.
 
 BSD kernel doesn't implement splice syscall. tpws uses regular recv/send operations with data copying to user space.
 Its slower but not critical.
@@ -47,33 +49,37 @@ It works for the moment but who knows. Such a usage is not very documented.
 
 mdig and ip2net are fully compatible with BSD.
 
-FreeBSD
--------
+## FreeBSD
 
 Divert sockets require special kernel module 'ipdivert'.
 Write the following to config files :
+
 /boot/loader.conf (create if absent) :
------------
+```
 ipdivert_load="YES"
 net.inet.ip.fw.default_to_accept=1
------------
+```
+
 /etc/rc.conf :
------------
+```
 firewall_enable="YES"
 firewall_script="/etc/rc.firewall.my"
------------
+```
+
 /etc/rc.firewall.my :
------------
+
+```
 ipfw -q -f flush
------------
-Later you will add ipfw commands to /etc/rc.firewall.my to be reapplied after reboot.
-You can also run zapret daemons from there. Start them with "--daemon" options, for example :
------------
+```
+
+Later you will add ipfw commands to `/etc/rc.firewall.my` to be reapplied after reboot.
+You can also run zapret daemons from there. Start them with `--daemon` options, for example :
+```
 pkill ^dvtws$
 /opt/zapret/nfq/dvtws --port=989 --daemon --dpi-desync=split2
------------
-To restart firewall and daemons run : /etc/rc.d/ipfw restart
+```
 
+To restart firewall and daemons run : `/etc/rc.d/ipfw restart`
 
 Assume LAN='em1', WAN="em0".
 
@@ -112,15 +118,19 @@ listen to that port and intercept traffic.
 dvtws quick start.
 
 For all traffic:
+```
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
+```
 
 Process only table zapret with the exception of table nozapret :
+```
 ipfw delete 100
 ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
 ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted not sockarg xmit em0
 /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
+```
 
 Reinjection loop avoidance.
 FreeBSD artificially ignores sockarg for ipv6 in the kernel.
@@ -137,18 +147,19 @@ Look for fe80:... address in ifconfig and use it for redirection target.
 4) How to set maximum table size : sysctl net.pf.request_maxcount=2000000
 5) The word 'divert-packet' is absent in the pfctl binary, divert-packet rules are not working.
 'divert-to' is not the same thing. Looks like its not possible to use dvtws with PF in FreeBSD.
+
 /etc/pf.conf
------------
+```
 rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::31c:29ff:dee2:1c4d port 988
 rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
------------
-/opt/zapret/tpws/tpws --port=988 --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force
+```
+
+`/opt/zapret/tpws/tpws --port=988 --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force`
 
 Its not clear how to do rdr-to outgoing traffic. I could not make route-to scheme work.
 
 
-OpenBSD
--------
+## OpenBSD
 
 In OpenBSD default tpws bind is ipv6 only. to bind to ipv4 specify --bind-addr=0.0.0.0
 Use --bind-addr=0.0.0.0 --bind-addr=::  to achieve the same default bind as in others OSes.
@@ -156,10 +167,11 @@ Use --bind-addr=0.0.0.0 --bind-addr=::  to achieve the same default bind as in o
 tpws for forwarded traffic only :
 
 /etc/pf.conf
-------------
+```
 pass in quick on em1 inet  proto tcp to port {80,443} rdr-to 127.0.0.1 port 988 
 pass in quick on em1 inet6 proto tcp to port {80,443} rdr-to ::1 port 988 
-------------
+```
+
 pfctl -f /etc/pf.conf
 tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
 
@@ -169,17 +181,18 @@ rdr-to support is done using /dev/pf, that's why transparent mode requires root.
 dvtws for all traffic:
 
 /etc/pf.conf
-------------
+```
 pass in  quick on em0 proto tcp from port {80,443} no state
 pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989
-------------
+```
+
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
 
 dwtws only for table zapret with the exception of table nozapret :
 
 /etc/pf.conf
-------------
+```
 set limit table-entries 2000000
 table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
 table <zapret-user> file "/opt/zapret/ipset/zapret-ip-user.txt"
@@ -197,7 +210,7 @@ pass in  quick on em0 inet6 proto tcp from <zapret6>  port {80,443} no state
 pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet port 989 no state
 pass in  quick on em0 inet6 proto tcp from <zapret6-user>  port {80,443} no state
 pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-packet port 989 no state
-------------
+```
 pfctl -f /etc/pf.conf
 ./dvtws --port=989 --dpi-desync=split2
 
@@ -224,8 +237,7 @@ After configuration is done you can put ipset script :
  write the line : 0 12 */2 * * /opt/zapret/ipset/get_config.sh
 
 
-MacOS
------
+## MacOS
 
 Initially, the kernel of this OS was based on BSD. That's why it is still BSD but a lot was modified by Apple.
 As usual a mass commercial project priorities differ from their free counterparts.
@@ -265,12 +277,12 @@ to your LAN interface and use it as the gateway address.
 tpws transparent mode only for outgoing connections.
 
 /etc/pf.conf
-------------
+```
 rdr pass on lo0 inet  proto tcp from !127.0.0.0/8 to any port {80,443} -> 127.0.0.1 port 988
 rdr pass on lo0 inet6 proto tcp from !::1 to any port {80,443} -> fe80::1 port 988
 pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} user { >root }
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
-------------
+```
 pfctl -ef /etc/pf.conf
 /opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force
 
@@ -280,27 +292,26 @@ tpws transparent mode for both passthrough and outgoing connections. en1 - LAN.
 ifconfig en1 | grep fe80
         inet6 fe80::bbbb:bbbb:bbbb:bbbb%en1 prefixlen 64 scopeid 0x8 
 /etc/pf.conf
-------------
+```
 rdr pass on en1 inet  proto tcp from any to any port {80,443} -> 127.0.0.1 port 988
 rdr pass on en1 inet6 proto tcp from any to any port {80,443} -> fe80::bbbb:bbbb:bbbb:bbbb port 988
 rdr pass on lo0 inet  proto tcp from !127.0.0.0/8 to any port {80,443} -> 127.0.0.1 port 988
 rdr pass on lo0 inet6 proto tcp from !::1 to any port {80,443} -> fe80::1 port 988
 pass out route-to (lo0 127.0.0.1) inet proto tcp from any to any port {80,443} user { >root }
 pass out route-to (lo0 fe80::1) inet6 proto tcp from any to any port {80,443} user { >root }
-------------
+```
 pfctl -ef /etc/pf.conf
 /opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
 
 
-Build from source : make -C /opt/zapret mac
+Build from source : `make -C /opt/zapret mac`
 
-ipset/*.sh scripts work.
+`ipset/*.sh` scripts work.
 
 
-MacOS easy install
-------------------
+### MacOS easy install
 
-install_easy.sh supports MacOS
+`install_easy.sh' supports MacOS
 
 Shipped precompiled binaries are built for 64-bit MacOS with -mmacosx-version-min=10.8 option.
 They should run on all supported MacOS versions.
@@ -309,25 +320,34 @@ If no - its easy to build your own. Running 'make' automatically installs develo
 !! Internet sharing is not supported !!
 Routing is supported but only manually configured through PF.
 If you enable internet sharing tpws stops functioning. When you disable internet sharing you may lose web site access.
-To fix : pfctl -f /etc/pf.conf
+To fix : `pfctl -f /etc/pf.conf`
+
 If you need internet sharing use tpws socks mode.
 
 launchd is used for autostart (/Library/LaunchDaemons/zapret.plist)
 Control script : /opt/zapret/init.d/macos/zapret
 The following commands fork with both tpws and firewall (if INIT_APPLY_FW=1 in config)
+```
 /opt/zapret/init.d/macos/zapret start
 /opt/zapret/init.d/macos/zapret stop
 /opt/zapret/init.d/macos/zapret restart
+```
 Work with tpws only :
+```
 /opt/zapret/init.d/macos/zapret start-daemons
 /opt/zapret/init.d/macos/zapret stop-daemons
 /opt/zapret/init.d/macos/zapret restart-daemons
+```
 Work with PF only :
+```
 /opt/zapret/init.d/macos/zapret start-fw
 /opt/zapret/init.d/macos/zapret stop-fw
 /opt/zapret/init.d/macos/zapret restart-fw
+```
 Reloading PF tables :
+```
 /opt/zapret/init.d/macos/zapret reload-fw-tables
+```
 
 Installer configures LISTS_RELOAD in the config so ipset/*.sh scripts automatically reload PF tables.
 Installer creates cron job for ipset/get_config.sh, as in OpenWRT.
