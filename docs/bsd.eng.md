@@ -312,7 +312,7 @@ Put the string `net.inet6.send.opmode=0` to `/etc/sysctl.conf`.  If not present 
 
 Then reboot the system.
 
-If you dont like this solution you can assign an additional static ipv6 address from fd00::/8 range with /128 prefix
+If you dont like this solution you can assign an additional static ipv6 address from `fd00::/8` range with `/128` prefix
 to your LAN interface and use it as the gateway address.
 
 tpws transparent mode only for outgoing connections.
@@ -365,6 +365,7 @@ They should run on all supported MacOS versions.
 If no - its easy to build your own. Running `make` automatically installs developer tools.
 
 !! **Internet sharing is not supported** !!
+
 Routing is supported but only manually configured through PF.
 If you enable internet sharing tpws stops functioning. When you disable internet sharing you may lose web site access.
 
@@ -372,9 +373,11 @@ To fix : `pfctl -f /etc/pf.conf`
 
 If you need internet sharing use tpws socks mode.
 
-launchd is used for autostart (/Library/LaunchDaemons/zapret.plist)
-Control script : /opt/zapret/init.d/macos/zapret
-The following commands fork with both tpws and firewall (if INIT_APPLY_FW=1 in config)
+launchd is used for autostart (`/Library/LaunchDaemons/zapret.plist`)
+
+Control script : `/opt/zapret/init.d/macos/zapret`
+
+The following commands fork with both tpws and firewall (if `INIT_APPLY_FW=1` in config)
 ```
 /opt/zapret/init.d/macos/zapret start
 /opt/zapret/init.d/macos/zapret stop
