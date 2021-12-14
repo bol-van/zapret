@@ -1,5 +1,4 @@
-What is it for
---------------
+## What is it for
 
 A stand-alone (without 3rd party servers) DPI circumvention tool.
 May allow to bypass http(s) website blocking or speed shaping, resist signature tcp protocol discovery.
@@ -10,8 +9,7 @@ blocked by Roskomnadzor), but most others are common.
 
 Mainly OpenWRT targeted but also supports traditional Linux, FreeBSD, OpenBSD, partially MacOS.
 
-How it works
-------------
+## How it works
 
 In the simplest case you are dealing with passive DPI. Passive DPI can read passthrough traffic,
 inject its own packets, but cannot drop packets.
@@ -27,17 +25,16 @@ This project is aimed at preventing the ban rather than eliminating its conseque
 To do that send what DPI does not expect and what breaks its algorithm of recognizing requests and blocking them.
 
 Some DPIs cannot recognize the http request if it is divided into TCP segments.
-For example, a request of the form "GET / HTTP / 1.1 \ r \ nHost: kinozal.tv ......"
-we send in 2 parts: first go "GET", then "/ HTTP / 1.1 \ r \ nHost: kinozal.tv .....".
-Other DPIs stumble when the "Host:" header is written in another case: for example, "host:".
-Sometimes work adding extra space after the method: "GET /" => "GET  /"
-or adding a dot at the end of the host name: "Host: kinozal.tv."
+For example, a request of the form `GET / HTTP / 1.1 \ r \ nHost: kinozal.tv ......`
+we send in 2 parts: first go "GET", then `/ HTTP / 1.1 \ r \ nHost: kinozal.tv .....`.
+Other DPIs stumble when the `Host:` header is written in another case: for example, "host:".
+Sometimes work adding extra space after the method: `GET /` => `GET  /`
+or adding a dot at the end of the host name: `Host: kinozal.tv.`
 
 There is also more advanced magic for bypassing DPI at the packet level.
 
 
-How to put this into practice in the linux system
--------------------------------------------------
+## How to put this into practice in the linux system
 
 In short, the options can be classified according to the following scheme:
 
@@ -53,15 +50,16 @@ You need to run them with the necessary parameters and redirect certain traffic 
 To redirect a TCP connection to a transparent proxy, the following commands are used:
 
 forwarded traffic :
-iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988
+`iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988`
+
 outgoing traffic :
-iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988
+`iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988`
 
 DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING chain without enabling the route_localnet parameter:
 
-sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1
+`sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1`
 
-You can use "-j REDIRECT --to-port 988" instead of DNAT, but in this case the transparent proxy process
+You can use `-j REDIRECT --to-port 988` instead of DNAT, but in this case the transparent proxy process
 should listen on the ip address of the incoming interface or on all addresses. Listen all - not good
 in terms of security. Listening one (local) is possible, but automated scripts will have to recognize it,
 then dynamically enter it into the command. In any case, additional efforts are required.
@@ -69,8 +67,10 @@ Using route_localnet can also introduce some security risks. You make available 
 bound to 127.0.0.0/8. Services are usually bound to 127.0.0.1. Its possible to deny input to 127.0.0.1 from all interfaces except lo
 or bind tpws to any other IP from 127.0.0.0/8 range, for example to 127.0.0.127, and allow incomings only to that IP :
 
+```
 iptables -A INPUT ! -i lo -d 127.0.0.127 -j ACCEPT
 iptables -A INPUT ! -i lo -d 127.0.0.0/8 -j DROP
+```
 
 Owner filter is necessary to prevent recursive redirection of connections from tpws itself.
 tpws must be started under OS user "tpws".
@@ -79,29 +79,28 @@ tpws must be started under OS user "tpws".
 NFQUEUE redirection of the outgoing traffic and forwarded traffic going towards the external interface,
 can be done with the following commands:
 
-iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -j NFQUEUE --queue-num 200 --queue-bypass
+`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -j NFQUEUE --queue-num 200 --queue-bypass`
 
 In order not to touch the traffic to unblocked addresses, you can take a list of blocked hosts, resolve it
 into IP addresses and put them to ipset 'zapret', then add a filter to the command:
 
-iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
+`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
 
 Some DPIs catch only the first http request, ignoring subsequent requests in a keep-alive session.
 Then we can reduce CPU load, refusing to process unnecessary packets.
 
-iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass
+`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
 
 Mark filter does not allow nfqws-generated packets to enter the queue again.
 Its necessary to use this filter when also using "connbytes 1:4". Without it packet ordering can be changed breaking the whole idea.
 
 
-ip6tables
----------
+## ip6tables
 
 ip6tables work almost exactly the same way as ipv4, but there are a number of important nuances.
 In DNAT, you should take the address --to in square brackets. For example :
 
- ip6tables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to [::1]:988
+ `ip6tables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to [::1]:988`
 
 The route_localnet parameter does not exist for ipv6.
 DNAT to localhost (:: 1) is possible only in the OUTPUT chain.
@@ -109,8 +108,7 @@ In the PREROUTING DNAT chain, it is possible to any global address or to the lin
 the packet came from.
 NFQUEUE works without changes.
 
-When it will not work
-----------------------
+## When it will not work
 
 * If DNS server returns false responses. ISP can return false IP addresses or not return anything
 when blocked domains are queried. If this is the case change DNS to public ones, such as 8.8.8.8 or 1.1.1.1.
@@ -123,13 +121,13 @@ as it should, it is useless to deceive him.
 BUT. Only small providers can afford using squid, since it is very resource intensive.
 Large companies usually use DPI, which is designed for much greater bandwidth.
 
-nfqws
------
+## nfqws
 
 This program is a packet modifier and a NFQUEUE queue handler.
 For BSD systems there is dvtws. Its built from the same source and has almost the same parameters (see bsd.eng.txt).
 nfqws takes the following parameters:
 
+```
  --debug=0|1				; 1=print debug info
  --qnum=<nfqueue_number>
  --wsize=<winsize>[:<scale_factor>]	; change window size in SYN,ACK packets. default is not to change scale factor (OBSOLETE !)
@@ -158,12 +156,14 @@ nfqws takes the following parameters:
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
  --dpi-desync-cutoff=N                  ; apply dpi desync only to packet numbers less than N
  --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
+```
 
 The manipulation parameters can be combined in any way.
 
-WARNING. --wsize parameter is now not used anymore in scripts. TCP split can be achieved using DPI desync attack.
+WARNING. `--wsize` parameter is now not used anymore in scripts. TCP split can be achieved using DPI desync attack.
 
-DPI DESYNC ATTACK
+### DPI DESYNC ATTACK
+
 After completion of the tcp 3-way handshake, the first data packet from the client goes.
 It usually has "GET / ..." or TLS ClientHello. We drop this packet, replacing with something else.
 It can be a fake version with another harmless but valid http or https request (fake), tcp reset packet (rst,rstack),
@@ -197,7 +197,7 @@ add tcp option "MD5 signature". All of them have their own disadvantages :
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
   If automatic solution cannot be found then use zapret-hosts-user-exclude.txt.
 
---dpi-desync-fooling takes multiple comma separated values.
+`--dpi-desync-fooling` takes multiple comma separated values.
 
 For fake,rst,rstack modes original packet can be sent after the fake one or just dropped.
 If its dropped OS will perform first retransmission after 0.2 sec, then the delay increases exponentially.
@@ -255,7 +255,8 @@ mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark wh
 nfqws can internally filter marked packets. but when connbytes filter is used without mark filter
 packet ordering can be changed breaking the whole idea of desync attack.
 
-DPI DESYNC COMBOS
+### DPI DESYNC COMBOS
+
 dpi-desync parameter takes up to 3 comma separated arguments.
 zero phase means tcp connection establishement (before sending data payload). Mode can be "synack".
 Hostlist filter is not applicable to the zero phase.
@@ -263,7 +264,8 @@ Next phases work on packets with data payload.
 1st phase mode can be fake,rst,rstack, 2nd phase mode - disorder,disorder2,split,split2.
 Can be useful for ISPs with more than one DPI.
 
-SYNACK MODE
+### SYNACK MODE
+
 In geneva docs it's called "TCP turnaround". Attempt to make the DPI believe the roles of client and server are reversed.
 !!! This mode breaks NAT operation and can be used only if there's no NAT between the attacker's device and the DPI !
 In linux it's required to remove standard firewall rule dropping INVALID packets in the OUTPUT chain,
@@ -284,13 +286,14 @@ then /etc/init.d/firewall restart
 Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
 If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
 
-VIRTUAL MACHINES
-Most of nfqws packet magic does not work from VMs powered by virtualbox and vmware when network is NATed.
+### VIRTUAL MACHINES
+
+Most of nfqws packet magic does not work from VMs powered byvirtualbox and vmware when network is NATed.
 Hypervisor forcibly changes ttl and does not forward fake packets.
 Set up bridge networking.
 
+### CONNTRACK
 
-CONNTRACK
 nfqws is equipped with minimalistic connection tracking system (conntrack)
 It's enabled if some specific DPI circumvention methods are involved.
 Currently these are --wssize and --dpi-desync-cutoff  options.
@@ -301,7 +304,7 @@ That's why iptables redirection must start with the first packet although can be
 A connection is deleted from the table as soon as it's no more required to satisfy nfqws needs or when a timeout happens.
 There're 3 timeouts for each connection state. They can be changed in --ctrack-timeouts parameter.
 
---wssize changes tcp window size for the server to force it to send split replies.
+`--wssize` changes tcp window size for the server to force it to send split replies.
 In order for this to affect all server operating systems, it is necessary to change the window size in each outgoing packet
 before sending the message, the answer to which must be split (for example, TLS ClientHello).
 That's why conntrack is required to know when to stop applying low window size.
@@ -329,19 +332,18 @@ On the other hand, the server response must not be large enough for the DPI to f
 
 Hostlist filter does not affect --wssize because it works since the connection initiation when it's not yet possible
 to extract the host name.
---wssize may slow down sites and/or increase response time. It's desired to use another methods if possible.
+`--wssize` may slow down sites and/or increase response time. It's desired to use another methods if possible.
 
---dpi-desync-cutoff allows you to set the limit on the number of the outgoing packet, at which it stops
+`--dpi-desync-cutoff` allows you to set the limit on the number of the outgoing packet, at which it stops
 applying dpi-desync. Useful with --dpi-desync-any-protocol=1.
 If the connection falls out of the conntrack and --dpi-desync-cutoff is set, dpi desync will not be applied.
 Set conntrack timeouts appropriately.
 
-
-tpws
------
+## tpws
 
 tpws is transparent proxy.
 
+```
  --debug=0|1|2			; 0(default)=silent 1=verbose 2=debug
  --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %interface_name : fe80::1%br-lan
  --bind-iface4=<interface_name> ; bind to the first ipv4 addr of interface
@@ -386,6 +388,7 @@ tpws is transparent proxy.
  --pidfile=<filename>           ; write pid to file
  --user=<username>              ; drop root privs
  --uid=uid[:gid]		; drop root privs
+```
 
 The manipulation parameters can be combined in any way.
 
@@ -397,10 +400,14 @@ Port number is always the same.
 Parameters --bind-iface* and --bind-addr create new bind.
 Other parameters --bind-* are related to the last bind.
 link local ipv6 (fe80::/8) mode selection :
+
+```
 --bind-iface6 --bind-linklocal=no : first selects private address fd00::/8, then global address
 --bind-iface6 --bind-linklocal=unwanted : first selects private address fd00::/8, then global address, then LL
 --bind-iface6 --bind-linklocal=prefer : first selects LL, then private address fd00::/8, then global address
 --bind-iface6 --bind-linklocal=force : select only LL
+```
+
 To bind to all ipv4 specify --bind-addr "0.0.0.0", all ipv6 - "::". --bind-addr="" - mean bind to all ipv4 and ipv6.
 If no binds are specified default bind to all ipv4 and ipv6 addresses is created.
 To bind to a specific link local address do : --bind-iface6=fe80::aaaa:bbbb:cccc:dddd%iface-name
@@ -419,8 +426,7 @@ if tpws serves many clients it can cause trouble. also DoS attack is possible ag
 if remote resolving causes trouble configure clients to use local name resolution and use
 --no-resolve option on tpws side.
 
-Ways to get a list of blocked IP
---------------------------------
+## Ways to get a list of blocked IP
 
 1) Enter the blocked domains to ipset/zapret-hosts-user.txt and run ipset/get_user.sh
 At the output, you get ipset/zapret-ip-user.txt with IP addresses.
@@ -473,8 +479,7 @@ Its useful on BSD systems with PF.
 LISTS_RELOAD=-  disables reloading ip list backend.
 
 
-Domain name filtering
----------------------
+## Domain name filtering
 
 An alternative to ipset is to use tpws or nfqws with a list of domains. Only one list is supported.
 
@@ -488,12 +493,10 @@ When filtering by domain name, daemons should run without filtering by ipset.
 When using large regulator lists estimate the amount of RAM on the router !
 
 
-Choosing parameters
--------------------
+## Choosing parameters
 
 The file /opt/zapret/config is used by various components of the system and contains basic settings.
 It needs to be viewed and edited if necessary.
-
 
 Main mode :
 tpws - tpws transparent mode
@@ -536,10 +539,12 @@ NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=bads
 
 Separate nfqws options for http and https and ip protocol versions 4,6:
 
+```
 NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
+```
 
 If one of NFQWS_OPT_DESYNC_HTTP/NFQWS_OPT_DESYNC_HTTPS is not defined it takes value of NFQWS_OPT_DESYNC.
 If one of NFQWS_OPT_DESYNC_HTTP6/NFQWS_OPT_DESYNC_HTTPS6 is not defined it takes value from
@@ -564,12 +569,16 @@ If not, then the parameter should be commented out.
 
 You can individually disable ipv4 or ipv6. If the parameter is commented out or not equal to "1",
 use of the protocol is permitted.
+
+```
 #DISABLE_IPV4=1
 DISABLE_IPV6=1
+```
 
 The number of threads for mdig multithreaded DNS resolver (1..100).
 The more of them, the faster, but will your DNS server be offended by hammering ?
-MDIG_THREADS=30
+
+`MDIG_THREADS=30`
 
 temp directory. Used by ipset/*.sh scripts for large lists processing.
 /tmp by default. Can be reassigned if /tmp is tmpfs and RAM is low.
@@ -585,11 +594,15 @@ On low RAM systems it can cause errors.
 Do not use too high hashsize. This way you waste your RAM. And dont use too low hashsize to avoid reallocs.
 
 ip2net options. separate for ipv4 and ipv6.
+
+```
 IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
 IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
+```
 
 Enable gzip compression for large lists. Used by ipset/*.sh scripts.
-GZIP_LISTS=1
+
+`GZIP_LISTS=1`
 
 Command to reload ip/host lists after update.
 Comment or leave empty for auto backend selection : ipset or ipfw if present.
@@ -605,19 +618,20 @@ OPENWRT_LAN="lan lan2 lan3"
 The following settings are not relevant for openwrt :
 
 If your system works as a router, then you need to enter the names of the internal and external interfaces:
+```
 IFACE_LAN = eth0
 IFACE_WAN = eth1
+```
 IMPORTANT: configuring routing, masquerade, etc. not a zapret task.
 Only modes that intercept transit traffic are enabled.
-It's possible to specify multiple interfaces like this : IFACE_LAN="eth0 eth1 eth2"
+It's possible to specify multiple interfaces like this : `IFACE_LAN="eth0 eth1 eth2"`
 
 The INIT_APPLY_FW=1 parameter enables the init script to independently apply iptables rules.
 With other values or if the parameter is commented out, the rules will not be applied.
 This is useful if you have a firewall management system, in the settings of which you should tie the rules.
 
 
-Screwing to the firewall control system or your launch system
--------------------------------------------------------------
+## Screwing to the firewall control system or your launch system
 
 If you use some kind of firewall management system, then it may conflict with an existing startup script.
 When re-applying the rules, it could break the iptables settings from the zapret.
@@ -625,23 +639,26 @@ In this case, the rules for iptables should be screwed to your firewall separate
 
 The following calls allow you to apply or remove iptables rules separately:
 
+```
  /opt/zapret/init.d/sysv/zapret start-fw
  /opt/zapret/init.d/sysv/zapret stop-fw
+```
 
 And you can start or stop the demons separately from the firewall:
 
+```
  /opt/zapret/init.d/sysv/zapret start-daemons
  /opt/zapret/init.d/sysv/zapret stop-daemons
+```
 
+## Installation
 
-Simple install to desktop linux system
---------------------------------------
+### desktop linux system
 
 Simple install works on most modern linux distributions with systemd or openrc, OpenWRT and MacOS.
 Run install_easy.sh and answer its questions.
 
-Simple install to openwrt
--------------------------
+### OpenWRT
 
 install_easy.sh works on openwrt but there're additional challenges.
 They are mainly about possibly low flash free space.
@@ -657,8 +674,7 @@ After installation remove /tmp/zapret to free RAM.
 The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extroot is recommended.
 
 
-Android
--------
+### Android
 
 Its not possible to use nfqws and tpws in transparent proxy mode without root privileges.
 Without root tpws can run in --socks mode.
@@ -695,14 +711,12 @@ chcon u:object_r:system_file:s0 /data/local/tmp/zapret/tpws
 Now its possible to run /data/local/tmp/zapret/tpws from any app such as tasker.
 
 
-FreeBSD, OpenBSD, MacOS
------------------------
+### FreeBSD, OpenBSD, MacOS
 
 see docs/bsd.eng.txt
 
 
-Windows (WSL)
--------------
+### Windows (WSL)
 
 Using WSL (Windows subsystem for Linux) it's possible to run tpws in socks mode under rather new builds of
 windows 10 and windows server.
@@ -722,8 +736,7 @@ Tested in windows 10 build 19041 (20.04).
 NOTICE. There is native windows solution GoodByeDPI. It works on packet level like nfqws.
 
 
-Other devices
--------------
+### Other devices
 
 Author's goal does not include easy supporting as much devices as possibles.
 Please do not ask for easy supporting firmwares. It requires a lot of work and owning lots of devices. Its counterproductive.
