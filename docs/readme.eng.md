@@ -185,6 +185,7 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   Some adapters/switches/drivers enable hardware filtering of rx badsum not allowing it to pass to the OS.
   This behavior was observed on a Mediatek MT7621 based device.
   Tried to modify mediatek ethernet driver with no luck, likely hardware enforced limitation.
+  However the device allowed to send badsum packets, problem only existed for passthrough traffic from clients.
 * badsum doesn't work if your device is behind NAT which does not pass invalid packets.
   Linux NAT by default does not pass them without special setting `sysctl -w net.netfilter.nf_conntrack_checksum=0`
   Openwrt sets it from the box, other routers in most cases don't, and its not always possible to change it.
