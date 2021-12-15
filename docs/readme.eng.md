@@ -834,7 +834,7 @@ You will need :
  * startup hook
  * r/w partition to store binaries and startup script with executable permission (+x)
  * tpws can be run almost anywhere but nfqws require kernel support for NFQUEUE. Its missing in most firmwares.
- * too old 2.6 kernels are unsupported and can cause errors
+ * too old 2.6 kernels are unsupported and can cause errors. newer 2.6 kernels are OK.
 If binaries crash with segfault (rare but happens on some kernels) try to unpack upx like this : upx -d tpws.
 
 First manually debug your scenario. Run iptables + daemon and check if its what you want.
