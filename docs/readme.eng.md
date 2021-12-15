@@ -465,8 +465,7 @@ To bind to a specific ip when its interface may not be configured yet do : `--bi
 
 It's possible to bind to any nonexistent address in transparent mode but in socks mode address must exist.
 
-in socks proxy mode no additional system privileges are required
-connection to local IPs of the system where tpws runs are prohibited
+In socks proxy mode no additional system privileges are required. Connections to local IPs of the system where tpws runs are prohibited.
 tpws supports remote dns resolving (curl : `--socks5-hostname`  firefox : `socks_remote_dns=true`) , but does it in blocking mode.
 
 tpws uses async sockets for all activity but resolving can break this model.
@@ -474,7 +473,7 @@ tpws uses async sockets for all activity but resolving can break this model.
 if tpws serves many clients it can cause trouble. also DoS attack is possible against tpws.
 
 if remote resolving causes trouble configure clients to use local name resolution and use
---no-resolve option on tpws side.
+`--no-resolve` option on tpws side.
 
 ## Ways to get a list of blocked IP
 
