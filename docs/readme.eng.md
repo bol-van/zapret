@@ -478,8 +478,8 @@ if remote resolving causes trouble configure clients to use local name resolutio
 
 ## Ways to get a list of blocked IP
 
-1. Enter the blocked domains to ipset/zapret-hosts-user.txt and run ipset/get_user.sh
-At the output, you get ipset/zapret-ip-user.txt with IP addresses.
+1. Enter the blocked domains to `ipset/zapret-hosts-user.txt` and run `ipset/get_user.sh`
+At the output, you get `ipset/zapret-ip-user.txt` with IP addresses.
 
 2. `ipset/get_reestr_*.sh`. Russian specific
 
