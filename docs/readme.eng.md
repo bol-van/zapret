@@ -722,6 +722,16 @@ And you can start or stop the demons separately from the firewall:
 
 ## Installation
 
+### Checking ISP
+
+Before running zapret you must discover working bypass strategy.
+`blockcheck.sh` automates this process. It first checks DNS then tries many strategies finding the working ones.
+Note that DNS check is mostly Russia targeted. It checks several pre-defined blocked in Russia domains and
+verifies system DNS answers with public DNS answers. Because ISP can block public DNS or redirect any DNS queries
+to their servers `blockcheck.sh` also checks that all returned answers are unique. Usually if DNS is blocked
+ISP returns single ip for all blocked domains to redirect you to their "access denied" page.
+`blockcheck.sh` works in Linux and FreeBSD.
+
 ### desktop linux system
 
 Simple install works on most modern linux distributions with systemd or openrc, OpenWRT and MacOS.
