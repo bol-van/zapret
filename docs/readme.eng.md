@@ -182,6 +182,9 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   System never verifies checksums of locally generated packets so nfqws will always work on the router itself.
   If you are behind another NAT, such as a ISP, and it does not pass invalid packages, there is nothing you can do about it.
   But usually ISPs pass badsum.
+  Some adapters/switches/drivers enable hardware filtering of rx badsum not allowing it to pass to the OS.
+  This behavior was observed on a Mediatek MT7621 based device.
+  Tried to modify mediatek ethernet driver with no luck, likely hardware enforced limitation.
 * badsum doesn't work if your device is behind NAT which does not pass invalid packets.
   Linux NAT by default does not pass them without special setting `sysctl -w net.netfilter.nf_conntrack_checksum=0`
   Openwrt sets it from the box, other routers in most cases don't, and its not always possible to change it.
