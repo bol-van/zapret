@@ -543,7 +543,7 @@ int main(int argc, char **argv)
 
 	params.desync_fwmark = DPI_DESYNC_FWMARK_DEFAULT;
 	params.desync_skip_nosni = true;
-	params.desync_split_pos = 3;
+	params.desync_split_pos = 2;
 	params.desync_repeats = 1;
 	params.fake_tls_size = sizeof(fake_tls_clienthello_default);
 	memcpy(params.fake_tls,fake_tls_clienthello_default,params.fake_tls_size);

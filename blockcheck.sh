@@ -419,7 +419,7 @@ pktws_check_domain_bypass()
 			s="$s --hostcase"
 			pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
 		}
-		for pos in 1 2 4 5 10 50 100; do
+		for pos in 1 3 4 5 10 50 100; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
 			if pktws_curl_test $1 $3 $s; then
 				strategy="${strategy:-$s}"

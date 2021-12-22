@@ -211,7 +211,7 @@ Disorder mode splits original packet and sends packets in the following order :
 3. 1st segment
 4. fake 1st segment, data filled with zeroes (2nd copy)
 
-Original packet is always dropped. `--dpi-desync-split-pos` sets split position (default 3).
+Original packet is always dropped. `--dpi-desync-split-pos` sets split position (default 2).
 If position is higher than packet length, pos=1 is used.
 This sequence is designed to make reconstruction of critical message as difficult as possible.
 Fake segments may not be required to bypass some DPIs, but can potentially help if more sophisticated reconstruction
