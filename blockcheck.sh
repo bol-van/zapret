@@ -352,15 +352,23 @@ curl_test()
 {
 	# $1 - test function
 	# $2 - domain
-	$1 $IPV $2 && {
-		echo '!!!!! AVAILABLE !!!!!'
-		return 0
-	}
-	local code=$?
+	local code=0 n=0
+
+	while [ $n -lt $REPEATS ]; do
+		n=$(($n+1))
+		[ $REPEATS -gt 1 ] && $ECHON "[attempt $n] "
+		$1 $IPV $2 && {
+			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
+			continue
+		}
+		code=$?
+	done
 	if [ $code = 254 ]; then
-		echo UNAVAILABLE
+		echo "UNAVAILABLE"
+	elif [ $code = 0 ]; then
+		echo '!!!!! AVAILABLE !!!!!'
 	else
-		echo UNAVAILABLE code=$code
+		echo "UNAVAILABLE code=$code"
 	fi
 	return $code
 }
@@ -638,12 +646,23 @@ ask_params()
 	CURL_OPT=
 	[ $ENABLE_HTTPS_TLS13 = 1 -o $ENABLE_HTTPS_TLS12 = 1 ] && {
 		echo
-		echo on limited systems like openwrt CA certificates might not be installed to preserve space
-		echo in such a case curl cannot verify server certificate and you should either install ca-bundle or disable verification
-		echo however disabling verification will break https check if ISP does MitM attack and substitutes server certificate
+		echo "on limited systems like openwrt CA certificates might not be installed to preserve space"
+		echo "in such a case curl cannot verify server certificate and you should either install ca-bundle or disable verification"
+		echo "however disabling verification will break https check if ISP does MitM attack and substitutes server certificate"
 		ask_yes_no_var IGNORE_CA "do not verify server certificate"
 		[ "$IGNORE_CA" = 1 ] && CURL_OPT=-k
 	}
+
+	echo
+	echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
+	$ECHON "how many times to repeat each test (default: 1) : "
+	read REPEATS
+	REPEATS=$((0+${REPEATS:-1}))
+	[ "$REPEATS" = 0 ] && {
+		echo invalid repeat count
+		exitp 1
+	}
+
 	echo
 }
 
