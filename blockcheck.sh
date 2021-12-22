@@ -463,7 +463,7 @@ pktws_check_domain_bypass()
 					break
 				}
 			done
-			for fooling in badsum md5sig badseq; do
+			for fooling in badsum badseq md5sig; do
 				s="--dpi-desync=$desync --dpi-desync-fooling=$fooling $e"
 				if pktws_curl_test $1 $3 $s ; then
 					strategy="${strategy:-$s}"
