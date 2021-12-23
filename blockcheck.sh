@@ -421,16 +421,10 @@ xxxws_curl_test_update()
 }
 pktws_curl_test_update()
 {
-	# $1 - test function
-	# $2 - domain
-	# $3,$4,$5, ... - nfqws/dvtws params
 	xxxws_curl_test_update pktws_curl_test "$@"
 }
 tpws_curl_test_update()
 {
-	# $1 - test function
-	# $2 - domain
-	# $3,$4,$5, ... - nfqws/dvtws params
 	xxxws_curl_test_update tpws_curl_test "$@"
 }
 
