@@ -404,6 +404,36 @@ pktws_curl_test()
 	echo - checking $PKTWSD $3 $4 $5 $6 $7 $8 $9
 	ws_curl_test pktws_start "$@"
 }
+xxxws_curl_test_update()
+{
+	# $1 - xxx_curl_test function
+	# $2 - test function
+	# $3 - domain
+	# $4,$5,$6, ... - nfqws/dvtws params
+	local code xxxf=$1 testf=$2 dom=$3
+	shift
+	shift
+	shift
+	$xxxf $testf $dom "$@"
+	code=$?
+	[ $code = 0 ] && strategy="${strategy:-$@}"
+	return $code
+}
+pktws_curl_test_update()
+{
+	# $1 - test function
+	# $2 - domain
+	# $3,$4,$5, ... - nfqws/dvtws params
+	xxxws_curl_test_update pktws_curl_test "$@"
+}
+tpws_curl_test_update()
+{
+	# $1 - test function
+	# $2 - domain
+	# $3,$4,$5, ... - nfqws/dvtws params
+	xxxws_curl_test_update tpws_curl_test "$@"
+}
+
 pktws_check_domain_bypass()
 {
 	# $1 - test function
@@ -414,61 +444,42 @@ pktws_check_domain_bypass()
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
-			pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+			pktws_curl_test_update $1 $3 $s
 		done
 	}
 
 	s="--dpi-desync=split2"
-	if pktws_curl_test $1 $3 $s; then
-		strategy="${strategy:-$s}"
-	else
+	pktws_curl_test_update $1 $3 $s || {
 		tests="$tests split fake,split2 fake,split"
-		[ "$sec" = 0 ] && {
-			s="$s --hostcase"
-			pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
-		}
+		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase
 		for pos in 1 3 4 5 10 50 100; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
-			if pktws_curl_test $1 $3 $s; then
-				strategy="${strategy:-$s}"
+			if pktws_curl_test_update $1 $3 $s; then
 				break
 			elif [ "$sec" = 0 ]; then
-				s="$s --hostcase"
-				pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+				pktws_curl_test_update $1 $3 $s --hostcase
 			fi
 		done
-	fi
+	}
 
-	s="--dpi-desync=disorder2"
-	if pktws_curl_test $1 $3 $s; then
-		strategy="${strategy:-$s}" 
-	else
-		tests="$tests disorder fake,disorder2 fake,disorder"
-	fi
+	pktws_curl_test_update $1 $3 --dpi-desync=disorder2 || tests="$tests disorder fake,disorder2 fake,disorder"
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
 	for e in '' '--wssize 1:6'; do
 		[ -n "$e" ] && {
-			pktws_curl_test $1 $3 $e && strategy="${strategy:-$e}"
+			pktws_curl_test_update $1 $3 $e
 			for desync in split2 disorder2; do
-				s="--dpi-desync=$desync $e"
-				pktws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
 		for desync in $tests; do
+			s="--dpi-desync=$desync"
 			for ttl in $ttls; do
-				s="--dpi-desync=$desync --dpi-desync-ttl=$ttl $e"
-				pktws_curl_test $1 $3 $s && {
-					strategy="${strategy:-$s}"
-					break
-				}
+				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=$ttl $e && break
 			done
 			for fooling in badsum badseq md5sig; do
-				s="--dpi-desync=$desync --dpi-desync-fooling=$fooling $e"
-				if pktws_curl_test $1 $3 $s ; then
-					strategy="${strategy:-$s}"
-					[ "$fooling" = "md5sig" ] && echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
-				fi
+				pktws_curl_test_update $1 $3 $s --dpi-desync-fooling=$fooling $e && [ "$fooling" = "md5sig" ] &&
+					echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
 			done
 		done
 		# do not do wssize test for http. it's useless
@@ -494,15 +505,12 @@ tpws_check_domain_bypass()
 		for s in '--hostcase' '--hostspell=hoSt' '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' \
 			'--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
 			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384'; do
-			tpws_curl_test $1 $3 $s && strategy="${strategy:-$s}"
+			tpws_curl_test_update $1 $3 $s
 		done
 	else
 		for pos in 1 2 3 4 5 10 50 100; do
 			s="--split-pos=$pos"
-			tpws_curl_test $1 $3 $s && {
-				strategy="${strategy:-$s}"
-				break
-			}
+			tpws_curl_test_update $1 $3 $s && break
 		done
 	fi
 	echo
