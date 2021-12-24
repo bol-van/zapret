@@ -480,10 +480,10 @@ pktws_check_domain_bypass()
 
 	echo
 	if [ -n "$strategy" ]; then
-		echo "!!!!! working strategy found : $PKTWSD $strategy !!!!!"
+		echo "!!!!! working strategy found for ipv${IPV} $3 : $PKTWSD $strategy !!!!!"
 		return 0
 	else
-		echo 'working strategy not found'
+		echo "strategy for ipv${IPV} $3 not found"
 		return 1
 	fi
 }
@@ -507,10 +507,10 @@ tpws_check_domain_bypass()
 	fi
 	echo
 	if [ -n "$strategy" ]; then
-		echo "!!!!! working strategy found : tpws $strategy !!!!!"
+		echo "!!!!! working strategy found for ipv${IPV} $3 : tpws $strategy !!!!!"
 		return 0
 	else
-		echo 'working strategy not found'
+		echo "strategy for ipv${IPV} $3 not found"
 		return 1
 	fi
 }
@@ -639,7 +639,7 @@ ask_params()
 		echo "with TLS 1.3 more DPI bypass strategies can work but they may not apply to all sites"
 		echo "if a strategy works with TLS 1.2 it will also work with TLS 1.3"
 		echo "if nothing works with TLS 1.2 this test may find TLS1.3 only strategies"
-		echo "make sure that $DOMAINS supports TLS 1.3 otherwise all test will return an error"
+		echo "make sure that $DOMAINS support TLS 1.3 otherwise all test will return an error"
 		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
 	else
 		echo "installed curl version does not support TLS 1.3 . tests disabled."
