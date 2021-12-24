@@ -782,11 +782,8 @@ check_dns()
 }
 
 
-sigint()
+unprepare_all()
 {
-	# make sure we are not in a middle state that impacts connectivity
-	echo
-	echo terminating...
 	[ -n "$IPV" ] && {
 		tpws_ipt_unprepare 80
 		tpws_ipt_unprepare 443
@@ -794,7 +791,22 @@ sigint()
 		pktws_ipt_unprepare 443
 	}
 	ws_kill
+}
+
+sigint()
+{
+	# make sure we are not in a middle state that impacts connectivity
+	echo
+	echo terminating...
+	unprepare_all
 	exitp 1
+}
+sigpipe()
+{
+	# make sure we are not in a middle state that impacts connectivity
+	# must not write anything here to stdout
+	unprepare_all
+	exit 1
 }
 
 check_system
@@ -804,10 +816,12 @@ check_dns
 ask_params
 
 PID=
-trap 'sigint' 2
+trap sigint INT
+trap sigpipe PIPE
 [ "$ENABLE_HTTP" = 1 ] && check_domain_http $DOMAIN
 [ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $DOMAIN
 [ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $DOMAIN
-trap - 2
+trap - PIPE
+trap - INT
 
 exitp 0
