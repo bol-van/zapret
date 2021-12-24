@@ -784,6 +784,7 @@ check_dns()
 
 unprepare_all()
 {
+	# make sure we are not in a middle state that impacts connectivity
 	[ -n "$IPV" ] && {
 		tpws_ipt_unprepare 80
 		tpws_ipt_unprepare 443
@@ -795,7 +796,6 @@ unprepare_all()
 
 sigint()
 {
-	# make sure we are not in a middle state that impacts connectivity
 	echo
 	echo terminating...
 	unprepare_all
@@ -803,7 +803,6 @@ sigint()
 }
 sigpipe()
 {
-	# make sure we are not in a middle state that impacts connectivity
 	# must not write anything here to stdout
 	unprepare_all
 	exit 1
