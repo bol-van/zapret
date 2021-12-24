@@ -784,6 +784,7 @@ check_dns()
 unprepare_all()
 {
 	# make sure we are not in a middle state that impacts connectivity
+	rm -f "$HDRTEMP"
 	[ -n "$IPV" ] && {
 		tpws_ipt_unprepare 80
 		tpws_ipt_unprepare 443
