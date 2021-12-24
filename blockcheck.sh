@@ -22,7 +22,7 @@ ZAPRET_BASE="$EXEDIR"
 HDRTEMP=/tmp/zapret-hdr.txt
 ECHON="echo -n"
 
-DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.8"
+DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
 DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to startmail.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
