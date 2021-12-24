@@ -426,6 +426,21 @@ tpws_curl_test_update()
 	xxxws_curl_test_update tpws_curl_test "$@"
 }
 
+report_strategy()
+{
+	# $1 - domain
+	# $2 - daemon
+	echo
+	if [ -n "$strategy" ]; then
+		echo "!!!!! working strategy found for ipv${IPV} $1 : $2 $strategy !!!!!"
+		echo
+		return 0
+	else
+		echo "strategy for ipv${IPV} $1 not found"
+		echo
+		return 1
+	fi
+}
 pktws_check_domain_bypass()
 {
 	# $1 - test function
@@ -477,15 +492,7 @@ pktws_check_domain_bypass()
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
-
-	echo
-	if [ -n "$strategy" ]; then
-		echo "!!!!! working strategy found for ipv${IPV} $3 : $PKTWSD $strategy !!!!!"
-		return 0
-	else
-		echo "strategy for ipv${IPV} $3 not found"
-		return 1
-	fi
+	report_strategy $3 $PKTWSD
 }
 tpws_check_domain_bypass()
 {
@@ -505,14 +512,7 @@ tpws_check_domain_bypass()
 			tpws_curl_test_update $1 $3 $s && break
 		done
 	fi
-	echo
-	if [ -n "$strategy" ]; then
-		echo "!!!!! working strategy found for ipv${IPV} $3 : tpws $strategy !!!!!"
-		return 0
-	else
-		echo "strategy for ipv${IPV} $3 not found"
-		return 1
-	fi
+	report_strategy $3 tpws
 }
 
 check_domain()
