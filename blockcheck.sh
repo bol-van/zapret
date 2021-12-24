@@ -14,7 +14,7 @@ ZAPRET_BASE="$EXEDIR"
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
 [ -n "$IPFW_RULE_NUM" ] || IPFW_RULE_NUM=1
 [ -n "$IPFW_DIVERT_PORT" ] || IPFW_DIVERT_PORT=59780
-[ -n "$DOMAIN" ] || DOMAIN=rutracker.org
+[ -n "$DOMAINS" ] || DOMAINS=rutracker.org
 [ -n "$CURL_MAX_TIME" ] || CURL_MAX_TIME=5
 [ -n "$MIN_TTL" ] || MIN_TTL=1
 [ -n "$MAX_TTL" ] || MAX_TTL=12
@@ -279,7 +279,7 @@ pktws_ipt_prepare()
 			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
 			;;
 		FreeBSD)
-			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any 80,443 out not diverted not sockarg
+			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any 80,443 proto ip${IPV} out not diverted not sockarg
 			;;
 	esac
 }
@@ -303,11 +303,7 @@ tpws_ipt_prepare()
 			IPT OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
 			;;
 		FreeBSD)
-			if [ "$IPV" = 4 ]; then
-				IPFW_ADD fwd 127.0.0.1,$TPPORT tcp from me to any 80,443 proto ip4 not uid $TPWS_UID
-			else
-				IPFW_ADD fwd ::1,$TPPORT tcp from me to any 80,443 proto ip6 not uid $TPWS_UID
-			fi
+			IPFW_ADD fwd $LOCALHOST,$TPPORT tcp from me to any 80,443 proto ip${IPV} not uid $TPWS_UID
 			;;
 	esac
 }
@@ -529,7 +525,7 @@ check_domain()
 	local code
 
 	echo
-	echo \* $1 $4
+	echo \* $1 ipv$IPV $4
 
 	# in case was interrupted before
 	pktws_ipt_unprepare $2
@@ -607,20 +603,23 @@ ask_params()
 {
 	echo
 	echo NOTE ! this test should be run with zapret or any other bypass software disabled, without VPN
+	echo
 
-	$ECHON "test this domain (default: $DOMAIN) : "
+	echo "specify domain(s) to test. multiple domains are space separated."
+	$ECHON "domain(s) (default: $DOMAINS) : "
 	local dom
 	read dom
-	[ -n "$dom" ] && DOMAIN=$dom
+	[ -n "$dom" ] && DOMAINS="$dom"
 
-	$ECHON "ip protocol version - 4 or 6 (default: 4) : "
-	read IPV
-	[ -n "$IPV" ] || IPV=4
-	[ "$IPV" = 4 -o "$IPV" = 6 ] || {
-		echo invalid ip version. should be 4 or 6.
+	$ECHON "ip protocol version(s) - 4, 6 or 46 for both (default: 4) : "
+	read IPVS
+	[ -n "$IPVS" ] || IPVS=4
+	[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
+		echo 'invalid ip version(s). should be 4, 6 or 46.'
 		exitp 1
 	}
-	configure_ip_version
+	[ "$IPVS" = 46 ] && IPVS="4 6"
+
 	configure_curl_opt
 
 	ENABLE_HTTP=1
@@ -640,7 +639,7 @@ ask_params()
 		echo "with TLS 1.3 more DPI bypass strategies can work but they may not apply to all sites"
 		echo "if a strategy works with TLS 1.2 it will also work with TLS 1.3"
 		echo "if nothing works with TLS 1.2 this test may find TLS1.3 only strategies"
-		echo "make sure that $DOMAIN supports TLS 1.3 otherwise all test will return an error"
+		echo "make sure that $DOMAINS supports TLS 1.3 otherwise all test will return an error"
 		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
 	else
 		echo "installed curl version does not support TLS 1.3 . tests disabled."
@@ -793,7 +792,6 @@ unprepare_all()
 	}
 	ws_kill
 }
-
 sigint()
 {
 	echo
@@ -817,9 +815,14 @@ ask_params
 PID=
 trap sigint INT
 trap sigpipe PIPE
-[ "$ENABLE_HTTP" = 1 ] && check_domain_http $DOMAIN
-[ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $DOMAIN
-[ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $DOMAIN
+for dom in $DOMAINS; do
+	for IPV in $IPVS; do
+		configure_ip_version
+		[ "$ENABLE_HTTP" = 1 ] && check_domain_http $dom
+		[ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $dom
+		[ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $dom
+	done
+done
 trap - PIPE
 trap - INT
 
