@@ -225,6 +225,10 @@ curl_translate_code()
 		;;
 		27) $ECHON ": out of memory"
 		;;
+		28) $ECHON ": operation timed out"
+		;;
+		35) $ECHON ": SSL connect error"
+		;;
 	esac
 }
 curl_supports_tls13()
