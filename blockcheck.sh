@@ -197,6 +197,36 @@ check_prerequisites()
 	fi
 }
 
+
+curl_translate_code()
+{
+	# $1 - code
+	$ECHON $1
+	case $1 in
+		0) $ECHON ": ok"
+		;;
+		1) $ECHON ": unsupported protocol"
+		;;
+		2) $ECHON ": early initialization code failed"
+		;;
+		3) $ECHON ": the URL was not properly formatted"
+		;;
+		4) $ECHON ": feature not supported by libcurl"
+		;;
+		5) $ECHON ": could not resolve proxy"
+		;;
+		6) $ECHON ": could not resolve host"
+		;;
+		7) $ECHON ": could not connect"
+		;;
+		8) $ECHON ": invalid server reply"
+		;;
+		9) $ECHON ": remote access denied"
+		;;
+		27) $ECHON ": out of memory"
+		;;
+	esac
+}
 curl_supports_tls13()
 {
 	curl --tlsv1.3 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
@@ -426,18 +456,37 @@ tpws_curl_test_update()
 	xxxws_curl_test_update tpws_curl_test "$@"
 }
 
+report_append()
+{
+	NREPORT=${NREPORT:-0}
+	eval REPORT_${NREPORT}=\"$@\"
+	NREPORT=$(($NREPORT+1))
+}
+report_print()
+{
+	local n=0 s
+	NREPORT=${NREPORT:-0}
+	while [ $n -lt $NREPORT ]; do
+		eval s=\"\${REPORT_$n}\"
+		echo $s
+		n=$(($n+1))
+	done
+}
 report_strategy()
 {
-	# $1 - domain
-	# $2 - daemon
+	# $1 - test function
+	# $2 - domain
+	# $3 - daemon
 	echo
 	if [ -n "$strategy" ]; then
-		echo "!!!!! working strategy found for ipv${IPV} $1 : $2 $strategy !!!!!"
+		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
+		report_append "ipv${IPV} $2 $1 : $3 $strategy"
 		return 0
 	else
-		echo "strategy for ipv${IPV} $1 not found"
+		echo "$1: $3 strategy for ipv${IPV} $2 not found"
 		echo
+		report_append "ipv${IPV} $2 $1 : $3 not working"
 		return 1
 	fi
 }
@@ -492,7 +541,7 @@ pktws_check_domain_bypass()
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
-	report_strategy $3 $PKTWSD
+	report_strategy $1 $3 $PKTWSD
 }
 tpws_check_domain_bypass()
 {
@@ -512,7 +561,7 @@ tpws_check_domain_bypass()
 			tpws_curl_test_update $1 $3 $s && break
 		done
 	fi
-	report_strategy $3 tpws
+	report_strategy $1 $3 tpws
 }
 
 check_domain()
@@ -533,10 +582,16 @@ check_domain()
 	ws_kill
 
 	echo "- checking without DPI bypass"
-	curl_test $1 $4 && return
+	curl_test $1 $4 && {
+		report_append "ipv${IPV} $4 $1 : working without bypass"
+		return
+	}
 	code=$?
 	for c in 1 2 3 4 6 27 ; do
-		[ $code = $c ] && return
+		[ $code = $c ] && {
+			report_append "ipv${IPV} $4 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
+			return
+		}
 	done
 
 	echo
@@ -807,6 +862,7 @@ sigpipe()
 	exit 1
 }
 
+
 check_system
 check_prerequisites
 require_root
@@ -814,6 +870,7 @@ check_dns
 ask_params
 
 PID=
+NREPORT=
 trap sigint INT
 trap sigpipe PIPE
 for dom in $DOMAINS; do
@@ -826,5 +883,9 @@ for dom in $DOMAINS; do
 done
 trap - PIPE
 trap - INT
+
+echo
+echo \* SUMMARY
+report_print
 
 exitp 0
