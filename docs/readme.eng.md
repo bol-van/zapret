@@ -148,6 +148,8 @@ nfqws takes the following parameters:
  --dpi-desync-repeats=<N>               ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for split* and disorder* only) split TCP packet at specified position
+ --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default -10000
+ --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default -65000
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
  --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
