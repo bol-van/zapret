@@ -494,6 +494,8 @@ static void exithelp()
 		" --dpi-desync-repeats=<N>\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%u>\t; TCP packet split position\n"
+		" --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default %d\n"
+		" --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
@@ -503,7 +505,8 @@ static void exithelp()
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
-		DPI_DESYNC_MAX_FAKE_LEN
+		DPI_DESYNC_MAX_FAKE_LEN,
+		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT
 	);
 	exit(1);
 }
@@ -554,6 +557,8 @@ int main(int argc, char **argv)
 	params.ctrack_t_est = CTRACK_T_EST;
 	params.ctrack_t_fin = CTRACK_T_FIN;
 	params.desync_ttl6 = 0xFF; // unused
+	params.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
+	params.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
 
 	if (can_drop_root()) // are we root ?
 	{
@@ -597,11 +602,13 @@ int main(int argc, char **argv)
 		{"dpi-desync-repeats",required_argument,0,0},	// optidx=20
 		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=21
 		{"dpi-desync-split-pos",required_argument,0,0},// optidx=22
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=23
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=24
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=25
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=26
-		{"hostlist",required_argument,0,0},		// optidx=27
+		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=23
+		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=24
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=25
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=26
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=27
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=28
+		{"hostlist",required_argument,0,0},		// optidx=29
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -816,10 +823,30 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 23: /* dpi-desync-any-protocol */
+		case 23: /* dpi-desync-badseq-increments */
+			if ((optarg[0]=='0' && optarg[1]=='x' || optarg[0]=='-' && optarg[1]=='0' && optarg[2]=='x') && sscanf(optarg+2+(optarg[0]=='-'), "%X", (int32_t*)&params.desync_badseq_increment))
+			{
+				if (optarg[0]=='-') params.desync_badseq_increment = -params.desync_badseq_increment;
+			} else if (!sscanf(optarg, "%d", (int32_t*)&params.desync_badseq_increment))
+			{
+				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
+				exit_clean(1);
+			}
+			break;
+		case 24: /* dpi-desync-badack-increment */
+			if ((optarg[0]=='0' && optarg[1]=='x' || optarg[0]=='-' && optarg[1]=='0' && optarg[2]=='x') && sscanf(optarg+2+(optarg[0]=='-'), "%X", (int32_t*)&params.desync_badseq_ack_increment))
+			{
+				if (optarg[0]=='-') params.desync_badseq_ack_increment = -params.desync_badseq_ack_increment;
+			} else if (!sscanf(optarg, "%d", (int32_t*)&params.desync_badseq_ack_increment))
+			{
+				fprintf(stderr, "dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
+				exit_clean(1);
+			}
+			break;
+		case 25: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 24: /* dpi-desync-fake-http */
+		case 26: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
 			if (!load_file_nonempty(optarg,params.fake_http,&params.fake_http_size))
 			{
@@ -827,7 +854,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 25: /* dpi-desync-fake-tls */
+		case 27: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
 			if (!load_file_nonempty(optarg,params.fake_tls,&params.fake_tls_size))
 			{
@@ -835,14 +862,14 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 26: /* desync-cutoff */
+		case 28: /* desync-cutoff */
 			if (!sscanf(optarg, "%u", &params.desync_cutoff))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 27: /* hostlist */
+		case 29: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

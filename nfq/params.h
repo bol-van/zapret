@@ -17,6 +17,9 @@
 
 #define Q_MAXLEN	1024		// in packets
 
+#define BADSEQ_INCREMENT_DEFAULT 	-10000
+#define BADSEQ_ACK_INCREMENT_DEFAULT 	-65000
+
 struct params_s
 {
 	bool debug;
@@ -37,6 +40,7 @@ struct params_s
 	uint8_t desync_ttl, desync_ttl6;
 	uint8_t desync_tcp_fooling_mode;
 	uint32_t desync_fwmark; // unused in BSD
+	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
 	char hostfile[256];
 	strpool *hostlist;
 	uint8_t fake_http[1460],fake_tls[1460];

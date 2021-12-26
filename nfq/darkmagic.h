@@ -31,6 +31,8 @@ bool prepare_tcp_segment4(
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
+	uint32_t badseq_increment,
+	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 bool prepare_tcp_segment6(
@@ -42,6 +44,8 @@ bool prepare_tcp_segment6(
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
+	uint32_t badseq_increment,
+	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 bool prepare_tcp_segment(
@@ -53,6 +57,8 @@ bool prepare_tcp_segment(
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t fooling,
+	uint32_t badseq_increment,
+	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 
