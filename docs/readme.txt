@@ -201,6 +201,7 @@ nfqws
  --dpi-desync-any-protocol=0|1		; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
  --dpi-desync-fake-http=<filename>	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-tls=<filename>	; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
+ --dpi-desync-fake-unknown=<filename>	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
  --dpi-desync-cutoff=N                  ; применять dpi desync только к исходящим пакетам по номеру меньше N
  --hostlist=<filename>			; применять дурение только к хостам из листа
 

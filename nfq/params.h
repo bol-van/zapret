@@ -43,8 +43,8 @@ struct params_s
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
 	char hostfile[256];
 	strpool *hostlist;
-	uint8_t fake_http[1460],fake_tls[1460];
-	size_t fake_http_size,fake_tls_size;
+	uint8_t fake_http[1432],fake_tls[1432],fake_unknown[1432];
+	size_t fake_http_size,fake_tls_size,fake_unknown_size;
 	bool droproot;
 	uid_t uid;
 	gid_t gid;

@@ -499,6 +499,7 @@ static void exithelp()
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-cutoff=N\t\t\t; apply dpi desync only to packet numbers less than N\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN,
@@ -552,6 +553,7 @@ int main(int argc, char **argv)
 	memcpy(params.fake_tls,fake_tls_clienthello_default,params.fake_tls_size);
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
+	params.fake_unknown_size = 256;
 	params.wscale=-1; // default - dont change scale factor (client)
 	params.ctrack_t_syn = CTRACK_T_SYN;
 	params.ctrack_t_est = CTRACK_T_EST;
@@ -607,8 +609,9 @@ int main(int argc, char **argv)
 		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=25
 		{"dpi-desync-fake-http",required_argument,0,0},// optidx=26
 		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=27
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=28
-		{"hostlist",required_argument,0,0},		// optidx=29
+		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=28
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=29
+		{"hostlist",required_argument,0,0},		// optidx=30
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -862,14 +865,22 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 28: /* desync-cutoff */
+		case 28: /* dpi-desync-fake-unknown */
+			params.fake_unknown_size = sizeof(params.fake_unknown);
+			if (!load_file_nonempty(optarg,params.fake_unknown,&params.fake_unknown_size))
+			{
+				fprintf(stderr, "could not read %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
+		case 29: /* desync-cutoff */
 			if (!sscanf(optarg, "%u", &params.desync_cutoff))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 29: /* hostlist */
+		case 30: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

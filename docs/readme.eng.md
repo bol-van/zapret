@@ -153,6 +153,7 @@ nfqws takes the following parameters:
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
  --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
+ --dpi-desync-fake-unknown=<filename>   ; file containing unknown protocol fake payload. default is 256 zeroes
  --dpi-desync-cutoff=N                  ; apply dpi desync only to packet numbers less than N
  --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
 ```

@@ -230,8 +230,8 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		{
 			if (!params.desync_any_proto) return res;
 			DLOG("applying tampering to unknown protocol\n")
-			fake = zeropkt;
-			fake_size = 256;
+			fake = params.fake_unknown;
+			fake_size = params.fake_unknown_size;
 		}
 
 		if (bHaveHost)
