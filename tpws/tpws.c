@@ -348,7 +348,7 @@ void parse_params(int argc, char *argv[])
 		case 13: /* uid */
 			params.gid=0x7FFFFFFF; // default git. drop gid=0
 			params.droproot = true;
-			if (!sscanf(optarg,"%u:%u",&params.uid,&params.gid))
+			if (sscanf(optarg,"%u:%u",&params.uid,&params.gid)<1)
 			{
 				fprintf(stderr, "--uid should be : uid[:gid]\n");
 				exit_clean(1);

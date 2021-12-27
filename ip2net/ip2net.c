@@ -184,7 +184,7 @@ static void parse_params(int argc, char *argv[])
 		case 4:
 			i = sscanf(optarg,"%u-%u",&plen1,&plen2);
 			if (i == 1) plen2 = plen1;
-			if (!i || plen2<plen1 || !plen1 || !plen2)
+			if (i<=0 || plen2<plen1 || !plen1 || !plen2)
 			{
 				fprintf(stderr, "invalid parameter for prefix-length : %s\n", optarg);
 				exit(1);
@@ -245,17 +245,15 @@ int main(int argc, char **argv)
 				{
 					// we have subnet ip6/y
 					// output it as is
-					*s = d;
-					if (sscanf(s + 1, "%u", &zct) && zct!=128)
+					if (sscanf(s + 1, "%u", &zct)==1 && zct!=128)
 					{
-						if (zct<128) printf("%s\n", str);
+						if (zct<128) printf("%s/%u\n", str, zct);
 						continue;
 					}
 				}
 				else if (d=='-')
 				{
-					*s = d;
-					if (inet_pton(AF_INET6, s+1, &a)) printf("%s\n", str);
+					if (inet_pton(AF_INET6, s+1, &a)) printf("%s-%s\n", str, s+1);
 					continue;
 				}
 				if (ipct >= iplist_size)

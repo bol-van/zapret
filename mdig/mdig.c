@@ -204,7 +204,7 @@ static void *t_resolver(void *arg)
 					bool mask_needed = false;
 					if (s_mask)
 					{
-						if (sscanf(s_mask, "%u", &mask))
+						if (sscanf(s_mask, "%u", &mask)==1)
 						{
 							switch (family)
 							{
