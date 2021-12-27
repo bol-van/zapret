@@ -49,8 +49,10 @@ typedef struct
 	t_connstate state;
 	time_t t_start, t_last;
 	uint32_t seq0, ack0;			// starting seq and ack
-	uint32_t seq_last, ack_last;		// current seq and ack
+	uint32_t seq_last, ack_last;		// last seen seq and ack
+	uint32_t pos_orig, pos_reply;		// seq_last+payload, ack_last+payload
 	uint64_t pcounter_orig, pcounter_reply;	// packet counter
+	uint64_t pdcounter_orig, pdcounter_reply; // data packet counter (with payload)
 	uint16_t winsize_orig, winsize_reply;	// last seen window size
 	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
 

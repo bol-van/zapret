@@ -473,7 +473,7 @@ static void exithelp()
 		" --uid=uid[:gid]\t\t\t; drop root privs\n"
 		" --wsize=<window_size>[:<scale_factor>]\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
-		" --wssize-cutoff=N\t\t\t; apply server wsize only to packet numbers less than N\n"
+		" --wssize-cutoff=[n|d|s]N\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --ctrack-timeouts=S:E:F\t\t; internal conntrack timeouts for SYN, ESTABLISHED and FIN stage. default %u:%u:%u\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
@@ -500,7 +500,7 @@ static void exithelp()
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
 		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
-		" --dpi-desync-cutoff=N\t\t\t; apply dpi desync only to packet numbers less than N\n"
+		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
@@ -532,6 +532,23 @@ static void exit_clean(int code)
 	exit(code);
 }
 
+static bool parse_cutoff(const char *opt, unsigned int *value, char *mode)
+{
+	*mode = (*opt=='n' || *opt=='d' || *opt=='s') ? *opt++ : 'n';
+	return sscanf(opt, "%u", value)>0;
+}
+static bool parse_badseq_increment(const char *opt, uint32_t *value)
+{
+	if ((opt[0]=='0' && opt[1]=='x' || opt[0]=='-' && opt[1]=='0' && opt[2]=='x') && sscanf(opt+2+(opt[0]=='-'), "%X", (int32_t*)value)>0)
+	{
+		if (opt[0]=='-') params.desync_badseq_increment = -params.desync_badseq_increment;
+		return true;
+	}
+	else
+	{
+		return sscanf(opt, "%d", (int32_t*)value)>0;
+	}
+}
 int main(int argc, char **argv)
 {
 	int result, v;
@@ -561,6 +578,7 @@ int main(int argc, char **argv)
 	params.desync_ttl6 = 0xFF; // unused
 	params.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
 	params.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
+	params.wssize_cutoff_mode = params.desync_cutoff_mode = 'n'; // packet number by default
 
 	if (can_drop_root()) // are we root ?
 	{
@@ -666,7 +684,7 @@ int main(int argc, char **argv)
 		case 5: /* uid */
 			params.gid = 0x7FFFFFFF; // default gid. drop gid=0
 			params.droproot = true;
-			if (!sscanf(optarg, "%u:%u", &params.uid, &params.gid))
+			if (sscanf(optarg, "%u:%u", &params.uid, &params.gid)<1)
 			{
 				fprintf(stderr, "--uid should be : uid[:gid]\n");
 				exit_clean(1);
@@ -681,7 +699,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			break;
 		case 8: /* wssize-cutoff */
-			if (!sscanf(optarg, "%u", &params.wssize_cutoff))
+			if (!parse_cutoff(optarg, &params.wssize_cutoff, &params.wssize_cutoff_mode))
 			{
 				fprintf(stderr, "invalid wssize-cutoff value\n");
 				exit_clean(1);
@@ -753,7 +771,7 @@ int main(int argc, char **argv)
 		case 15: /* dpi-desync-fwmark/dpi-desync-sockarg */
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 			params.desync_fwmark = 0;
-			if (!sscanf(optarg, "0x%X", &params.desync_fwmark)) sscanf(optarg, "%u", &params.desync_fwmark);
+			if (sscanf(optarg, "0x%X", &params.desync_fwmark)<=0) sscanf(optarg, "%u", &params.desync_fwmark);
 			if (!params.desync_fwmark)
 			{
 				fprintf(stderr, "fwmark/sockarg should be decimal or 0xHEX and should not be zero\n");
@@ -827,20 +845,15 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 23: /* dpi-desync-badseq-increments */
-			if ((optarg[0]=='0' && optarg[1]=='x' || optarg[0]=='-' && optarg[1]=='0' && optarg[2]=='x') && sscanf(optarg+2+(optarg[0]=='-'), "%X", (int32_t*)&params.desync_badseq_increment))
-			{
-				if (optarg[0]=='-') params.desync_badseq_increment = -params.desync_badseq_increment;
-			} else if (!sscanf(optarg, "%d", (int32_t*)&params.desync_badseq_increment))
+			if (!parse_badseq_increment(optarg,&params.desync_badseq_increment))
 			{
 				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
+printf("FFF %08X\n", params.desync_badseq_increment);
 			break;
 		case 24: /* dpi-desync-badack-increment */
-			if ((optarg[0]=='0' && optarg[1]=='x' || optarg[0]=='-' && optarg[1]=='0' && optarg[2]=='x') && sscanf(optarg+2+(optarg[0]=='-'), "%X", (int32_t*)&params.desync_badseq_ack_increment))
-			{
-				if (optarg[0]=='-') params.desync_badseq_ack_increment = -params.desync_badseq_ack_increment;
-			} else if (!sscanf(optarg, "%d", (int32_t*)&params.desync_badseq_ack_increment))
+			if (!parse_badseq_increment(optarg,&params.desync_badseq_ack_increment))
 			{
 				fprintf(stderr, "dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
@@ -874,7 +887,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 29: /* desync-cutoff */
-			if (!sscanf(optarg, "%u", &params.desync_cutoff))
+			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);

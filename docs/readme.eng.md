@@ -129,7 +129,7 @@ nfqws takes the following parameters:
  --qnum=<nfqueue_number>
  --wsize=<winsize>[:<scale_factor>]	; change window size in SYN,ACK packets. default is not to change scale factor (OBSOLETE !)
  --wssize=<winsize>[:<scale_factor>]	; change window size in outgoing packets. default scale factor is 0. (see CONNTRACK)
- --wssize-cutoff=N                      ; apply server wsize only to packet numbers less than N
+ --wssize-cutoff=[n|d|s]N               ; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --ctrack-timeouts=S:E:F                ; internal conntrack timeouts for SYN, ESTABLISHED and FIN stages. default 60:300:60
  --hostcase           			; change Host: => host:
  --hostspell=HoSt      			; exact spelling of the "Host" header. must be 4 chars. default is "host"
@@ -154,7 +154,7 @@ nfqws takes the following parameters:
  --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
  --dpi-desync-fake-unknown=<filename>   ; file containing unknown protocol fake payload. default is 256 zeroes
- --dpi-desync-cutoff=N                  ; apply dpi desync only to packet numbers less than N
+ --dpi-desync-cutoff=[n|d|s]N           ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
 ```
 
@@ -337,9 +337,10 @@ Linux can overcome this using connbytes filter but other OS may not include simi
 
 In http(s) case wssize stops after the first http request or TLS ClientHello.
 
-If you deal with a non-http(s) protocol you need `--wssize-cutoff`. It sets the number of the outgoing packet where wssize stops.
+If you deal with a non-http(s) protocol you need `--wssize-cutoff`. It sets the threshold where wssize stops.
 
-(numbering starts from 1). 
+Threshold can be prefixed with 'n' (packet number starting from 1), 'd' (data packet number starting from 1), 
+'s' (relative sequence number - sent by client bytes + 1).
 
 If a http request or TLS ClientHello packet is detected wssize stops immediately ignoring wssize-cutoff option.
 
@@ -373,8 +374,9 @@ to extract the host name.
 
 `--wssize` may slow down sites and/or increase response time. It's desired to use another methods if possible.
 
-`--dpi-desync-cutoff` allows you to set the limit on the number of the outgoing packet, at which it stops
-applying dpi-desync. Useful with `--dpi-desync-any-protocol=1`.
+`--dpi-desync-cutoff` allows you to set the threshold at which it stops applying dpi-desync.
+Can be prefixed with 'n', 'd', 's' symbol the same way as `--wssize-cutoff`.
+Useful with `--dpi-desync-any-protocol=1`.
 If the connection falls out of the conntrack and --dpi-desync-cutoff is set, dpi desync will not be applied.
 
 Set conntrack timeouts appropriately.

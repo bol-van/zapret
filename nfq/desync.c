@@ -106,14 +106,29 @@ static bool rawsend_rep(const struct sockaddr* dst,uint32_t fwmark,const void *d
 }
 
 
+static uint64_t cutoff_get_limit(t_ctrack *ctrack, char mode)
+{
+	switch(mode)
+	{
+		case 'n': return ctrack->pcounter_orig;
+		case 'd': return ctrack->pdcounter_orig;
+		case 's': return ctrack->seq_last - ctrack->seq0;
+		default: return 0;
+	}
+}
+static bool cutoff_test(t_ctrack *ctrack, uint64_t cutoff, char mode)
+{
+	return cutoff && cutoff_get_limit(ctrack, mode)>=cutoff;
+}
 static void maybe_cutoff(t_ctrack *ctrack)
 {
 	if (ctrack)
 	{
-		ctrack->b_wssize_cutoff |= params.wssize_cutoff && ctrack->pcounter_orig>=params.wssize_cutoff;
-		ctrack->b_desync_cutoff |= params.desync_cutoff && ctrack->pcounter_orig>=params.desync_cutoff;
-		
-		ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && !params.desync_cutoff;
+		ctrack->b_wssize_cutoff |= cutoff_test(ctrack, params.wssize_cutoff, params.wssize_cutoff_mode);
+		ctrack->b_desync_cutoff |= cutoff_test(ctrack, params.desync_cutoff, params.desync_cutoff_mode);
+
+		// we do not need conntrack entry anymore if all cutoff conditions are either not defined or reached
+		ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && (!params.desync_cutoff || ctrack->b_desync_cutoff);
 	}
 }
 static void wssize_cutoff(t_ctrack *ctrack)
@@ -146,6 +161,9 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, len_payload, &ctrack, &bReverse))
 			maybe_cutoff(ctrack);
 	}
+
+	//ConntrackPoolDump(&params.conntrack);
+
 	if (params.wsize && tcp_synack_segment(tcphdr))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
@@ -154,10 +172,25 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 
 	if (bReverse) return res; // nothing to do. do not waste cpu
 
-	if (params.wssize && (ctrack && !ctrack->b_wssize_cutoff))
+	if (params.wssize)
 	{
-		tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
-		res=modify;
+		if (ctrack)
+		{
+			if (ctrack->b_wssize_cutoff)
+			{
+				DLOG("not changing wssize. wssize-cutoff reached\n");
+			}
+			else
+			{
+				if (params.wssize_cutoff) DLOG("wssize-cutoff not reached (mode %c): %llu/%u\n", params.wssize_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.wssize_cutoff_mode), params.wssize_cutoff);
+				tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
+				res=modify;
+			}
+		}
+		else
+		{
+			DLOG("not changing wssize. wssize is set but conntrack entry is missing\n");
+		}
 	}
 
 	if (params.desync_mode0!=DESYNC_NONE || params.desync_mode!=DESYNC_NONE) // save some cpu
@@ -186,6 +219,24 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 			return res;
 	}
 
+	if (params.desync_cutoff)
+	{
+		if (ctrack)
+		{
+			if (ctrack->b_desync_cutoff)
+			{
+				DLOG("not desyncing. desync-cutoff reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+				return res;
+			}
+			DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+		}
+		else
+		{
+			DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
+			return res;
+		}
+	}
+
 	if (!params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
 
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)
@@ -200,6 +251,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		if ((bIsHttp = IsHttp(data_payload,len_payload)))
 		{
 			DLOG("packet contains HTTP request\n")
+			if (params.wssize) DLOG("forced wssize-cutoff\n");
 			wssize_cutoff(ctrack);
 			fake = params.fake_http;
 			fake_size = params.fake_http_size;
@@ -213,6 +265,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		else if (IsTLSClientHello(data_payload,len_payload))
 		{
 			DLOG("packet contains TLS ClientHello\n")
+			if (params.wssize) DLOG("forced wssize-cutoff\n");
 			wssize_cutoff(ctrack);
 			fake = params.fake_tls;
 			fake_size = params.fake_tls_size;
@@ -280,16 +333,6 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		}
 
 		if (params.desync_mode==DESYNC_NONE) return res;
-		if (ctrack && ctrack->b_desync_cutoff)
-		{
-			DLOG("not desyncing. cutoff reached : %llu/%u\n", (unsigned long long)ctrack->pcounter_orig, params.desync_cutoff);
-			return res;
-		}
-		if (!ctrack && params.desync_cutoff)
-		{
-			DLOG("not desyncing. desync_cutoff is set but conntrack entry is missing\n");
-			return res;
-		}
 
 		if (params.debug)
 		{

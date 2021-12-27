@@ -25,6 +25,7 @@ struct params_s
 	bool debug;
 	uint16_t wsize,wssize;
 	uint8_t wscale,wsscale;
+	char wssize_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int wssize_cutoff;
 #ifdef __linux__
 	int qnum;
@@ -36,6 +37,7 @@ struct params_s
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	int desync_repeats,desync_split_pos;
+	char desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;
 	uint8_t desync_tcp_fooling_mode;

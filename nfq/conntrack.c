@@ -150,18 +150,22 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 	scale = tcp_find_scale_factor(tcphdr);
 	if (bReverse)
 	{
-		t->seq_last = htonl(tcphdr->th_ack);
-		t->ack_last = htonl(tcphdr->th_seq) + len_payload;
+		t->pos_orig = t->seq_last = htonl(tcphdr->th_ack);
+		t->ack_last = htonl(tcphdr->th_seq);
+		t->pos_reply = t->ack_last + len_payload;
 		t->pcounter_reply++;
+		t->pdcounter_reply+=!!len_payload;
 		t->winsize_reply = htons(tcphdr->th_win);
 		if (scale!=SCALE_NONE) t->scale_reply = scale;
 		
 	}
 	else
 	{
-		t->seq_last = htonl(tcphdr->th_seq) + len_payload;
-		t->ack_last = htonl(tcphdr->th_ack);
+		t->seq_last = htonl(tcphdr->th_seq);
+		t->pos_orig = t->seq_last + len_payload;
+		t->pos_reply = t->ack_last = htonl(tcphdr->th_ack);
 		t->pcounter_orig++;
+		t->pdcounter_orig+=!!len_payload;
 		t->winsize_orig = htons(tcphdr->th_win);
 		if (scale!=SCALE_NONE) t->scale_orig = scale;
 	}
@@ -276,12 +280,14 @@ void ConntrackPoolPurge(t_conntrack *p)
 	HASH_ITER(hh, p, t, tmp) { \
 		*sa1=0; inet_ntop(AF_INET##f, &t->conn.e1.adr, sa1, sizeof(sa1)); \
 		*sa2=0; inet_ntop(AF_INET##f, &t->conn.e2.adr, sa2, sizeof(sa2)); \
-		printf("[%s]:%u => [%s]:%u : %s : t0=%llu last=t0+%llu now=last+%llu packets_orig=%llu packets_reply=%llu seq0=%u rseq=%u ack0=%u rack=%u wsize_orig=%u:%d wsize_reply=%u:%d  cutoff=%u wss_cutoff=%u d_cutoff=%u\n", \
+		printf("[%s]:%u => [%s]:%u : %s : t0=%llu last=t0+%llu now=last+%llu packets_orig=d%llu/n%llu packets_reply=d%llu/n%llu seq0=%u rseq=%u pos_orig=%u ack0=%u rack=%u pos_reply=%u wsize_orig=%u:%d wsize_reply=%u:%d  cutoff=%u wss_cutoff=%u d_cutoff=%u\n", \
 			sa1, t->conn.e1.port, sa2, t->conn.e2.port, \
 			connstate_s[t->track.state], \
 			(unsigned long long)t->track.t_start, (unsigned long long)(t->track.t_last - t->track.t_start), (unsigned long long)(tnow - t->track.t_last), \
-			(unsigned long long)t->track.pcounter_orig, (unsigned long long)t->track.pcounter_reply, \
-			t->track.seq0, t->track.seq_last - t->track.seq0, t->track.ack0, t->track.ack_last - t->track.ack0, \
+			(unsigned long long)t->track.pdcounter_orig, (unsigned long long)t->track.pcounter_orig, \
+			(unsigned long long)t->track.pdcounter_reply, (unsigned long long)t->track.pcounter_reply,\
+			t->track.seq0, t->track.seq_last - t->track.seq0, t->track.pos_orig - t->track.seq0, \
+			t->track.ack0, t->track.ack_last - t->track.ack0, t->track.pos_reply - t->track.ack0, \
 			t->track.winsize_orig, t->track.scale_orig==SCALE_NONE ? -1 : t->track.scale_orig, \
 			t->track.winsize_reply, t->track.scale_reply==SCALE_NONE ? -1 : t->track.scale_reply, \
 			t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff); \
