@@ -189,13 +189,10 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   This behavior was observed on a Mediatek MT7621 based device.
   Tried to modify mediatek ethernet driver with no luck, likely hardware enforced limitation.
   However the device allowed to send badsum packets, problem only existed for passthrough traffic from clients.
-* badsum doesn't work if your device is behind NAT which does not pass invalid packets.
-  Linux NAT by default does not pass them without special setting `sysctl -w net.netfilter.nf_conntrack_checksum=0`
-  Openwrt sets it from the box, other routers in most cases don't, and its not always possible to change it.
-  If nfqws is on the router, its not necessary to switch of `net.netfilter.nf_conntrack_checksum`.
-  Fake packet doesn't go through FORWARD chain, it goes through OUTPUT. But if your router is behind another NAT, for example ISP NAT,
-  and that NAT does not pass invalid packets, you cant do anything.
-* badseq packets will be dropped by server, but DPI also can ignore them
+* badseq packets will be dropped by server, but DPI also can ignore them.
+  default badseq increment is set to -10000 because some DPIs drop packets outside of the small tcp window.
+  But this also can cause troubles when `--dpi-desync-any-protocol` is enabled.
+  To be 100% sure fake packet cannot fit to server tcp window consider setting badseq increment to 0x80000000
 * TTL looks like the best option, but it requires special tuning for each ISP. If DPI is further than local ISP websites
   you can cut access to them. Manual IP exclude list is required. Its possible to use md5sig with ttl.
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
@@ -264,7 +261,7 @@ mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark wh
 nfqws can internally filter marked packets. but when connbytes filter is used without mark filter
 packet ordering can be changed breaking the whole idea of desync attack.
 
-### DPI deync combos
+### DPI desync combos
 
 dpi-desync parameter takes up to 3 comma separated arguments.
 zero phase means tcp connection establishement (before sending data payload). Mode can be `synack`.
