@@ -197,6 +197,8 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   you can cut access to them. Manual IP exclude list is required. Its possible to use md5sig with ttl.
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
   If automatic solution cannot be found then use `zapret-hosts-user-exclude.txt`.
+  Some router stock firmwares fix outgoing TTL. Without switching this option off TTL fooling will not work.
+
 
 `--dpi-desync-fooling` takes multiple comma separated values.
 
