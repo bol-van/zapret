@@ -18,7 +18,7 @@
 #define Q_MAXLEN	1024		// in packets
 
 #define BADSEQ_INCREMENT_DEFAULT 	-10000
-#define BADSEQ_ACK_INCREMENT_DEFAULT 	-65000
+#define BADSEQ_ACK_INCREMENT_DEFAULT 	-66000
 
 struct params_s
 {

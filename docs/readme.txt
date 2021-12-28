@@ -197,7 +197,7 @@ nfqws
  --dpi-desync-skip-nosni=0|1		; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI
  --dpi-desync-split-pos=<1..1500>	; (только для split*, disorder*) разбивать пакет на указанной позиции
  --dpi-desync-badseq-increment=<int|0xHEX> ; инкремент sequence number для badseq. по умолчанию -10000
- --dpi-desync-badack-increment=<int|0xHEX> ; инкремент ack sequence number для badseq. по умолчанию -65000
+ --dpi-desync-badack-increment=<int|0xHEX> ; инкремент ack sequence number для badseq. по умолчанию -66000
  --dpi-desync-any-protocol=0|1		; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
  --dpi-desync-fake-http=<filename>	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-tls=<filename>	; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
