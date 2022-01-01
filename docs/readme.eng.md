@@ -385,7 +385,7 @@ Set conntrack timeouts appropriately.
 
 UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
 IP fragmentation is not implemented now.
-No protocol recognition is implemented yet so only - `-dpi-desync-any-protocol` will work.
+No protocol recognition is implemented yet so only `--dpi-desync-any-protocol` will work.
 Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th
 parameter of `--ctrack-timeouts`.
 Fake attack is useful only for stateful DPI and useless for stateless dealing with each packet independently.
