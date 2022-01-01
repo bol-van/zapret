@@ -395,7 +395,7 @@ zapret_do_firewall()
 {
 	# $1 - 1 - add, 0 - del
 
-	case "${MODE}" in
+	case "${MODE_OVERRIDE:-$MODE}" in
 		tpws|filter|custom)
 			if [ "$1" = "1" ] ; then
 				pf_anchor_root || return 1
@@ -438,7 +438,7 @@ zapret_do_daemons()
 
 	local opt
 
-	case "${MODE}" in
+	case "${MODE_OVERRIDE:-$MODE}" in
 		tpws)
 			[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
 				echo "both ipv4 and ipv6 are disabled. nothing to do"

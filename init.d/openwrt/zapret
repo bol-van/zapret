@@ -107,7 +107,7 @@ tpws_apply_socks_binds()
 start_service() {
 	local opt qn qns qn6 qns6
 
-	case "${MODE}" in
+	case "${MODE_OVERRIDE:-$MODE}" in
 		tpws)
 			opt="--port=$TPPORT $TPWS_OPT"
 			filter_apply_hostlist_target opt

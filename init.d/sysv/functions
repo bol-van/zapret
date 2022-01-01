@@ -630,7 +630,7 @@ zapret_do_firewall()
 	# always create ipsets. ip_exclude ipset is required
 	[ "$1" != "1" ] || create_ipset no-update
 
-	case "${MODE}" in
+	case "${MODE_OVERRIDE:-$MODE}" in
 		tpws)
 			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
 				echo both http and https are disabled. not applying redirection.
@@ -708,7 +708,7 @@ zapret_do_daemons()
 
 	local opt qn qns qn6 qns6
 
-	case "${MODE}" in
+	case "${MODE_OVERRIDE:-$MODE}" in
 		tpws)
 			opt="--port=$TPPORT $TPWS_OPT"
 			filter_apply_hostlist_target opt
