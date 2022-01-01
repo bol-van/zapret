@@ -570,11 +570,6 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 	if (params.desync_mode==DESYNC_NONE) return res;
 
-	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-	if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
-	else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
-	extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
-
 	if (len_payload)
 	{
 		const uint8_t *fake;
@@ -583,6 +578,11 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 		if (!params.desync_any_proto) return res;
 		DLOG("applying tampering to unknown protocol\n")
+
+		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
+		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
+		else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+		extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
 
 		fake = params.fake_unknown_udp;
 		fake_size = params.fake_unknown_udp_size;
