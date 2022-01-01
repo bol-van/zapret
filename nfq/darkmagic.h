@@ -7,17 +7,18 @@
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
 // returns netorder value
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 
-#define TCP_FOOL_NONE	0
-#define TCP_FOOL_MD5SIG	1
-#define TCP_FOOL_BADSUM	2
-#define TCP_FOOL_TS	4
-#define TCP_FOOL_BADSEQ	8
+#define FOOL_NONE	0
+#define FOOL_MD5SIG	1
+#define FOOL_BADSUM 2
+#define FOOL_TS	4
+#define FOOL_BADSEQ	8
 
 #define SCALE_NONE ((uint8_t)-1)
 
@@ -62,7 +63,29 @@ bool prepare_tcp_segment(
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 
-void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
+
+bool prepare_udp_segment4(
+	const struct sockaddr_in *src, const struct sockaddr_in *dst,
+	uint8_t ttl,
+	uint8_t fooling,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen);
+bool prepare_udp_segment6(
+	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
+	uint8_t ttl,
+	uint8_t fooling,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen);
+bool prepare_udp_segment(
+	const struct sockaddr *src, const struct sockaddr *dst,
+	uint8_t ttl,
+	uint8_t fooling,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen);
+
+
+void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport);
+void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr,const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
 uint8_t *tcp_find_option(struct tcphdr *tcp, uint8_t kind);
 uint32_t *tcp_find_timestamps(struct tcphdr *tcp);
 uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
@@ -74,17 +97,21 @@ bool rawsend_preinit(uint32_t fwmark);
 // cleans up socket autocreated by rawsend
 void rawsend_cleanup();
 
+const char *proto_name(uint8_t proto);
+uint16_t family_from_proto(uint8_t l3proto);
 void print_ip(const struct ip *ip);
 void print_ip6hdr(const struct ip6_hdr *ip6hdr, uint8_t proto);
 void print_tcphdr(const struct tcphdr *tcphdr);
-
+void print_udphdr(const struct udphdr *udphdr);
 
 bool proto_check_ipv4(const uint8_t *data, size_t len);
 void proto_skip_ipv4(uint8_t **data, size_t *len);
-bool proto_check_tcp(const uint8_t *data, size_t len);
-void proto_skip_tcp(uint8_t **data, size_t *len);
 bool proto_check_ipv6(const uint8_t *data, size_t len);
 void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type);
+bool proto_check_tcp(const uint8_t *data, size_t len);
+void proto_skip_tcp(uint8_t **data, size_t *len);
+bool proto_check_udp(const uint8_t *data, size_t len);
+void proto_skip_udp(uint8_t **data, size_t *len);
 
 bool tcp_synack_segment(const struct tcphdr *tcphdr);
 bool tcp_syn_segment(const struct tcphdr *tcphdr);

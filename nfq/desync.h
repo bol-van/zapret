@@ -40,4 +40,5 @@ bool desync_valid_first_stage(enum dpi_desync_mode mode);
 bool desync_valid_second_stage(enum dpi_desync_mode mode);
 
 void desync_init();
-packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload);
+packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload);
+packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, uint8_t *data_payload, size_t len_payload);

@@ -67,9 +67,9 @@ static void fill_tcphdr(
 	uint8_t t=0;
 
 	memset(tcp,0,sizeof(*tcp));
-	tcp->th_sport     = nsport;
-	tcp->th_dport       = ndport;
-	if (fooling & TCP_FOOL_BADSEQ)
+	tcp->th_sport = nsport;
+	tcp->th_dport = ndport;
+	if (fooling & FOOL_BADSEQ)
 	{
 		tcp->th_seq = net32_add(nseq,badseq_increment);
 		tcp->th_ack = net32_add(nack_seq,badseq_ack_increment);
@@ -82,7 +82,7 @@ static void fill_tcphdr(
 	tcp->th_off       = 5;
 	*((uint8_t*)tcp+13)= tcp_flags;
 	tcp->th_win     = nwsize;
-	if (fooling & TCP_FOOL_MD5SIG)
+	if (fooling & FOOL_MD5SIG)
 	{
 		tcpopt[0] = 19; // kind
 		tcpopt[1] = 18; // len
@@ -92,13 +92,13 @@ static void fill_tcphdr(
 		*(uint32_t*)(tcpopt+14)=random();
 		t=18;
 	}
-	if (timestamps || (fooling & TCP_FOOL_TS))
+	if (timestamps || (fooling & FOOL_TS))
 	{
 		tcpopt[t] = 8; // kind
 		tcpopt[t+1] = 10; // len
 		// forge only TSecr if orig timestamp is present
 		*(uint32_t*)(tcpopt+t+2) = timestamps ? timestamps[0] : -1;
-		*(uint32_t*)(tcpopt+t+6) = (timestamps && !(fooling & TCP_FOOL_TS)) ? timestamps[1] : -1;
+		*(uint32_t*)(tcpopt+t+6) = (timestamps && !(fooling & FOOL_TS)) ? timestamps[1] : -1;
 		t+=10;
 	}
 	if (scale_factor!=SCALE_NONE)
@@ -109,15 +109,517 @@ static void fill_tcphdr(
 	}
 	while (t&3) tcpopt[t++]=1; // noop
 	tcp->th_off += t>>2;
+	tcp->th_sum = 0;
 }
 static uint16_t tcpopt_len(uint8_t fooling, const uint32_t *timestamps, uint8_t scale_factor)
 {
 	uint16_t t=0;
-	if (fooling & TCP_FOOL_MD5SIG) t=18;
-	if ((fooling & TCP_FOOL_TS) || timestamps) t+=10;
+	if (fooling & FOOL_MD5SIG) t=18;
+	if ((fooling & FOOL_TS) || timestamps) t+=10;
 	if (scale_factor!=SCALE_NONE) t+=3;
 	return (t+3)&~3;
 }
+
+// n prefix (nsport, nwsize) means network byte order
+static void fill_udphdr(struct udphdr *udp, uint16_t nsport, uint16_t ndport, uint16_t len_payload)
+{
+	udp->uh_sport = nsport;
+	udp->uh_dport = ndport;
+	udp->uh_ulen = htons(len_payload+sizeof(struct udphdr));
+	udp->uh_sum = 0;
+}
+
+static void fill_iphdr(struct ip *ip, const struct in_addr *src, const struct in_addr *dst, uint16_t pktlen, uint8_t proto, uint8_t ttl)
+{
+	ip->ip_off = 0;
+	ip->ip_v = 4;
+	ip->ip_hl = 5;
+	ip->ip_len = htons(pktlen);
+	ip->ip_id = 0;
+	ip->ip_ttl = ttl;
+	ip->ip_p = proto;
+	ip->ip_src = *src;
+	ip->ip_dst = *dst;
+}
+static void fill_ip6hdr(struct ip6_hdr *ip6, const struct in6_addr *src, const struct in6_addr *dst, uint16_t payloadlen, uint8_t proto, uint8_t ttl)
+{
+	ip6->ip6_ctlun.ip6_un1.ip6_un1_flow = htonl(0x60000000);
+	ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(payloadlen);
+	ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = proto;
+	ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = ttl;
+	ip6->ip6_src = *src;
+	ip6->ip6_dst = *dst;
+}
+
+bool prepare_tcp_segment4(
+	const struct sockaddr_in *src, const struct sockaddr_in *dst,
+	uint8_t tcp_flags,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
+	uint8_t scale_factor,
+	uint32_t *timestamps,
+	uint8_t ttl,
+	uint8_t fooling,
+	uint32_t badseq_increment,
+	uint32_t badseq_ack_increment,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen)
+{
+	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
+	uint16_t ip_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
+	uint16_t pktlen = sizeof(struct ip) + ip_payload_len;
+	if (pktlen>*buflen) return false;
+
+	struct ip *ip = (struct ip*)buf;
+	struct tcphdr *tcp = (struct tcphdr*)(ip+1);
+	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
+
+	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_TCP, ttl);
+	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
+
+	memcpy(payload,data,len);
+	tcp4_fix_checksum(tcp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
+	if (fooling & FOOL_BADSUM) tcp->th_sum^=htons(0xBEAF);
+
+	*buflen = pktlen;
+	return true;
+}
+
+bool prepare_tcp_segment6(
+	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
+	uint8_t tcp_flags,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
+	uint8_t scale_factor,
+	uint32_t *timestamps,
+	uint8_t ttl,
+	uint8_t fooling,
+	uint32_t badseq_increment,
+	uint32_t badseq_ack_increment,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen)
+{
+	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
+	uint16_t ip_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
+	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
+	if (pktlen>*buflen) return false;
+
+	struct ip6_hdr *ip6 = (struct ip6_hdr*)buf;
+	struct tcphdr *tcp = (struct tcphdr*)(ip6+1);
+	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
+
+	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, IPPROTO_TCP, ttl);
+	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
+
+	memcpy(payload,data,len);
+	tcp6_fix_checksum(tcp,ip_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
+	if (fooling & FOOL_BADSUM) tcp->th_sum^=htons(0xBEAF);
+
+	*buflen = pktlen;
+	return true;
+}
+
+bool prepare_tcp_segment(
+	const struct sockaddr *src, const struct sockaddr *dst,
+	uint8_t tcp_flags,
+	uint32_t nseq, uint32_t nack_seq,
+	uint16_t nwsize,
+	uint8_t scale_factor,
+	uint32_t *timestamps,
+	uint8_t ttl,
+	uint8_t fooling,
+	uint32_t badseq_increment,
+	uint32_t badseq_ack_increment,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen)
+{
+	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		false;
+}
+
+
+bool prepare_udp_segment4(
+	const struct sockaddr_in *src, const struct sockaddr_in *dst,
+	uint8_t ttl,
+	uint8_t fooling,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen)
+{
+	uint16_t ip_payload_len = sizeof(struct udphdr) + len;
+	uint16_t pktlen = sizeof(struct ip) + ip_payload_len;
+	if (pktlen>*buflen) return false;
+
+	struct ip *ip = (struct ip*)buf;
+	struct udphdr *udp = (struct udphdr*)(ip+1);
+	uint8_t *payload = (uint8_t*)(udp+1);
+
+	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_UDP, ttl);
+	fill_udphdr(udp, src->sin_port, dst->sin_port, len);
+
+	memcpy(payload,data,len);
+	udp4_fix_checksum(udp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
+	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
+
+	*buflen = pktlen;
+	return true;
+}
+bool prepare_udp_segment6(
+	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
+	uint8_t ttl,
+	uint8_t fooling,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen)
+{
+	uint16_t ip_payload_len = sizeof(struct udphdr) + len;
+	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
+	if (pktlen>*buflen) return false;
+
+	struct ip6_hdr *ip6 = (struct ip6_hdr*)buf;
+	struct udphdr *udp = (struct udphdr*)(ip6+1);
+	uint8_t *payload = (uint8_t*)(udp+1);
+
+	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, IPPROTO_UDP, ttl);
+	fill_udphdr(udp, src->sin6_port, dst->sin6_port, len);
+
+	memcpy(payload,data,len);
+	udp6_fix_checksum(udp,ip_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
+	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
+
+	*buflen = pktlen;
+	return true;
+}
+bool prepare_udp_segment(
+	const struct sockaddr *src, const struct sockaddr *dst,
+	uint8_t ttl,
+	uint8_t fooling,
+	const void *data, uint16_t len,
+	uint8_t *buf, size_t *buflen)
+{
+	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
+		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,fooling,data,len,buf,buflen) :
+		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
+		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,fooling,data,len,buf,buflen) :
+		false;
+}
+
+
+
+void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport)
+{
+	if (sport) *sport  = htons(tcphdr ? tcphdr->th_sport : udphdr ? udphdr->uh_sport : 0);
+	if (dport) *dport  = htons(tcphdr ? tcphdr->th_dport : udphdr ? udphdr->uh_dport : 0);
+	if (proto) *proto = tcphdr ? IPPROTO_TCP : udphdr ? IPPROTO_UDP : -1;
+}
+
+void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr,const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst)
+{
+	if (ip)
+	{
+		struct sockaddr_in *si;
+
+		if (dst)
+		{
+			si = (struct sockaddr_in*)dst;
+			si->sin_family = AF_INET;
+			si->sin_port = tcphdr ? tcphdr->th_dport : udphdr ? udphdr->uh_dport : 0;
+			si->sin_addr = ip->ip_dst;
+		}
+
+		if (src)
+		{
+			si = (struct sockaddr_in*)src;
+			si->sin_family = AF_INET;
+			si->sin_port = tcphdr ? tcphdr->th_sport : udphdr ? udphdr->uh_sport : 0;
+			si->sin_addr = ip->ip_src;
+		}
+	}
+	else if (ip6hdr)
+	{
+		struct sockaddr_in6 *si;
+
+		if (dst)
+		{
+			si = (struct sockaddr_in6*)dst;
+			si->sin6_family = AF_INET6;
+			si->sin6_port = tcphdr ? tcphdr->th_dport : udphdr ? udphdr->uh_dport : 0;
+			si->sin6_addr = ip6hdr->ip6_dst;
+			si->sin6_flowinfo = 0;
+			si->sin6_scope_id = 0;
+		}
+
+		if (src)
+		{
+			si = (struct sockaddr_in6*)src;
+			si->sin6_family = AF_INET6;
+			si->sin6_port = tcphdr ? tcphdr->th_sport : udphdr ? udphdr->uh_sport : 0;
+			si->sin6_addr = ip6hdr->ip6_src;
+			si->sin6_flowinfo = 0;
+			si->sin6_scope_id = 0;
+		}
+	}
+}
+
+const char *proto_name(uint8_t proto)
+{
+	switch(proto)
+	{
+		case IPPROTO_TCP:
+			return "tcp";
+		case IPPROTO_UDP:
+			return "udp";
+		case IPPROTO_ICMP:
+			return "icmp";
+		case IPPROTO_IGMP:
+			return "igmp";
+		case IPPROTO_ESP:
+			return "esp";
+		case IPPROTO_AH:
+			return "ah";
+		case IPPROTO_IPV6:
+			return "6in4";
+		case IPPROTO_IPIP:
+			return "4in4";
+		case IPPROTO_GRE:
+			return "gre";
+#ifdef IPPROTO_SCTP
+		case IPPROTO_SCTP:
+			return "sctp";
+#endif
+		default:
+			return NULL;
+	}
+}
+static void str_proto_name(char *s, size_t s_len, uint8_t proto)
+{
+	const char *name = proto_name(proto);
+	if (name)
+		snprintf(s,s_len,"%s",name);
+	else
+		snprintf(s,s_len,"%u",proto);
+}
+uint16_t family_from_proto(uint8_t l3proto)
+{
+	switch(l3proto)
+	{
+		case IPPROTO_IP: return AF_INET;
+		case IPPROTO_IPV6: return AF_INET6;
+		default: return -1;
+	}
+}
+
+static void str_srcdst_ip(char *s, size_t s_len, const void *saddr,const void *daddr)
+{
+	char s_ip[16],d_ip[16];
+	*s_ip=*d_ip=0;
+	inet_ntop(AF_INET, saddr, s_ip, sizeof(s_ip));
+	inet_ntop(AF_INET, daddr, d_ip, sizeof(d_ip));
+	snprintf(s,s_len,"%s => %s",s_ip,d_ip);
+}
+static void str_ip(char *s, size_t s_len, const struct ip *ip)
+{
+	char ss[35],s_proto[16];
+	str_srcdst_ip(ss,sizeof(ss),&ip->ip_src,&ip->ip_dst);
+	str_proto_name(s_proto,sizeof(s_proto),ip->ip_p);
+	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
+}
+void print_ip(const struct ip *ip)
+{
+	char s[64];
+	str_ip(s,sizeof(s),ip);
+	printf("%s",s);
+}
+static void str_srcdst_ip6(char *s, size_t s_len, const void *saddr,const void *daddr)
+{
+	char s_ip[40],d_ip[40];
+	*s_ip=*d_ip=0;
+	inet_ntop(AF_INET6, saddr, s_ip, sizeof(s_ip));
+	inet_ntop(AF_INET6, daddr, d_ip, sizeof(d_ip));
+	snprintf(s,s_len,"%s => %s",s_ip,d_ip);
+}
+static void str_ip6hdr(char *s, size_t s_len, const struct ip6_hdr *ip6hdr, uint8_t proto)
+{
+	char ss[83],s_proto[16];
+	str_srcdst_ip6(ss,sizeof(ss),&ip6hdr->ip6_src,&ip6hdr->ip6_dst);
+	str_proto_name(s_proto,sizeof(s_proto),proto);
+	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
+}
+void print_ip6hdr(const struct ip6_hdr *ip6hdr, uint8_t proto)
+{
+	char s[128];
+	str_ip6hdr(s,sizeof(s),ip6hdr,proto);
+	printf("%s",s);
+}
+static void str_tcphdr(char *s, size_t s_len, const struct tcphdr *tcphdr)
+{
+	char flags[7],*f=flags;
+	if (tcphdr->th_flags & TH_SYN) *f++='S';
+	if (tcphdr->th_flags & TH_ACK) *f++='A';
+	if (tcphdr->th_flags & TH_RST) *f++='R';
+	if (tcphdr->th_flags & TH_FIN) *f++='F';
+	if (tcphdr->th_flags & TH_PUSH) *f++='P';
+	if (tcphdr->th_flags & TH_URG) *f++='U';
+	*f=0;
+	snprintf(s,s_len,"sport=%u dport=%u flags=%s seq=%u ack_seq=%u",htons(tcphdr->th_sport),htons(tcphdr->th_dport),flags,htonl(tcphdr->th_seq),htonl(tcphdr->th_ack));
+}
+void print_tcphdr(const struct tcphdr *tcphdr)
+{
+	char s[80];
+	str_tcphdr(s,sizeof(s),tcphdr);
+	printf("%s",s);
+}
+static void str_udphdr(char *s, size_t s_len, const struct udphdr *udphdr)
+{
+	snprintf(s,s_len,"sport=%u dport=%u",htons(udphdr->uh_sport),htons(udphdr->uh_dport));
+}
+void print_udphdr(const struct udphdr *udphdr)
+{
+	char s[30];
+	str_udphdr(s,sizeof(s),udphdr);
+	printf("%s",s);
+}
+
+
+
+
+bool proto_check_ipv4(const uint8_t *data, size_t len)
+{
+	return 	len >= 20 && (data[0] & 0xF0) == 0x40 &&
+		len >= ((data[0] & 0x0F) << 2);
+}
+// move to transport protocol
+void proto_skip_ipv4(uint8_t **data, size_t *len)
+{
+	size_t l;
+
+	l = (**data & 0x0F) << 2;
+	*data += l;
+	*len -= l;
+}
+bool proto_check_tcp(const uint8_t *data, size_t len)
+{
+	return len >= 20 && len >= ((data[12] & 0xF0) >> 2);
+}
+void proto_skip_tcp(uint8_t **data, size_t *len)
+{
+	size_t l;
+	l = ((*data)[12] & 0xF0) >> 2;
+	*data += l;
+	*len -= l;
+}
+bool proto_check_udp(const uint8_t *data, size_t len)
+{
+	return len >= 8 && len>=(data[4]<<8 | data[5]);
+}
+void proto_skip_udp(uint8_t **data, size_t *len)
+{
+	*data += 8;
+	*len -= 8;
+}
+
+bool proto_check_ipv6(const uint8_t *data, size_t len)
+{
+	return 	len >= 40 && (data[0] & 0xF0) == 0x60 &&
+		(len - 40) >= htons(*(uint16_t*)(data + 4)); // payload length
+}
+// move to transport protocol
+// proto_type = 0 => error
+void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type)
+{
+	size_t hdrlen;
+	uint8_t HeaderType;
+
+	if (proto_type) *proto_type = 0; // put error in advance
+
+	HeaderType = (*data)[6]; // NextHeader field
+	*data += 40; *len -= 40; // skip ipv6 base header
+	while (*len > 0) // need at least one byte for NextHeader field
+	{
+		switch (HeaderType)
+		{
+		case 0: // Hop-by-Hop Options
+		case 43: // routing
+		case 51: // authentication
+		case 60: // Destination Options
+		case 135: // mobility
+		case 139: // Host Identity Protocol Version v2
+		case 140: // Shim6
+			if (*len < 2) return; // error
+			hdrlen = 8 + ((*data)[1] << 3);
+			break;
+		case 44: // fragment. length fixed to 8, hdrlen field defined as reserved
+			hdrlen = 8;
+			break;
+		case 59: // no next header
+			return; // error
+		default:
+			// we found some meaningful payload. it can be tcp, udp, icmp or some another exotic shit
+			if (proto_type) *proto_type = HeaderType;
+			return;
+		}
+		if (*len < hdrlen) return; // error
+		HeaderType = **data;
+		// advance to the next header location
+		*len -= hdrlen;
+		*data += hdrlen;
+	}
+	// we have garbage
+}
+
+bool tcp_synack_segment(const struct tcphdr *tcphdr)
+{
+	/* check for set bits in TCP hdr */
+	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == (TH_ACK|TH_SYN));
+}
+bool tcp_syn_segment(const struct tcphdr *tcphdr)
+{
+	/* check for set bits in TCP hdr */
+	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == TH_SYN);
+}
+bool tcp_ack_segment(const struct tcphdr *tcphdr)
+{
+	/* check for set bits in TCP hdr */
+	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == TH_ACK);
+}
+
+void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
+{
+	uint8_t *scale,scale_factor_old;
+
+	if (scale_factor!=SCALE_NONE)
+	{
+		scale = tcp_find_option(tcp,3); // tcp option 3 - scale factor
+		if (scale && scale[1]==3) // length should be 3
+		{
+			scale_factor_old=scale[2];
+			// do not allow increasing scale factor
+			if (scale_factor>=scale_factor_old)
+				DLOG("Scale factor %u unchanged\n", scale_factor_old)
+			else
+			{
+				scale[2]=scale_factor;
+				DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
+			}
+		}
+	}
+}
+// scale_factor=SCALE_NONE - do not change
+void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor)
+{
+	uint16_t winsize_old;
+
+	winsize_old = htons(tcp->th_win); // << scale_factor;
+	tcp->th_win = htons(winsize);
+	DLOG("Window size change %u => %u\n", winsize_old, winsize)
+
+	tcp_rewrite_wscale(tcp, scale_factor);
+}
+
+
+
+
 
 static int rawsend_sock4=-1, rawsend_sock6=-1;
 static void rawsend_clean_sock(int *sock)
@@ -288,7 +790,7 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 			// BSD ipv6 raw socks are limited. cannot pass the whole packet with ip6 header.
 			struct sockaddr_storage sa_src;
 			int v;
-			extract_endpoints(NULL,(struct ip6_hdr *)data,NULL, &sa_src, NULL);
+			extract_endpoints(NULL,(struct ip6_hdr *)data,NULL,NULL, &sa_src, NULL);
 			v = ((struct ip6_hdr *)data)->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 			if (setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &v, sizeof(v)) == -1)
 				perror("rawsend: setsockopt(IPV6_HOPLIMIT)");
@@ -316,7 +818,7 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 #endif
 
 #if defined(__FreeBSD__) && __FreeBSD__<=10
-	// old FreeBSD requires some fields in the host byte order
+	// old FreeBSD requires some fields in host byte order
 	if (dst->sa_family==AF_INET && len>=sizeof(struct ip))
 	{
 		((struct ip*)data)->ip_len = htons(((struct ip*)data)->ip_len);
@@ -339,386 +841,4 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 		return false;
 	}
 	return true;
-}
-bool prepare_tcp_segment4(
-	const struct sockaddr_in *src, const struct sockaddr_in *dst,
-	uint8_t tcp_flags,
-	uint32_t nseq, uint32_t nack_seq,
-	uint16_t nwsize,
-	uint8_t scale_factor,
-	uint32_t *timestamps,
-	uint8_t ttl,
-	uint8_t fooling,
-	uint32_t badseq_increment,
-	uint32_t badseq_ack_increment,
-	const void *data, uint16_t len,
-	uint8_t *buf, size_t *buflen)
-{
-	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps, scale_factor);
-	uint16_t pktlen = sizeof(struct ip) + sizeof(struct tcphdr) + tcpoptlen  + len;
-	if (pktlen>*buflen)
-	{
-		fprintf(stderr,"prepare_tcp_segment : packet len cannot exceed %zu\n",*buflen);
-		return false;
-	}
-
-	struct ip *ip = (struct ip*) buf;
-	struct tcphdr *tcp = (struct tcphdr*) (ip+1);
-
-	ip->ip_off = 0;
-	ip->ip_v = 4;
-	ip->ip_hl = 5;
-	ip->ip_len = htons(pktlen);
-	ip->ip_id = 0;
-	ip->ip_ttl = ttl;
-	ip->ip_p = IPPROTO_TCP;
-	ip->ip_src = src->sin_addr;
-	ip->ip_dst = dst->sin_addr;
-
-	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
-
-	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
-	tcp4_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip->ip_src,&ip->ip_dst);
-	if (fooling & TCP_FOOL_BADSUM) tcp->th_sum^=0xBEAF;
-
-	*buflen = pktlen;
-	return true;
-}
-
-
-bool prepare_tcp_segment6(
-	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
-	uint8_t tcp_flags,
-	uint32_t nseq, uint32_t nack_seq,
-	uint16_t nwsize,
-	uint8_t scale_factor,
-	uint32_t *timestamps,
-	uint8_t ttl,
-	uint8_t fooling,
-	uint32_t badseq_increment,
-	uint32_t badseq_ack_increment,
-	const void *data, uint16_t len,
-	uint8_t *buf, size_t *buflen)
-{
-	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps, scale_factor);
-	uint16_t payloadlen = sizeof(struct tcphdr) + tcpoptlen + len;
-	uint16_t pktlen = sizeof(struct ip6_hdr) + payloadlen;
-	if (pktlen>*buflen)
-	{
-		fprintf(stderr,"prepare_tcp_segment : packet len cannot exceed %zu\n",*buflen);
-		return false;
-	}
-
-	struct ip6_hdr *ip6 = (struct ip6_hdr*) buf;
-	struct tcphdr *tcp = (struct tcphdr*) (ip6+1);
-
-	ip6->ip6_ctlun.ip6_un1.ip6_un1_flow = htonl(0x60000000);
-	ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(payloadlen);
-	ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = IPPROTO_TCP;
-	ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = ttl;
-	ip6->ip6_src = src->sin6_addr;
-	ip6->ip6_dst = dst->sin6_addr;
-
-	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
-
-	memcpy((char*)tcp+sizeof(struct tcphdr)+tcpoptlen,data,len);
-	tcp6_fix_checksum(tcp,sizeof(struct tcphdr)+tcpoptlen+len,&ip6->ip6_src,&ip6->ip6_dst);
-	if (fooling & TCP_FOOL_BADSUM) tcp->th_sum^=0xBEAF;
-
-	*buflen = pktlen;
-	return true;
-}
-
-bool prepare_tcp_segment(
-	const struct sockaddr *src, const struct sockaddr *dst,
-	uint8_t tcp_flags,
-	uint32_t nseq, uint32_t nack_seq,
-	uint16_t nwsize,
-	uint8_t scale_factor,
-	uint32_t *timestamps,
-	uint8_t ttl,
-	uint8_t fooling,
-	uint32_t badseq_increment,
-	uint32_t badseq_ack_increment,
-	const void *data, uint16_t len,
-	uint8_t *buf, size_t *buflen)
-{
-	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
-		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
-		false;
-}
-
-
-void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst)
-{
-	if (ip)
-	{
-		struct sockaddr_in *si;
-
-		if (dst)
-		{
-			si = (struct sockaddr_in*)dst;
-			si->sin_family = AF_INET;
-			si->sin_port = tcphdr ? tcphdr->th_dport : 0;
-			si->sin_addr = ip->ip_dst;
-		}
-
-		if (src)
-		{
-			si = (struct sockaddr_in*)src;
-			si->sin_family = AF_INET;
-			si->sin_port = tcphdr ? tcphdr->th_sport : 0;
-			si->sin_addr = ip->ip_src;
-		}
-	}
-	else if (ip6hdr)
-	{
-		struct sockaddr_in6 *si;
-
-		if (dst)
-		{
-			si = (struct sockaddr_in6*)dst;
-			si->sin6_family = AF_INET6;
-			si->sin6_port = tcphdr ? tcphdr->th_dport : 0;
-			si->sin6_addr = ip6hdr->ip6_dst;
-			si->sin6_flowinfo = 0;
-			si->sin6_scope_id = 0;
-		}
-
-		if (src)
-		{
-			si = (struct sockaddr_in6*)src;
-			si->sin6_family = AF_INET6;
-			si->sin6_port = tcphdr ? tcphdr->th_sport : 0;
-			si->sin6_addr = ip6hdr->ip6_src;
-			si->sin6_flowinfo = 0;
-			si->sin6_scope_id = 0;
-		}
-	}
-}
-
-static const char *proto_name(uint8_t proto)
-{
-	switch(proto)
-	{
-		case IPPROTO_TCP:
-			return "tcp";
-		case IPPROTO_UDP:
-			return "udp";
-		case IPPROTO_ICMP:
-			return "icmp";
-		case IPPROTO_IGMP:
-			return "igmp";
-		case IPPROTO_ESP:
-			return "esp";
-		case IPPROTO_AH:
-			return "ah";
-		case IPPROTO_IPV6:
-			return "6in4";
-#ifdef IPPROTO_SCTP
-		case IPPROTO_SCTP:
-			return "sctp";
-#endif
-		default:
-			return NULL;
-	}
-}
-static void str_proto_name(char *s, size_t s_len, uint8_t proto)
-{
-	const char *name = proto_name(proto);
-	if (name)
-		snprintf(s,s_len,"%s",name);
-	else
-		snprintf(s,s_len,"%u",proto);
-}
-
-static void str_srcdst_ip(char *s, size_t s_len, const void *saddr,const void *daddr)
-{
-	char s_ip[16],d_ip[16];
-	*s_ip=*d_ip=0;
-	inet_ntop(AF_INET, saddr, s_ip, sizeof(s_ip));
-	inet_ntop(AF_INET, daddr, d_ip, sizeof(d_ip));
-	snprintf(s,s_len,"%s => %s",s_ip,d_ip);
-}
-static void str_ip(char *s, size_t s_len, const struct ip *ip)
-{
-	char ss[35],s_proto[16];
-	str_srcdst_ip(ss,sizeof(ss),&ip->ip_src,&ip->ip_dst);
-	str_proto_name(s_proto,sizeof(s_proto),ip->ip_p);
-	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
-}
-void print_ip(const struct ip *ip)
-{
-	char s[64];
-	str_ip(s,sizeof(s),ip);
-	printf("%s",s);
-}
-static void str_srcdst_ip6(char *s, size_t s_len, const void *saddr,const void *daddr)
-{
-	char s_ip[40],d_ip[40];
-	*s_ip=*d_ip=0;
-	inet_ntop(AF_INET6, saddr, s_ip, sizeof(s_ip));
-	inet_ntop(AF_INET6, daddr, d_ip, sizeof(d_ip));
-	snprintf(s,s_len,"%s => %s",s_ip,d_ip);
-}
-static void str_ip6hdr(char *s, size_t s_len, const struct ip6_hdr *ip6hdr, uint8_t proto)
-{
-	char ss[83],s_proto[16];
-	str_srcdst_ip6(ss,sizeof(ss),&ip6hdr->ip6_src,&ip6hdr->ip6_dst);
-	str_proto_name(s_proto,sizeof(s_proto),proto);
-	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
-}
-void print_ip6hdr(const struct ip6_hdr *ip6hdr, uint8_t proto)
-{
-	char s[128];
-	str_ip6hdr(s,sizeof(s),ip6hdr,proto);
-	printf("%s",s);
-}
-
-static void str_tcphdr(char *s, size_t s_len, const struct tcphdr *tcphdr)
-{
-	char flags[7],*f=flags;
-	if (tcphdr->th_flags & TH_SYN) *f++='S';
-	if (tcphdr->th_flags & TH_ACK) *f++='A';
-	if (tcphdr->th_flags & TH_RST) *f++='R';
-	if (tcphdr->th_flags & TH_FIN) *f++='F';
-	if (tcphdr->th_flags & TH_PUSH) *f++='P';
-	if (tcphdr->th_flags & TH_URG) *f++='U';
-	*f=0;
-	snprintf(s,s_len,"sport=%u dport=%u flags=%s seq=%u ack_seq=%u",htons(tcphdr->th_sport),htons(tcphdr->th_dport),flags,htonl(tcphdr->th_seq),htonl(tcphdr->th_ack));
-}
-void print_tcphdr(const struct tcphdr *tcphdr)
-{
-	char s[80];
-	str_tcphdr(s,sizeof(s),tcphdr);
-	printf("%s",s);
-}
-
-
-
-
-bool proto_check_ipv4(const uint8_t *data, size_t len)
-{
-	return 	len >= 20 && (data[0] & 0xF0) == 0x40 &&
-		len >= ((data[0] & 0x0F) << 2);
-}
-// move to transport protocol
-void proto_skip_ipv4(uint8_t **data, size_t *len)
-{
-	size_t l;
-
-	l = (**data & 0x0F) << 2;
-	*data += l;
-	*len -= l;
-}
-bool proto_check_tcp(const uint8_t *data, size_t len)
-{
-	return	len >= 20 && len >= ((data[12] & 0xF0) >> 2);
-}
-void proto_skip_tcp(uint8_t **data, size_t *len)
-{
-	size_t l;
-	l = ((*data)[12] & 0xF0) >> 2;
-	*data += l;
-	*len -= l;
-}
-
-bool proto_check_ipv6(const uint8_t *data, size_t len)
-{
-	return 	len >= 40 && (data[0] & 0xF0) == 0x60 &&
-		(len - 40) >= htons(*(uint16_t*)(data + 4)); // payload length
-}
-// move to transport protocol
-// proto_type = 0 => error
-void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type)
-{
-	size_t hdrlen;
-	uint8_t HeaderType;
-
-	if (proto_type) *proto_type = 0; // put error in advance
-
-	HeaderType = (*data)[6]; // NextHeader field
-	*data += 40; *len -= 40; // skip ipv6 base header
-	while (*len > 0) // need at least one byte for NextHeader field
-	{
-		switch (HeaderType)
-		{
-		case 0: // Hop-by-Hop Options
-		case 43: // routing
-		case 51: // authentication
-		case 60: // Destination Options
-		case 135: // mobility
-		case 139: // Host Identity Protocol Version v2
-		case 140: // Shim6
-			if (*len < 2) return; // error
-			hdrlen = 8 + ((*data)[1] << 3);
-			break;
-		case 44: // fragment. length fixed to 8, hdrlen field defined as reserved
-			hdrlen = 8;
-			break;
-		case 59: // no next header
-			return; // error
-		default:
-			// we found some meaningful payload. it can be tcp, udp, icmp or some another exotic shit
-			if (proto_type) *proto_type = HeaderType;
-			return;
-		}
-		if (*len < hdrlen) return; // error
-		HeaderType = **data;
-		// advance to the next header location
-		*len -= hdrlen;
-		*data += hdrlen;
-	}
-	// we have garbage
-}
-
-bool tcp_synack_segment(const struct tcphdr *tcphdr)
-{
-	/* check for set bits in TCP hdr */
-	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == (TH_ACK|TH_SYN));
-}
-bool tcp_syn_segment(const struct tcphdr *tcphdr)
-{
-	/* check for set bits in TCP hdr */
-	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == TH_SYN);
-}
-bool tcp_ack_segment(const struct tcphdr *tcphdr)
-{
-	/* check for set bits in TCP hdr */
-	return ((tcphdr->th_flags & (TH_URG|TH_ACK|TH_PUSH|TH_RST|TH_SYN|TH_FIN)) == TH_ACK);
-}
-
-void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor)
-{
-	uint8_t *scale,scale_factor_old;
-
-	if (scale_factor!=SCALE_NONE)
-	{
-		scale = tcp_find_option(tcp,3); // tcp option 3 - scale factor
-		if (scale && scale[1]==3) // length should be 3
-		{
-			scale_factor_old=scale[2];
-			// do not allow increasing scale factor
-			if (scale_factor>=scale_factor_old)
-				DLOG("Scale factor %u unchanged\n", scale_factor_old)
-			else
-			{
-				scale[2]=scale_factor;
-				DLOG("Scale factor change %u => %u\n", scale_factor_old, scale_factor)
-			}
-		}
-	}
-}
-// scale_factor=SCALE_NONE - do not change
-void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor)
-{
-	uint16_t winsize_old;
-
-	winsize_old = htons(tcp->th_win); // << scale_factor;
-	tcp->th_win = htons(winsize);
-	DLOG("Window size change %u => %u\n", winsize_old, winsize)
-
-	tcp_rewrite_wscale(tcp, scale_factor);
 }

@@ -120,15 +120,18 @@ static bool cutoff_test(t_ctrack *ctrack, uint64_t cutoff, char mode)
 {
 	return cutoff && cutoff_get_limit(ctrack, mode)>=cutoff;
 }
-static void maybe_cutoff(t_ctrack *ctrack)
+static void maybe_cutoff(t_ctrack *ctrack, uint8_t proto)
 {
 	if (ctrack)
 	{
-		ctrack->b_wssize_cutoff |= cutoff_test(ctrack, params.wssize_cutoff, params.wssize_cutoff_mode);
+		if (proto==IPPROTO_TCP)
+			ctrack->b_wssize_cutoff |= cutoff_test(ctrack, params.wssize_cutoff, params.wssize_cutoff_mode);
 		ctrack->b_desync_cutoff |= cutoff_test(ctrack, params.desync_cutoff, params.desync_cutoff_mode);
 
-		// we do not need conntrack entry anymore if all cutoff conditions are either not defined or reached
-		ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && (!params.desync_cutoff || ctrack->b_desync_cutoff);
+		if (proto==IPPROTO_TCP)
+			// we do not need conntrack entry anymore if all cutoff conditions are either not defined or reached
+			// do not drop udp entry because it will be recreated when next packet arrives
+			ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && (!params.desync_cutoff || ctrack->b_desync_cutoff);
 	}
 }
 static void wssize_cutoff(t_ctrack *ctrack)
@@ -136,12 +139,12 @@ static void wssize_cutoff(t_ctrack *ctrack)
 	if (ctrack)
 	{
 		ctrack->b_wssize_cutoff = true;
-		maybe_cutoff(ctrack);
+		maybe_cutoff(ctrack, IPPROTO_TCP);
 	}
 }
 #define CONNTRACK_REQUIRED (params.wssize || params.desync_cutoff)
 // result : true - drop original packet, false = dont drop
-packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
+packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {
 	packet_process_result res=pass;
 	t_ctrack *ctrack=NULL;
@@ -158,8 +161,8 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 	if (CONNTRACK_REQUIRED)
 	{
 		ConntrackPoolPurge(&params.conntrack);
-		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, len_payload, &ctrack, &bReverse))
-			maybe_cutoff(ctrack);
+		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, NULL, len_payload, &ctrack, &bReverse))
+			maybe_cutoff(ctrack, IPPROTO_TCP);
 	}
 
 	//ConntrackPoolDump(&params.conntrack);
@@ -202,14 +205,14 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		scale_factor = tcp_find_scale_factor(tcphdr);
 		timestamps = tcp_find_timestamps(tcphdr);
 
-		extract_endpoints(ip, ip6hdr, tcphdr, &src, &dst);
+		extract_endpoints(ip, ip6hdr, tcphdr, NULL, &src, &dst);
 	}
 
 	if (params.desync_mode0==DESYNC_SYNACK && tcp_syn_segment(tcphdr))
 	{
 		newlen = sizeof(newdata);
 		if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-			ttl_fake,params.desync_tcp_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+			ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 			NULL, 0, newdata, &newlen))
 		{
 			return res;
@@ -352,7 +355,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 		{
 			case DESYNC_FAKE:
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-					ttl_fake,params.desync_tcp_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 					fake, fake_size, newdata, &newlen))
 				{
 					return res;
@@ -364,7 +367,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 			case DESYNC_RST:
 			case DESYNC_RSTACK:
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-					ttl_fake,params.desync_tcp_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 					NULL, 0, newdata, &newlen))
 				{
 					return res;
@@ -416,7 +419,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 					if (split_pos<len_payload)
 					{
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_orig,TCP_FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								data_payload+split_pos, len_payload-split_pos, newdata, &newlen))
 							return res;
 						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
@@ -430,7 +433,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 					{
 						fakeseg_len = sizeof(fakeseg);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_fake,params.desync_tcp_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								zeropkt, split_pos, fakeseg, &fakeseg_len))
 							return res;
 						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
@@ -442,7 +445,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 
 					newlen = sizeof(newdata);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-							ttl_orig,TCP_FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+							ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 							data_payload, split_pos, newdata, &newlen))
 						return res;
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
@@ -472,7 +475,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 					{
 						fakeseg_len = sizeof(fakeseg);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_fake,params.desync_tcp_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								zeropkt, split_pos, fakeseg, &fakeseg_len))
 							return res;
 						DLOG("sending fake(1) 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
@@ -483,7 +486,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 
 					newlen = sizeof(newdata);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-							ttl_orig,TCP_FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+							ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 							data_payload, split_pos, newdata, &newlen))
 						return res;
 					DLOG("sending 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
@@ -503,7 +506,7 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 					{
 						newlen = sizeof(newdata);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_orig,TCP_FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								data_payload+split_pos, len_payload-split_pos, newdata, &newlen))
 							return res;
 						DLOG("sending 2nd tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
@@ -516,8 +519,113 @@ packet_process_result dpi_desync_packet(uint8_t *data_pkt, size_t len_pkt, struc
 				}
 				break;
 		}
+	}
 
-		return res;
+	return res;
+}
+
+
+
+packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, uint8_t *data_payload, size_t len_payload)
+{
+	packet_process_result res=pass;
+	t_ctrack *ctrack=NULL;
+	bool bReverse=false;
+
+	struct sockaddr_storage src, dst;
+	uint8_t newdata[DPI_DESYNC_MAX_FAKE_LEN+100];
+	size_t newlen;
+	uint8_t ttl_orig,ttl_fake;
+
+	if (!!ip == !!ip6hdr) return res; // one and only one must be present
+
+	if (CONNTRACK_REQUIRED)
+	{
+		ConntrackPoolPurge(&params.conntrack);
+		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, NULL, udphdr, len_payload, &ctrack, &bReverse))
+			maybe_cutoff(ctrack, IPPROTO_UDP);
+	}
+
+	//ConntrackPoolDump(&params.conntrack);
+
+	if (bReverse) return res; // nothing to do. do not waste cpu
+
+	if (params.desync_cutoff)
+	{
+		if (ctrack)
+		{
+			if (ctrack->b_desync_cutoff)
+			{
+				DLOG("not desyncing. desync-cutoff reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+				return res;
+			}
+			DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+		}
+		else
+		{
+			DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
+			return res;
+		}
+	}
+
+	if (params.desync_mode==DESYNC_NONE) return res;
+
+	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
+	if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
+	else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+	extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
+
+	if (len_payload)
+	{
+		const uint8_t *fake;
+		size_t fake_size;
+		bool b;
+
+		if (!params.desync_any_proto) return res;
+		DLOG("applying tampering to unknown protocol\n")
+
+		fake = params.fake_unknown_udp;
+		fake_size = params.fake_unknown_udp_size;
+
+		if (params.debug)
+		{
+			printf("dpi desync src=");
+			print_sockaddr((struct sockaddr *)&src);
+			printf(" dst=");
+			print_sockaddr((struct sockaddr *)&dst);
+			printf("\n");
+		}
+
+		newlen = sizeof(newdata);
+		b = false;
+		switch(params.desync_mode)
+		{
+			case DESYNC_FAKE:
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, params.desync_fooling_mode, fake, fake_size, newdata, &newlen))
+					return res;
+				DLOG("sending fake request : ");
+				hexdump_limited_dlog(fake,fake_size,PKT_MAXDUMP); DLOG("\n")
+				b = true;
+				break;
+		}
+
+		if (b)
+		{
+			if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+				return res;
+			DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
+			#ifdef __FreeBSD__
+			// FreeBSD tend to pass ipv6 frames with wrong checksum
+			if (res==modify || ip6hdr)
+			#else
+			// if original packet was tampered earlier it needs checksum fixed
+			if (res==modify)
+			#endif
+				udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
+			if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, data_pkt, len_pkt))
+				return res;
+			return drop;
+		}
 	}
 
 	return res;

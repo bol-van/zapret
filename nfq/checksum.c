@@ -11,6 +11,9 @@ static uint16_t from64to16(uint64_t x)
 	return (uint16_t)u + (uint16_t)(u>>16);
 }
 
+// this function preserves data alignment requirements (otherwise it will be damn slow on mips arch)
+// and uses 64-bit arithmetics to improve speed
+// taken from linux source code
 static uint16_t do_csum(const uint8_t * buff, size_t len)
 {
 	uint8_t odd;
@@ -122,12 +125,12 @@ uint16_t csum_ipv6_magic(const void *saddr, const void *daddr, size_t len, uint8
 void tcp4_fix_checksum(struct tcphdr *tcp,size_t len, const struct in_addr *src_addr, const struct in_addr *dest_addr)
 {
 	tcp->th_sum = 0;
-	tcp->th_sum = csum_tcpudp_magic(src_addr->s_addr,dest_addr->s_addr,len,IPPROTO_TCP,csum_partial(tcp, len));
+	tcp->th_sum = csum_tcpudp_magic(src_addr->s_addr,dest_addr->s_addr,len,IPPROTO_TCP,csum_partial(tcp,len));
 }
 void tcp6_fix_checksum(struct tcphdr *tcp,size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
 {
 	tcp->th_sum = 0;
-	tcp->th_sum = csum_ipv6_magic(src_addr,dest_addr,len,IPPROTO_TCP,csum_partial(tcp, len));	
+	tcp->th_sum = csum_ipv6_magic(src_addr,dest_addr,len,IPPROTO_TCP,csum_partial(tcp,len));
 }
 void tcp_fix_checksum(struct tcphdr *tcp,size_t len,const struct ip *ip,const struct ip6_hdr *ip6hdr)
 {
@@ -135,4 +138,22 @@ void tcp_fix_checksum(struct tcphdr *tcp,size_t len,const struct ip *ip,const st
 		tcp4_fix_checksum(tcp, len, &ip->ip_src, &ip->ip_dst);
 	else if (ip6hdr)
 		tcp6_fix_checksum(tcp, len, &ip6hdr->ip6_src, &ip6hdr->ip6_dst);
+}
+
+void udp4_fix_checksum(struct udphdr *udp,size_t len, const struct in_addr *src_addr, const struct in_addr *dest_addr)
+{
+	udp->uh_sum = 0;
+	udp->uh_sum = csum_tcpudp_magic(src_addr->s_addr,dest_addr->s_addr,len,IPPROTO_UDP,csum_partial(udp,len));
+}
+void udp6_fix_checksum(struct udphdr *udp,size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
+{
+	udp->uh_sum = 0;
+	udp->uh_sum = csum_ipv6_magic(src_addr,dest_addr,len,IPPROTO_UDP,csum_partial(udp,len));
+}
+void udp_fix_checksum(struct udphdr *udp,size_t len,const struct ip *ip,const struct ip6_hdr *ip6hdr)
+{
+	if (ip)
+		udp4_fix_checksum(udp, len, &ip->ip_src, &ip->ip_dst);
+	else if (ip6hdr)
+		udp6_fix_checksum(udp, len, &ip6hdr->ip6_src, &ip6hdr->ip6_dst);
 }

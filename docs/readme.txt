@@ -1,4 +1,4 @@
-﻿zapret v.42
+﻿zapret v.43
 
 English
 -------
@@ -9,7 +9,7 @@ For english version refer to docs/readme.eng.txt
 -----------------
 
 Автономное, без задействования сторонних серверов, средство противодействия DPI.
-Может помочь обойти блокировки или замедление сайтов http(s), сигнатурный анализ tcp протоколов,
+Может помочь обойти блокировки или замедление сайтов http(s), сигнатурный анализ tcp и udp протоколов,
 например с целью блокировки VPN.
 
 Проект нацелен прежде всего на маломощные embedded устройства - роутеры, работающие под openwrt.
@@ -182,7 +182,7 @@ nfqws
  --wsize=<winsize>[:<scale_factor>]	; менять tcp window size на указанный размер в SYN,ACK. если не задан scale_factor, то он не меняется (устарело !)
  --wssize=<winsize>[:<scale_factor>]	; менять tcp window size на указанный размер в исходящих пакетах. scale_factor по умолчанию 0. (см. conntrack !)
  --wssize-cutoff=[n|d|s]N               ; изменять server window size в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
- --ctrack-timeouts=S:E:F                ; таймауты внутреннего conntrack в состояниях SYN, ESTABLISHED, FIN. по умолчанию 60:300:60
+ --ctrack-timeouts=S:E:F[:U]            ; таймауты внутреннего conntrack в состояниях SYN, ESTABLISHED, FIN, таймаут udp. по умолчанию 60:300:60:60
  --hostcase				; менять регистр заголовка "Host:" по умолчанию на "host:".
  --hostnospace				; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
  --hostspell=HoST			; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
@@ -202,6 +202,7 @@ nfqws
  --dpi-desync-fake-http=<filename>	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-tls=<filename>	; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-unknown=<filename>	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
+ --dpi-desync-fake-unknown-udp=<filename> ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
  --dpi-desync-cutoff=[n|d|s]N           ; применять dpi desync только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
  --hostlist=<filename>			; применять дурение только к хостам из листа
 
@@ -415,6 +416,14 @@ window size итоговый размер окна стал максимальн
 На склонных к бездействию соединениях следует изменить таймауты conntrack.
 Если соединение выпало из conntrack и задана опция --dpi-desync-cutoff, dpi desync применяться не будет.
 
+ПОДДЕРЖКА UDP
+Атаки на udp более ограничены в возможностях. udp нельзя фрагментировать иначе, чем на уровне ip.
+ip фрагментация на данный момент не реализована.
+Пока что реализован только метод десинхронизации fake в режиме --dpi-desync-any-protocol.
+Реализован conntrack для udp. Можно пользоваться --dpi-desync-cutoff. Таймаут conntrack для udp
+можно изменить 4-м параметром в --ctrack-timeouts.
+Атака fake полезна только для stateful DPI, она бесполезна для анализа на уровне отдельных пакетов.
+По умолчанию fake наполнение - 64 нуля. Можно указать файл в --dpi-desync-fake-unknown-udp.
 
 tpws
 -----

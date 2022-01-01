@@ -39,6 +39,7 @@
 #define CTRACK_T_SYN	60
 #define CTRACK_T_FIN	60
 #define CTRACK_T_EST	300
+#define CTRACK_T_UDP	60
 
 struct params_s params;
 
@@ -86,7 +87,8 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 	struct ip *ip = NULL;
 	struct ip6_hdr *ip6hdr = NULL;
 	struct tcphdr *tcphdr = NULL;
-	size_t len = len_pkt, len_tcp;
+	struct udphdr *udphdr = NULL;
+	size_t len = len_pkt, len_with_th;
 	uint8_t *data = data_pkt;
 	packet_process_result res = pass;
 	uint8_t proto;
@@ -129,7 +131,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 	if (proto==IPPROTO_TCP && proto_check_tcp(data, len))
 	{
 		tcphdr = (struct tcphdr *) data;
-		len_tcp = len;
+		len_with_th = len;
 		proto_skip_tcp(&data, &len);
 
 		if (params.debug)
@@ -141,7 +143,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 
 		if (len) { DLOG("TCP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
 
-		res = dpi_desync_packet(data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_tcp, data, len);
+		res = dpi_desync_tcp_packet(data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_with_th, data, len);
 		// in my FreeBSD divert tests only ipv4 packets were reinjected with correct checksum
 		// ipv6 packets were with incorrect checksum
 #ifdef __FreeBSD__
@@ -150,7 +152,30 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 #else
 		if (res==modify)
 #endif
-			tcp_fix_checksum(tcphdr,len_tcp,ip,ip6hdr);
+			tcp_fix_checksum(tcphdr,len_with_th,ip,ip6hdr);
+	}
+	else if (proto==IPPROTO_UDP && proto_check_udp(data, len))
+	{
+		udphdr = (struct udphdr *) data;
+		len_with_th = len;
+		proto_skip_udp(&data, &len);
+
+		if (params.debug)
+		{
+			printf(" ");
+			print_udphdr(udphdr);
+			printf("\n");
+		}
+		if (len) { DLOG("UDP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
+
+		res = dpi_desync_udp_packet(data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
+#ifdef __FreeBSD__
+		// FreeBSD tend to pass ipv6 frames with wrong checksum
+		if (res==modify || ip6hdr)
+#else
+		if (res==modify)
+#endif
+			udp_fix_checksum(udphdr,len_with_th,ip,ip6hdr);
 	}
 	else
 	{
@@ -474,7 +499,7 @@ static void exithelp()
 		" --wsize=<window_size>[:<scale_factor>]\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --ctrack-timeouts=S:E:F\t\t; internal conntrack timeouts for SYN, ESTABLISHED and FIN stage. default %u:%u:%u\n"
+		" --ctrack-timeouts=S:E:F[:U]\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
@@ -500,9 +525,10 @@ static void exithelp()
 		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
 		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
+		" --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
-		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN,
+		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
@@ -549,6 +575,17 @@ static bool parse_badseq_increment(const char *opt, uint32_t *value)
 		return sscanf(opt, "%d", (int32_t*)value)>0;
 	}
 }
+static void load_file_or_exit(const char *filename, void *buf, size_t *size)
+{
+	if (!load_file_nonempty(filename,buf,size))
+	{
+		fprintf(stderr, "could not read %s\n",filename);
+		exit_clean(1);
+	}
+	DLOG("read %zu bytes from %s\n",*size,filename)
+}
+
+
 int main(int argc, char **argv)
 {
 	int result, v;
@@ -571,10 +608,12 @@ int main(int argc, char **argv)
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
 	params.fake_unknown_size = 256;
+	params.fake_unknown_udp_size = 64;
 	params.wscale=-1; // default - dont change scale factor (client)
 	params.ctrack_t_syn = CTRACK_T_SYN;
 	params.ctrack_t_est = CTRACK_T_EST;
 	params.ctrack_t_fin = CTRACK_T_FIN;
+	params.ctrack_t_udp = CTRACK_T_UDP;
 	params.desync_ttl6 = 0xFF; // unused
 	params.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
 	params.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
@@ -628,8 +667,9 @@ int main(int argc, char **argv)
 		{"dpi-desync-fake-http",required_argument,0,0},// optidx=26
 		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=27
 		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=28
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=29
-		{"hostlist",required_argument,0,0},		// optidx=30
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=29
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=30
+		{"hostlist",required_argument,0,0},		// optidx=31
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -706,7 +746,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 9: /* ctrack-timeouts */
-			if (sscanf(optarg, "%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin)!=3)
+			if (sscanf(optarg, "%u:%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin, &params.ctrack_t_udp)<3)
 			{
 				fprintf(stderr, "invalid ctrack-timeouts value\n");
 				exit_clean(1);
@@ -796,18 +836,18 @@ int main(int argc, char **argv)
 					e = strchr(p,',');
 					if (e) *e++=0;
 					if (!strcmp(p,"md5sig"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_MD5SIG;
+						params.desync_fooling_mode |= FOOL_MD5SIG;
 					else if (!strcmp(p,"ts"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_TS;
+						params.desync_fooling_mode |= FOOL_TS;
 					else if (!strcmp(p,"badsum"))
 					{
 						#ifdef __OpenBSD__
-						printf("\nWARNING !!! OpenBSD may forcibly recompute tcp checksums !!! In this case badsum fooling will not work.\nYou should check tcp checksum correctness in tcpdump manually before using badsum.\n\n");
+						printf("\nWARNING !!! OpenBSD may forcibly recompute tcp/udp checksums !!! In this case badsum fooling will not work.\nYou should check tcp checksum correctness in tcpdump manually before using badsum.\n\n");
 						#endif
-						params.desync_tcp_fooling_mode |= TCP_FOOL_BADSUM;
+						params.desync_fooling_mode |= FOOL_BADSUM;
 					}
 					else if (!strcmp(p,"badseq"))
-						params.desync_tcp_fooling_mode |= TCP_FOOL_BADSEQ;
+						params.desync_fooling_mode |= FOOL_BADSEQ;
 					else if (strcmp(p,"none"))
 					{
 						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum\n");
@@ -850,7 +890,6 @@ int main(int argc, char **argv)
 				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
-printf("FFF %08X\n", params.desync_badseq_increment);
 			break;
 		case 24: /* dpi-desync-badack-increment */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_ack_increment))
@@ -864,36 +903,28 @@ printf("FFF %08X\n", params.desync_badseq_increment);
 			break;
 		case 26: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
-			if (!load_file_nonempty(optarg,params.fake_http,&params.fake_http_size))
-			{
-				fprintf(stderr, "could not read %s\n",optarg);
-				exit_clean(1);
-			}
+			load_file_or_exit(optarg,params.fake_http,&params.fake_http_size);
 			break;
 		case 27: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
-			if (!load_file_nonempty(optarg,params.fake_tls,&params.fake_tls_size))
-			{
-				fprintf(stderr, "could not read %s\n",optarg);
-				exit_clean(1);
-			}
+			load_file_or_exit(optarg,params.fake_tls,&params.fake_tls_size);
 			break;
 		case 28: /* dpi-desync-fake-unknown */
 			params.fake_unknown_size = sizeof(params.fake_unknown);
-			if (!load_file_nonempty(optarg,params.fake_unknown,&params.fake_unknown_size))
-			{
-				fprintf(stderr, "could not read %s\n",optarg);
-				exit_clean(1);
-			}
+			load_file_or_exit(optarg,params.fake_unknown,&params.fake_unknown_size);
 			break;
-		case 29: /* desync-cutoff */
+		case 29: /* dpi-desync-fake-unknown-udp */
+			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
+			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
+			break;
+		case 30: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 30: /* hostlist */
+		case 31: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
@@ -919,8 +950,8 @@ printf("FFF %08X\n", params.desync_badseq_increment);
 		goto exiterr;
 	}
 
-	DLOG("initializing conntrack with timeouts %u:%u:%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin)
-	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin);
+	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp)
+	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 
 #ifdef __linux__
 	result = nfq_main();

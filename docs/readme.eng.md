@@ -1,7 +1,7 @@
 ## What is it for
 
 A stand-alone (without 3rd party servers) DPI circumvention tool.
-May allow to bypass http(s) website blocking or speed shaping, resist signature tcp protocol discovery.
+May allow to bypass http(s) website blocking or speed shaping, resist signature tcp/udp protocol discovery.
 
 The project is mainly aimed at the Russian audience to fight russian regulator named "Roskomnadzor".
 Some features of the project are russian reality specific (such as getting list of sites
@@ -154,6 +154,7 @@ nfqws takes the following parameters:
  --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
  --dpi-desync-fake-unknown=<filename>   ; file containing unknown protocol fake payload. default is 256 zeroes
+ --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload
  --dpi-desync-cutoff=[n|d|s]N           ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
 ```
@@ -379,6 +380,17 @@ Useful with `--dpi-desync-any-protocol=1`.
 If the connection falls out of the conntrack and --dpi-desync-cutoff is set, dpi desync will not be applied.
 
 Set conntrack timeouts appropriately.
+
+### UDP support
+
+UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
+IP fragmentation is not implemented now.
+No protocol recognition is implemented yet so only - `-dpi-desync-any-protocol` will work.
+Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th
+parameter of `--ctrack-timeouts`.
+Fake attack is useful only for stateful DPI and useless for stateless dealing with each packet independently.
+By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-unknown-udp`.
+
 
 ## tpws
 
