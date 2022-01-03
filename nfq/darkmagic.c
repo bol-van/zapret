@@ -794,15 +794,6 @@ static int rawsend_socket_raw(int domain, int proto)
 			close(fd);
 			return -1;
 		}
-		#ifdef __linux__
-		int yes=1;
-		if (setsockopt(fd,IPPROTO_IP,IP_NODEFRAG,&yes,sizeof(yes)) == -1)
-		{
-			perror("rawsend: setsockopt(IP_NODEFRAG)");
-			close(fd);
-			return -1;
-		}
-		#endif
 	}
 	return fd;
 }
@@ -861,6 +852,11 @@ static int rawsend_socket(sa_family_t family,uint32_t fwmark)
 		if (setsockopt(*sock, SOL_SOCKET, SO_PRIORITY, &pri, sizeof(pri)) == -1)
 		{
 			perror("rawsend: setsockopt(SO_PRIORITY)");
+			goto exiterr;
+		}
+		if (setsockopt(*sock, IPPROTO_IP, IP_NODEFRAG, &yes, sizeof(yes)) == -1)
+		{
+			perror("rawsend: setsockopt(IP_NODEFRAG)");
 			goto exiterr;
 		}
 #endif
