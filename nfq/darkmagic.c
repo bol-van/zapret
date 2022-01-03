@@ -327,7 +327,6 @@ bool ip_frag4(
 	((struct ip*)pkt1)->ip_off = htons(IP_MF);
 	((struct ip*)pkt1)->ip_len = htons(hdrlen+frag_pos);
 	if (ident!=(uint32_t)-1) ((struct ip*)pkt1)->ip_id = (uint16_t)ident;
-
 	*pkt1_size=hdrlen+frag_pos;
 	ip4_fix_checksum((struct ip *)pkt1);
 
@@ -795,6 +794,15 @@ static int rawsend_socket_raw(int domain, int proto)
 			close(fd);
 			return -1;
 		}
+		#ifdef __linux__
+		int yes=1;
+		if (setsockopt(fd,IPPROTO_IP,IP_NODEFRAG,&yes,sizeof(yes)) == -1)
+		{
+			perror("rawsend: setsockopt(IP_NODEFRAG)");
+			close(fd);
+			return -1;
+		}
+		#endif
 	}
 	return fd;
 }
