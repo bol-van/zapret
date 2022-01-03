@@ -545,6 +545,11 @@ pktws_check_domain_bypass()
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
+
+	for frag in 24 32 40 64 80 104; do
+		pktws_curl_test_update $1 $3 --dpi-desync=ipfrag2 --dpi-desync-ipfrag-pos-tcp=$frag
+	done
+
 	report_strategy $1 $3 $PKTWSD
 }
 tpws_check_domain_bypass()
