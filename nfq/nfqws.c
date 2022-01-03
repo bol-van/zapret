@@ -148,7 +148,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 		// ipv6 packets were with incorrect checksum
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (res==modify || ip6hdr)
+		if (res==modify || res!=frag && ip6hdr)
 #else
 		if (res==modify)
 #endif
@@ -171,7 +171,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 		res = dpi_desync_udp_packet(data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (res==modify || ip6hdr)
+		if (res==modify || res!=frag && ip6hdr)
 #else
 		if (res==modify)
 #endif
@@ -209,6 +209,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 			DLOG("packet: id=%d pass modified\n", id);
 			return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, len, data);
 		case drop:
+		case frag:
 			DLOG("packet: id=%d drop\n", id);
 			return nfq_set_verdict2(qh, id, NF_DROP, mark, 0, NULL);
 		}
@@ -504,7 +505,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2 ipfrag2\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -518,7 +519,9 @@ static void exithelp()
 #endif
 		" --dpi-desync-repeats=<N>\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=<1..%u>\t; TCP packet split position\n"
+		" --dpi-desync-split-pos=<1..%u>\t; data payload split position\n"
+		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t; ip frag position starting from the second header (usually transport header). multiple of 8, default %u.\n"
+		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t; ip frag position starting from the second header (usually transport header). multiple of 8, default %u.\n"
 		" --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default %d\n"
 		" --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
@@ -533,6 +536,8 @@ static void exithelp()
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
 		DPI_DESYNC_MAX_FAKE_LEN,
+		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
+		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
 		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT
 	);
 	exit(1);
@@ -602,6 +607,8 @@ int main(int argc, char **argv)
 	params.desync_fwmark = DPI_DESYNC_FWMARK_DEFAULT;
 	params.desync_skip_nosni = true;
 	params.desync_split_pos = 2;
+	params.desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
+	params.desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
 	params.desync_repeats = 1;
 	params.fake_tls_size = sizeof(fake_tls_clienthello_default);
 	memcpy(params.fake_tls,fake_tls_clienthello_default,params.fake_tls_size);
@@ -661,15 +668,17 @@ int main(int argc, char **argv)
 		{"dpi-desync-repeats",required_argument,0,0},	// optidx=20
 		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=21
 		{"dpi-desync-split-pos",required_argument,0,0},// optidx=22
-		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=23
-		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=24
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=25
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=26
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=27
-		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=28
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=29
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=30
-		{"hostlist",required_argument,0,0},		// optidx=31
+		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=24
+		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=25
+		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=26
+		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=27
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=28
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=29
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=30
+		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=31
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=32
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=33
+		{"hostlist",required_argument,0,0},		// optidx=34
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -806,6 +815,13 @@ int main(int argc, char **argv)
 					fprintf(stderr, "invalid desync combo : %s+%s\n", mode,mode2);
 					exit_clean(1);
 				}
+				#if defined(__OpenBSD__)
+				if (params.desync_mode==DESYNC_IPFRAG2 || params.desync_mode2==DESYNC_IPFRAG2)
+				{
+					fprintf(stderr, "OpenBSD has checksum issues with fragmented packets. ipfrag disabled.\n");
+					exit_clean(1);
+				}
+				#endif
 			}
 			break;
 		case 15: /* dpi-desync-fwmark/dpi-desync-sockarg */
@@ -866,8 +882,7 @@ int main(int argc, char **argv)
 #endif
 			break;
 		case 20: /* dpi-desync-repeats */
-			params.desync_repeats = atoi(optarg);
-			if (params.desync_repeats<=0 || params.desync_repeats>20)
+			if (sscanf(optarg,"%u",&params.desync_repeats)<1 || params.desync_repeats<=0 || params.desync_repeats>20)
 			{
 				fprintf(stderr, "dpi-desync-repeats must be within 1..20\n");
 				exit_clean(1);
@@ -877,54 +892,77 @@ int main(int argc, char **argv)
 			params.desync_skip_nosni = !optarg || atoi(optarg);
 			break;
 		case 22: /* dpi-desync-split-pos */
-			params.desync_split_pos = atoi(optarg);
-			if (params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
+			if (sscanf(optarg,"%u",&params.desync_split_pos)<1 || params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-split-pos must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
 				exit_clean(1);
 			}
 			break;
-		case 23: /* dpi-desync-badseq-increments */
+		case 23: /* dpi-desync-ipfrag-pos-tcp */
+			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_tcp)<1 || params.desync_ipfrag_pos_tcp<1 || params.desync_ipfrag_pos_tcp>DPI_DESYNC_MAX_FAKE_LEN)
+			{
+				fprintf(stderr, "dpi-desync-ipfrag-pos-tcp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
+				exit_clean(1);
+			}
+			if (params.desync_ipfrag_pos_tcp & 7)
+			{
+				fprintf(stderr, "dpi-desync-ipfrag-pos-tcp must be multiple of 8\n");
+				exit_clean(1);
+			}
+			break;
+		case 24: /* dpi-desync-ipfrag-pos-udp */
+			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_udp)<1 || params.desync_ipfrag_pos_udp<1 || params.desync_ipfrag_pos_udp>DPI_DESYNC_MAX_FAKE_LEN)
+			{
+				fprintf(stderr, "dpi-desync-ipfrag-pos-udp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
+				exit_clean(1);
+			}
+			if (params.desync_ipfrag_pos_udp & 7)
+			{
+				fprintf(stderr, "dpi-desync-ipfrag-pos-udp must be multiple of 8\n");
+				exit_clean(1);
+			}
+			break;
+		case 25: /* dpi-desync-badseq-increments */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_increment))
 			{
 				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 24: /* dpi-desync-badack-increment */
+		case 26: /* dpi-desync-badack-increment */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_ack_increment))
 			{
 				fprintf(stderr, "dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 25: /* dpi-desync-any-protocol */
+		case 27: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 26: /* dpi-desync-fake-http */
+		case 28: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
 			load_file_or_exit(optarg,params.fake_http,&params.fake_http_size);
 			break;
-		case 27: /* dpi-desync-fake-tls */
+		case 29: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
 			load_file_or_exit(optarg,params.fake_tls,&params.fake_tls_size);
 			break;
-		case 28: /* dpi-desync-fake-unknown */
+		case 30: /* dpi-desync-fake-unknown */
 			params.fake_unknown_size = sizeof(params.fake_unknown);
 			load_file_or_exit(optarg,params.fake_unknown,&params.fake_unknown_size);
 			break;
-		case 29: /* dpi-desync-fake-unknown-udp */
+		case 31: /* dpi-desync-fake-unknown-udp */
 			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
-		case 30: /* desync-cutoff */
+		case 32: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 31: /* hostlist */
+		case 33: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

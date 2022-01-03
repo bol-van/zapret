@@ -307,6 +307,100 @@ bool prepare_udp_segment(
 
 
 
+// split ipv4 packet into 2 fragments at data payload position frag_pos
+bool ip_frag4(
+	const uint8_t *pkt, size_t pkt_size,
+	size_t frag_pos, uint32_t ident,
+	uint8_t *pkt1, size_t *pkt1_size,
+	uint8_t *pkt2, size_t *pkt2_size)
+{
+	uint16_t hdrlen, payload_len;
+	// frag_pos must be 8-byte aligned
+	if (frag_pos & 7 || pkt_size < sizeof(struct ip)) return false;
+	payload_len = htons(((struct ip *)pkt)->ip_len);
+	hdrlen = ((struct ip *)pkt)->ip_hl<<2;
+	if (payload_len>pkt_size || hdrlen>pkt_size || hdrlen>payload_len) return false;
+	payload_len -= hdrlen;
+	if (frag_pos>=payload_len || *pkt1_size<(hdrlen+frag_pos) || *pkt2_size<(hdrlen+payload_len-frag_pos)) return false;
+
+	memcpy(pkt1, pkt, hdrlen+frag_pos);
+	((struct ip*)pkt1)->ip_off = htons(IP_MF);
+	((struct ip*)pkt1)->ip_len = htons(hdrlen+frag_pos);
+	if (ident!=(uint32_t)-1) ((struct ip*)pkt1)->ip_id = (uint16_t)ident;
+
+	*pkt1_size=hdrlen+frag_pos;
+	ip4_fix_checksum((struct ip *)pkt1);
+
+	memcpy(pkt2, pkt, hdrlen);
+	memcpy(pkt2+hdrlen, pkt+hdrlen+frag_pos, payload_len-frag_pos);
+	((struct ip*)pkt2)->ip_off = htons((uint16_t)frag_pos>>3 & IP_OFFMASK);
+	((struct ip*)pkt2)->ip_len = htons(hdrlen+payload_len-frag_pos);
+	if (ident!=(uint32_t)-1) ((struct ip*)pkt2)->ip_id = (uint16_t)ident;
+	*pkt2_size=hdrlen+payload_len-frag_pos;
+	ip4_fix_checksum((struct ip *)pkt2);
+
+	return true;
+}
+bool ip_frag6(
+	const uint8_t *pkt, size_t pkt_size,
+	size_t frag_pos, uint32_t ident,
+	uint8_t *pkt1, size_t *pkt1_size,
+	uint8_t *pkt2, size_t *pkt2_size)
+{
+	uint16_t payload_len;
+	uint8_t proto;
+	struct ip6_frag *frag;
+
+	if (frag_pos & 7 || pkt_size < sizeof(struct ip6_hdr)) return false;
+	payload_len = htons(((struct ip6_hdr*)pkt)->ip6_ctlun.ip6_un1.ip6_un1_plen);
+	if ((sizeof(struct ip6_hdr)+payload_len)>pkt_size || frag_pos>=payload_len ||
+		*pkt1_size<(sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+frag_pos) ||
+		*pkt2_size<(sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+payload_len-frag_pos))
+	{
+		return false;
+	}
+
+	proto = ((struct ip6_hdr*)pkt)->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+	
+	memcpy(pkt1, pkt, sizeof(struct ip6_hdr));
+	((struct ip6_hdr*)pkt1)->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(sizeof(struct ip6_frag)+frag_pos);
+	((struct ip6_hdr*)pkt1)->ip6_ctlun.ip6_un1.ip6_un1_nxt = IPPROTO_FRAGMENT;
+	frag = (struct ip6_frag*)(((struct ip6_hdr*)pkt1)+1);
+	frag->ip6f_nxt = proto;
+	frag->ip6f_reserved = 0;
+	frag->ip6f_offlg = IP6F_MORE_FRAG;
+	frag->ip6f_ident = ident;
+	memcpy(frag+1, pkt+sizeof(struct ip6_hdr), frag_pos);
+	*pkt1_size = sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+frag_pos;
+
+	memcpy(pkt2, pkt, sizeof(struct ip6_hdr));
+	((struct ip6_hdr*)pkt2)->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(sizeof(struct ip6_frag)+payload_len-frag_pos);
+	((struct ip6_hdr*)pkt2)->ip6_ctlun.ip6_un1.ip6_un1_nxt = IPPROTO_FRAGMENT;
+	frag = (struct ip6_frag*)(((struct ip6_hdr*)pkt2)+1);
+	frag->ip6f_nxt = proto;
+	frag->ip6f_reserved = 0;
+	frag->ip6f_offlg = htons(frag_pos);
+	frag->ip6f_ident = ident;
+	memcpy(frag+1, pkt+sizeof(struct ip6_hdr)+frag_pos, payload_len-frag_pos);
+	*pkt2_size = sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+payload_len-frag_pos;
+
+	return true;
+}
+bool ip_frag(
+	const uint8_t *pkt, size_t pkt_size,
+	size_t frag_pos, uint32_t ident,
+	uint8_t *pkt1, size_t *pkt1_size,
+	uint8_t *pkt2, size_t *pkt2_size)
+{
+	if (proto_check_ipv4(pkt,pkt_size))
+		return ip_frag4(pkt,pkt_size,frag_pos,ident,pkt1,pkt1_size,pkt2,pkt2_size);
+	else if (proto_check_ipv6(pkt,pkt_size))
+		return ip_frag6(pkt,pkt_size,frag_pos,ident,pkt1,pkt1_size,pkt2,pkt2_size);
+	else
+		return false;
+}
+
+
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport)
 {
 	if (sport) *sport  = htons(tcphdr ? tcphdr->th_sport : udphdr ? udphdr->uh_sport : 0);

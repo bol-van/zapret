@@ -50,7 +50,8 @@ const uint8_t fake_tls_clienthello_default[517] = {
     0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-#define PKT_MAXDUMP 32
+#define PKTDATA_MAXDUMP 32
+#define IP_MAXDUMP 64
 
 static uint8_t zeropkt[DPI_DESYNC_MAX_FAKE_LEN];
 
@@ -70,7 +71,7 @@ bool desync_valid_first_stage(enum dpi_desync_mode mode)
 }
 bool desync_valid_second_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_NONE || mode==DESYNC_DISORDER || mode==DESYNC_DISORDER2 || mode==DESYNC_SPLIT || mode==DESYNC_SPLIT2;
+	return mode==DESYNC_NONE || mode==DESYNC_DISORDER || mode==DESYNC_DISORDER2 || mode==DESYNC_SPLIT || mode==DESYNC_SPLIT2 || mode==DESYNC_IPFRAG2;
 }
 enum dpi_desync_mode desync_mode_from_string(const char *s)
 {
@@ -92,6 +93,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_SPLIT;
 	else if (!strcmp(s,"split2"))
 		return DESYNC_SPLIT2;
+	else if (!strcmp(s,"ipfrag2"))
+		return DESYNC_IPFRAG2;
 	return DESYNC_INVALID;
 }
 
@@ -151,8 +154,8 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 	bool bReverse=false;
 
 	struct sockaddr_storage src, dst;
-	uint8_t newdata[DPI_DESYNC_MAX_FAKE_LEN+100];
-	size_t newlen;
+	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
+	size_t pkt1_len, pkt2_len;
 	uint8_t ttl_orig,ttl_fake,flags_orig,scale_factor;
 	uint32_t *timestamps;
 
@@ -210,15 +213,15 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 	if (params.desync_mode0==DESYNC_SYNACK && tcp_syn_segment(tcphdr))
 	{
-		newlen = sizeof(newdata);
+		pkt1_len = sizeof(pkt1);
 		if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 			ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-			NULL, 0, newdata, &newlen))
+			NULL, 0, pkt1, &pkt1_len))
 		{
 			return res;
 		}
 		DLOG("sending fake SYNACK\n");
-		if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+		if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 			return res;
 	}
 
@@ -349,26 +352,26 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		enum dpi_desync_mode desync_mode = params.desync_mode;
 		bool b;
 
-		newlen = sizeof(newdata);
+		pkt1_len = sizeof(pkt1);
 		b = false;
 		switch(desync_mode)
 		{
 			case DESYNC_FAKE:
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-					fake, fake_size, newdata, &newlen))
+					fake, fake_size, pkt1, &pkt1_len))
 				{
 					return res;
 				}
 				DLOG("sending fake request : ");
-				hexdump_limited_dlog(fake,fake_size,PKT_MAXDUMP); DLOG("\n")
+				hexdump_limited_dlog(fake,fake_size,PKTDATA_MAXDUMP); DLOG("\n")
 				b = true;
 				break;
 			case DESYNC_RST:
 			case DESYNC_RSTACK:
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-					NULL, 0, newdata, &newlen))
+					NULL, 0, pkt1, &pkt1_len))
 				{
 					return res;
 				}
@@ -379,7 +382,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 		if (b)
 		{
-			if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+			if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 				return res;
 			if (params.desync_mode2==DESYNC_NONE)
 			{
@@ -406,13 +409,13 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 			desync_mode = params.desync_mode2;
 		}
 
-		newlen = sizeof(newdata);
+		size_t split_pos=len_payload>params.desync_split_pos ? params.desync_split_pos : 1;
+		pkt1_len = sizeof(pkt1);
 		switch(desync_mode)
 		{
 			case DESYNC_DISORDER:
 			case DESYNC_DISORDER2:
 				{
-					size_t split_pos=len_payload>params.desync_split_pos ? params.desync_split_pos : 1;
 					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100];
 					size_t fakeseg_len;
 
@@ -420,11 +423,11 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					{
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 								ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-								data_payload+split_pos, len_payload-split_pos, newdata, &newlen))
+								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
 							return res;
 						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
-						hexdump_limited_dlog(data_payload+split_pos,len_payload-split_pos,PKT_MAXDUMP); DLOG("\n")
-						if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+						hexdump_limited_dlog(data_payload+split_pos,len_payload-split_pos,PKTDATA_MAXDUMP); DLOG("\n")
+						if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 							return res;
 					}
 
@@ -437,26 +440,26 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 								zeropkt, split_pos, fakeseg, &fakeseg_len))
 							return res;
 						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-						hexdump_limited_dlog(zeropkt,split_pos,PKT_MAXDUMP); DLOG("\n")
+						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
 						if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
 							return res;
 					}
 
 
-					newlen = sizeof(newdata);
+					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 							ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-							data_payload, split_pos, newdata, &newlen))
+							data_payload, split_pos, pkt1, &pkt1_len))
 						return res;
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-					hexdump_limited_dlog(data_payload,split_pos,PKT_MAXDUMP); DLOG("\n")
-					if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+					hexdump_limited_dlog(data_payload,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
+					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 						return res;
 
 					if (desync_mode==DESYNC_DISORDER)
 					{
 						DLOG("sending fake(2) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-						hexdump_limited_dlog(zeropkt,split_pos,PKT_MAXDUMP); DLOG("\n")
+						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
 						if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
 							return res;
 					}
@@ -467,7 +470,6 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 			case DESYNC_SPLIT:
 			case DESYNC_SPLIT2:
 				{
-					size_t split_pos=len_payload>params.desync_split_pos ? params.desync_split_pos : 1;
 					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100];
 					size_t fakeseg_len;
 
@@ -479,45 +481,74 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 								zeropkt, split_pos, fakeseg, &fakeseg_len))
 							return res;
 						DLOG("sending fake(1) 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-						hexdump_limited_dlog(zeropkt,split_pos,PKT_MAXDUMP); DLOG("\n")
+						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
 						if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
 							return res;
 					}
 
-					newlen = sizeof(newdata);
+					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 							ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-							data_payload, split_pos, newdata, &newlen))
+							data_payload, split_pos, pkt1, &pkt1_len))
 						return res;
 					DLOG("sending 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-					hexdump_limited_dlog(data_payload,split_pos,PKT_MAXDUMP); DLOG("\n")
-					if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+					hexdump_limited_dlog(data_payload,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
+					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 						return res;
 
 					if (desync_mode==DESYNC_SPLIT)
 					{
 						DLOG("sending fake(2) 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-						hexdump_limited_dlog(zeropkt,split_pos,PKT_MAXDUMP); DLOG("\n")
+						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
 						if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, fakeseg, fakeseg_len))
 							return res;
 					}
 
 					if (split_pos<len_payload)
 					{
-						newlen = sizeof(newdata);
+						pkt1_len = sizeof(pkt1);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 								ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-								data_payload+split_pos, len_payload-split_pos, newdata, &newlen))
+								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
 							return res;
 						DLOG("sending 2nd tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
-						hexdump_limited_dlog(data_payload+split_pos,len_payload-split_pos,PKT_MAXDUMP); DLOG("\n")
-						if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
+						hexdump_limited_dlog(data_payload+split_pos,len_payload-split_pos,PKTDATA_MAXDUMP); DLOG("\n")
+						if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 							return res;
 					}
 
 					return drop;
 				}
 				break;
+			case DESYNC_IPFRAG2:
+				{
+					#ifdef __FreeBSD__
+					// FreeBSD tend to pass ipv6 frames with wrong checksum
+					if (ip6hdr)
+						tcp_fix_checksum(tcphdr,len_tcp,ip,ip6hdr);
+					#endif
+
+					size_t ipfrag_pos = (params.desync_ipfrag_pos_tcp && params.desync_ipfrag_pos_tcp<len_tcp) ? params.desync_ipfrag_pos_tcp : 24;
+					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()&0xFFFFFFFF);
+
+					pkt1_len = sizeof(pkt1);
+					pkt2_len = sizeof(pkt2);
+
+					if (!ip_frag(data_pkt, len_pkt, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
+						return res;
+
+					DLOG("sending 1st ip fragment 0-%zu len=%zu : ", ipfrag_pos-1, ipfrag_pos)
+					hexdump_limited_dlog(pkt1,pkt1_len,IP_MAXDUMP); DLOG("\n")
+					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt2, pkt2_len))
+						return res;
+
+					DLOG("sending 2nd ip fragment %zu-%zu len=%zu : ", ipfrag_pos, len_tcp-1, len_tcp-ipfrag_pos)
+					hexdump_limited_dlog(pkt2,pkt2_len,IP_MAXDUMP); DLOG("\n")
+					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
+						return res;
+
+					return frag;
+				}
 		}
 	}
 
@@ -533,8 +564,8 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 	bool bReverse=false;
 
 	struct sockaddr_storage src, dst;
-	uint8_t newdata[DPI_DESYNC_MAX_FAKE_LEN+100];
-	size_t newlen;
+	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
+	size_t pkt1_len, pkt2_len;
 	uint8_t ttl_orig,ttl_fake;
 
 	if (!!ip == !!ip6hdr) return res; // one and only one must be present
@@ -579,6 +610,8 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		if (!params.desync_any_proto) return res;
 		DLOG("applying tampering to unknown protocol\n")
 
+		enum dpi_desync_mode desync_mode = params.desync_mode;
+
 		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
 		else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
@@ -596,36 +629,77 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 			printf("\n");
 		}
 
-		newlen = sizeof(newdata);
+		pkt1_len = sizeof(pkt1);
 		b = false;
-		switch(params.desync_mode)
+		switch(desync_mode)
 		{
 			case DESYNC_FAKE:
-				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, params.desync_fooling_mode, fake, fake_size, newdata, &newlen))
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, params.desync_fooling_mode, fake, fake_size, pkt1, &pkt1_len))
 					return res;
 				DLOG("sending fake request : ");
-				hexdump_limited_dlog(fake,fake_size,PKT_MAXDUMP); DLOG("\n")
+				hexdump_limited_dlog(fake,fake_size,PKTDATA_MAXDUMP); DLOG("\n")
 				b = true;
 				break;
 		}
 
 		if (b)
 		{
-			if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, newdata, newlen))
-				return res;
-			DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
-			#ifdef __FreeBSD__
-			// FreeBSD tend to pass ipv6 frames with wrong checksum
-			if (res==modify || ip6hdr)
-			#else
-			// if original packet was tampered earlier it needs checksum fixed
-			if (res==modify)
-			#endif
-				udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
-			if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, data_pkt, len_pkt))
-				return res;
-			return drop;
+			if (params.desync_mode2==DESYNC_NONE)
+			{
+				if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
+					return res;
+				DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
+				#ifdef __FreeBSD__
+				// FreeBSD tend to pass ipv6 frames with wrong checksum
+				if (res==modify || ip6hdr)
+				#else
+				// if original packet was tampered earlier it needs checksum fixed
+				if (res==modify)
+				#endif
+					udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
+				if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, data_pkt, len_pkt))
+					return res;
+				return drop;
+			}
+			desync_mode = params.desync_mode2;
 		}
+
+		switch(desync_mode)
+		{
+			case DESYNC_IPFRAG2:
+				{
+
+					#ifdef __FreeBSD__
+					// FreeBSD tend to pass ipv6 frames with wrong checksum
+					if (ip6hdr)
+						udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
+					#endif
+
+					size_t len_transport = len_payload + sizeof(struct udphdr);
+					size_t ipfrag_pos = (params.desync_ipfrag_pos_udp && params.desync_ipfrag_pos_udp<len_transport) ? params.desync_ipfrag_pos_udp : sizeof(struct udphdr);
+					// freebsd do not set ip.id
+					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()&0xFFFFFFFF);
+
+					pkt1_len = sizeof(pkt1);
+					pkt2_len = sizeof(pkt2);
+
+					if (!ip_frag(data_pkt, len_pkt, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
+						return res;
+
+					DLOG("sending 1st ip fragment 0-%zu len=%zu : ", ipfrag_pos-1, ipfrag_pos)
+					hexdump_limited_dlog(pkt1,pkt1_len,IP_MAXDUMP); DLOG("\n")
+					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt2, pkt2_len))
+						return res;
+
+					DLOG("sending 2nd ip fragment %zu-%zu len=%zu : ", ipfrag_pos, len_transport-1, len_transport-ipfrag_pos)
+					hexdump_limited_dlog(pkt2,pkt2_len,IP_MAXDUMP); DLOG("\n")
+					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
+						return res;
+
+					return frag;
+				}
+		}
+
 	}
 
 	return res;

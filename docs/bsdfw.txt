@@ -27,6 +27,7 @@ ipfw add 100 fwd ::1,988 tcp from any to any 80,443 proto ip6 recv em1
 
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
+ipfw add 100 divert 989 udp from any to any 443 out not diverted not sockarg xmit em0
 
 ipfw delete 100
 ipfw add 100 allow tcp from me to table\(nozapret\) 80,443

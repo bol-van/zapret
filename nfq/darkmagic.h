@@ -84,6 +84,24 @@ bool prepare_udp_segment(
 	uint8_t *buf, size_t *buflen);
 
 
+// ipv4: ident==-1 - copy ip_id from original ipv4 packet
+bool ip_frag4(
+	const uint8_t *pkt, size_t pkt_size,
+	size_t frag_pos, uint32_t ident,
+	uint8_t *pkt1, size_t *pkt1_size,
+	uint8_t *pkt2, size_t *pkt2_size);
+bool ip_frag6(
+	const uint8_t *pkt, size_t pkt_size,
+	size_t frag_pos, uint32_t ident,
+	uint8_t *pkt1, size_t *pkt1_size,
+	uint8_t *pkt2, size_t *pkt2_size);
+bool ip_frag(
+	const uint8_t *pkt, size_t pkt_size,
+	size_t frag_pos, uint32_t ident,
+	uint8_t *pkt1, size_t *pkt1_size,
+	uint8_t *pkt2, size_t *pkt2_size);
+
+
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport);
 void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr,const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
 uint8_t *tcp_find_option(struct tcphdr *tcp, uint8_t kind);

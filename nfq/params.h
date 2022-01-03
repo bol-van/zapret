@@ -20,6 +20,9 @@
 #define BADSEQ_INCREMENT_DEFAULT 	-10000
 #define BADSEQ_ACK_INCREMENT_DEFAULT 	-66000
 
+#define IPFRAG_UDP_DEFAULT 8
+#define IPFRAG_TCP_DEFAULT 32
+
 struct params_s
 {
 	bool debug;
@@ -36,7 +39,7 @@ struct params_s
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
-	int desync_repeats,desync_split_pos;
+	unsigned int desync_repeats,desync_split_pos,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
 	char desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;

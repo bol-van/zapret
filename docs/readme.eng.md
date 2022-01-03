@@ -139,7 +139,7 @@ nfqws takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2
+ --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2 ipfrag2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                ; set ipv6 hop limit for desync packet. by default ttl value is used
@@ -148,6 +148,8 @@ nfqws takes the following parameters:
  --dpi-desync-repeats=<N>               ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for split* and disorder* only) split TCP packet at specified position
+ --dpi-desync-ipfrag-pos-tcp=<8..9216>  ; ip frag position starting from the second header (usually transport header). multiple of 8, default 8.
+ --dpi-desync-ipfrag-pos-udp=<8..9216>  ; ip frag position starting from the second header (usually transport header). multiple of 8, default 32.
  --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default -10000
  --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default -66000
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
@@ -390,6 +392,14 @@ Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout c
 parameter of `--ctrack-timeouts`.
 Fake attack is useful only for stateful DPI and useless for stateless dealing with each packet independently.
 By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-unknown-udp`.
+
+### IP fragmentation
+
+Modern network is very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled
+on the way. Linux always reassembles forwarded fragmented ipv6 if possible and it cannot be disablled.
+But Linux can send fragments.
+Frag position is set independently for tcp and udp. By default 24 and 8, must be multiple of 8.
+Offset starts from the header following ip header - transport header in most cases.
 
 
 ## tpws
