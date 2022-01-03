@@ -854,7 +854,7 @@ static int rawsend_socket(sa_family_t family,uint32_t fwmark)
 			perror("rawsend: setsockopt(SO_PRIORITY)");
 			goto exiterr;
 		}
-		if (setsockopt(*sock, IPPROTO_IP, IP_NODEFRAG, &yes, sizeof(yes)) == -1)
+		if (family==AF_INET && setsockopt(*sock, IPPROTO_IP, IP_NODEFRAG, &yes, sizeof(yes)) == -1)
 		{
 			perror("rawsend: setsockopt(IP_NODEFRAG)");
 			goto exiterr;
