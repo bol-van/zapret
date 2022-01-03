@@ -668,17 +668,17 @@ int main(int argc, char **argv)
 		{"dpi-desync-repeats",required_argument,0,0},	// optidx=20
 		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=21
 		{"dpi-desync-split-pos",required_argument,0,0},// optidx=22
-		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=24
-		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=25
-		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=26
-		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=27
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=28
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=29
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=30
-		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=31
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=32
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=33
-		{"hostlist",required_argument,0,0},		// optidx=34
+		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=23
+		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=24
+		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=25
+		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=26
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=27
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=28
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=29
+		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=30
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=31
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=32
+		{"hostlist",required_argument,0,0},		// optidx=33
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
