@@ -115,6 +115,10 @@ IPFW_DEL()
 {
 	ipfw -qf delete $IPFW_RULE_NUM
 }
+ipt6_has_raw()
+{
+	ip6tables -t raw -L >/dev/null 2>/dev/null
+}
 
 
 check_system()
@@ -311,6 +315,12 @@ pktws_ipt_prepare()
 	case "$UNAME" in
 		Linux)
 			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+			# otherwise ipv6 fragmentation may not work
+			[ $IPV = 6 ] && [ -n "$IPT6_HAS_RAW" ] && {
+				# to avoid possible INVALID state drop
+				IPT INPUT -p tcp --sport $1 -j ACCEPT
+				IPT OUTPUT -t raw -p tcp --dport $1 -j CT --notrack
+			}
 			;;
 		FreeBSD)
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any 80,443 proto ip${IPV} out not diverted not sockarg
@@ -323,6 +333,10 @@ pktws_ipt_unprepare()
 	case "$UNAME" in
 		Linux)
 			IPT_DEL POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+			[ $IPV = 6 ] && [ -n "$IPT6_HAS_RAW" ] && {
+				IPT_DEL OUTPUT -t raw -p tcp --dport $1 -j CT --notrack
+				IPT_DEL INPUT -p tcp --sport $1 -j ACCEPT
+			}
 			;;
 		FreeBSD)
 			IPFW_DEL
@@ -546,9 +560,11 @@ pktws_check_domain_bypass()
 		[ "$sec" = 1 ] || break
 	done
 
-	for frag in 24 32 40 64 80 104; do
-		pktws_curl_test_update $1 $3 --dpi-desync=ipfrag2 --dpi-desync-ipfrag-pos-tcp=$frag
-	done
+	[ $IPV=4 -o -n "$IPT6_HAS_RAW" ] && {
+		for frag in 24 32 40 64 80 104; do
+			pktws_curl_test_update $1 $3 --dpi-desync=ipfrag2 --dpi-desync-ipfrag-pos-tcp=$frag
+		done
+	}
 
 	report_strategy $1 $3 $PKTWSD
 }
@@ -731,6 +747,14 @@ ask_params()
 	}
 
 	echo
+
+	IPT6_HAS_RAW=
+	ipt6_has_raw && IPT6_HAS_RAW=1
+
+	[ -n "$IPT6_HAS_RAW" ] || {
+		echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
+		echo
+	}
 }
 
 
