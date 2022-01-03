@@ -396,7 +396,7 @@ By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-
 ### IP fragmentation
 
 Modern network is very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled
-on the way. Linux always reassembles forwarded fragmented ipv6 if possible and it cannot be disablled.
+on the way. Linux always reassembles forwarded fragmented ipv6 if possible and it cannot be disabled.
 But Linux can send fragments.
 Frag position is set independently for tcp and udp. By default 24 and 8, must be multiple of 8.
 Offset starts from the header following ip header - transport header in most cases.
