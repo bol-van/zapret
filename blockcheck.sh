@@ -314,13 +314,18 @@ pktws_ipt_prepare()
 	# $1 - port
 	case "$UNAME" in
 		Linux)
-			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
-			# otherwise ipv6 fragmentation may not work
-			[ $IPV = 6 ] && [ -n "$IPT6_HAS_RAW" ] && {
-				# to avoid possible INVALID state drop
-				IPT INPUT -p tcp --sport $1 -j ACCEPT
+			# to avoid possible INVALID state drop
+			IPT INPUT -p tcp --sport $1 ! --syn -j ACCEPT
+			IPT OUTPUT -p tcp --dport $1 -m conntrack --ctstate INVALID -j ACCEPT
+			if [ "$IPV" = 6 -a -n "$IP6_DEFRAG_DISABLE" ]; then
+				# the only way to reliable disable ipv6 defrag. works only in 4.16+ kernels
 				IPT OUTPUT -t raw -p tcp --dport $1 -j CT --notrack
-			}
+			elif [ "$IPV" = 4 ]; then
+				# enable fragments
+				IPT OUTPUT -f -j ACCEPT
+			fi
+
+			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
 			;;
 		FreeBSD)
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any 80,443 proto ip${IPV} out not diverted not sockarg
@@ -333,10 +338,14 @@ pktws_ipt_unprepare()
 	case "$UNAME" in
 		Linux)
 			IPT_DEL POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
-			[ $IPV = 6 ] && [ -n "$IPT6_HAS_RAW" ] && {
+
+			IPT_DEL INPUT -p tcp --sport $1 ! --syn -j ACCEPT
+			IPT_DEL OUTPUT -p tcp --dport $1 -m conntrack --ctstate INVALID -j ACCEPT
+			if [ "$IPV" = 6 -a -n "$IP6_DEFRAG_DISABLE" ]; then
 				IPT_DEL OUTPUT -t raw -p tcp --dport $1 -j CT --notrack
-				IPT_DEL INPUT -p tcp --sport $1 -j ACCEPT
-			}
+			elif [ "$IPV" = 4 ]; then
+				IPT_DEL OUTPUT -f -j ACCEPT
+			fi
 			;;
 		FreeBSD)
 			IPFW_DEL
@@ -403,7 +412,7 @@ curl_test()
 	while [ $n -lt $REPEATS ]; do
 		n=$(($n+1))
 		[ $REPEATS -gt 1 ] && $ECHON "[attempt $n] "
-		$1 $IPV $2 && {
+		$1 "$IPV" $2 && {
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 			continue
 		}
@@ -560,7 +569,7 @@ pktws_check_domain_bypass()
 		[ "$sec" = 1 ] || break
 	done
 
-	[ $IPV=4 -o -n "$IPT6_HAS_RAW" ] && {
+	[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
 		for frag in 24 32 40 64 80 104; do
 			pktws_curl_test_update $1 $3 --dpi-desync=ipfrag2 --dpi-desync-ipfrag-pos-tcp=$frag
 		done
@@ -748,12 +757,22 @@ ask_params()
 
 	echo
 
-	IPT6_HAS_RAW=
-	ipt6_has_raw && IPT6_HAS_RAW=1
+	IP6_DEFRAG_DISABLE=
+	[ "$UNAME" = "Linux" ] && [ "$IPVS" = 6 -o "$IPVS" = "4 6" ] && {
+		local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
+		local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
+		if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
+			ipt6_has_raw && IP6_DEFRAG_DISABLE=1
+			[ -n "$IP6_DEFRAG_DISABLE" ] || {
+				echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
+				echo
+			}
+		else
+			echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
+			echo "WARNING ! ipv6 ipfrag tests are disabled"
+			echo
+		fi
 
-	[ -n "$IPT6_HAS_RAW" ] || {
-		echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
-		echo
 	}
 }
 
