@@ -757,23 +757,29 @@ ask_params()
 
 	echo
 
-	IP6_DEFRAG_DISABLE=
-	[ "$UNAME" = "Linux" ] && [ "$IPVS" = 6 -o "$IPVS" = "4 6" ] && {
-		local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
-		local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
-		if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
-			ipt6_has_raw && IP6_DEFRAG_DISABLE=1
-			[ -n "$IP6_DEFRAG_DISABLE" ] || {
-				echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
-				echo
+	case "$UNAME" in
+		Linux)
+			IP6_DEFRAG_DISABLE=
+			[ "$IPVS" = 6 -o "$IPVS" = "4 6" ] && {
+				local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
+				local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
+				if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
+					ipt6_has_raw && IP6_DEFRAG_DISABLE=1
+					[ -n "$IP6_DEFRAG_DISABLE" ] || {
+						echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
+						echo
+					}
+				else
+					echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
+					echo "WARNING ! ipv6 ipfrag tests are disabled"
+					echo
+				fi
 			}
-		else
-			echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
-			echo "WARNING ! ipv6 ipfrag tests are disabled"
-			echo
-		fi
-
-	}
+			;;
+		*)
+			IP6_DEFRAG_DISABLE=1
+			;;
+	esac
 }
 
 
