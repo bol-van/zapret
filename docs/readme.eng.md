@@ -404,9 +404,9 @@ ipv4 : Linux allows to send ipv4 fragments but standard firewall rules in OUTPUT
 ipv6 : There's no way for an application to reliably send fragments without defragmentation in conntrack.
 Sometimes it works, sometimes system defragments packets.
 Looks like kernels <4.16 have no simple way to solve this problem. Unloading of nf_conntrack module
-and its dependency nf_defrag_ipv6 helps but this severe impacts functionality.
+and its dependency nf_defrag_ipv6 helps but this severely impacts functionality.
 Kernels 4.16+ exclude from defragmentation untracked packets.
-See blockcheck.sh code for example.
+See `blockcheck.sh` code for example.
 
 
 ## tpws
