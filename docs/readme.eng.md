@@ -395,11 +395,18 @@ By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-
 
 ### IP fragmentation
 
-Modern network is very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled
-on the way. Linux always reassembles forwarded fragmented ipv6 if possible and it cannot be disabled.
-But Linux can send fragments.
+Modern network is very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled on the way. 
 Frag position is set independently for tcp and udp. By default 24 and 8, must be multiple of 8.
 Offset starts from the header following ip header - transport header in most cases.
+
+There are important nuances when working with fragments in Linux.
+ipv4 : Linux allows to send ipv4 fragments but standard firewall rules in OUTPUT chain can drop them.
+ipv6 : There's no way for an application to reliably send fragments without defragmentation in conntrack.
+Sometimes it works, sometimes system defragments packets.
+Looks like kernels <4.16 have no simple way to solve this problem. Unloading of nf_conntrack module
+and its dependency nf_defrag_ipv6 helps but this severe impacts functionality.
+Kernels 4.16+ exclude from defragmentation untracked packets.
+See blockcheck.sh code for example.
 
 
 ## tpws
