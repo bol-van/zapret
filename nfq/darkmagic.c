@@ -346,42 +346,50 @@ bool ip_frag6(
 	uint8_t *pkt1, size_t *pkt1_size,
 	uint8_t *pkt2, size_t *pkt2_size)
 {
-	uint16_t payload_len;
+	size_t payload_len, unfragmentable;
+	uint8_t *last_header_type;
 	uint8_t proto;
 	struct ip6_frag *frag;
+	const uint8_t *payload;
 
 	if (frag_pos & 7 || pkt_size < sizeof(struct ip6_hdr)) return false;
-	payload_len = htons(((struct ip6_hdr*)pkt)->ip6_ctlun.ip6_un1.ip6_un1_plen);
-	if ((sizeof(struct ip6_hdr)+payload_len)>pkt_size || frag_pos>=payload_len ||
-		*pkt1_size<(sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+frag_pos) ||
-		*pkt2_size<(sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+payload_len-frag_pos))
+	payload_len = sizeof(struct ip6_hdr) + htons(((struct ip6_hdr*)pkt)->ip6_ctlun.ip6_un1.ip6_un1_plen);
+	if (pkt_size < payload_len) return false;
+
+	payload = pkt;
+	proto_skip_ipv6((uint8_t**)&payload, &payload_len, &proto, &last_header_type);
+	unfragmentable = payload - pkt;
+
+	//printf("pkt_size=%zu FRAG_POS=%zu payload_len=%zu unfragmentable=%zu dh=%zu\n",pkt_size,frag_pos,payload_len,unfragmentable,last_header_type - pkt);
+
+	if (frag_pos>=payload_len ||
+		*pkt1_size<(unfragmentable + sizeof(struct ip6_frag) + frag_pos) ||
+		*pkt2_size<(unfragmentable + sizeof(struct ip6_frag) + payload_len - frag_pos))
 	{
 		return false;
 	}
 
-	proto = ((struct ip6_hdr*)pkt)->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-	
-	memcpy(pkt1, pkt, sizeof(struct ip6_hdr));
-	((struct ip6_hdr*)pkt1)->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(sizeof(struct ip6_frag)+frag_pos);
-	((struct ip6_hdr*)pkt1)->ip6_ctlun.ip6_un1.ip6_un1_nxt = IPPROTO_FRAGMENT;
-	frag = (struct ip6_frag*)(((struct ip6_hdr*)pkt1)+1);
+	memcpy(pkt1, pkt, unfragmentable);
+	((struct ip6_hdr*)pkt1)->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(unfragmentable - sizeof(struct ip6_hdr) + sizeof(struct ip6_frag) + frag_pos);
+	pkt1[last_header_type - pkt] = IPPROTO_FRAGMENT;
+	frag = (struct ip6_frag*)(pkt1 + unfragmentable);
 	frag->ip6f_nxt = proto;
 	frag->ip6f_reserved = 0;
 	frag->ip6f_offlg = IP6F_MORE_FRAG;
 	frag->ip6f_ident = ident;
-	memcpy(frag+1, pkt+sizeof(struct ip6_hdr), frag_pos);
-	*pkt1_size = sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+frag_pos;
+	memcpy(frag+1, pkt + unfragmentable, frag_pos);
+	*pkt1_size = unfragmentable + sizeof(struct ip6_frag) + frag_pos;
 
 	memcpy(pkt2, pkt, sizeof(struct ip6_hdr));
-	((struct ip6_hdr*)pkt2)->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(sizeof(struct ip6_frag)+payload_len-frag_pos);
-	((struct ip6_hdr*)pkt2)->ip6_ctlun.ip6_un1.ip6_un1_nxt = IPPROTO_FRAGMENT;
-	frag = (struct ip6_frag*)(((struct ip6_hdr*)pkt2)+1);
+	((struct ip6_hdr*)pkt2)->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(unfragmentable - sizeof(struct ip6_hdr) + sizeof(struct ip6_frag) + payload_len - frag_pos);
+	pkt2[last_header_type - pkt] = IPPROTO_FRAGMENT;
+	frag = (struct ip6_frag*)(pkt2 + unfragmentable);
 	frag->ip6f_nxt = proto;
 	frag->ip6f_reserved = 0;
 	frag->ip6f_offlg = htons(frag_pos);
 	frag->ip6f_ident = ident;
-	memcpy(frag+1, pkt+sizeof(struct ip6_hdr)+frag_pos, payload_len-frag_pos);
-	*pkt2_size = sizeof(struct ip6_hdr)+sizeof(struct ip6_frag)+payload_len-frag_pos;
+	memcpy(frag+1, pkt + unfragmentable + frag_pos, payload_len - frag_pos);
+	*pkt2_size = unfragmentable + sizeof(struct ip6_frag) + payload_len - frag_pos;
 
 	return true;
 }
@@ -619,7 +627,7 @@ bool proto_check_ipv6(const uint8_t *data, size_t len)
 }
 // move to transport protocol
 // proto_type = 0 => error
-void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type)
+void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t **last_header_type)
 {
 	size_t hdrlen;
 	uint8_t HeaderType;
@@ -627,6 +635,7 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type)
 	if (proto_type) *proto_type = 0; // put error in advance
 
 	HeaderType = (*data)[6]; // NextHeader field
+	if (last_header_type) *last_header_type = (*data)+6;
 	*data += 40; *len -= 40; // skip ipv6 base header
 	while (*len > 0) // need at least one byte for NextHeader field
 	{
@@ -654,6 +663,7 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type)
 		}
 		if (*len < hdrlen) return; // error
 		HeaderType = **data;
+		if (last_header_type) *last_header_type = *data;
 		// advance to the next header location
 		*len -= hdrlen;
 		*data += hdrlen;

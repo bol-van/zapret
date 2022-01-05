@@ -125,7 +125,7 @@ void print_udphdr(const struct udphdr *udphdr);
 bool proto_check_ipv4(const uint8_t *data, size_t len);
 void proto_skip_ipv4(uint8_t **data, size_t *len);
 bool proto_check_ipv6(const uint8_t *data, size_t len);
-void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type);
+void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t **last_header_type);
 bool proto_check_tcp(const uint8_t *data, size_t len);
 void proto_skip_tcp(uint8_t **data, size_t *len);
 bool proto_check_udp(const uint8_t *data, size_t len);

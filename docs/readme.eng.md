@@ -148,8 +148,8 @@ nfqws takes the following parameters:
  --dpi-desync-repeats=<N>               ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
  --dpi-desync-split-pos=<1..1500>	; (for split* and disorder* only) split TCP packet at specified position
- --dpi-desync-ipfrag-pos-tcp=<8..9216>  ; ip frag position starting from the second header (usually transport header). multiple of 8, default 8.
- --dpi-desync-ipfrag-pos-udp=<8..9216>  ; ip frag position starting from the second header (usually transport header). multiple of 8, default 32.
+ --dpi-desync-ipfrag-pos-tcp=<8..9216>  ; ip frag position starting from the transport header. multiple of 8, default 8.
+ --dpi-desync-ipfrag-pos-udp=<8..9216>  ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default -10000
  --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default -66000
  --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
@@ -397,11 +397,11 @@ By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-
 
 Modern network is very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled on the way. 
 Frag position is set independently for tcp and udp. By default 24 and 8, must be multiple of 8.
-Offset starts from the header following ip header - transport header in most cases.
+Offset starts from the transport header.
 
 There are important nuances when working with fragments in Linux.
-ipv4 : Linux allows to send ipv4 fragments but standard firewall rules in OUTPUT chain can drop them.
-ipv6 : There's no way for an application to reliably send fragments without defragmentation in conntrack.
+ipv4 : Linux allows to send ipv4 fragments but standard firewall rules in OUTPUT chain can cause raw send to fail.
+ipv6 : There's no way for an application to reliably send fragments without defragmentation by conntrack.
 Sometimes it works, sometimes system defragments packets.
 Looks like kernels <4.16 have no simple way to solve this problem. Unloading of nf_conntrack module
 and its dependency nf_defrag_ipv6 helps but this severely impacts functionality.

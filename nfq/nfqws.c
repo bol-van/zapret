@@ -115,7 +115,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 	else if (proto_check_ipv6(data, len))
 	{
 		ip6hdr = (struct ip6_hdr *) data;
-		proto_skip_ipv6(&data, &len, &proto);
+		proto_skip_ipv6(&data, &len, &proto, NULL);
 		if (params.debug)
 		{
 			printf("IP6: ");
@@ -520,8 +520,8 @@ static void exithelp()
 		" --dpi-desync-repeats=<N>\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%u>\t; data payload split position\n"
-		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t; ip frag position starting from the second header (usually transport header). multiple of 8, default %u.\n"
-		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t; ip frag position starting from the second header (usually transport header). multiple of 8, default %u.\n"
+		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default %d\n"
 		" --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
