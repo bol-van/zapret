@@ -117,7 +117,7 @@ IPFW_DEL()
 }
 ipt6_has_raw()
 {
-	grep -Fq raw /proc/net/ip6_tables_names
+	grep -xFq raw /proc/net/ip6_tables_names
 }
 
 
@@ -176,7 +176,7 @@ check_prerequisites()
 	case "$UNAME" in
 		Linux)
 			progs="$progs iptables ip6tables"
-			! grep -Fq NFQUEUE /proc/net/ip_tables_targets || ! grep -Fq NFQUEUE /proc/net/ip6_tables_targets && {
+			! grep -xFq NFQUEUE /proc/net/ip_tables_targets || ! grep -xFq NFQUEUE /proc/net/ip6_tables_targets && {
 				echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
 				[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install iptables-mod-nfqueue'
 				exitp 6
