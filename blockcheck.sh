@@ -181,7 +181,7 @@ check_prerequisites()
 		exitp 6
 	}
 
-	local progs='curl'
+	local prog progs='curl'
 	case "$UNAME" in
 		Linux)
 			progs="$progs iptables ip6tables"
@@ -543,7 +543,7 @@ pktws_check_domain_bypass()
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local strategy tests='fake' ttls s sec="$2"
+	local strategy tests='fake' ttls s e desync pos fooling frag sec="$2"
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -602,7 +602,7 @@ tpws_check_domain_bypass()
 	# $1 - test function
 	# $2 - encrypted test : 1/0
 	# $3 - domain
-	local s strategy sec="$2"
+	local s pos strategy sec="$2"
 	if [ "$sec" = 0 ]; then
 		for s in '--hostcase' '--hostspell=hoSt' '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' \
 			'--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
@@ -625,7 +625,7 @@ check_domain()
 	# $3 - encrypted test : 1/0
 	# $4 - domain
 
-	local code
+	local code c
 
 	echo
 	echo \* $1 ipv$IPV $4
@@ -815,6 +815,7 @@ dnstest()
 }
 find_working_public_dns()
 {
+	local dns
 	for dns in $DNSCHECK_DNS; do
 		pingtest $dns && dnstest $dns && {
 			PUBDNS=$dns
@@ -851,7 +852,7 @@ check_dns_cleanup()
 }
 check_dns()
 {
-	local C1 C2
+	local C1 C2 dom
 
 	echo \* checking DNS
 
