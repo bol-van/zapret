@@ -122,11 +122,9 @@ ipt6_has_raw()
 ipt_has_nfq()
 {
 	# cannot just check /proc/net/ip_tables_targets because of iptables-nft or modules not loaded yet
-	local ret ipt
+	local ipt
 	for ipt in iptables ip6tables; do
-		$ipt -A OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null
-		ret=$?
-		[ $ret = 0 ] || return 1
+		$ipt -A OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null || return 1
 		$ipt -D OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null
 	done
 	return 0
