@@ -22,8 +22,8 @@ ZAPRET_BASE="$EXEDIR"
 HDRTEMP=/tmp/zapret-hdr.txt
 ECHON="echo -n"
 
-DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
-DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to startmail.com"
+[ -n "$DNSCHECK_DNS" ] || DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
+[ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to startmail.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -117,7 +117,7 @@ IPFW_DEL()
 }
 ipt6_has_raw()
 {
-	ip6tables -t raw -L >/dev/null 2>/dev/null
+	grep -Fq raw /proc/net/ip6_tables_names
 }
 
 
@@ -126,10 +126,16 @@ check_system()
 	echo \* checking system
 
 	UNAME=$(uname)
+	SUBSYS=
+
 	case "$UNAME" in
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
+			local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
+			[ -L "$INIT" ] && INIT=$(readlink "$INIT")
+			INIT=$(basename "$INIT")
+			[ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] && SUBSYS=openwrt
 			;;
 		FreeBSD)
 			PKTWS="$DVTWS"
@@ -139,6 +145,7 @@ check_system()
 			echo $UNAME not supported
 			exitp 5
 	esac
+	echo $UNAME${SUBSYS:+/$SUBSYS} detected
 }
 
 freebsd_module_loaded()
@@ -159,7 +166,6 @@ freebsd_modules_loaded()
 check_prerequisites()
 {
 	echo \* checking prerequisites
-
 	
 	[ -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
 		echo $PKTWS or $TPWS or $MDIG is not available. run \"$ZAPRET_BASE/install_bin.sh\" or make -C \"$ZAPRET_BASE\"
@@ -170,6 +176,11 @@ check_prerequisites()
 	case "$UNAME" in
 		Linux)
 			progs="$progs iptables ip6tables"
+			! grep -Fq NFQUEUE /proc/net/ip_tables_targets || ! grep -Fq NFQUEUE /proc/net/ip6_tables_targets && {
+				echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
+				[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install iptables-mod-nfqueue'
+				exitp 6
+			}
 			;;
 		FreeBSD)
 			progs="$progs ipfw"
