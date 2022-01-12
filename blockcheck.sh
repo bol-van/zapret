@@ -160,7 +160,7 @@ check_system()
 freebsd_module_loaded()
 {
 	# $1 - module name
-	kldstat -qn "${1}.ko"
+	kldstat -qm "${1}"
 }
 freebsd_modules_loaded()
 {
