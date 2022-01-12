@@ -160,7 +160,7 @@ check_system()
 freebsd_module_loaded()
 {
 	# $1 - module name
-	kldstat | grep -q "${1}.ko"
+	kldstat -qn "${1}.ko"
 }
 freebsd_modules_loaded()
 {
@@ -268,7 +268,7 @@ curl_supports_tls13()
 curl_supports_tlsmax()
 {
 	# supported only in OpenSSL
-	curl --version | grep -q OpenSSL || return 1
+	curl --version | grep -Fq OpenSSL || return 1
 	# supported since curl 7.54
 	curl --tls-max 1.2 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
