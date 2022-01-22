@@ -285,7 +285,7 @@ hdrfile_location()
 	# $1 - hdr file
 
 	# some DPIs return CRLF line ending
-	tr -d '\015' <"$1" | sed -nre 's/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[ \t]*([^ \t]*)[ \t]*$/\1/p'
+	tr -d '\015' <"$1" | sed -nre 's/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[ 	]*([^ 	]*)[ 	]*$/\1/p'
 }
 curl_test_http()
 {
