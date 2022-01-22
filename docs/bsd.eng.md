@@ -2,7 +2,7 @@
 
 FreeBSD 11.x+ , OpenBSD 6.x+, partially MacOS Sierra+
 
-Older versions may work or not. pfSense is not supported.
+Older versions may work or not.
 
 ## BSD features
 
@@ -166,6 +166,32 @@ then
 ```
 
 Its not clear how to do rdr-to outgoing traffic. I could not make route-to scheme work.
+
+
+## pfsense
+
+pfsense is based on FreeBSD.
+Binaries compiled in compatible FreeBSD versions shoud work.
+It's been tested that dvtws binary from FreeBSD 13 works on pfsense 2.5.2 with FreeBSD kernel 12.2.
+pfsense uses pf firewall which does not support divert.
+Fortunately ipfw and ipdivert modules are present and can be kldload-ed.
+It's also necessary to change firewall order using sysctl commands.
+Sometimes pf may limit dvtws abilities. It scrubs ip fragments disabling dvtws ipfrag2 desync mode.
+If something is absent, no ipfw.ko/ipdivert.ko or binaries do not work - try the latest pfsense version.
+
+/usr/local/etc/rc.d/zapret.sh  (chmod 755)
+```
+#!/bin/sh
+
+kldload ipfw
+kldload ipdivert
+sysctl net.inet.ip.pfil.outbound=ipfw,pf
+sysctl net.inet.ip.pfil.inbound=ipfw,pf
+sysctl net.inet6.ip6.pfil.outbound=ipfw,pf
+sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
+ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg
+dvtws --daemon --port 989 --dpi-desync=split2
+```
 
 
 ## OpenBSD
