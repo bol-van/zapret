@@ -157,7 +157,7 @@ rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
 ```
 then
 ```
-/opt/zapret/tpws/tpws --port=988 --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force
+/opt/zapret/tpws/tpws --port=988 --enable-pf --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force
 ```
 
 Its not clear how to do rdr-to outgoing traffic. I could not make route-to scheme work.
