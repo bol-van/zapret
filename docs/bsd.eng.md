@@ -16,11 +16,6 @@ To compile sources in FreeBSD use `make`, in OpenBSD - use `make bsd`, in MacOS 
 
 Compile all programs : `make -C /opt/zapret`
 
-Compile all programs with PF support : `make -C /opt/zapret CFLAGS=-DUSE_PF`
-
-In FreeBSD enable PF only if you use it. Its undesirable if you don't.
-PF is enabled automatically in OpenBSD and MacOS.
-
 Divert sockets are internal type sockets in the BSD kernel. They have no relation to network addresses
 or network packet exchange. They are identified by a port number `1..65535`. Its like queue number in NFQUEUE.
 Traffic can be diverted to a divert socket using firewall rule.
@@ -147,7 +142,7 @@ ipv4 frames are filtered using 'sockarg'.
 
 PF in FreeBSD:
 The setup is similar to OpenBSD, but there are important nuances.
-1) Don't forget to build special PF-enabled version of tpws : make CFLAGS=-DUSE_PF
+1) Don't forget to use special tpws parameter `--enable-pf`
 2) It's not possible to redirect to ::1. Need to redirect to the link-local address of the incoming interface.
 Look for fe80:... address in ifconfig and use it for redirection target.
 3) pf.conf syntax is a bit different from OpenBSD.
@@ -228,11 +223,10 @@ rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::20c:29ff:5ae3:4821 por
 Autostart '/usr/local/etc/rc.d/zapret.sh' :
 ```
 pfctl -a zapret -f /etc/zapret.anchor
-pkill ^tpws_pf$
-tpws_pf --daemon --port=988 --split-http-req=method --split-pos=2
+pkill ^tpws$
+tpws --daemon --port=988 --split-http-req=method --split-pos=2
 ```
 
-Note that the special tpws version is used which supports PF.
 After reboot check that anchor is created and referred from the main ruleset :
 ```
 [root@pfSense /]# pfctl -s nat

@@ -10,25 +10,19 @@
 #include "params.h"
 #include "helpers.h"
 
-//#if !defined(USE_PF) && defined(__OpenBSD__)
-#if !defined(USE_PF) && (defined(__OpenBSD__) || defined(__APPLE__))
- #define USE_PF 1
-#endif
-
 #ifdef __linux__
  #include <linux/netfilter_ipv4.h>
  #ifndef IP6T_SO_ORIGINAL_DST
   #define IP6T_SO_ORIGINAL_DST 80
  #endif
 #endif
-#ifdef USE_PF
- #include <net/if.h>
- #include <net/pfvar.h>
-#endif
 
 
+#if defined(BSD)
 
-#if defined(USE_PF)
+#include <net/if.h>
+#include <net/pfvar.h>
+
 static int redirector_fd=-1;
 
 void redir_close()
@@ -54,7 +48,7 @@ static bool redir_open_private(const char *fname, int flags)
 }
 bool redir_init()
 {
-	return redir_open_private("/dev/pf", O_RDONLY);
+	return params.pf_enable ? redir_open_private("/dev/pf", O_RDONLY) : true;
 }
 
 static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockaddr_storage *orig_dst)
@@ -209,8 +203,8 @@ bool get_dest_addr(int sockfd, const struct sockaddr *accept_sa, struct sockaddr
 		}
 		if (orig_dst->ss_family==AF_INET6)
 			((struct sockaddr_in6*)orig_dst)->sin6_scope_id=0; // or MacOS will not connect()
-#ifdef USE_PF
-		if (!destination_from_pf(accept_sa, orig_dst))
+#ifdef BSD
+		if (params.pf_enable && !destination_from_pf(accept_sa, orig_dst))
 			DBGPRINT("pf filter destination_from_pf failed");
 #endif
 #ifdef __linux__

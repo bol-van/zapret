@@ -3,6 +3,7 @@
 #include <net/if.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/param.h>
 #include "strpool.h"
 
 enum splithttpreq { split_none = 0, split_method, split_host };
@@ -46,6 +47,10 @@ struct params_s
 	strpool *hostlist;
 
 	int debug;
+
+#if defined(BSD)
+	bool pf_enable;
+#endif
 };
 
 extern struct params_s params;

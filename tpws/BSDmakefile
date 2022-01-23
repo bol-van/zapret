@@ -7,7 +7,6 @@ all: tpws
 
 tpws: $(SRC_FILES)
 	$(CC) $(CFLAGS) -Iepoll-shim/include -o $@ $(SRC_FILES) epoll-shim/src/*.c $(LDFLAGS) $(LIBS)
-	$(CC) $(CFLAGS) -Iepoll-shim/include -o $@_pf $(SRC_FILES) -DUSE_PF epoll-shim/src/*.c $(LDFLAGS) $(LIBS)
 
 clean:
-	rm -f tpws tpws_pf *.o
+	rm -f tpws *.o

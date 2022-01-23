@@ -139,6 +139,9 @@ static void exithelp()
 		" --pidfile=<filename>\t\t; write pid to file\n"
 		" --user=<username>\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t; drop root privs\n"
+#if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
+		" --enable-pf\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
+#endif
 		" --debug=0|1|2\t\t\t; 0(default)=silent 1=verbose 2=debug\n"
 		"\nTAMPERING:\n"
 		" --hostlist=<filename>\t\t; only act on host in the list (one host per line, subdomains auto apply)\n"
@@ -205,6 +208,9 @@ void parse_params(int argc, char *argv[])
 	params.maxconn = DEFAULT_MAX_CONN;
 	params.max_orphan_time = DEFAULT_MAX_ORPHAN_TIME;
 	params.binds_last = -1;
+#if defined(__OpenBSD__) || defined(__APPLE__)
+	params.pf_enable = true; // OpenBSD and MacOS have no other choice
+#endif
 	if (can_drop_root())
 	{
 	    params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
@@ -252,6 +258,9 @@ void parse_params(int argc, char *argv[])
 		{ "socks",no_argument,0,0 },// optidx=37
 		{ "no-resolve",no_argument,0,0 },// optidx=38
 		{ "skip-nodelay",no_argument,0,0 },// optidx=39
+#if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
+		{ "enable-pf",no_argument,0,0 },// optidx=40
+#endif
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -485,6 +494,11 @@ void parse_params(int argc, char *argv[])
 		case 39: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
+#if defined(BSD) && !defined(__OpenBSD__)
+		case 40: /* enable-pf */
+			params.pf_enable = true;
+			break;
+#endif
 		}
 	}
 	if (!params.bind_wait_only && !params.port)
