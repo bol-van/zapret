@@ -185,6 +185,11 @@ Copy zip with zapret files to `/opt` and unpack there as it's done in other syst
 In this case run dvtws as `/opt/zapret/nfq/dvtws`. Or just copy `dvtws` to `/usr/local/sbin`. As you wish.
 ipset scripts are working, cron is present. It's possible to renew lists.
 
+If you dont like poverty of default repos its possible to enable FreeBSD repo.
+Change no to yes in /usr/local/etc/pkg/repos/FreeBSD.conf.
+Then it becomes possible to install all the required software including git to download zapret from github directly.
+
+
 /usr/local/etc/rc.d/zapret.sh  (chmod 755)
 ```
 #!/bin/sh
