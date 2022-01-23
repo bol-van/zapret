@@ -477,9 +477,9 @@ Other parameters `--bind-*` are related to the last bind.
 link local ipv6 (`fe80::/8`) mode selection :
 
 ```
---bind-iface6 --bind-linklocal=no : first selects private address fd00::/8, then global address
---bind-iface6 --bind-linklocal=unwanted : first selects private address fd00::/8, then global address, then LL
---bind-iface6 --bind-linklocal=prefer : first selects LL, then private address fd00::/8, then global address
+--bind-iface6 --bind-linklocal=no : first selects private address fc00::/7, then global address
+--bind-iface6 --bind-linklocal=unwanted : first selects private address fc00::/7, then global address, then LL
+--bind-iface6 --bind-linklocal=prefer : first selects LL, then private address fc00::/7, then global address
 --bind-iface6 --bind-linklocal=force : select only LL
 ```
 

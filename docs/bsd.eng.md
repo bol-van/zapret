@@ -351,7 +351,7 @@ Put the string `net.inet6.send.opmode=0` to `/etc/sysctl.conf`.  If not present 
 
 Then reboot the system.
 
-If you dont like this solution you can assign an additional static ipv6 address from `fd00::/8` range with `/128` prefix
+If you dont like this solution you can assign an additional static ipv6 address from `fc00::/7` range with `/128` prefix
 to your LAN interface and use it as the gateway address.
 
 tpws transparent mode only for outgoing connections.
