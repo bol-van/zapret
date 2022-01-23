@@ -181,6 +181,10 @@ There's autostart script example in `init.d/pfsense`. It should be placed to `/u
 Write your ipfw rules and daemon start commands.
 Because git is absent the most convinient way to copy files is ssh. curl is present by default.
 
+Copy zip with zapret files to `/opt` and unpack there as it's done in other systems.
+In this case run dvtws as `/opt/zapret/nfq/dvtws`. Or just copy `dvtws` to `/usr/local/sbin`. As you wish.
+ipset scripts are working, cron is present. It's possible to renew lists.
+
 /usr/local/etc/rc.d/zapret.sh  (chmod 755)
 ```
 #!/bin/sh
