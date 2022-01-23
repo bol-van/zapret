@@ -171,13 +171,11 @@ Its not clear how to do rdr-to outgoing traffic. I could not make route-to schem
 ## pfsense
 
 pfsense is based on FreeBSD.
-Binaries compiled in compatible FreeBSD versions should work.
-It's been tested that dvtws binary from FreeBSD 13 works on pfsense 2.5.2 with FreeBSD kernel 12.2.
+Binaries from `binaries/freebsd-x64` are compiled in FreeBSD 11 and should work. Use `install_bin.sh`.
 pfsense uses pf firewall which does not support divert.
 Fortunately ipfw and ipdivert modules are present and can be kldload-ed.
 It's also necessary to change firewall order using sysctl commands.
 Sometimes pf may limit dvtws abilities. It scrubs ip fragments disabling dvtws ipfrag2 desync mode.
-If something is absent, no ipfw.ko/ipdivert.ko or binaries do not work - try the latest pfsense version.
 
 /usr/local/etc/rc.d/zapret.sh  (chmod 755)
 ```

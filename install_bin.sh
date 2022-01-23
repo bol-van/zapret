@@ -36,6 +36,8 @@ if [ "$UNAME" = "Linux" ]; then
  ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
 elif [ "$UNAME" = "Darwin" ]; then
  ARCHLIST="my mac64"
+elif [ "$UNAME" = "FreeBSD" ]; then
+ ARCHLIST="freebsd-x64"
 else
  ARCHLIST="my"
 fi
