@@ -201,9 +201,54 @@ sysctl net.inet.ip.pfil.inbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.outbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
 ipfw delete 100
-ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg
+ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 pkill ^dvtws$
 dvtws --daemon --port 989 --dpi-desync=split2
+```
+
+I could not make tpws work from ipfw. Looks like there's some conflict between two firewalls.
+Only PF redirection works. PF does not allow to freely add and delete rules. Only anchors can be reloaded.
+To make an anchor work it must be referred from the main ruleset. But its managed by pfsense scripts.
+One possible solution would be to modify '/etc/inc/filter.inc' as follows :
+```
+	$natrules .= "# TFTP proxy\n";
+
+	/* MOD */
+	$natrules .= "rdr-anchor \"zapret/*\"\n";
+
+	$natrules .= "rdr-anchor \"tftp-proxy/*\"\n";
+```
+
+Write the anchor code to '/etc/zapret.anchor':
+```
+rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
+rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::20c:29ff:5ae3:4821 port 988
+```
+
+Autostart '/usr/local/etc/rc.d/zapret.sh' :
+```
+pfctl -a zapret -f /etc/zapret.anchor
+pkill ^tpws_pf$
+tpws_pf --daemon --port=988 --split-http-req=method --split-pos=2
+```
+
+Note that the special tpws version is used which supports PF.
+After reboot check that anchor is created and referred from the main ruleset :
+```
+[root@pfSense /]# pfctl -s nat
+no nat proto carp all
+nat-anchor "natearly/*" all
+nat-anchor "natrules/*" all
+...................
+no rdr proto carp all
+rdr-anchor "zapret/*" all
+rdr-anchor "tftp-proxy/*" all
+rdr-anchor "miniupnpd" all
+[root@pfSense /]# pfctl -s nat -a zapret
+rdr pass on em1 inet proto tcp from any to any port = http -> 127.0.0.1 port 988
+rdr pass on em1 inet proto tcp from any to any port = https -> 127.0.0.1 port 988
+rdr pass on em1 inet6 proto tcp from any to any port = http -> fe80::20c:29ff:5ae3:4821 port 988
+rdr pass on em1 inet6 proto tcp from any to any port = https -> fe80::20c:29ff:5ae3:4821 port 988
 ```
 
 
