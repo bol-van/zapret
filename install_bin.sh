@@ -60,12 +60,13 @@ else
 			echo installing binaries ...
 			ccp $arch/ip2net ip2net
 			ccp $arch/mdig mdig
-			if [ "$(uname)" = "Linux" ]; then
+			if [ "$UNAME" = "Linux" ]; then
 			 ccp $arch/nfqws nfq
 			else
 			 ccp $arch/dvtws nfq
 			fi
 			ccp $arch/tpws tpws
+			[ "$UNAME" = "FreeBSD" ] && ccp $arch/tpws_pf tpws
 	 		exit 0
 		else
 			echo $arch is NOT OK
