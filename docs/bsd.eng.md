@@ -177,6 +177,10 @@ Fortunately ipfw and ipdivert modules are present and can be kldload-ed.
 It's also necessary to change firewall order using sysctl commands.
 Sometimes pf may limit dvtws abilities. It scrubs ip fragments disabling dvtws ipfrag2 desync mode.
 
+There's autostart script example in `init.d/pfsense`. It should be placed to `/usr/local/etc/rc.d` and edited.
+Write your ipfw rules and daemon start commands.
+Because git is absent the most convinient way to copy files is ssh. curl is present by default.
+
 /usr/local/etc/rc.d/zapret.sh  (chmod 755)
 ```
 #!/bin/sh
@@ -187,7 +191,9 @@ sysctl net.inet.ip.pfil.outbound=ipfw,pf
 sysctl net.inet.ip.pfil.inbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.outbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
+ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg
+pkill ^dvtws$
 dvtws --daemon --port 989 --dpi-desync=split2
 ```
 

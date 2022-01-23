@@ -175,6 +175,10 @@ pfsense использует фаервол pf, а он не поддержив�
 Бинарики из binaries/freebsd-x64 собраны под FreeBSD 11. Они должны работать и на последующих версиях FreeBSD,
 включая pfsense. Можно пользоваться install_bin.sh.
 
+Пример скрипта автозапуска лежит в init.d/pfsense. Его следует поместить в /usr/local/etc/rc.d и отредактировать
+на предмет правил ipfw и запуска демонов. Есть встроенный редактор edit как более приемлемая альтернатива vi.
+Поскольку git отсутствует, копировать файлы удобнее всего через ssh. curl присутствует по умолчанию.
+
 /usr/local/etc/rc.d/zapret.sh  (chmod 755)
 -----------
 #!/bin/sh
@@ -185,7 +189,9 @@ sysctl net.inet.ip.pfil.outbound=ipfw,pf
 sysctl net.inet.ip.pfil.inbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.outbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
+ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg
+pkill ^dvtws$
 dvtws --daemon --port 989 --dpi-desync=split2
 -----------
 
