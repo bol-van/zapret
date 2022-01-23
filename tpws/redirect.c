@@ -60,8 +60,33 @@ bool redir_init()
 static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockaddr_storage *orig_dst)
 {
 	struct pfioc_natlook nl;
+	struct sockaddr_storage asa2;
 
 	if (redirector_fd==-1) return false;
+
+	if (params.debug>=2)
+	{
+		char s[48],s2[48];
+		*s=0; ntop46_port(accept_sa, s, sizeof(s));
+		*s2=0; ntop46_port((struct sockaddr *)orig_dst, s2, sizeof(s2));
+		DBGPRINT("destination_from_pf %s %s",s,s2);
+	}
+
+	saconvmapped(orig_dst);
+	if (accept_sa->sa_family==AF_INET6 && orig_dst->ss_family==AF_INET)
+	{
+		memcpy(&asa2,accept_sa,sizeof(struct sockaddr_in6));
+		saconvmapped(&asa2);
+		accept_sa = (struct sockaddr*)&asa2;
+	}
+
+	if (params.debug>=2)
+	{
+		char s[48],s2[48];
+		*s=0; ntop46_port(accept_sa, s, sizeof(s));
+		*s2=0; ntop46_port((struct sockaddr *)orig_dst, s2, sizeof(s2));
+		DBGPRINT("destination_from_pf (saconvmapped) %s %s",s,s2);
+	}
 
 	if (accept_sa->sa_family!=orig_dst->ss_family)
 	{
@@ -78,8 +103,8 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 	case AF_INET:
 		{
 		struct sockaddr_in *sin = (struct sockaddr_in *)orig_dst;
-		nl.saddr.v4.s_addr = ((struct sockaddr_in*)accept_sa)->sin_addr.s_addr;
 		nl.daddr.v4.s_addr = sin->sin_addr.s_addr;
+		nl.saddr.v4.s_addr = ((struct sockaddr_in*)accept_sa)->sin_addr.s_addr;
 #ifdef __APPLE__
 		nl.sxport.port     = ((struct sockaddr_in*)accept_sa)->sin_port;
 		nl.dxport.port     = sin->sin_port;
@@ -92,8 +117,8 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 	case AF_INET6:
 		{
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)orig_dst;
-		nl.saddr.v6 = ((struct sockaddr_in6*)accept_sa)->sin6_addr;
 		nl.daddr.v6 = sin6->sin6_addr;
+		nl.saddr.v6 = ((struct sockaddr_in6*)accept_sa)->sin6_addr;
 #ifdef __APPLE__
 		nl.sxport.port = ((struct sockaddr_in6*)accept_sa)->sin6_port;
 		nl.dxport.port = sin6->sin6_port;

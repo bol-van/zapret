@@ -165,8 +165,8 @@ bool is_linklocal(const struct sockaddr_in6 *a)
 }
 bool is_private6(const struct sockaddr_in6* a)
 {
-	// fdf0::/8
-	return a->sin6_addr.s6_addr[0]==0xFD;
+	// fc00::/7
+	return (a->sin6_addr.s6_addr[0] & 0xFE) == 0xFC;
 }
 
 
