@@ -207,11 +207,11 @@ dvtws --daemon --port 989 --dpi-desync=split2
 Его трогать нельзя, иначе порушится весь фаервол.
 Поэтому придется править код скриптов pfsense. Поправьте /etc/inc/filter.inc следующим образом :
 -----------
-	$natrules .= "# TFTP proxy\n";
-
 	/* MOD */
+	$natrules .= "# ZAPRET redirection\n";
 	$natrules .= "rdr-anchor \"zapret/*\"\n";
 
+	$natrules .= "# TFTP proxy\n";
 	$natrules .= "rdr-anchor \"tftp-proxy/*\"\n";
 -----------
 
