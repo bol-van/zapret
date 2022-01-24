@@ -66,7 +66,6 @@ else
 			 ccp $arch/dvtws nfq
 			fi
 			ccp $arch/tpws tpws
-			[ "$UNAME" = "FreeBSD" ] && ccp $arch/tpws_pf tpws
 	 		exit 0
 		else
 			echo $arch is NOT OK
