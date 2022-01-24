@@ -142,7 +142,7 @@ ipv4 frames are filtered using 'sockarg'.
 
 PF in FreeBSD:
 The setup is similar to OpenBSD, but there are important nuances.
-1) Don't forget to use special tpws parameter `--enable-pf`
+1) PF support is disabled by default in FreeBSD. Use parameter `--enable-pf`.
 2) It's not possible to redirect to ::1. Need to redirect to the link-local address of the incoming interface.
 Look for fe80:... address in ifconfig and use it for redirection target.
 3) pf.conf syntax is a bit different from OpenBSD.
