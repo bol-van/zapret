@@ -206,12 +206,14 @@ Only PF redirection works. PF does not allow to freely add and delete rules. Onl
 To make an anchor work it must be referred from the main ruleset. But its managed by pfsense scripts.
 One possible solution would be to modify '/etc/inc/filter.inc' as follows :
 ```
+	.................
 	/* MOD */
 	$natrules .= "# ZAPRET redirection\n";
 	$natrules .= "rdr-anchor \"zapret/*\"\n";
 
 	$natrules .= "# TFTP proxy\n";
 	$natrules .= "rdr-anchor \"tftp-proxy/*\"\n";
+	.................
 ```
 
 Write the anchor code to '/etc/zapret.anchor':
