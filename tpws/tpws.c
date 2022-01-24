@@ -494,7 +494,7 @@ void parse_params(int argc, char *argv[])
 		case 39: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
-#if defined(BSD) && !defined(__OpenBSD__)
+#if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
 		case 40: /* enable-pf */
 			params.pf_enable = true;
 			break;
