@@ -37,7 +37,7 @@ if [ "$UNAME" = "Linux" ]; then
 elif [ "$UNAME" = "Darwin" ]; then
  ARCHLIST="my mac64"
 elif [ "$UNAME" = "FreeBSD" ]; then
- ARCHLIST="freebsd-x64"
+ ARCHLIST="my freebsd-x64"
 else
  ARCHLIST="my"
 fi
