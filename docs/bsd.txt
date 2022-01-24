@@ -226,7 +226,7 @@ rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::20c:29ff:5ae3:4821 por
 -----------
 pfctl -a zapret -f /etc/zapret.anchor
 pkill ^tpws$
-tpws --daemon --port=988 --enable-pf --split-http-req=method --split-pos=2
+tpws --daemon --port=988 --enable-pf --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force --split-http-req=method --split-pos=2
 -----------
 
 После перезагрузки проверьте, что правила создались :

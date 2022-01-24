@@ -224,7 +224,7 @@ Autostart '/usr/local/etc/rc.d/zapret.sh' :
 ```
 pfctl -a zapret -f /etc/zapret.anchor
 pkill ^tpws$
-tpws --daemon --port=988 --enable-pf --split-http-req=method --split-pos=2
+tpws --daemon --port=988 --enable-pf --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force --split-http-req=method --split-pos=2
 ```
 
 After reboot check that anchor is created and referred from the main ruleset :
