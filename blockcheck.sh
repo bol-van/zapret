@@ -302,7 +302,7 @@ curl_test_http()
 		loc=$(hdrfile_location "$HDRTEMP")
 		echo "$loc" | grep -qE "^https?://.*$2(/|$)" ||
 		echo "$loc" | grep -vqE '^https?://' || {
-			echo suspicious redirection to : $loc
+			echo suspicious redirection $code to : $loc
 			rm -f "$HDRTEMP"
 			return 254
 		}
