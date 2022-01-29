@@ -272,7 +272,7 @@ dpi-desync parameter takes up to 3 comma separated arguments.
 zero phase means tcp connection establishement (before sending data payload). Mode can be `synack`.
 Hostlist filter is not applicable to the zero phase.
 Next phases work on packets with data payload.
-1st phase mode can be `fake`,`rst`,`rstack`, 2nd phase mode - `disorder`,`disorder2`,`split`,`split2`.
+1st phase mode can be `fake`,`rst`,`rstack`, 2nd phase mode - `disorder`,`disorder2`,`split`,`split2`,`ipfrag2`.
 Can be useful for ISPs with more than one DPI.
 
 ### SYNACK mode
