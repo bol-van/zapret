@@ -326,7 +326,7 @@ A SYN or SYN,ACK packet creates an entry in the conntrack table.
 That's why iptables redirection must start with the first packet although can be cut later using connbytes filter.
 
 First seen UDP packet creates UDP stream. It defines the stream direction. Then all packets with the same
-src_ip,src_port,dst_ip,dst_port are considered to belong to the same UDP stream. UDP stream exists till timeout.
+`src_ip,src_port,dst_ip,dst_port` are considered to belong to the same UDP stream. UDP stream exists till inactivity timeout.
 
 A connection is deleted from the table as soon as it's no more required to satisfy nfqws needs or when a timeout happens.
 
