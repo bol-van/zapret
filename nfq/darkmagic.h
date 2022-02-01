@@ -14,11 +14,13 @@
 // returns netorder value
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 
-#define FOOL_NONE	0
-#define FOOL_MD5SIG	1
-#define FOOL_BADSUM 2
-#define FOOL_TS	4
-#define FOOL_BADSEQ	8
+#define FOOL_NONE	0x00
+#define FOOL_MD5SIG	0x01
+#define FOOL_BADSUM	0x02
+#define FOOL_TS		0x04
+#define FOOL_BADSEQ	0x08
+#define FOOL_HOPBYHOP	0x10
+#define FOOL_HOPBYHOP2	0x20
 
 #define SCALE_NONE ((uint8_t)-1)
 

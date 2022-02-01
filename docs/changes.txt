@@ -214,3 +214,7 @@ nfqws: UDP desync with conntrack support (any-protocol only for now)
 v44
 
 nfqws: ipfrag
+
+v45
+
+nfqws: hop-by-hop ipv6 desync and fooling

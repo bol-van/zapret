@@ -200,19 +200,40 @@ bool prepare_tcp_segment6(
 	uint8_t *buf, size_t *buflen)
 {
 	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
-	uint16_t ip_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
+	uint16_t transport_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
+	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2);
 	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
 	struct ip6_hdr *ip6 = (struct ip6_hdr*)buf;
 	struct tcphdr *tcp = (struct tcphdr*)(ip6+1);
+	uint8_t proto;
+
+	if (fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))
+	{
+		struct ip6_hbh *hbh = (struct ip6_hbh*)tcp;
+		tcp = (struct tcphdr*)((uint8_t*)tcp+8);
+		memset(hbh,0,8);
+		// extra HOPBYHOP header. standard violation
+		if (fooling & FOOL_HOPBYHOP2)
+		{
+			hbh = (struct ip6_hbh*)tcp;
+			tcp = (struct tcphdr*)((uint8_t*)tcp+8);
+			memset(hbh,0,8);
+		}
+		hbh->ip6h_nxt = IPPROTO_TCP;
+		proto = 0; // hop by hop options
+	}
+	else
+		proto = IPPROTO_TCP;
+
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
-	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, IPPROTO_TCP, ttl);
+	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
 	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
 
 	memcpy(payload,data,len);
-	tcp6_fix_checksum(tcp,ip_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
+	tcp6_fix_checksum(tcp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
 	if (fooling & FOOL_BADSUM) tcp->th_sum^=htons(0xBEAF);
 
 	*buflen = pktlen;
@@ -273,19 +294,39 @@ bool prepare_udp_segment6(
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t ip_payload_len = sizeof(struct udphdr) + len;
+	uint16_t transport_payload_len = sizeof(struct udphdr) + len;
+	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2);
 	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
 	struct ip6_hdr *ip6 = (struct ip6_hdr*)buf;
 	struct udphdr *udp = (struct udphdr*)(ip6+1);
+	uint8_t proto;
+
+	if (fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))
+	{
+		struct ip6_hbh *hbh = (struct ip6_hbh*)udp;
+		udp = (struct udphdr*)((uint8_t*)udp+8);
+		memset(hbh,0,8);
+		// extra HOPBYHOP header. standard violation
+		if (fooling & FOOL_HOPBYHOP2)
+		{
+			hbh = (struct ip6_hbh*)udp;
+			udp = (struct udphdr*)((uint8_t*)udp+8);
+			memset(hbh,0,8);
+		}
+		hbh->ip6h_nxt = IPPROTO_UDP;
+		proto = 0; // hop by hop options
+	}
+	else
+		proto = IPPROTO_UDP;
 	uint8_t *payload = (uint8_t*)(udp+1);
 
-	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, IPPROTO_UDP, ttl);
+	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
 	fill_udphdr(udp, src->sin6_port, dst->sin6_port, len);
 
 	memcpy(payload,data,len);
-	udp6_fix_checksum(udp,ip_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
+	udp6_fix_checksum(udp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
 	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
 
 	*buflen = pktlen;

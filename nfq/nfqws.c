@@ -505,7 +505,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2 ipfrag2\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack hopbyhop disorder disorder2 split split2 ipfrag2\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -513,7 +513,7 @@ static void exithelp()
 #endif
 		" --dpi-desync-ttl=<int>\t\t\t; set ttl for desync packet\n"
 		" --dpi-desync-ttl6=<int>\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum hopbyhop hopbyhop2\n"
 #ifdef __linux__
 		" --dpi-desync-retrans=0|1\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
 #endif
@@ -810,7 +810,7 @@ int main(int argc, char **argv)
 					fprintf(stderr, "invalid desync combo : %s+%s+%s\n",mode,mode2,mode3);
 					exit_clean(1);
 				}
-				if (params.desync_mode2 && !(desync_valid_first_stage(params.desync_mode) && desync_valid_second_stage(params.desync_mode2)))
+				if (params.desync_mode2 && (desync_only_first_stage(params.desync_mode) || !(desync_valid_first_stage(params.desync_mode) && desync_valid_second_stage(params.desync_mode2))))
 				{
 					fprintf(stderr, "invalid desync combo : %s+%s\n", mode,mode2);
 					exit_clean(1);
@@ -864,6 +864,10 @@ int main(int argc, char **argv)
 					}
 					else if (!strcmp(p,"badseq"))
 						params.desync_fooling_mode |= FOOL_BADSEQ;
+					else if (!strcmp(p,"hopbyhop"))
+						params.desync_fooling_mode |= FOOL_HOPBYHOP;
+					else if (!strcmp(p,"hopbyhop2"))
+						params.desync_fooling_mode |= FOOL_HOPBYHOP2;
 					else if (strcmp(p,"none"))
 					{
 						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum\n");

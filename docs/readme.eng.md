@@ -139,11 +139,11 @@ nfqws takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack disorder disorder2 split split2 ipfrag2
+ --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack hopbyhop disorder disorder2 split split2 ipfrag2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                ; set ipv6 hop limit for desync packet. by default ttl value is used
- --dpi-desync-fooling=none|md5sig|ts|badseq|badsum ; can take multiple comma separated values
+ --dpi-desync-fooling=<fooling>		; can take multiple comma separated values : none md5sig badseq badsum hopbyhop hopbyhop2
  --dpi-desync-retrans=0|1               ; (fake,rst,rstack only) 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
  --dpi-desync-repeats=<N>               ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
@@ -201,7 +201,12 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
   If automatic solution cannot be found then use `zapret-hosts-user-exclude.txt`.
   Some router stock firmwares fix outgoing TTL. Without switching this option off TTL fooling will not work.
-
+* `hopbyhop` is ipv6 only. This fooling adds empty extension header `hop-by-hop options` or two headers in case of `hopbyhop2`.
+  Packets with two hop-by-hop headers violate RFC and discarded by all operating systems.
+  All OS accept packets with one hop-by-hop header.
+  Some ISPs/operators drop ipv6 packets with hop-by-hop options. Fakes will not be processed by the server either because
+  ISP drops them or because there are two same headers.
+  DPIs may still anaylize packets with one or two hop-by-hop headers.
 
 `--dpi-desync-fooling` takes multiple comma separated values.
 
@@ -233,6 +238,14 @@ Split mode is very similar to disorder but without segment reordering :
 Mode `split2` disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
 In `disorder2` and 'split2` modes no fake packets are sent, so ttl and fooling options are not required.
+
+`hopbyhop` desync mode (it's not the same as `hopbyhop` fooling !) is ipv6 only. One hop-by-hop header
+is added to all desynced packets.
+Extra header increases packet size and can't be applied to the maximum size packets.
+If it's not possible to send modified packet original one will be sent.
+The idea here is that DPI sees 0 in the next header field of the main ipv6 header and does not
+walk through the extension header chain until transport header is found.
+`hopbyhop` mode cannot be used with second phase modes.
 
 There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
 that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server

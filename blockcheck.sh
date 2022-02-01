@@ -543,7 +543,7 @@ pktws_check_domain_bypass()
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local strategy tests='fake' ttls s e desync pos fooling frag sec="$2"
+	local strategy tests='fake' ttls s f e desync pos fooling frag sec="$2"
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -575,12 +575,15 @@ pktws_check_domain_bypass()
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
+		[ "$IPV" = 6 ] && pktws_curl_test_update $1 $3 $e --dpi-desync=hopbyhop
 		for desync in $tests; do
 			s="--dpi-desync=$desync"
 			for ttl in $ttls; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=$ttl $e && break
 			done
-			for fooling in badsum badseq md5sig; do
+			f="badsum badseq md5sig"
+			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
+			for fooling in $f; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-fooling=$fooling $e && [ "$fooling" = "md5sig" ] &&
 					echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
 			done
