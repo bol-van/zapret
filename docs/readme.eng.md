@@ -245,7 +245,9 @@ Extra header increases packet size and can't be applied to the maximum size pack
 If it's not possible to send modified packet original one will be sent.
 The idea here is that DPI sees 0 in the next header field of the main ipv6 header and does not
 walk through the extension header chain until transport header is found.
-`hopbyhop` mode cannot be used with second phase modes.
+`hopbyhop` mode can be used with any second phase mode.
+For example, `hopbyhop,split2` means split original tcp packet into 2 pieces and add hop-by-hop header to both.
+With `hopbyhop,ipfrag2` header sequence will be : `ipv6,hop-by-hop,fragment,tcp/udp`.
 
 There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
 that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server

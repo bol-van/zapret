@@ -575,7 +575,6 @@ pktws_check_domain_bypass()
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
-		[ "$IPV" = 6 ] && pktws_curl_test_update $1 $3 --dpi-desync=hopbyhop $e
 		for desync in $tests; do
 			s="--dpi-desync=$desync"
 			for ttl in $ttls; do
@@ -588,13 +587,22 @@ pktws_check_domain_bypass()
 					echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
 			done
 		done
+		[ "$IPV" = 6 ] && {
+			for desync in hopbyhop hopbyhop,split2 hopbyhop,disorder2; do
+				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
+			done
+		}
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
 
 	[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
 		for frag in 24 32 40 64 80 104; do
-			pktws_curl_test_update $1 $3 --dpi-desync=ipfrag2 --dpi-desync-ipfrag-pos-tcp=$frag
+			tests="ipfrag2"
+			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2"
+			for desync in $tests; do
+				pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
+			done
 		done
 	}
 

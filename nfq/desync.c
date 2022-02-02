@@ -51,7 +51,7 @@ const uint8_t fake_tls_clienthello_default[517] = {
 };
 
 #define PKTDATA_MAXDUMP 32
-#define IP_MAXDUMP 64
+#define IP_MAXDUMP 80
 
 static uint8_t zeropkt[DPI_DESYNC_MAX_FAKE_LEN];
 
@@ -71,7 +71,7 @@ bool desync_valid_first_stage(enum dpi_desync_mode mode)
 }
 bool desync_only_first_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_HOPBYHOP;
+	return false;
 }
 bool desync_valid_second_stage(enum dpi_desync_mode mode)
 {
@@ -356,6 +356,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		}
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;
+		uint8_t fooling_orig = FOOL_NONE;
 		bool b;
 
 		pkt1_len = sizeof(pkt1);
@@ -385,7 +386,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				b = true;
 				break;
 			case DESYNC_HOPBYHOP:
-				if (ip6hdr)
+				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
 				{
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 						ttl_orig,FOOL_HOPBYHOP,0,0,
@@ -399,7 +400,8 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					// this mode is final, no other options available
 					return drop;
 				}
-				return res;
+				fooling_orig = FOOL_HOPBYHOP;
+				desync_mode = params.desync_mode2;
 		}
 
 		if (b)
@@ -444,7 +446,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					if (split_pos<len_payload)
 					{
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
 							return res;
 						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
@@ -470,7 +472,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-							ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+							ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 							data_payload, split_pos, pkt1, &pkt1_len))
 						return res;
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
@@ -510,7 +512,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-							ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+							ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 							data_payload, split_pos, pkt1, &pkt1_len))
 						return res;
 					DLOG("sending 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
@@ -530,7 +532,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					{
 						pkt1_len = sizeof(pkt1);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_orig,FOOL_NONE,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
 							return res;
 						DLOG("sending 2nd tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
@@ -546,9 +548,15 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				{
 					#ifdef __FreeBSD__
 					// FreeBSD tend to pass ipv6 frames with wrong checksum
-					if (ip6hdr)
-						tcp_fix_checksum(tcphdr,len_tcp,ip,ip6hdr);
+					if (res==modify || ip6hdr)
+					#else
+					// if original packet was tampered earlier it needs checksum fixed
+					if (res==modify)
 					#endif
+						tcp_fix_checksum(tcphdr,len_tcp,ip,ip6hdr);
+
+					uint8_t pkt3[DPI_DESYNC_MAX_FAKE_LEN+100], *pkt_orig;
+					size_t pkt_orig_len;
 
 					size_t ipfrag_pos = (params.desync_ipfrag_pos_tcp && params.desync_ipfrag_pos_tcp<len_tcp) ? params.desync_ipfrag_pos_tcp : 24;
 					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()&0xFFFFFFFF);
@@ -556,7 +564,20 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
-					if (!ip_frag(data_pkt, len_pkt, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
+					if (ip6hdr && fooling_orig==FOOL_HOPBYHOP)
+					{
+						pkt_orig_len = sizeof(pkt3);
+						if (!ip6_insert_hopbyhop(data_pkt, len_pkt, pkt3, &pkt_orig_len))
+							return res;
+						pkt_orig = pkt3;
+					}
+					else
+					{
+						pkt_orig = data_pkt;
+						pkt_orig_len = len_pkt;
+					}
+
+					if (!ip_frag(pkt_orig, pkt_orig_len, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
 						return res;
 
 					DLOG("sending 1st ip fragment 0-%zu len=%zu : ", ipfrag_pos-1, ipfrag_pos)
@@ -633,6 +654,7 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		DLOG("applying tampering to unknown protocol\n")
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;
+		uint8_t fooling_orig = FOOL_NONE;
 
 		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
@@ -653,6 +675,7 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 		pkt1_len = sizeof(pkt1);
 		b = false;
+
 		switch(desync_mode)
 		{
 			case DESYNC_FAKE:
@@ -663,7 +686,7 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				b = true;
 				break;
 			case DESYNC_HOPBYHOP:
-				if (ip6hdr)
+				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
 				{
 					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
 						ttl_orig,FOOL_HOPBYHOP,
@@ -677,7 +700,8 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					// this mode is final, no other options available
 					return drop;
 				}
-				return res;
+				fooling_orig = FOOL_HOPBYHOP;
+				desync_mode = params.desync_mode2;
 		}
 
 		if (b)
@@ -709,9 +733,15 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 					#ifdef __FreeBSD__
 					// FreeBSD tend to pass ipv6 frames with wrong checksum
-					if (ip6hdr)
-						udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
+					if (res==modify || ip6hdr)
+					#else
+					// if original packet was tampered earlier it needs checksum fixed
+					if (res==modify)
 					#endif
+						udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
+
+					uint8_t pkt3[DPI_DESYNC_MAX_FAKE_LEN+100], *pkt_orig;
+					size_t pkt_orig_len;
 
 					size_t len_transport = len_payload + sizeof(struct udphdr);
 					size_t ipfrag_pos = (params.desync_ipfrag_pos_udp && params.desync_ipfrag_pos_udp<len_transport) ? params.desync_ipfrag_pos_udp : sizeof(struct udphdr);
@@ -721,7 +751,20 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
-					if (!ip_frag(data_pkt, len_pkt, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
+					if (ip6hdr && fooling_orig==FOOL_HOPBYHOP)
+					{
+						pkt_orig_len = sizeof(pkt3);
+						if (!ip6_insert_hopbyhop(data_pkt, len_pkt, pkt3, &pkt_orig_len))
+							return res;
+						pkt_orig = pkt3;
+					}
+					else
+					{
+						pkt_orig = data_pkt;
+						pkt_orig_len = len_pkt;
+					}
+
+					if (!ip_frag(pkt_orig, pkt_orig_len, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
 						return res;
 
 					DLOG("sending 1st ip fragment 0-%zu len=%zu : ", ipfrag_pos-1, ipfrag_pos)

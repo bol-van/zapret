@@ -13,6 +13,7 @@
 
 // returns netorder value
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
+uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 
 #define FOOL_NONE	0x00
 #define FOOL_MD5SIG	0x01
@@ -85,6 +86,7 @@ bool prepare_udp_segment(
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 
+bool ip6_insert_hopbyhop(uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen);
 
 // ipv4: ident==-1 - copy ip_id from original ipv4 packet
 bool ip_frag4(

@@ -16,6 +16,10 @@ uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
 	return htonl(ntohl(netorder_value)+cpuorder_increment);
 }
+uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment)
+{
+	return htons(ntohs(netorder_value)+cpuorder_increment);
+}
 
 uint8_t *tcp_find_option(struct tcphdr *tcp, uint8_t kind)
 {
@@ -346,7 +350,23 @@ bool prepare_udp_segment(
 		false;
 }
 
-
+bool ip6_insert_hopbyhop(uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen)
+{
+	if ((len_pkt+8)<=*buflen && len_pkt>=sizeof(struct ip6_hdr))
+	{
+		struct ip6_hdr *ip6 = (struct ip6_hdr *)buf;
+		struct ip6_hbh *hbh = (struct ip6_hbh*)(ip6+1);
+		*ip6 = *(struct ip6_hdr*)data_pkt;
+		memset(hbh,0,8);
+		memcpy((uint8_t*)hbh+8, data_pkt+sizeof(struct ip6_hdr), len_pkt-sizeof(struct ip6_hdr));
+		hbh->ip6h_nxt = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+		ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = 0;
+		ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = net16_add(ip6->ip6_ctlun.ip6_un1.ip6_un1_plen, 8);
+		*buflen = len_pkt + 8;
+		return true;
+	}
+	return false;
+}
 
 // split ipv4 packet into 2 fragments at data payload position frag_pos
 bool ip_frag4(
