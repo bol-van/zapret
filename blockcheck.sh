@@ -737,7 +737,7 @@ ask_params()
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
 
-	[ -n "$TLSMAX12" ] || echo "WARNING ! your curl version or TLS library does not support tls-max option. TLS 1.2 tests may use TLS 1.3+ protocols"
+	[ -z "$TLSMAX12" -a -n "$TLS13" ] && echo "WARNING ! your curl version or TLS library does not support tls-max option. TLS 1.2 tests may use TLS 1.3+ protocols"
 
 	ENABLE_HTTPS_TLS12=1
 	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
