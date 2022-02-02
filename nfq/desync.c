@@ -396,9 +396,10 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					DLOG("resending original packet with hop-by-hop options\n");
 					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 						return res;
+					// this mode is final, no other options available
+					return drop;
 				}
-				// this mode is final, no other options available
-				return drop;
+				return res;
 		}
 
 		if (b)
@@ -673,9 +674,10 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					DLOG("resending original packet with hop-by-hop options\n");
 					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 						return res;
+					// this mode is final, no other options available
+					return drop;
 				}
-				// this mode is final, no other options available
-				return drop;
+				return res;
 		}
 
 		if (b)
