@@ -575,7 +575,7 @@ pktws_check_domain_bypass()
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
-		[ "$IPV" = 6 ] && pktws_curl_test_update $1 $3 $e --dpi-desync=hopbyhop
+		[ "$IPV" = 6 ] && pktws_curl_test_update $1 $3 --dpi-desync=hopbyhop $e
 		for desync in $tests; do
 			s="--dpi-desync=$desync"
 			for ttl in $ttls; do
