@@ -6,7 +6,7 @@ ZAPRET_BASE="$EXEDIR"
 
 [ -n "$QNUM" ] || QNUM=59780
 [ -n "$TPPORT" ] || TPPORT=993
-[ -n "$TPWS_UID" ] || TPWS_UID=1
+[ -n "$TPWS_UID" ] || TPWS_UID=1:3003
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
 [ -n "$DVTWS" ] || DVTWS="$ZAPRET_BASE/nfq/dvtws"
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
