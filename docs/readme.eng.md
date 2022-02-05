@@ -139,7 +139,7 @@ nfqws takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack hopbyhop destopt disorder disorder2 split split2 ipfrag2
+ --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                ; set ipv6 hop limit for desync packet. by default ttl value is used
@@ -239,13 +239,13 @@ Mode `split2` disables sending of fake segments. It can be used as a faster alte
 
 In `disorder2` and 'split2` modes no fake packets are sent, so ttl and fooling options are not required.
 
-`hopbyhop` and `destopt` desync modes (it's not the same as `hopbyhop` fooling !) are ipv6 only. One `hop-by-hop` or
-`destination options` header is added to all desynced packets.
+`hopbyhop`, `destopt` and `ipfrag1` desync modes (they're not the same as `hopbyhop` fooling !) are ipv6 only. One `hop-by-hop`,
+`destination options` or `fragment` header is added to all desynced packets.
 Extra header increases packet size and can't be applied to the maximum size packets.
 If it's not possible to send modified packet original one will be sent.
 The idea here is that DPI sees 0 in the next header field of the main ipv6 header and does not
 walk through the extension header chain until transport header is found.
-`hopbyhop` and `destopt`  modes can be used with any second phase mode.
+`hopbyhop`, `destopt`, `ipfrag1` modes can be used with any second phase mode except `ipfrag1+ipfrag2`.
 For example, `hopbyhop,split2` means split original tcp packet into 2 pieces and add hop-by-hop header to both.
 With `hopbyhop,ipfrag2` header sequence will be : `ipv6,hop-by-hop,fragment,tcp/udp`.
 

@@ -589,7 +589,7 @@ pktws_check_domain_bypass()
 			done
 		done
 		[ "$IPV" = 6 ] && {
-			for desync in hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2; do
+			for desync in hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2 ipfrag1 ipfrag1,split2 ipfrag1,disorder2; do
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
