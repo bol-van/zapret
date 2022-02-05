@@ -425,10 +425,10 @@ Sometimes it works, sometimes system defragments packets.
 Looks like kernels <4.16 have no simple way to solve this problem. Unloading of nf_conntrack module
 and its dependency nf_defrag_ipv6 helps but this severely impacts functionality.
 Kernels 4.16+ exclude from defragmentation untracked packets.
+See `blockcheck.sh` code for example.
 Sometimes it's required to load `ip6table_raw` kernel module with parameter raw_before_defrag=1.
 In openwrt module parameters are specified after module names separated by space in files located in `/etc/modules.d`
-See `blockcheck.sh` code for example.
-
+It must be done manually, `blockcheck.sh` cannot auto fix this for you.
 
 ## tpws
 
