@@ -427,7 +427,13 @@ and its dependency nf_defrag_ipv6 helps but this severely impacts functionality.
 Kernels 4.16+ exclude from defragmentation untracked packets.
 See `blockcheck.sh` code for example.
 Sometimes it's required to load `ip6table_raw` kernel module with parameter raw_before_defrag=1.
-In openwrt module parameters are specified after module names separated by space in files located in `/etc/modules.d`
+In openwrt module parameters are specified after module names separated by space in files located in `/etc/modules.d`.
+In traditional linux first check if the problem actually exists using tcpdump or wireshark.
+If it does check whether iptables-legacy or iptables-nft are used. If legacy create the file
+/etc/modprobe.d/ip6table_raw.conf with the following content :
+```
+options ip6table_raw raw_before_defrag=1
+```
 It must be done manually, `blockcheck.sh` cannot auto fix this for you.
 
 ## tpws
