@@ -7,10 +7,15 @@ BINDIR="$EXEDIR/$BINS"
 
 check_dir()
 {
-	local exe=$BINDIR/$1/ip2net
+	local dir="$BINDIR/$1"
+	local exe="$dir/ip2net"
+	local out
 	if [ -f "$exe" ]; then
 		if [ -x "$exe" ]; then
-			echo 0.0.0.0 | "$exe" 1>/dev/null 2>/dev/null
+			# ash and dash try to execute invalid executables as a script. they interpret binary garbage with possible negative consequences
+			# find do not use shell exec
+			out=$(echo 0.0.0.0 | find "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
+			[ -n "$out" ]
 		else
 			echo "$exe is not executable. set proper chmod."
 			return 1
