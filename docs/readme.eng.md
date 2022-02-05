@@ -239,13 +239,13 @@ Mode `split2` disables sending of fake segments. It can be used as a faster alte
 
 In `disorder2` and 'split2` modes no fake packets are sent, so ttl and fooling options are not required.
 
-`hopbyhop` desync mode (it's not the same as `hopbyhop` fooling !) is ipv6 only. One hop-by-hop header
-is added to all desynced packets.
+`hopbyhop` and `destopt` desync modes (it's not the same as `hopbyhop` fooling !) are ipv6 only. One `hop-by-hop` or
+`destination options` header is added to all desynced packets.
 Extra header increases packet size and can't be applied to the maximum size packets.
 If it's not possible to send modified packet original one will be sent.
 The idea here is that DPI sees 0 in the next header field of the main ipv6 header and does not
 walk through the extension header chain until transport header is found.
-`hopbyhop` mode can be used with any second phase mode.
+`hopbyhop` and `destopt`  modes can be used with any second phase mode.
 For example, `hopbyhop,split2` means split original tcp packet into 2 pieces and add hop-by-hop header to both.
 With `hopbyhop,ipfrag2` header sequence will be : `ipv6,hop-by-hop,fragment,tcp/udp`.
 

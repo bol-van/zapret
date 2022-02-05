@@ -205,13 +205,13 @@ bool prepare_tcp_segment6(
 {
 	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
 	uint16_t transport_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
-	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2);
+	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2) + 8*!!(fooling & FOOL_DESTOPT);
 	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
 	struct ip6_hdr *ip6 = (struct ip6_hdr*)buf;
 	struct tcphdr *tcp = (struct tcphdr*)(ip6+1);
-	uint8_t proto;
+	uint8_t proto = IPPROTO_TCP, *nexttype = NULL;
 
 	if (fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))
 	{
@@ -226,10 +226,20 @@ bool prepare_tcp_segment6(
 			memset(hbh,0,8);
 		}
 		hbh->ip6h_nxt = IPPROTO_TCP;
+		nexttype = &hbh->ip6h_nxt;
 		proto = 0; // hop by hop options
 	}
-	else
-		proto = IPPROTO_TCP;
+	if (fooling & FOOL_DESTOPT)
+	{
+		struct ip6_dest *dest = (struct ip6_dest*)tcp;
+		tcp = (struct tcphdr*)((uint8_t*)tcp+8);
+		memset(dest,0,8);
+		dest->ip6d_nxt = IPPROTO_TCP;
+		if (nexttype)
+			*nexttype = 60;  // destination options
+		else
+			proto = 60;
+	}
 
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
@@ -299,13 +309,13 @@ bool prepare_udp_segment6(
 	uint8_t *buf, size_t *buflen)
 {
 	uint16_t transport_payload_len = sizeof(struct udphdr) + len;
-	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2);
+	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2) + 8*!!(fooling & FOOL_DESTOPT) ;
 	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
 	struct ip6_hdr *ip6 = (struct ip6_hdr*)buf;
 	struct udphdr *udp = (struct udphdr*)(ip6+1);
-	uint8_t proto;
+	uint8_t proto = IPPROTO_UDP, *nexttype = NULL;
 
 	if (fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))
 	{
@@ -320,10 +330,21 @@ bool prepare_udp_segment6(
 			memset(hbh,0,8);
 		}
 		hbh->ip6h_nxt = IPPROTO_UDP;
+		nexttype = &hbh->ip6h_nxt;
 		proto = 0; // hop by hop options
 	}
-	else
-		proto = IPPROTO_UDP;
+	if (fooling & FOOL_DESTOPT)
+	{
+		struct ip6_dest *dest = (struct ip6_dest*)udp;
+		udp = (struct udphdr*)((uint8_t*)udp+8);
+		memset(dest,0,8);
+		dest->ip6d_nxt = IPPROTO_UDP;
+		if (nexttype)
+			*nexttype = 60;  // destination options
+		else
+			proto = 60;
+	}
+
 	uint8_t *payload = (uint8_t*)(udp+1);
 
 	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
@@ -350,17 +371,17 @@ bool prepare_udp_segment(
 		false;
 }
 
-bool ip6_insert_hopbyhop(uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen)
+bool ip6_insert_simple_hdr(uint8_t type, uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen)
 {
 	if ((len_pkt+8)<=*buflen && len_pkt>=sizeof(struct ip6_hdr))
 	{
 		struct ip6_hdr *ip6 = (struct ip6_hdr *)buf;
-		struct ip6_hbh *hbh = (struct ip6_hbh*)(ip6+1);
+		struct ip6_ext *hbh = (struct ip6_ext*)(ip6+1);
 		*ip6 = *(struct ip6_hdr*)data_pkt;
 		memset(hbh,0,8);
 		memcpy((uint8_t*)hbh+8, data_pkt+sizeof(struct ip6_hdr), len_pkt-sizeof(struct ip6_hdr));
-		hbh->ip6h_nxt = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-		ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = 0;
+		hbh->ip6e_nxt = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+		ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = type;
 		ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = net16_add(ip6->ip6_ctlun.ip6_un1.ip6_un1_plen, 8);
 		*buflen = len_pkt + 8;
 		return true;

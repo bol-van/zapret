@@ -589,7 +589,7 @@ pktws_check_domain_bypass()
 			done
 		done
 		[ "$IPV" = 6 ] && {
-			for desync in hopbyhop hopbyhop,split2 hopbyhop,disorder2; do
+			for desync in hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2; do
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
@@ -600,7 +600,7 @@ pktws_check_domain_bypass()
 	[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
 		for frag in 24 32 40 64 80 104; do
 			tests="ipfrag2"
-			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2"
+			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
 			for desync in $tests; do
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
 			done

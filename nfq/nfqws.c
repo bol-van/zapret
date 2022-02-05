@@ -505,7 +505,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack hopbyhop disorder disorder2 split split2 ipfrag2\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack hopbyhop destopt disorder disorder2 split split2 ipfrag2\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -870,7 +870,7 @@ int main(int argc, char **argv)
 						params.desync_fooling_mode |= FOOL_HOPBYHOP2;
 					else if (strcmp(p,"none"))
 					{
-						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum\n");
+						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum,hopbyhop,hopbyhop2\n");
 						exit_clean(1);
 					}
 					p = e;

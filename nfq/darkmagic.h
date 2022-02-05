@@ -22,6 +22,7 @@ uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 #define FOOL_BADSEQ	0x08
 #define FOOL_HOPBYHOP	0x10
 #define FOOL_HOPBYHOP2	0x20
+#define FOOL_DESTOPT	0x40
 
 #define SCALE_NONE ((uint8_t)-1)
 
@@ -86,7 +87,7 @@ bool prepare_udp_segment(
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 
-bool ip6_insert_hopbyhop(uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen);
+bool ip6_insert_simple_hdr(uint8_t type, uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen);
 
 // ipv4: ident==-1 - copy ip_id from original ipv4 packet
 bool ip_frag4(

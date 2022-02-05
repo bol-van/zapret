@@ -67,7 +67,7 @@ bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 }
 bool desync_valid_first_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_FAKE || mode==DESYNC_RST || mode==DESYNC_RSTACK || mode==DESYNC_HOPBYHOP;
+	return mode==DESYNC_FAKE || mode==DESYNC_RST || mode==DESYNC_RSTACK || mode==DESYNC_HOPBYHOP || mode==DESYNC_DESTOPT;
 }
 bool desync_only_first_stage(enum dpi_desync_mode mode)
 {
@@ -101,6 +101,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_IPFRAG2;
 	else if (!strcmp(s,"hopbyhop"))
 		return DESYNC_HOPBYHOP;
+	else if (!strcmp(s,"destopt"))
+		return DESYNC_DESTOPT;
 	return DESYNC_INVALID;
 }
 
@@ -386,21 +388,22 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				b = true;
 				break;
 			case DESYNC_HOPBYHOP:
+			case DESYNC_DESTOPT:
+				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : FOOL_DESTOPT;
 				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
 				{
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-						ttl_orig,FOOL_HOPBYHOP,0,0,
+						ttl_orig,fooling_orig,0,0,
 						data_payload, len_payload, pkt1, &pkt1_len))
 					{
 						return res;
 					}
-					DLOG("resending original packet with hop-by-hop options\n");
+					DLOG("resending original packet with extension header\n");
 					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 						return res;
 					// this mode is final, no other options available
 					return drop;
 				}
-				fooling_orig = FOOL_HOPBYHOP;
 				desync_mode = params.desync_mode2;
 		}
 
@@ -564,10 +567,10 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
-					if (ip6hdr && fooling_orig==FOOL_HOPBYHOP)
+					if (ip6hdr && fooling_orig!=FOOL_NONE)
 					{
 						pkt_orig_len = sizeof(pkt3);
-						if (!ip6_insert_hopbyhop(data_pkt, len_pkt, pkt3, &pkt_orig_len))
+						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? 0 : 60, data_pkt, len_pkt, pkt3, &pkt_orig_len))
 							return res;
 						pkt_orig = pkt3;
 					}
@@ -686,21 +689,22 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				b = true;
 				break;
 			case DESYNC_HOPBYHOP:
+			case DESYNC_DESTOPT:
+				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : FOOL_DESTOPT;
 				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
 				{
 					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
-						ttl_orig,FOOL_HOPBYHOP,
+						ttl_orig,fooling_orig,
 						data_payload, len_payload, pkt1, &pkt1_len))
 					{
 						return res;
 					}
-					DLOG("resending original packet with hop-by-hop options\n");
+					DLOG("resending original packet with extension header\n");
 					if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 						return res;
 					// this mode is final, no other options available
 					return drop;
 				}
-				fooling_orig = FOOL_HOPBYHOP;
 				desync_mode = params.desync_mode2;
 		}
 
@@ -751,10 +755,10 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
-					if (ip6hdr && fooling_orig==FOOL_HOPBYHOP)
+					if (ip6hdr && fooling_orig!=FOOL_NONE)
 					{
 						pkt_orig_len = sizeof(pkt3);
-						if (!ip6_insert_hopbyhop(data_pkt, len_pkt, pkt3, &pkt_orig_len))
+						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? 0 : 60, data_pkt, len_pkt, pkt3, &pkt_orig_len))
 							return res;
 						pkt_orig = pkt3;
 					}
