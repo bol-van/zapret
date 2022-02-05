@@ -114,7 +114,7 @@ IPFW_ADD()
 }
 IPFW_DEL()
 {
-	ipfw -qf delete $IPFW_RULE_NUM
+	ipfw -qf delete $IPFW_RULE_NUM 2>/dev/null
 }
 ipt6_has_raw()
 {
