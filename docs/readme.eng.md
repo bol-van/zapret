@@ -248,6 +248,7 @@ walk through the extension header chain until transport header is found.
 `hopbyhop`, `destopt`, `ipfrag1` modes can be used with any second phase mode except `ipfrag1+ipfrag2`.
 For example, `hopbyhop,split2` means split original tcp packet into 2 pieces and add hop-by-hop header to both.
 With `hopbyhop,ipfrag2` header sequence will be : `ipv6,hop-by-hop,fragment,tcp/udp`.
+`ipfrag1` mode may not always work without special preparations. See "IP Fragmentation" notices.
 
 There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
 that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server
@@ -424,6 +425,8 @@ Sometimes it works, sometimes system defragments packets.
 Looks like kernels <4.16 have no simple way to solve this problem. Unloading of nf_conntrack module
 and its dependency nf_defrag_ipv6 helps but this severely impacts functionality.
 Kernels 4.16+ exclude from defragmentation untracked packets.
+Sometimes it's required to load `ip6table_raw` kernel module with parameter raw_before_defrag=1.
+In openwrt module parameters are specified after module names separated by space in files located in `/etc/modules.d`
 See `blockcheck.sh` code for example.
 
 

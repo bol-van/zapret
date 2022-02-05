@@ -340,7 +340,7 @@ pktws_ipt_prepare()
 			IPT OUTPUT -p tcp --dport $1 -m conntrack --ctstate INVALID -j ACCEPT
 			if [ "$IPV" = 6 -a -n "$IP6_DEFRAG_DISABLE" ]; then
 				# the only way to reliable disable ipv6 defrag. works only in 4.16+ kernels
-				IPT OUTPUT -t raw -p tcp --dport $1 -j CT --notrack
+				IPT OUTPUT -t raw -p tcp -m frag -j CT --notrack
 			elif [ "$IPV" = 4 ]; then
 				# enable fragments
 				IPT OUTPUT -f -j ACCEPT
@@ -363,7 +363,7 @@ pktws_ipt_unprepare()
 			IPT_DEL INPUT -p tcp --sport $1 ! --syn -j ACCEPT
 			IPT_DEL OUTPUT -p tcp --dport $1 -m conntrack --ctstate INVALID -j ACCEPT
 			if [ "$IPV" = 6 -a -n "$IP6_DEFRAG_DISABLE" ]; then
-				IPT_DEL OUTPUT -t raw -p tcp --dport $1 -j CT --notrack
+				IPT_DEL OUTPUT -t raw -p tcp -m frag -j CT --notrack
 			elif [ "$IPV" = 4 ]; then
 				IPT_DEL OUTPUT -f -j ACCEPT
 			fi
