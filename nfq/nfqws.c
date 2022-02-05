@@ -505,7 +505,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack hopbyhop destopt disorder disorder2 split split2 ipfrag2\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)

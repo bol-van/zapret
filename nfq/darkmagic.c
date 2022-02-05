@@ -205,7 +205,11 @@ bool prepare_tcp_segment6(
 {
 	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
 	uint16_t transport_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
-	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2) + 8*!!(fooling & FOOL_DESTOPT);
+	uint16_t ip_payload_len = transport_payload_len +
+		8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) +
+		16*!!(fooling & FOOL_HOPBYHOP2) +
+		8*!!(fooling & FOOL_DESTOPT) +
+		8*!!(fooling & FOOL_IPFRAG1);
 	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
@@ -227,7 +231,7 @@ bool prepare_tcp_segment6(
 		}
 		hbh->ip6h_nxt = IPPROTO_TCP;
 		nexttype = &hbh->ip6h_nxt;
-		proto = 0; // hop by hop options
+		proto = IPPROTO_HOPOPTS;
 	}
 	if (fooling & FOOL_DESTOPT)
 	{
@@ -236,9 +240,23 @@ bool prepare_tcp_segment6(
 		memset(dest,0,8);
 		dest->ip6d_nxt = IPPROTO_TCP;
 		if (nexttype)
-			*nexttype = 60;  // destination options
+			*nexttype = IPPROTO_DSTOPTS;
 		else
-			proto = 60;
+			proto = IPPROTO_DSTOPTS;
+		nexttype = &dest->ip6d_nxt;
+	}
+	if (fooling & FOOL_IPFRAG1)
+	{
+		struct ip6_frag *frag = (struct ip6_frag*)tcp;
+		tcp = (struct tcphdr*)((uint8_t*)tcp+sizeof(struct ip6_frag));
+		frag->ip6f_nxt = IPPROTO_TCP;
+		frag->ip6f_ident = htonl(1+random()%0xFFFFFFFF);
+		frag->ip6f_reserved = 0;
+		frag->ip6f_offlg = 0;
+		if (nexttype)
+			*nexttype = IPPROTO_FRAGMENT;
+		else
+			proto = IPPROTO_FRAGMENT;
 	}
 
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
@@ -309,7 +327,11 @@ bool prepare_udp_segment6(
 	uint8_t *buf, size_t *buflen)
 {
 	uint16_t transport_payload_len = sizeof(struct udphdr) + len;
-	uint16_t ip_payload_len = transport_payload_len + 8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) + 16*!!(fooling & FOOL_HOPBYHOP2) + 8*!!(fooling & FOOL_DESTOPT) ;
+	uint16_t ip_payload_len = transport_payload_len +
+		8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) +
+		16*!!(fooling & FOOL_HOPBYHOP2) +
+		8*!!(fooling & FOOL_DESTOPT) +
+		8*!!(fooling & FOOL_IPFRAG1);
 	uint16_t pktlen = sizeof(struct ip6_hdr) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
@@ -331,7 +353,7 @@ bool prepare_udp_segment6(
 		}
 		hbh->ip6h_nxt = IPPROTO_UDP;
 		nexttype = &hbh->ip6h_nxt;
-		proto = 0; // hop by hop options
+		proto = IPPROTO_HOPOPTS;
 	}
 	if (fooling & FOOL_DESTOPT)
 	{
@@ -340,9 +362,23 @@ bool prepare_udp_segment6(
 		memset(dest,0,8);
 		dest->ip6d_nxt = IPPROTO_UDP;
 		if (nexttype)
-			*nexttype = 60;  // destination options
+			*nexttype = IPPROTO_DSTOPTS;
 		else
-			proto = 60;
+			proto = IPPROTO_DSTOPTS;
+		nexttype = &dest->ip6d_nxt;
+	}
+	if (fooling & FOOL_IPFRAG1)
+	{
+		struct ip6_frag *frag = (struct ip6_frag*)udp;
+		udp = (struct udphdr*)((uint8_t*)udp+sizeof(struct ip6_frag));
+		frag->ip6f_nxt = IPPROTO_UDP;
+		frag->ip6f_ident = htonl(1+random()%0xFFFFFFFF);
+		frag->ip6f_reserved = 0;
+		frag->ip6f_offlg = 0;
+		if (nexttype)
+			*nexttype = IPPROTO_FRAGMENT;
+		else
+			proto = IPPROTO_FRAGMENT;
 	}
 
 	uint8_t *payload = (uint8_t*)(udp+1);

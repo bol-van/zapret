@@ -67,7 +67,7 @@ bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 }
 bool desync_valid_first_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_FAKE || mode==DESYNC_RST || mode==DESYNC_RSTACK || mode==DESYNC_HOPBYHOP || mode==DESYNC_DESTOPT;
+	return mode==DESYNC_FAKE || mode==DESYNC_RST || mode==DESYNC_RSTACK || mode==DESYNC_HOPBYHOP || mode==DESYNC_DESTOPT || mode==DESYNC_IPFRAG1;
 }
 bool desync_only_first_stage(enum dpi_desync_mode mode)
 {
@@ -103,6 +103,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_HOPBYHOP;
 	else if (!strcmp(s,"destopt"))
 		return DESYNC_DESTOPT;
+	else if (!strcmp(s,"ipfrag1"))
+		return DESYNC_IPFRAG1;
 	return DESYNC_INVALID;
 }
 
@@ -389,7 +391,8 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				break;
 			case DESYNC_HOPBYHOP:
 			case DESYNC_DESTOPT:
-				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : FOOL_DESTOPT;
+			case DESYNC_IPFRAG1:
+				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
 				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
 				{
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
@@ -562,15 +565,15 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					size_t pkt_orig_len;
 
 					size_t ipfrag_pos = (params.desync_ipfrag_pos_tcp && params.desync_ipfrag_pos_tcp<len_tcp) ? params.desync_ipfrag_pos_tcp : 24;
-					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()&0xFFFFFFFF);
+					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 
 					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
-					if (ip6hdr && fooling_orig!=FOOL_NONE)
+					if (ip6hdr && (fooling_orig==FOOL_HOPBYHOP || fooling_orig==FOOL_DESTOPT))
 					{
 						pkt_orig_len = sizeof(pkt3);
-						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? 0 : 60, data_pkt, len_pkt, pkt3, &pkt_orig_len))
+						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? IPPROTO_HOPOPTS : IPPROTO_DSTOPTS, data_pkt, len_pkt, pkt3, &pkt_orig_len))
 							return res;
 						pkt_orig = pkt3;
 					}
@@ -690,7 +693,8 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				break;
 			case DESYNC_HOPBYHOP:
 			case DESYNC_DESTOPT:
-				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : FOOL_DESTOPT;
+			case DESYNC_IPFRAG1:
+				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
 				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
 				{
 					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
@@ -750,15 +754,15 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					size_t len_transport = len_payload + sizeof(struct udphdr);
 					size_t ipfrag_pos = (params.desync_ipfrag_pos_udp && params.desync_ipfrag_pos_udp<len_transport) ? params.desync_ipfrag_pos_udp : sizeof(struct udphdr);
 					// freebsd do not set ip.id
-					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()&0xFFFFFFFF);
+					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 
 					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
-					if (ip6hdr && fooling_orig!=FOOL_NONE)
+					if (ip6hdr && (fooling_orig==FOOL_HOPBYHOP || fooling_orig==FOOL_DESTOPT))
 					{
 						pkt_orig_len = sizeof(pkt3);
-						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? 0 : 60, data_pkt, len_pkt, pkt3, &pkt_orig_len))
+						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? IPPROTO_HOPOPTS : IPPROTO_DSTOPTS, data_pkt, len_pkt, pkt3, &pkt_orig_len))
 							return res;
 						pkt_orig = pkt3;
 					}

@@ -23,6 +23,7 @@ uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 #define FOOL_HOPBYHOP	0x10
 #define FOOL_HOPBYHOP2	0x20
 #define FOOL_DESTOPT	0x40
+#define FOOL_IPFRAG1	0x80
 
 #define SCALE_NONE ((uint8_t)-1)
 
