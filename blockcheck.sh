@@ -120,6 +120,11 @@ ipt6_has_raw()
 {
 	ip6tables -nL -t raw >/dev/null 2>/dev/null
 }
+ipt6_has_frag()
+{
+	ip6tables -A OUTPUT -m frag 2>/dev/null || return 1
+	ip6tables -D OUTPUT -m frag 2>/dev/null
+}
 ipt_has_nfq()
 {
 	# cannot just check /proc/net/ip_tables_targets because of iptables-nft or modules not loaded yet
@@ -589,7 +594,9 @@ pktws_check_domain_bypass()
 			done
 		done
 		[ "$IPV" = 6 ] && {
-			for desync in hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2 ipfrag1 ipfrag1,split2 ipfrag1,disorder2; do
+			f="hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2"
+			[ -n "$IP6_DEFRAG_DISABLE" ] && f="$f ipfrag1 ipfrag1,split2 ipfrag1,disorder2"
+			for desync in $f; do
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
 			done
 		}
@@ -796,16 +803,29 @@ ask_params()
 				local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
 				local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
 				if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
-					ipt6_has_raw && IP6_DEFRAG_DISABLE=1
-					[ -n "$IP6_DEFRAG_DISABLE" ] || {
+					if ipt6_has_raw ; then
+						if ipt6_has_frag; then
+							IP6_DEFRAG_DISABLE=1
+						else
+							echo "WARNING ! ip6tables does not have '-m frag' module, ipv6 ipfrag tests are disabled"
+							echo
+						fi
+					else
 						echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
 						echo
-					}
+					fi
 				else
 					echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
 					echo "WARNING ! ipv6 ipfrag tests are disabled"
 					echo
 				fi
+				[ -n "$IP6_DEFRAG_DISABLE" ] && {
+					local ipexe="$(readlink -f $(which ip6tables))"
+					[ "${ipexe#*nft}" != "$ipexe" ] &&
+						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
+					echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
+					echo
+				}
 			}
 			;;
 		*)
