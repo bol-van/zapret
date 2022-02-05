@@ -376,11 +376,11 @@ bool ip6_insert_simple_hdr(uint8_t type, uint8_t *data_pkt, size_t len_pkt, uint
 	if ((len_pkt+8)<=*buflen && len_pkt>=sizeof(struct ip6_hdr))
 	{
 		struct ip6_hdr *ip6 = (struct ip6_hdr *)buf;
-		struct ip6_ext *hbh = (struct ip6_ext*)(ip6+1);
+		struct ip6_ext *hdr = (struct ip6_ext*)(ip6+1);
 		*ip6 = *(struct ip6_hdr*)data_pkt;
-		memset(hbh,0,8);
-		memcpy((uint8_t*)hbh+8, data_pkt+sizeof(struct ip6_hdr), len_pkt-sizeof(struct ip6_hdr));
-		hbh->ip6e_nxt = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+		memset(hdr,0,8);
+		memcpy((uint8_t*)hdr+8, data_pkt+sizeof(struct ip6_hdr), len_pkt-sizeof(struct ip6_hdr));
+		hdr->ip6e_nxt = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
 		ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = type;
 		ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = net16_add(ip6->ip6_ctlun.ip6_un1.ip6_un1_plen, 8);
 		*buflen = len_pkt + 8;
