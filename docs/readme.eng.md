@@ -430,7 +430,7 @@ Sometimes it's required to load `ip6table_raw` kernel module with parameter raw_
 In openwrt module parameters are specified after module names separated by space in files located in `/etc/modules.d`.
 In traditional linux first check if the problem actually exists using tcpdump or wireshark.
 If it does check whether iptables-legacy or iptables-nft are used. If legacy create the file
-/etc/modprobe.d/ip6table_raw.conf with the following content :
+`/etc/modprobe.d/ip6table_raw.conf` with the following content :
 ```
 options ip6table_raw raw_before_defrag=1
 ```
