@@ -435,9 +435,9 @@ In traditional linux check whether `iptables-legacy` or `iptables-nft` are used.
 ```
 options ip6table_raw raw_before_defrag=1
 ```
-In some linux distros its possible to change current ip6tables using this command: `update-alternatives --config ip6tables`
+In some linux distros its possible to change current ip6tables using this command: `update-alternatives --config ip6tables`.
 If you want to stay with `nftables-nft` you need to patch and recompile your version.
-In nft.c find :
+In `nft.c` find :
 ```
 			{
 				.name	= "PREROUTING",
