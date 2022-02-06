@@ -430,13 +430,13 @@ See `blockcheck.sh` code for example.
 Sometimes it's required to load `ip6table_raw` kernel module with parameter raw_before_defrag=1.
 In openwrt module parameters are specified after module names separated by space in files located in `/etc/modules.d`.
 
-In traditional linux check whether iptables-legacy or iptables-nft are used. If legacy create the file
+In traditional linux check whether `iptables-legacy` or `iptables-nft` are used. If legacy create the file
 `/etc/modprobe.d/ip6table_raw.conf` with the following content :
 ```
 options ip6table_raw raw_before_defrag=1
 ```
-In some linux distros its possible to change current ip6tables using this command: update-alternatives --config ip6tables
-If you want to stay with nftables-nft you need to patch and recompile your version.
+In some linux distros its possible to change current ip6tables using this command: `update-alternatives --config ip6tables`
+If you want to stay with `nftables-nft` you need to patch and recompile your version.
 In nft.c find :
 ```
 			{
