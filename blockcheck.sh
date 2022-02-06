@@ -322,7 +322,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl -${1}ISs --max-time $CURL_MAX_TIME $CURL_OPT ---tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
+	curl -${1}ISs --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
