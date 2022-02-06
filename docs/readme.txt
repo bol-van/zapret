@@ -473,10 +473,19 @@ options ip6table_raw raw_before_defrag=1
 В некоторых традиционных дистрибутивах можно изменить текущий ip6tables через : update-alternatives --config ip6tables
 Если вы хотите оставаться на iptables-nft, вам придется пересобрать патченную версию. Патч совсем небольшой.
 В nft.c найдите фрагмент :
-	name= "PREROUTING",
-	type = "filter",
-	prio = -300, /* NF_IP_PRI_RAW */
-и замените -300 на -450.
+			{
+				.name	= "PREROUTING",
+				.type	= "filter",
+				.prio	= -300,	/* NF_IP_PRI_RAW */
+				.hook	= NF_INET_PRE_ROUTING,
+			},
+			{
+				.name	= "OUTPUT",
+				.type	= "filter",
+				.prio	= -300,	/* NF_IP_PRI_RAW */
+				.hook	= NF_INET_LOCAL_OUT,
+			},
+и замените везде -300 на -450.
 
 Это нужно сделать вручную, никакой автоматики в blockcheck.sh нет.
 

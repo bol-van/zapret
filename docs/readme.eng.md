@@ -439,9 +439,18 @@ In some linux distros its possible to change current ip6tables using this comman
 If you want to stay with nftables-nft you need to patch and recompile your version.
 In nft.c find :
 ```
-	name= "PREROUTING",
-	type = "filter",
-	prio = -300, /* NF_IP_PRI_RAW */
+			{
+				.name	= "PREROUTING",
+				.type	= "filter",
+				.prio	= -300,	/* NF_IP_PRI_RAW */
+				.hook	= NF_INET_PRE_ROUTING,
+			},
+			{
+				.name	= "OUTPUT",
+				.type	= "filter",
+				.prio	= -300,	/* NF_IP_PRI_RAW */
+				.hook	= NF_INET_LOCAL_OUT,
+			},
 ```
 and replace -300 to -450.
 
