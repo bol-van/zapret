@@ -819,9 +819,11 @@ ask_params()
 				fi
 				[ -n "$IP6_DEFRAG_DISABLE" ] && {
 					local ipexe="$(readlink -f $(which ip6tables))"
-					[ "${ipexe#*nft}" != "$ipexe" ] &&
+					if [ "${ipexe#*nft}" != "$ipexe" ]; then
 						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
-					echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
+					else
+						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
+					fi
 					echo
 				}
 			}
