@@ -34,6 +34,10 @@ exists()
 {
 	which $1 >/dev/null 2>/dev/null
 }
+whichq()
+{
+	which $1 2>/dev/null
+}
 killwait()
 {
 	# $1 - signal (-9, -2, ...)
@@ -818,7 +822,7 @@ ask_params()
 					echo
 				fi
 				[ -n "$IP6_DEFRAG_DISABLE" ] && {
-					local ipexe="$(readlink -f $(which ip6tables))"
+					local ipexe="$(readlink -f $(whichq ip6tables))"
 					if [ "${ipexe#*nft}" != "$ipexe" ]; then
 						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
 					else
