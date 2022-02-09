@@ -560,7 +560,8 @@ pktws_check_domain_bypass()
 	}
 
 	s="--dpi-desync=split2"
-	pktws_curl_test_update $1 $3 $s || {
+	pktws_curl_test_update $1 $3 $s
+	[ "$?" != 0 -o "$FORCE" = 1 ] && {
 		tests="$tests split fake,split2 fake,split"
 		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase
 		for pos in 1 3 4 5 10 50 100; do
