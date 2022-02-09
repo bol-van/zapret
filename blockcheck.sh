@@ -573,7 +573,8 @@ pktws_check_domain_bypass()
 		done
 	}
 
-	pktws_curl_test_update $1 $3 --dpi-desync=disorder2 || tests="$tests disorder fake,disorder2 fake,disorder"
+	pktws_curl_test_update $1 $3 --dpi-desync=disorder2
+	[ "$?" != 0 -o "$FORCE" = 1 ] && tests="$tests disorder fake,disorder2 fake,disorder"
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
 	for e in '' '--wssize 1:6'; do
@@ -659,7 +660,7 @@ check_domain()
 	echo "- checking without DPI bypass"
 	curl_test $1 $4 && {
 		report_append "ipv${IPV} $4 $1 : working without bypass"
-		return
+		[ "$FORCE" = 1 ] || return
 	}
 	code=$?
 	for c in 1 2 3 4 6 27 ; do
@@ -727,6 +728,48 @@ configure_curl_opt()
 	}
 	TLS13=
 	curl_supports_tls13 && TLS13=1
+}
+
+defrag_config()
+{
+	case "$UNAME" in
+		Linux)
+			IP6_DEFRAG_DISABLE=
+			[ "$IPVS" = 6 -o "$IPVS" = "4 6" ] && {
+				local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
+				local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
+				if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
+					if ipt6_has_raw ; then
+						if ipt6_has_frag; then
+							IP6_DEFRAG_DISABLE=1
+						else
+							echo "WARNING ! ip6tables does not have '-m frag' module, ipv6 ipfrag tests are disabled"
+							echo
+						fi
+					else
+						echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
+						echo
+					fi
+				else
+					echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
+					echo "WARNING ! ipv6 ipfrag tests are disabled"
+					echo
+				fi
+				[ -n "$IP6_DEFRAG_DISABLE" ] && {
+					local ipexe="$(readlink -f $(whichq ip6tables))"
+					if [ "${ipexe#*nft}" != "$ipexe" ]; then
+						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
+					else
+						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
+					fi
+					echo
+				}
+			}
+			;;
+		*)
+			IP6_DEFRAG_DISABLE=1
+			;;
+	esac
 }
 
 ask_params()
@@ -797,45 +840,12 @@ ask_params()
 	}
 
 	echo
+	FORCE=0
+	ask_yes_no_var FORCE "do all tests despite of result ?"
 
-	case "$UNAME" in
-		Linux)
-			IP6_DEFRAG_DISABLE=
-			[ "$IPVS" = 6 -o "$IPVS" = "4 6" ] && {
-				local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
-				local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
-				if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
-					if ipt6_has_raw ; then
-						if ipt6_has_frag; then
-							IP6_DEFRAG_DISABLE=1
-						else
-							echo "WARNING ! ip6tables does not have '-m frag' module, ipv6 ipfrag tests are disabled"
-							echo
-						fi
-					else
-						echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
-						echo
-					fi
-				else
-					echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
-					echo "WARNING ! ipv6 ipfrag tests are disabled"
-					echo
-				fi
-				[ -n "$IP6_DEFRAG_DISABLE" ] && {
-					local ipexe="$(readlink -f $(whichq ip6tables))"
-					if [ "${ipexe#*nft}" != "$ipexe" ]; then
-						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
-					else
-						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
-					fi
-					echo
-				}
-			}
-			;;
-		*)
-			IP6_DEFRAG_DISABLE=1
-			;;
-	esac
+	echo
+
+	defrag_config
 }
 
 
