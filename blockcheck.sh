@@ -731,7 +731,7 @@ configure_curl_opt()
 	curl_supports_tls13 && TLS13=1
 }
 
-defrag_config()
+configure_defrag()
 {
 	case "$UNAME" in
 		Linux)
@@ -846,7 +846,7 @@ ask_params()
 
 	echo
 
-	defrag_config
+	configure_defrag
 }
 
 
