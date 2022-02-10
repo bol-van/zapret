@@ -23,6 +23,8 @@ ZAPRET_BASE="$EXEDIR"
 HDRTEMP=/tmp/zapret-hdr.txt
 ECHON="echo -n"
 
+NFT_TABLE=blockcheck
+
 [ -n "$DNSCHECK_DNS" ] || DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
 [ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to startmail.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
@@ -139,6 +141,17 @@ ipt_has_nfq()
 	done
 	return 0
 }
+nft_has_nfq()
+{
+	local res=1
+	nft delete table ${NFT_TABLE}_test 2>/dev/null
+	nft add table ${NFT_TABLE}_test 2>/dev/null && {
+		nft add chain ${NFT_TABLE}_test test
+		nft add rule ${NFT_TABLE}_test test queue num $QNUM bypass 2>/dev/null && res=0
+		nft delete table ${NFT_TABLE}_test
+	}
+	return $res
+}
 
 check_system()
 {
@@ -146,6 +159,7 @@ check_system()
 
 	UNAME=$(uname)
 	SUBSYS=
+	FWTYPE=
 
 	case "$UNAME" in
 		Linux)
@@ -154,17 +168,38 @@ check_system()
 			local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
 			[ -L "$INIT" ] && INIT=$(readlink "$INIT")
 			INIT=$(basename "$INIT")
-			[ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] && SUBSYS=openwrt
+			if [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] ; then
+				SUBSYS=openwrt
+				# new openwrt version abandon iptables and use nftables instead
+				# no iptables/ip6tables/ipt-kmods are installed by default
+				# fw4 firewall is used, fw3 is symbolic link to fw4
+				# no more firewall includes
+				# make sure nft was not just installed by user but all the system is based on fw4
+				if [ -x /sbin/fw4 ] && exists nft; then
+					FWTYPE=nftables
+				else
+					FWTYPE=iptables
+				fi
+			else
+				# generic linux
+				if exists nft; then
+					FWTYPE=nftables
+				else
+					FWTYPE=iptables
+				fi
+			fi
 			;;
 		FreeBSD)
 			PKTWS="$DVTWS"
 			PKTWSD=dvtws
+			FWTYPE=ipfw
 			;;
 		*)
 			echo $UNAME not supported
 			exitp 5
 	esac
 	echo $UNAME${SUBSYS:+/$SUBSYS} detected
+	echo firewall type is $FWTYPE
 }
 
 freebsd_module_loaded()
@@ -194,12 +229,23 @@ check_prerequisites()
 	local prog progs='curl'
 	case "$UNAME" in
 		Linux)
-			progs="$progs iptables ip6tables"
-			ipt_has_nfq || {
-				echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
-				[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install iptables-mod-nfqueue'
-				exitp 6
-			}
+			case "$FWTYPE" in
+				iptables)
+					progs="$progs iptables ip6tables"
+					ipt_has_nfq || {
+						echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
+						[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install iptables-mod-nfqueue'
+						exitp 6
+					}
+					;;
+				nftables)
+					nft_has_nfq || {
+						echo nftables queue support is not available. pls install modules.
+						[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install kmod-nft-queue'
+						exitp 6
+					}
+					;;
+			esac
 			;;
 		FreeBSD)
 			progs="$progs ipfw"
@@ -340,8 +386,8 @@ curl_test_https_tls13()
 pktws_ipt_prepare()
 {
 	# $1 - port
-	case "$UNAME" in
-		Linux)
+	case "$FWTYPE" in
+		iptables)
 			# to avoid possible INVALID state drop
 			IPT INPUT -p tcp --sport $1 ! --syn -j ACCEPT
 			IPT OUTPUT -p tcp --dport $1 -m conntrack --ctstate INVALID -j ACCEPT
@@ -352,19 +398,27 @@ pktws_ipt_prepare()
 				# enable fragments
 				IPT OUTPUT -f -j ACCEPT
 			fi
-
 			IPT POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
 			;;
-		FreeBSD)
-			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any 80,443 proto ip${IPV} out not diverted not sockarg
+		nftables)
+			nft add table inet $NFT_TABLE
+			[ "$IPV" = 6 -a -n "$IP6_DEFRAG_DISABLE" ] && {
+				nft "add chain inet $NFT_TABLE predefrag { type filter hook output priority -401; }"
+				nft "add rule inet $NFT_TABLE predefrag meta nfproto ipv${IPV} exthdr frag exists notrack"
+			}
+			nft "add chain inet $NFT_TABLE premangle { type filter hook output priority -151; }"
+			nft "add rule inet $NFT_TABLE premangle meta nfproto ipv${IPV} tcp dport $1 mark and 0x40000000 != 0x40000000 queue num $QNUM bypass"
+			;;
+		ipfw)
+			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any $1 proto ip${IPV} out not diverted not sockarg
 			;;
 	esac
 }
 pktws_ipt_unprepare()
 {
 	# $1 - port
-	case "$UNAME" in
-		Linux)
+	case "$FWTYPE" in
+		iptables)
 			IPT_DEL POSTROUTING -t mangle -p tcp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
 
 			IPT_DEL INPUT -p tcp --sport $1 ! --syn -j ACCEPT
@@ -375,7 +429,10 @@ pktws_ipt_unprepare()
 				IPT_DEL OUTPUT -f -j ACCEPT
 			fi
 			;;
-		FreeBSD)
+		nftables)
+			nft delete table inet $NFT_TABLE 2>/dev/null
+			;;
+		ipfw)
 			IPFW_DEL
 			;;
 	esac
@@ -383,23 +440,32 @@ pktws_ipt_unprepare()
 tpws_ipt_prepare()
 {
 	# $1 - port
-	case "$UNAME" in
-		Linux)
+	case "$FWTYPE" in
+		iptables)
 			IPT OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
 			;;
-		FreeBSD)
-			IPFW_ADD fwd $LOCALHOST,$TPPORT tcp from me to any 80,443 proto ip${IPV} not uid $TPWS_UID
+		nftables)
+			nft add table inet $NFT_TABLE
+			# -101 = pre dstnat
+			nft "add chain inet $NFT_TABLE output { type nat hook output priority -101; }"
+			nft "add rule inet $NFT_TABLE output tcp dport $1 skuid != $TPWS_UID dnat ip${IPVV} to $LOCALHOST_IPT:$TPPORT"
+			;;
+		ipfw)
+			IPFW_ADD fwd $LOCALHOST,$TPPORT tcp from me to any $1 proto ip${IPV} not uid $TPWS_UID
 			;;
 	esac
 }
 tpws_ipt_unprepare()
 {
 	# $1 - port
-	case "$UNAME" in
-		Linux)
+	case "$FWTYPE" in
+		iptables)
 			IPT_DEL OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TPWS_UID -j DNAT --to $LOCALHOST_IPT:$TPPORT
 			;;
-		FreeBSD)
+		nftables)
+			nft delete table inet $NFT_TABLE 2>/dev/null
+			;;
+		ipfw)
 			IPFW_DEL
 			;;
 	esac
@@ -710,14 +776,16 @@ check_domain_https_tls13()
 configure_ip_version()
 {
 	if [ "$IPV" = 6 ]; then
-		IPTABLES=ip6tables
 		LOCALHOST=::1
-		LOCALHOST_IPT=[::1]
+		LOCALHOST_IPT=[${LOCALHOST}]
+		IPVV=6
 	else
 		IPTABLES=iptables
 		LOCALHOST=127.0.0.1
-		LOCALHOST_IPT=127.0.0.1
+		LOCALHOST_IPT=$LOCALHOST
+		IPVV=
 	fi
+	IPTABLES=ip${IPVV}tables
 }
 configure_curl_opt()
 {
@@ -731,40 +799,49 @@ configure_curl_opt()
 	curl_supports_tls13 && TLS13=1
 }
 
+linux_ipv6_defrag_can_be_disabled()
+{
+	local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
+	local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
+	[ -n "$V1" -a -n "$V2" ] && [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]
+}
+
 configure_defrag()
 {
-	case "$UNAME" in
-		Linux)
-			IP6_DEFRAG_DISABLE=
-			[ "$IPVS" = 6 -o "$IPVS" = "4 6" ] && {
-				local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
-				local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
-				if [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]; then
-					if ipt6_has_raw ; then
-						if ipt6_has_frag; then
-							IP6_DEFRAG_DISABLE=1
-						else
-							echo "WARNING ! ip6tables does not have '-m frag' module, ipv6 ipfrag tests are disabled"
-							echo
-						fi
-					else
-						echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
-						echo
-					fi
+	IP6_DEFRAG_DISABLE=
+
+	[ "$IPVS" = 4 ] && return
+
+	[ "$UNAME" = "Linux" ] && {
+		linux_ipv6_defrag_can_be_disabled || {
+			echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
+			echo "WARNING ! ipv6 ipfrag tests are disabled"
+			echo
+			return
+		}
+	}
+
+	case "$FWTYPE" in
+		iptables)
+			if ipt6_has_raw ; then
+				if ipt6_has_frag; then
+					IP6_DEFRAG_DISABLE=1
 				else
-					echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
-					echo "WARNING ! ipv6 ipfrag tests are disabled"
+					echo "WARNING ! ip6tables does not have '-m frag' module, ipv6 ipfrag tests are disabled"
 					echo
 				fi
-				[ -n "$IP6_DEFRAG_DISABLE" ] && {
-					local ipexe="$(readlink -f $(whichq ip6tables))"
-					if [ "${ipexe#*nft}" != "$ipexe" ]; then
-						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
-					else
-						echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
-					fi
-					echo
-				}
+			else
+				echo "WARNING ! ip6tables raw table is not available, ipv6 ipfrag tests are disabled"
+				echo
+			fi
+			[ -n "$IP6_DEFRAG_DISABLE" ] && {
+				local ipexe="$(readlink -f $(whichq ip6tables))"
+				if [ "${ipexe#*nft}" != "$ipexe" ]; then
+					echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
+				else
+					echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"
+				fi
+				echo
 			}
 			;;
 		*)
