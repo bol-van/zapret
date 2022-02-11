@@ -159,8 +159,8 @@ check_system()
 
 	UNAME=$(uname)
 	SUBSYS=
-	FWTYPE=
 
+	# can be passed FWTYPE=iptables to override default nftables preference
 	case "$UNAME" in
 		Linux)
 			PKTWS="$NFQWS"
@@ -175,14 +175,14 @@ check_system()
 				# fw4 firewall is used, fw3 is symbolic link to fw4
 				# no more firewall includes
 				# make sure nft was not just installed by user but all the system is based on fw4
-				if [ -x /sbin/fw4 ] && exists nft; then
+				if [ -x /sbin/fw4 ] && exists nft && [ "$FWTYPE" != "iptables" ] ; then
 					FWTYPE=nftables
 				else
 					FWTYPE=iptables
 				fi
 			else
 				# generic linux
-				if exists nft; then
+				if exists nft && [ "$FWTYPE" != "iptables" ]; then
 					FWTYPE=nftables
 				else
 					FWTYPE=iptables
