@@ -470,6 +470,8 @@ and replace -300 to -450.
 
 It must be done manually, `blockcheck.sh` cannot auto fix this for you.
 
+Or just move to `nftables`. You can create hooks with any priority there.
+
 ## tpws
 
 tpws is transparent proxy.
