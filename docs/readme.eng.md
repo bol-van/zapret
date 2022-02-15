@@ -850,7 +850,9 @@ Lookup `lanif`, `wanif`, `wanif6` and `flow table` interface sets.
 Renew `lanif`, `wanif`, `wanif6` and `flow table` interface sets.
 Taken from `IFACE_LAN`, `IFACE_WAN` config variables on traditional Linux systems.
 Autoselected on `OpenWRT`. `lanif` can be extended using `OPENWRT_LAN` config variable.
+```
  /opt/zapret/init.d/sysv/zapret reload_ifsets
+```
 
 Calls `nft -t list table inet zapret`.
 ```
