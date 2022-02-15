@@ -660,7 +660,7 @@ The file `/opt/zapret/config` is used by various components of the system and co
 It needs to be viewed and edited if necessary.
 
 Which firewall type use on linux systems : `nftables` or `iptables`.
-On traditional systems `nftables` is selected by default if nft is installed.
+On traditional systems `nftables` is selected by default if `nft` is installed.
 On openwrt by default `nftables` is selected on `firewall4` based systems.
 
 `FWTYPE=iptables`
