@@ -792,8 +792,9 @@ Set to "-" to disable reload.
 
 `LISTS_RELOAD="pfctl -f /etc/pf.conf"`
 
-In openwrt there's default network 'lan'. Only traffic coming from this network is redirected to tpws by default.
+In openwrt there's default network `lan`. Only traffic coming from this network is redirected to tpws by default.
 To override this behaviour set the following variable :
+
 `OPENWRT_LAN="lan lan2 lan3"`
 
 The `INIT_APPLY_FW=1` parameter enables the init script to independently apply iptables rules.
