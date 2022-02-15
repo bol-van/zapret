@@ -763,8 +763,10 @@ TMPDIR=/opt/zapret/tmp
 
 ipset and nfset options :
 
-`SET_MAXELEM=262144`
-`IPSET_OPT="hashsize 262144 maxelem 2097152`
+```
+SET_MAXELEM=262144
+IPSET_OPT="hashsize 262144 maxelem 2097152
+```
 
 Kernel automatically increases hashsize if ipset is too large for the current hashsize.
 This procedure requires internal reallocation and may require additional memory.
@@ -785,9 +787,10 @@ Enable gzip compression for large lists. Used by ipset/*.sh scripts.
 Command to reload ip/host lists after update.
 Comment or leave empty for auto backend selection : ipset or ipfw if present.
 On BSD systems with PF no auto reloading happens. You must provide your own command.
-Newer FreeBSD versions support table only reloading : pfctl -Tl -f /etc/pf.conf
+Newer FreeBSD versions support table only reloading : `pfctl -Tl -f /etc/pf.conf`
 Set to "-" to disable reload.
-LISTS_RELOAD="pfctl -f /etc/pf.conf"
+
+`LISTS_RELOAD="pfctl -f /etc/pf.conf"`
 
 In openwrt there's default network 'lan'. Only traffic coming from this network is redirected to tpws by default.
 To override this behaviour set the following variable :
