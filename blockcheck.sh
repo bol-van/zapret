@@ -27,7 +27,6 @@ ZAPRET_BASE="$EXEDIR"
 [ -n "$MAX_TTL" ] || MAX_TTL=12
 
 HDRTEMP=/tmp/zapret-hdr.txt
-ECHON="echo -n"
 
 NFT_TABLE=blockcheck
 
@@ -214,33 +213,33 @@ check_prerequisites()
 curl_translate_code()
 {
 	# $1 - code
-	$ECHON $1
+	printf $1
 	case $1 in
-		0) $ECHON ": ok"
+		0) printf ": ok"
 		;;
-		1) $ECHON ": unsupported protocol"
+		1) printf ": unsupported protocol"
 		;;
-		2) $ECHON ": early initialization code failed"
+		2) printf ": early initialization code failed"
 		;;
-		3) $ECHON ": the URL was not properly formatted"
+		3) printf ": the URL was not properly formatted"
 		;;
-		4) $ECHON ": feature not supported by libcurl"
+		4) printf ": feature not supported by libcurl"
 		;;
-		5) $ECHON ": could not resolve proxy"
+		5) printf ": could not resolve proxy"
 		;;
-		6) $ECHON ": could not resolve host"
+		6) printf ": could not resolve host"
 		;;
-		7) $ECHON ": could not connect"
+		7) printf ": could not connect"
 		;;
-		8) $ECHON ": invalid server reply"
+		8) printf ": invalid server reply"
 		;;
-		9) $ECHON ": remote access denied"
+		9) printf ": remote access denied"
 		;;
-		27) $ECHON ": out of memory"
+		27) printf ": out of memory"
 		;;
-		28) $ECHON ": operation timed out"
+		28) printf ": operation timed out"
 		;;
-		35) $ECHON ": SSL connect error"
+		35) printf ": SSL connect error"
 		;;
 	esac
 }
@@ -438,7 +437,7 @@ curl_test()
 
 	while [ $n -lt $REPEATS ]; do
 		n=$(($n+1))
-		[ $REPEATS -gt 1 ] && $ECHON "[attempt $n] "
+		[ $REPEATS -gt 1 ] && printf "[attempt $n] "
 		$1 "$IPV" $2 && {
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 			continue
@@ -788,12 +787,12 @@ ask_params()
 	echo
 
 	echo "specify domain(s) to test. multiple domains are space separated."
-	$ECHON "domain(s) (default: $DOMAINS) : "
+	printf "domain(s) (default: $DOMAINS) : "
 	local dom
 	read dom
 	[ -n "$dom" ] && DOMAINS="$dom"
 
-	$ECHON "ip protocol version(s) - 4, 6 or 46 for both (default: 4) : "
+	printf "ip protocol version(s) - 4, 6 or 46 for both (default: 4) : "
 	read IPVS
 	[ -n "$IPVS" ] || IPVS=4
 	[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
@@ -840,7 +839,7 @@ ask_params()
 
 	echo
 	echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
-	$ECHON "how many times to repeat each test (default: 1) : "
+	printf "how many times to repeat each test (default: 1) : "
 	read REPEATS
 	REPEATS=$((0+${REPEATS:-1}))
 	[ "$REPEATS" = 0 ] && {

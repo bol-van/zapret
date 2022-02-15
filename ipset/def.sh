@@ -128,7 +128,7 @@ zzsize()
  if [ -f "$f" ]; then
   wc -c <"$f" | xargs
  else
-  $ECHON -n 0
+  printf 0
  fi
 }
 
