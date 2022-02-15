@@ -75,6 +75,11 @@ make_comma_list()
 	shift
 	make_separator_list $var , "$@"
 }
+unique()
+{
+	local i
+	for i in "$@"; do echo $i; done | sort -u | xargs
+}
 
 is_linked_to_busybox()
 {
@@ -132,4 +137,24 @@ openwrt_fw3_integration()
 create_dev_stdin()
 {
 	[ -e /dev/stdin ] || ln -s /proc/self/fd/0 /dev/stdin
+}
+
+call_for_multiple_items()
+{
+	# $1 - function to get an item
+	# $2 - variable name to put result into
+	# $3 - space separated parameters to function $1
+
+	local i item items
+	for i in $3; do
+		$1 item $i
+		[ -n "$item" ] && {
+			if [ -n "$items" ]; then
+				items="$items $item"
+			else
+				items="$item"
+			fi
+		}
+	done
+	eval $2=\"$items\"
 }

@@ -384,59 +384,19 @@ flow_offloading_unexempt()
 }
 
 
-
-nft_fill_ifsets()
+nft_fill_ifsets_overload()
 {
-	local script elements i wan_iface DEVICE DLAN DWAN DWAN6 ALLDEVS flags
+	local script ifaces DLAN DWAN DWAN6
 
-	# if large sets exist nft works very ineffectively
-	# looks like it analyzes the whole table blob to find required data pieces
-	# calling all in one shot helps not to waste cpu time many times
+	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
 
-	script="flush set inet $ZAPRET_NFT_TABLE wanif
-flush set inet $ZAPRET_NFT_TABLE wanif6
-flush set inet $ZAPRET_NFT_TABLE lanif"
+	network_find_wan_all ifaces
+	call_for_multiple_items network_get_device DWAN "$ifaces"
 
-	[ "$DISABLE_IPV4" = "1" ] || {
-		network_find_wan_all wan_iface
-		for i in $wan_iface; do
-			network_get_device DEVICE $i
-			DWAN="$DWAN $DEVICE"
-		done
-		[ -n "$DWAN" ] && {
-			make_comma_list elements $DWAN
-			script="${script}
-add element inet $ZAPRET_NFT_TABLE wanif { $elements }"
-		}
-	}
-	[ "$DISABLE_IPV6" = "1" ] || {
-		network_find_wan6_all wan_iface
-		for i in $wan_iface; do
-			network_get_device DEVICE $i
-			DWAN6="$DWAN6 $DEVICE"
-		done
-		[ -n "$DWAN6" ] && {
-			make_comma_list elements $DWAN6
-			script="${script}
-add element inet $ZAPRET_NFT_TABLE wanif6 { $elements }"
-		}
-	}
-	for i in $OPENWRT_LAN; do
-		network_get_device DEVICE $i
-		DLAN="$DLAN $DEVICE"
-	done
-	[ -n "$DLAN" ] && {
-		make_comma_list elements $DLAN
-		script="${script}
-add element inet $ZAPRET_NFT_TABLE lanif { $elements }"
-	}
-	echo "$script" | nft -f -
+	network_find_wan6_all ifaces
+	call_for_multiple_items network_get_device DWAN6 "$ifaces"
 
-	[ "$FLOWOFFLOAD" = 'software' -o "$FLOWOFFLOAD" = 'hardware' ] && {
-		ALLDEVS=$(for i in $DLAN $DWAN $DWAN6; do echo $i; done | sort -u | xargs)
-		[ "$FLOWOFFLOAD" = 'hardware' ] && nft_hw_offload_supported $ALLDEVS && flags=offload
-		nft_create_or_update_flowtable "$flags" $ALLDEVS
-	}
+	nft_fill_ifsets "$DLAN" "$DWAN" "$DWAN6"
 }
 
 nft_fw_tpws4()

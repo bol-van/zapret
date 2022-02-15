@@ -119,7 +119,7 @@ nft_list_ifsets()
 	nft list set inet $ZAPRET_NFT_TABLE lanif
 	nft list set inet $ZAPRET_NFT_TABLE wanif
 	nft list set inet $ZAPRET_NFT_TABLE wanif6
-	nft list flowtable inet $ZAPRET_NFT_TABLE ft
+	nft list flowtable inet $ZAPRET_NFT_TABLE ft 2>/dev/null
 }
 
 nft_create_firewall()
@@ -223,6 +223,57 @@ nft_filter_apply_ipset_target()
 	nft_filter_apply_ipset_target6 $2
 }
 
+
+nft_script_add_ifset_element()
+{
+	# $1 - set name
+	# $2 - space separated elements
+	local elements
+	[ -n "$2" ] && {
+		make_comma_list elements $2
+		script="${script}
+add element inet $ZAPRET_NFT_TABLE $1 { $elements }"
+	}
+}
+nft_fill_ifsets()
+{
+	# $1 - space separated lan interface names
+	# $2 - space separated wan interface names
+	# $3 - space separated wan6 interface names
+
+	local script i ALLDEVS
+
+	# if large sets exist nft works very ineffectively
+	# looks like it analyzes the whole table blob to find required data pieces
+	# calling all in one shot helps not to waste cpu time many times
+
+	script="flush set inet $ZAPRET_NFT_TABLE wanif
+flush set inet $ZAPRET_NFT_TABLE wanif6
+flush set inet $ZAPRET_NFT_TABLE lanif"
+
+	[ "$DISABLE_IPV4" = "1" ] || nft_script_add_ifset_element wanif "$2"
+	[ "$DISABLE_IPV6" = "1" ] || nft_script_add_ifset_element wanif6 "$3"
+	nft_script_add_ifset_element lanif "$1"
+
+	echo "$script" | nft -f -
+
+	case "$FLOWOFFLOAD" in
+		software)
+			ALLDEVS=$(unique $1 $2 $3)
+			nft_create_or_update_flowtable '' $ALLDEVS
+			;;
+		hardware)
+			ALLDEVS=$(unique $1 $2 $3)
+			# first create unbound flowtable. may cause error in older nft version
+			nft_create_or_update_flowtable 'offload' 2>/dev/null
+			# then add elements. some of them can cause error because unsupported
+			for i in $ALLDEVS; do
+				nft_hw_offload_supported $i && nft_create_or_update_flowtable 'offload' $i
+			done
+			;;
+	esac
+}
+
 nft_only()
 {
 	linux_fwtype
@@ -236,7 +287,7 @@ nft_only()
 
 zapret_reload_ifsets()
 {
-	nft_only nft_create_table ; nft_fill_ifsets
+	nft_only nft_create_table ; nft_fill_ifsets_overload
 	return 0
 }
 zapret_list_ifsets()
@@ -264,7 +315,7 @@ zapret_apply_firewall_nft()
 
 	create_ipset no-update
 	nft_create_firewall
-	nft_fill_ifsets
+	nft_fill_ifsets_overload
 
 	case "$mode" in
 		tpws)

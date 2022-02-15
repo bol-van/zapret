@@ -521,38 +521,9 @@ zapret_stop_daemons()
 }
 
 
-nft_fill_ifsets()
+nft_fill_ifsets_overload()
 {
-	local script elements i ALLDEVS flags
-
-	# if large sets exist nft works very ineffectively
-	# looks like it analyzes the whole table blob to find required data pieces
-	# calling all in one shot helps not to waste cpu time many times
-
-	script="flush set inet $ZAPRET_NFT_TABLE wanif
-flush set inet $ZAPRET_NFT_TABLE wanif6
-flush set inet $ZAPRET_NFT_TABLE lanif"
-
-	[ -n "$IFACE_LAN" ] && {
-		make_comma_list elements $IFACE_LAN
-		script="${script}
-add element inet $ZAPRET_NFT_TABLE lanif { $elements }"
-	}
-	[ -n "$IFACE_WAN" ] && {
-		make_comma_list elements $IFACE_WAN
-		script="${script}
-add element inet $ZAPRET_NFT_TABLE wanif { $elements }
-add element inet $ZAPRET_NFT_TABLE wanif6 { $elements }"
-	}
-	echo "$script" | nft -f -
-
-	[ "$FLOWOFFLOAD" = 'software' -o "$FLOWOFFLOAD" = 'hardware' ] && {
-		ALLDEVS=$(for i in $IFACE_LAN $IFACE_WAN; do echo $i; done | sort -u | xargs)
-		[ -n "$ALLDEVS" ] && {
-			[ "$FLOWOFFLOAD" = 'hardware' ] && nft_hw_offload_supported $ALLDEVS && flags=offload
-			nft_create_or_update_flowtable "$flags" $ALLDEVS
-		}
-	}
+	nft_fill_ifsets "$IFACE_LAN" "$IFACE_WAN" "$IFACE_WAN"
 }
 
 nft_print_op()
