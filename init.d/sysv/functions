@@ -589,7 +589,7 @@ nft_fw_nfqws_post6()
 	# $1 - filter ipv6
 	# $2 - queue number
 
-	local DEVICE rule
+	local rule
 
 	[ "$DISABLE_IPV6" = "1" ] || {
 		nft_print_op "$1" "nfqws postrouting (qnum $2)" 6

@@ -441,7 +441,7 @@ nft_fw_nfqws_post4()
 	# $1 - filter ipv4
 	# $2 - queue number
 
-	local DEVICE wan_iface rule
+	local rule
 
 	[ "$DISABLE_IPV4" = "1" ] || {
 		rule="oifname @wanif meta l4proto tcp $1 ip daddr != @nozapret"
@@ -454,7 +454,7 @@ nft_fw_nfqws_post6()
 	# $1 - filter ipv6
 	# $2 - queue number
 
-	local DEVICE wan_iface rule
+	local rule
 
 	[ "$DISABLE_IPV6" = "1" ] || {
 		rule="oifname @wanif6 meta l4proto tcp $1 ip6 daddr != @nozapret6"
