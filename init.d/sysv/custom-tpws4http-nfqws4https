@@ -3,6 +3,8 @@
 
 zapret_custom_daemons()
 {
+	# $1 - 1 - run, 0 - stop
+
 	local opt
 
 	[ "$MODE_HTTP" = "1" ] && {
@@ -19,6 +21,8 @@ zapret_custom_daemons()
 }
 zapret_custom_firewall()
 {
+	# $1 - 1 - run, 0 - stop
+
 	local f4 f6
 	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
@@ -35,5 +39,27 @@ zapret_custom_firewall()
 		f6=$f4
 		filter_apply_ipset_target f4 f6
 		fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+	}
+}
+zapret_custom_firewall_nft()
+{
+	# stop logic is not required
+
+	local f4 f6
+	local first_packet_only="ct original packets 1-4"
+	local desync="mark and $DESYNC_MARK == 0"
+
+	[ "$MODE_HTTP" = "1" ] && {
+		f4="tcp dport 80"
+		f6=$f4
+		nft_filter_apply_ipset_target f4 f6
+		nft_fw_tpws "$f4" "$f6" $TPPORT
+	}
+	
+	[ "$MODE_HTTPS" = "1" ] && {
+		f4="tcp dport 443 $first_packet_only"
+		f6=$f4
+		nft_filter_apply_ipset_target f4 f6
+		nft_fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM
 	}
 }

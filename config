@@ -4,10 +4,15 @@
 # can help in case /tmp has not enough space
 #TMPDIR=/opt/zapret/tmp
 
+# override firewall type : iptables,nftables,ipfw
+#FWTYPE=iptables
+
 # options for ipsets
+# maximum number of elements in sets. also used for nft sets
+SET_MAXELEM=262144
 # too low hashsize can cause memory allocation errors on low RAM systems , even if RAM is enough
 # too large hashsize will waste lots of RAM
-IPSET_OPT="hashsize 262144 maxelem 2097152"
+IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
 
 # options for ip2net. "-4" or "-6" auto added by ipset create script
 IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
@@ -65,9 +70,8 @@ FLOWOFFLOAD=donttouch
 #IFACE_LAN=eth0
 #IFACE_WAN=eth1
 
-# should init scripts apply firewall rules ?
-# set to 0 if firewall control system is present
-# openwrt uses fw3 firewall , init never touch fw
+# should start/stop command of init scripts apply firewall rules ?
+# not applicable to older openwrt with fw3 firewall
 INIT_APPLY_FW=1
 
 # do not work with ipv4

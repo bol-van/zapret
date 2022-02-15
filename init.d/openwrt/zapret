@@ -4,6 +4,24 @@ USE_PROCD=1
 # after network
 START=21
 
+my_extra_command() {
+	local cmd="$1"
+	local help="$2"
+
+	local extra="$(printf "%-16s%s" "${cmd}" "${help}")"
+	EXTRA_HELP="${EXTRA_HELP}	${extra}
+"
+	EXTRA_COMMANDS="${EXTRA_COMMANDS} ${cmd}"
+}
+my_extra_command stop_fw "Stop zapret firewall (noop in iptables+fw3 case)"
+my_extra_command start_fw "Start zapret firewall (noop in iptables+fw3 case)"
+my_extra_command restart_fw "Restart zapret firewall (noop in iptables+fw3 case)"
+my_extra_command reload_ifsets "Reload interface lists (nftables only)"
+my_extra_command list_ifsets "Display interface lists (nftables only)"
+my_extra_command list_table "Display zapret nftable (nftables only)"
+my_extra_command stop_daemons "Stop zapret daemons only (=stop in iptables+fw3 case)"
+my_extra_command start_daemons "Start zapret daemons only (=start in iptables+fw3 case)"
+my_extra_command restart_daemons "Restart zapret firewall only (=restart in iptables+fw3 case)"
 
 SCRIPT=$(readlink /etc/init.d/zapret)
 if [ -n "$SCRIPT" ]; then
@@ -12,10 +30,12 @@ if [ -n "$SCRIPT" ]; then
 else
  ZAPRET_BASE=/opt/zapret
 fi
+
 . "$ZAPRET_BASE/init.d/openwrt/functions"
 
 
-# !!!!! in openwrt firewall rules are configured separately
+# !!!!! in old openwrt 21.x- with iptables firewall rules are configured separately
+# !!!!! in new openwrt >21.x with nftables firewall is configured here
 
 PIDDIR=/var/run
 
@@ -23,7 +43,6 @@ PIDDIR=/var/run
 NFQWS_OPT_BASE="--user=$WS_USER --dpi-desync-fwmark=$DESYNC_MARK"
 
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
-TPWS_LOCALHOST4=127.0.0.127
 HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
 [ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"
 [ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts-user.txt"
@@ -104,7 +123,8 @@ tpws_apply_socks_binds()
 }
 
 
-start_service() {
+start_daemons_procd()
+{
 	local opt qn qns qn6 qns6
 
 	case "${MODE_OVERRIDE:-$MODE}" in
@@ -148,4 +168,62 @@ start_service() {
 	esac
 
 	return 0
+}
+start_daemons()
+{
+	rc_procd start_daemons_procd "$@"
+}
+stop_daemons()
+{
+	procd_kill "$(basename ${basescript:-$initscript})" "$1"
+}
+restart_daemons()
+{
+	stop_daemons
+	start_daemons
+}
+
+start_fw()
+{
+	zapret_apply_firewall
+}
+stop_fw()
+{
+	zapret_unapply_firewall
+}
+restart_fw()
+{
+	stop_fw
+	start_fw
+}
+reload_ifsets()
+{
+	zapret_reload_ifsets
+}
+list_ifsets()
+{
+	zapret_list_ifsets
+}
+list_table()
+{
+	zapret_list_table
+}
+
+start_service()
+{
+	start_daemons_procd
+	[ "$INIT_APPLY_FW" != "1" ] || {
+		linux_fwtype
+		openwrt_fw3_integration || start_fw
+	}
+}
+
+stop_service()
+{
+	# this procedure is called from stop()
+	# stop() already stop daemons
+	[ "$INIT_APPLY_FW" != "1" ] || {
+		linux_fwtype
+		openwrt_fw3_integration || stop_fw
+	}
 }

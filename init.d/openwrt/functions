@@ -2,13 +2,21 @@
 
 [ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
 . "$ZAPRET_BASE/config"
+. "$ZAPRET_BASE/common/base.sh"
+. "$ZAPRET_BASE/common/fwtype.sh"
+. "$ZAPRET_BASE/common/queue.sh"
+. "$ZAPRET_BASE/common/linux_iphelper.sh"
+. "$ZAPRET_BASE/common/ipt.sh"
+. "$ZAPRET_BASE/common/nft.sh"
+. "$ZAPRET_BASE/common/linux_fw.sh"
 
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$TPPORT" ] || TPPORT=988
 [ -n "$WS_USER" ] || WS_USER=daemon
-TPWS_LOCALHOST4=127.0.0.127
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
 [ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
+
+TPWS_LOCALHOST4=127.0.0.127
 
 # max wait time for the link local ipv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
@@ -26,14 +34,6 @@ NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
 NFQWS_OPT_DESYNC_HTTP6="${NFQWS_OPT_DESYNC_HTTP6:-$NFQWS_OPT_DESYNC_HTTP}"
 NFQWS_OPT_DESYNC_HTTPS6="${NFQWS_OPT_DESYNC_HTTPS6:-$NFQWS_OPT_DESYNC_HTTPS}"
 
-exists()
-{
- which "$1" >/dev/null 2>/dev/null
-}
-existf()
-{
- type "$1" >/dev/null 2>/dev/null
-}
 
 
 # can be multiple ipv6 outgoing interfaces
@@ -46,341 +46,268 @@ existf()
 
 network_find_wan_all()
 {
- __network_ifstatus "$1" "" "[@.route[@.target='0.0.0.0' && !@.table]].interface" "" 10 2>/dev/null && return
- network_find_wan $1
+	__network_ifstatus "$1" "" "[@.route[@.target='0.0.0.0' && !@.table]].interface" "" 10 2>/dev/null && return
+	network_find_wan $1
 }
 network_find_wan6_all()
 {
- __network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 10 2>/dev/null && return
- network_find_wan6 $1
+	__network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 10 2>/dev/null && return
+	network_find_wan6 $1
 }
 
-ipt()
+route_localnet()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null || iptables -I "$@"
-}
-ipt_del()
-{
-	iptables -C "$@" >/dev/null 2>/dev/null && iptables -D "$@"
-}
-ipt6()
-{
-	ip6tables -C "$@" >/dev/null 2>/dev/null || ip6tables -I "$@"
-}
-ipt6_del()
-{
-	ip6tables -C "$@" >/dev/null 2>/dev/null && ip6tables -D "$@"
-}
-
-# there's no route_localnet for ipv6
-# the best we can is to route to link local of the incoming interface
-# OUTPUT - can DNAT to ::1
-# PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr
-# not a good idea to expose tpws to the world (bind to ::)
-
-get_ipv6_linklocal()
-{
- # $1 - interface name. if empty - any interface
- if exists ip ; then
-    local dev
-    [ -n "$1" ] && dev="dev $1"
-    ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope link.*$/\1/;t;d' | head -n 1
- else
-    ifconfig $1 | sed -re 's/^.*inet6 addr: ([^ ]*)\/[0-9]* Scope:Link.*$/\1/;t;d' | head -n 1
- fi
-}
-get_ipv6_global()
-{
- # $1 - interface name. if empty - any interface
- if exists ip ; then
-    local dev
-    [ -n "$1" ] && dev="dev $1"
-    ip addr show $dev | sed -e 's/^.*inet6 \([^ ]*\)\/[0-9]* scope global.*$/\1/;t;d' | head -n 1
- else
-    ifconfig $1 | sed -re 's/^.*inet6 addr: ([^ ]*)\/[0-9]* Scope:Global.*$/\1/;t;d' | head -n 1
- fi
+	for lan in $OPENWRT_LAN; do
+		network_get_device DEVICE $lan
+		[ -n "$DEVICE" ] || continue
+		sysctl -qw net.ipv4.conf.$DEVICE.route_localnet=1
+	done
 }
 
 dnat6_target()
 {
- # $1 - lan network name
- # $2 - var to store target ip6
- # get target ip address for DNAT. prefer link locals
- # tpws should be as inaccessible from outside as possible
- # link local address can appear not immediately after ifup
- # DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
+	# $1 - lan network name
+	# $2 - var to store target ip6
+	# get target ip address for DNAT. prefer link locals
+	# tpws should be as inaccessible from outside as possible
+	# link local address can appear not immediately after ifup
+	# DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
 
- local DNAT6_TARGET DVAR=DNAT6_TARGET_$1
- DVAR=$(echo $DVAR | sed 's/[^a-zA-Z0-9_]/_/g')
- eval DNAT6_TARGET="\$$DVAR"
- [ -n "$2" ] && eval $2=''
+	local DNAT6_TARGET DVAR=DNAT6_TARGET_$1
+	DVAR=$(echo $DVAR | sed 's/[^a-zA-Z0-9_]/_/g')
+	eval DNAT6_TARGET="\$$DVAR"
+	[ -n "$2" ] && eval $2=''
  
- [ -n "$DNAT6_TARGET" ] || {
-    # no reason to query if its down
-    network_is_up $1 || return
+	[ -n "$DNAT6_TARGET" ] || {
+		# no reason to query if its down
+		network_is_up $1 || return
 
-    local DEVICE
-    network_get_device DEVICE $1
+		local DEVICE
+		network_get_device DEVICE $1
 
-    local ct=0
-    while 
-      DNAT6_TARGET=$(get_ipv6_linklocal $DEVICE)
-      [ -n "$DNAT6_TARGET" ] && break
-      [ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
-      echo $DEVICE: waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
-      ct=$(($ct+1))
-      sleep 1
-    do :; done
+		local ct=0
+		while 
+			DNAT6_TARGET=$(get_ipv6_linklocal $DEVICE)
+			[ -n "$DNAT6_TARGET" ] && break
+			[ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
+			echo $DEVICE: waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
+			ct=$(($ct+1))
+			sleep 1
+		do :; done
 
-    [ -n "$DNAT6_TARGET" ] || {
-      echo $DEVICE: no link local. getting global
-      DNAT6_TARGET=$(get_ipv6_global $DEVICE)
-      [ -n "$DNAT6_TARGET" ] || {
-        echo $DEVICE: could not get any address
-        DNAT6_TARGET=-
-      }
-    }
-    eval $DVAR="$DNAT6_TARGET"
- }
- [ -n "$2" ] && eval $2="$DNAT6_TARGET"
+		[ -n "$DNAT6_TARGET" ] || {
+			echo $DEVICE: no link local. getting global
+			DNAT6_TARGET=$(get_ipv6_global $DEVICE)
+			[ -n "$DNAT6_TARGET" ] || {
+				echo $DEVICE: could not get any address
+				DNAT6_TARGET=-
+			}
+		}
+		eval $DVAR="$DNAT6_TARGET"
+	}
+	[ -n "$2" ] && eval $2="$DNAT6_TARGET"
 }
 
+
+set_route_localnet()
+{
+	# $1 - 1 = enable, 0 = disable
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		local lan DEVICE
+		for lan in $OPENWRT_LAN; do
+			network_get_device DEVICE $lan
+			[ -n "$DEVICE" ] || continue
+			sysctl -q -w net.ipv4.conf.$DEVICE.route_localnet=$1
+		done
+	}
+}
+prepare_route_localnet()
+{
+	set_route_localnet 1
+}
+unprepare_route_localnet()
+{
+	set_route_localnet 0
+}
+prepare_tpws_fw4()
+{
+	# otherwise linux kernel will treat 127.0.0.0/8 as "martian" ip and refuse routing to it
+	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.0/8
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		iptables -N input_rule_zapret 2>/dev/null
+		ipt input_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
+		ipta input_rule_zapret -d 127.0.0.0/8 -j DROP
+		ipt INPUT ! -i lo -j input_rule_zapret
+
+		prepare_route_localnet
+	}
+}
+unprepare_tpws_fw4()
+{
+	[ "$DISABLE_IPV4" = "1" ] || {
+		unprepare_route_localnet
+
+		ipt_del INPUT ! -i lo -j input_rule_zapret
+		iptables -F input_rule_zapret 2>/dev/null
+		iptables -X input_rule_zapret 2>/dev/null
+	}
+}
+unprepare_tpws_fw()
+{
+	unprepare_tpws_fw4
+}
 
 fw_nfqws_pre4()
 {
- # $1 - filter ipv4
- # $2 - queue number
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv4
+	# $3 - queue number
 
- local DEVICE wan_iface
+	local DEVICE wan_iface
 
- [ "$DISABLE_IPV4" = "1" ] || {
-    network_find_wan_all wan_iface
-    for ext_iface in $wan_iface; do
-       network_get_device DEVICE $ext_iface
-       ipt PREROUTING -t mangle -i $DEVICE -p tcp $1 $IPSET_EXCLUDE src -j NFQUEUE --queue-num $2 --queue-bypass
-    done
- }
+	[ "$DISABLE_IPV4" = "1" ] || {
+		network_find_wan_all wan_iface
+		for ext_iface in $wan_iface; do
+			network_get_device DEVICE $ext_iface
+			ipt_add_del $1 PREROUTING -t mangle -i $DEVICE -p tcp $2 $IPSET_EXCLUDE src -j NFQUEUE --queue-num $3 --queue-bypass
+		done
+	}
 }
 fw_nfqws_pre6()
 {
- # $1 - filter ipv6
- # $2 - queue number
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv6
+	# $3 - queue number
 
- local DEVICE wan_iface
+	local DEVICE wan_iface
 
- [ "$DISABLE_IPV6" = "1" ] || {
-    network_find_wan6_all wan_iface
-    for ext_iface in $wan_iface; do
-       network_get_device DEVICE $ext_iface
-       ipt6 PREROUTING -t mangle -i $DEVICE -p tcp $1 $IPSET_EXCLUDE6 src -j NFQUEUE --queue-num $2 --queue-bypass
-    done
- }
+	[ "$DISABLE_IPV6" = "1" ] || {
+		network_find_wan6_all wan_iface
+		for ext_iface in $wan_iface; do
+			network_get_device DEVICE $ext_iface
+			ipt6_add_del $1 PREROUTING -t mangle -i $DEVICE -p tcp $2 $IPSET_EXCLUDE6 src -j NFQUEUE --queue-num $3 --queue-bypass
+		done
+	}
 }
 fw_nfqws_pre()
 {
- # $1 - filter ipv4
- # $2 - filter ipv6
- # $3 - queue number
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv4
+	# $3 - filter ipv6
+	# $4 - queue number
 
- fw_nfqws_pre4 "$1" $3
- fw_nfqws_pre6 "$2" $3
+	fw_nfqws_pre4 $1 "$2" $4
+	fw_nfqws_pre6 $1 "$3" $4
 }
 fw_nfqws_post4()
 {
- # $1 - filter ipv4
- # $2 - queue number
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv4
+	# $3 - queue number
 
- local DEVICE wan_iface
+	local DEVICE wan_iface
 
- [ "$DISABLE_IPV4" = "1" ] || {
-    network_find_wan_all wan_iface
-    for ext_iface in $wan_iface; do
-       network_get_device DEVICE $ext_iface
-       ipt POSTROUTING -t mangle -o $DEVICE -p tcp $1 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $2 --queue-bypass
-    done
- }
+	[ "$DISABLE_IPV4" = "1" ] || {
+		network_find_wan_all wan_iface
+		for ext_iface in $wan_iface; do
+			network_get_device DEVICE $ext_iface
+			ipt_add_del $1 POSTROUTING -t mangle -o $DEVICE -p tcp $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass
+		done
+	}
 }
 fw_nfqws_post6()
 {
- # $1 - filter ipv6
- # $2 - queue number
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv6
+	# $3 - queue number
 
- local DEVICE wan_iface
+	local DEVICE wan_iface
 
- [ "$DISABLE_IPV6" = "1" ] || {
-    network_find_wan6_all wan_iface
-    for ext_iface in $wan_iface; do
-       network_get_device DEVICE $ext_iface
-       ipt6 POSTROUTING -t mangle -o $DEVICE -p tcp $1 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $2 --queue-bypass
-    done
- }
+	[ "$DISABLE_IPV6" = "1" ] || {
+		network_find_wan6_all wan_iface
+		for ext_iface in $wan_iface; do
+			network_get_device DEVICE $ext_iface
+			ipt6_add_del $1 POSTROUTING -t mangle -o $DEVICE -p tcp $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass
+		done
+	}
 }
 fw_nfqws_post()
 {
- # $1 - filter ipv4
- # $2 - filter ipv6
- # $3 - queue number
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv4
+	# $3 - filter ipv6
+	# $4 - queue number
 
- fw_nfqws_post4 "$1" $3
- fw_nfqws_post6 "$2" $3
+	fw_nfqws_post4 $1 "$2" $4
+	fw_nfqws_post6 $1 "$3" $4
 }
 
 
 IPT_OWNER="-m owner ! --uid-owner $WS_USER"
 fw_tpws4()
 {
- # $1 - filter ipv6
- # $2 - tpws port
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv4
+	# $3 - tpws port
 
- local DEVICE wan_iface
+	local lan DEVICE ext_iface wan_iface
  
- [ "$DISABLE_IPV4" = "1" ] || {
-    network_find_wan_all wan_iface
-    for ext_iface in $wan_iface; do
-       network_get_device DEVICE $ext_iface
-       ipt OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $1 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$2
-    done
-    
-    # allow localnet route only to special tpws IP
-    iptables -N input_rule_zapret 2>/dev/null
-    ipt input_rule_zapret -d 127.0.0.0/8 -j DROP
-    ipt input_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
-
-    for lan in $OPENWRT_LAN; do
-	network_get_device DEVICE $lan
-	[ -n "$DEVICE" ] || continue
-	ipt prerouting_rule -t nat -i $DEVICE -p tcp $1 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$2
-	ipt input_rule -i $DEVICE -j input_rule_zapret
-	sysctl -qw net.ipv4.conf.$DEVICE.route_localnet=1
-    done
- }
+	[ "$DISABLE_IPV4" = "1" ] || {
+		network_find_wan_all wan_iface
+		for ext_iface in $wan_iface; do
+			network_get_device DEVICE $ext_iface
+			ipt_add_del $1 OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3
+		done
+		[ "$1" = 1 ] &&	prepare_tpws_fw4
+		for lan in $OPENWRT_LAN; do
+			network_get_device DEVICE $lan
+			[ -n "$DEVICE" ] || continue
+			ipt_add_del $1 PREROUTING -t nat -i $DEVICE -p tcp $2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3
+ 		done
+	}
 }
 fw_tpws6()
 {
- # $1 - filter ipv6
- # $2 - tpws port
+	# $1 - 1 - add, 0 - del
+	# $2 - filter ipv6
+	# $3 - tpws port
 
- local DEVICE wan_iface DNAT6
+	local lan DEVICE ext_iface wan_iface DNAT6
  
- [ "$DISABLE_IPV6" = "1" ] || {
-    network_find_wan6_all wan_iface
-    for ext_iface in $wan_iface; do
-       network_get_device DEVICE $ext_iface
-       ipt6 OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $1 $IPSET_EXCLUDE6 dst -j DNAT --to [::1]:$2
-    done
-    for lan in $OPENWRT_LAN; do
-	network_get_device DEVICE $lan
-	[ -n "$DEVICE" ] || continue
-	dnat6_target $lan DNAT6
-	[ "$DNAT6" != '-' ] && ipt6 PREROUTING -t nat -i $DEVICE -p tcp $1 $IPSET_EXCLUDE6 dst -j DNAT --to [$DNAT6]:$2
-    done
- }
+	[ "$DISABLE_IPV6" = "1" ] || {
+		network_find_wan6_all wan_iface
+			for ext_iface in $wan_iface; do
+				network_get_device DEVICE $ext_iface
+				ipt6_add_del $1 OUTPUT -t nat -o $DEVICE $IPT_OWNER -p tcp $2 $IPSET_EXCLUDE6 dst -j DNAT --to [::1]:$3
+			done
+ 			for lan in $OPENWRT_LAN; do
+				network_get_device DEVICE $lan
+				[ -n "$DEVICE" ] || continue
+				dnat6_target $lan DNAT6
+				[ "$DNAT6" != '-' ] && ipt6_add_del $1 PREROUTING -t nat -i $DEVICE -p tcp $2 $IPSET_EXCLUDE6 dst -j DNAT --to [$DNAT6]:$3
+			done
+	}
 }
 fw_tpws()
 {
- # $1 - filter ipv4
- # $2 - filter ipv6
- # $3 - tpws port
+ # $1 - 1 - add, 0 - del
+ # $2 - filter ipv4
+ # $3 - filter ipv6
+ # $4 - tpws port
 
- fw_tpws4 "$1" $3
- fw_tpws6 "$2" $3
-}
-
-filter_apply_port_target()
-{
-	# $1 - var name of iptables filter
-	local f
-	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		f="-m multiport --dports 80,443"
-	elif [ "$MODE_HTTPS" = "1" ]; then
-		f="--dport 443"
-	elif [ "$MODE_HTTP" = "1" ]; then
-		f="--dport 80"
-	else
-		echo WARNING !!! HTTP and HTTPS are both disabled
-	fi
-	eval $1="\"\$$1 $f\""
-}
-filter_apply_ipset_target4()
-{
-	# $1 - var name of ipv4 iptables filter
-	if [ "$MODE_FILTER" = "ipset" ]; then
-		eval $1="\"\$$1 -m set --match-set zapret dst\""
-	fi
-}
-filter_apply_ipset_target6()
-{
-	# $1 - var name of ipv4 iptables filter
-	if [ "$MODE_FILTER" = "ipset" ]; then
-		eval $1="\"\$$1 -m set --match-set zapret6 dst\""
-	fi
-}
-filter_apply_ipset_target()
-{
-	# $1 - var name of ipv4 iptables filter
-	# $2 - var name of ipv6 iptables filter
-	filter_apply_ipset_target4 $1
-	filter_apply_ipset_target6 $2
+ fw_tpws4 $1 "$2" $4
+ fw_tpws6 $1 "$3" $4
 }
 
-get_nfqws_qnums()
-{
-	# $1 - var name for ipv4 http
-	# $2 - var name for ipv4 https
-	# $3 - var name for ipv6 http
-	# $4 - var name for ipv6 https
-	local _qn _qns _qn6 _qns6
-
-	[ "$DISABLE_IPV4" = "1" ] || {
-		_qn=$QNUM
-		_qns=$_qn
-		[ "$NFQWS_OPT_DESYNC_HTTP" = "$NFQWS_OPT_DESYNC_HTTPS" ] || _qns=$(($QNUM+1))
-	}
-	[ "$DISABLE_IPV6" = "1" ] || {
-		_qn6=$(($QNUM+2))
-		_qns6=$(($QNUM+3))
-		[ "$DISABLE_IPV4" = "1" ] || {
-			if [ "$NFQWS_OPT_DESYNC_HTTP6" = "$NFQWS_OPT_DESYNC_HTTP" ]; then
-				_qn6=$_qn;
-			elif [ "$NFQWS_OPT_DESYNC_HTTP6" = "$NFQWS_OPT_DESYNC_HTTPS" ]; then
-				_qn6=$_qns;
-			fi
-			if [ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTP" ]; then
-				_qns6=$_qn;
-			elif [ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTPS" ]; then
-				_qns6=$_qns;
-			fi
-		}
-		[ "$NFQWS_OPT_DESYNC_HTTPS6" = "$NFQWS_OPT_DESYNC_HTTP6" ] && _qns6=$_qn6;
-	}
-	if [ "$MODE_HTTP" = 1 ]; then
-		eval $1=$_qn
-		eval $3=$_qn6
-	else
-		eval $1=
-		eval $3=
-	fi
-	if [ "$MODE_HTTPS" = 1 ]; then
-		eval $2=$_qns
-		eval $4=$_qns6
-	else
-		eval $2=
-		eval $4=
-	fi
-}
 
 create_ipset()
 {
- echo "Creating ipset"
- "$IPSET_CR" "$@"
+	echo "Creating ip list table (firewall type $FWTYPE)"
+	"$IPSET_CR" "$@"
 }
 
-
-is_flow_offload_avail()
-{
-	# $1 = '' for ipv4, '6' for ipv6
-	grep -q FLOWOFFLOAD /proc/net/ip$1_tables_targets
-}
 list_nfqws_rules()
 {
 	# $1 = '' for ipv4, '6' for ipv6
@@ -390,7 +317,7 @@ list_nfqws_rules()
 }
 reverse_nfqws_rule()
 {
-	sed -e 's/-o /-i /' -e 's/--dport /--sport /' -e 's/--dports /--sports /' -e 's/ dst$/ src/' -e 's/ dst / src /'
+	sed -e 's/-o /-i /g' -e 's/--dport /--sport /g' -e 's/--dports /--sports /g' -e 's/ dst$/ src/' -e 's/ dst / src /g'
 }
 apply_flow_offloading_enable_rule()
 {
@@ -411,15 +338,19 @@ apply_flow_offloading_exempt_rule()
 	echo applying ipv${v:-4} flow offloading exemption : $i
 	ip${v}tables -A $i
 }
+flow_offloading_unexempt_v()
+{
+	ipt$1_del FORWARD -j forwarding_rule_zapret
+	ip$1tables -F forwarding_rule_zapret 2>/dev/null
+	ip$1tables -X forwarding_rule_zapret 2>/dev/null
+}
 flow_offloading_exempt_v()
 {
 	# $1 = '' for ipv4, '6' for ipv6
 
-	is_flow_offload_avail $1 || return 0
+	is_ipt_flow_offload_avail $1 || return 0
 
-	ipt$1_del forwarding_rule -j forwarding_rule_zapret
-	ip$1tables -F forwarding_rule_zapret 2>/dev/null
-	ip$1tables -X forwarding_rule_zapret 2>/dev/null
+	flow_offloading_unexempt_v $1
 
 	[ "$FLOWOFFLOAD" = 'software' -o "$FLOWOFFLOAD" = 'hardware' ] && {
 		ip$1tables -N forwarding_rule_zapret
@@ -436,7 +367,7 @@ flow_offloading_exempt_v()
 	
 		apply_flow_offloading_enable_rule $1
 
-		ipt$1 forwarding_rule -j forwarding_rule_zapret
+		ipt$1 FORWARD -j forwarding_rule_zapret
 	}
 
 	return 0
@@ -446,75 +377,137 @@ flow_offloading_exempt()
 	[ "$DISABLE_IPV4" = "1" ] || flow_offloading_exempt_v
 	[ "$DISABLE_IPV6" = "1" ] || flow_offloading_exempt_v 6
 }
-
-
-zapret_apply_firewall()
+flow_offloading_unexempt()
 {
-	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
-	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	local f4 f6 qn qns qn6 qns6
+	[ "$DISABLE_IPV4" = "1" ] || flow_offloading_unexempt_v
+	[ "$DISABLE_IPV6" = "1" ] || flow_offloading_unexempt_v 6
+}
 
-	# always create ipsets. ip_exclude ipset is required
-	create_ipset no-update
 
-	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws)
-			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
-				echo both http and https are disabled. not applying redirection.
-			else
-				filter_apply_port_target f4
-				f6=$f4
-				filter_apply_ipset_target f4 f6
-				fw_tpws "$f4" "$f6" $TPPORT
-			fi
-			;;
-	
-		nfqws)
-			# quite complex but we need to minimize nfqws processes to save RAM
-			get_nfqws_qnums qn qns qn6 qns6
-			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn" ] && [ "$qn" = "$qns" ]; then
-				filter_apply_port_target f4
-				f4="$f4 $first_packet_only"
-				filter_apply_ipset_target4 f4
-				fw_nfqws_post4 "$f4 $desync" $qn
-			else
-				if [ -n "$qn" ]; then
-					f4="--dport 80"
-					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
-					filter_apply_ipset_target4 f4
-					fw_nfqws_post4 "$f4 $desync" $qn
-				fi
-				if [ -n "$qns" ]; then
-					f4="--dport 443 $first_packet_only"
-					filter_apply_ipset_target4 f4
-					fw_nfqws_post4 "$f4 $desync" $qns
-				fi
-			fi
-			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn6" ] && [ "$qn6" = "$qns6" ]; then
-				filter_apply_port_target f6
-				f6="$f6 $first_packet_only"
-				filter_apply_ipset_target6 f6
-				fw_nfqws_post6 "$f6 $desync" $qn6
-			else
-				if [ -n "$qn6" ]; then
-					f6="--dport 80"
-					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
-					filter_apply_ipset_target6 f6
-					fw_nfqws_post6 "$f6 $desync" $qn6
-				fi
-				if [ -n "$qns6" ]; then
-					f6="--dport 443 $first_packet_only"
-					filter_apply_ipset_target6 f6
-					fw_nfqws_post6 "$f6 $desync" $qns6
-				fi
-			fi
-			;;
-		custom)
-	    		existf zapret_custom_firewall && zapret_custom_firewall
-			;;
-	esac
 
-	flow_offloading_exempt
+nft_fill_ifsets()
+{
+	local script elements i wan_iface DEVICE DLAN DWAN DWAN6 ALLDEVS flags
 
-	return 0
+	# if large sets exist nft works very ineffectively
+	# looks like it analyzes the whole table blob to find required data pieces
+	# calling all in one shot helps not to waste cpu time many times
+
+	script="flush set inet $ZAPRET_NFT_TABLE wanif
+flush set inet $ZAPRET_NFT_TABLE wanif6
+flush set inet $ZAPRET_NFT_TABLE lanif"
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		network_find_wan_all wan_iface
+		for i in $wan_iface; do
+			network_get_device DEVICE $i
+			DWAN="$DWAN $DEVICE"
+		done
+		[ -n "$DWAN" ] && {
+			make_comma_list elements $DWAN
+			script="${script}
+add element inet $ZAPRET_NFT_TABLE wanif { $elements }"
+		}
+	}
+	[ "$DISABLE_IPV6" = "1" ] || {
+		network_find_wan6_all wan_iface
+		for i in $wan_iface; do
+			network_get_device DEVICE $i
+			DWAN6="$DWAN6 $DEVICE"
+		done
+		[ -n "$DWAN6" ] && {
+			make_comma_list elements $DWAN6
+			script="${script}
+add element inet $ZAPRET_NFT_TABLE wanif6 { $elements }"
+		}
+	}
+	for i in $OPENWRT_LAN; do
+		network_get_device DEVICE $i
+		DLAN="$DLAN $DEVICE"
+	done
+	[ -n "$DLAN" ] && {
+		make_comma_list elements $DLAN
+		script="${script}
+add element inet $ZAPRET_NFT_TABLE lanif { $elements }"
+	}
+	echo "$script" | nft -f -
+
+	[ "$FLOWOFFLOAD" = 'software' -o "$FLOWOFFLOAD" = 'hardware' ] && {
+		ALLDEVS=$(for i in $DLAN $DWAN $DWAN6; do echo $i; done | sort -u | xargs)
+		[ "$FLOWOFFLOAD" = 'hardware' ] && nft_hw_offload_supported $ALLDEVS && flags=offload
+		nft_create_or_update_flowtable "$flags" $ALLDEVS
+	}
+}
+
+nft_fw_tpws4()
+{
+	# $1 - filter ipv4
+	# $2 - tpws port
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		nft_add_rule dnat_output skuid != $WS_USER oifname @wanif meta l4proto tcp $1 ip daddr != @nozapret dnat ip to $TPWS_LOCALHOST4:$2
+		nft_add_rule dnat_pre iifname @lanif meta l4proto tcp $1 ip daddr != @nozapret dnat ip to $TPWS_LOCALHOST4:$2
+		prepare_route_localnet
+	}
+}
+nft_fw_tpws6()
+{
+	# $1 - filter ipv6
+	# $2 - tpws port
+
+	local lan DEVICE DNAT6
+	[ "$DISABLE_IPV6" = "1" ] || {
+		nft_add_rule dnat_output skuid != $WS_USER oifname @wanif6 meta l4proto tcp $1 ip6 daddr != @nozapret6 dnat ip6 to [::1]:$2
+		for lan in $OPENWRT_LAN; do
+			network_get_device DEVICE $lan
+			[ -n "$DEVICE" ] || continue
+			dnat6_target $lan DNAT6
+			[ "$DNAT6" != '-' ] && nft_add_rule dnat_pre iifname $DEVICE meta l4proto tcp $1 ip6 daddr != @nozapret6 dnat ip6 to [$DNAT6]:$2
+		done
+	}
+}
+nft_fw_tpws()
+{
+	# $1 - filter ipv4
+	# $2 - filter ipv6
+	# $3 - tpws port
+
+	nft_fw_tpws4 "$1" $3
+	nft_fw_tpws6 "$2" $3
+}
+
+nft_fw_nfqws_post4()
+{
+	# $1 - filter ipv4
+	# $2 - queue number
+
+	local DEVICE wan_iface rule
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		rule="oifname @wanif meta l4proto tcp $1 ip daddr != @nozapret"
+		nft_add_rule postrouting $rule queue num $2 bypass
+		nft_add_nfqws_flow_exempt_rule "$rule"
+	}
+}
+nft_fw_nfqws_post6()
+{
+	# $1 - filter ipv6
+	# $2 - queue number
+
+	local DEVICE wan_iface rule
+
+	[ "$DISABLE_IPV6" = "1" ] || {
+		rule="oifname @wanif6 meta l4proto tcp $1 ip6 daddr != @nozapret6"
+		nft_add_rule postrouting $rule queue num $2 bypass
+		nft_add_nfqws_flow_exempt_rule "$rule"
+	}
+}
+nft_fw_nfqws_post()
+{
+	# $1 - filter ipv4
+	# $2 - filter ipv6
+	# $3 - queue number
+
+	nft_fw_nfqws_post4 "$1" $3
+	nft_fw_nfqws_post6 "$2" $3
 }

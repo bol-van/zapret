@@ -49,7 +49,7 @@ deal with its consequences.
 3. Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
 
 For options 2 and 3, tpws and nfqws programs are implemented, respectively.
-You need to run them with the necessary parameters and redirect certain traffic with iptables.
+You need to run them with the necessary parameters and redirect certain traffic with iptables or nftables.
 
 To redirect a TCP connection to a transparent proxy, the following commands are used:
 
@@ -109,6 +109,17 @@ DNAT to localhost (:: 1) is possible only in the OUTPUT chain.
 In the PREROUTING DNAT chain, it is possible to any global address or to the link local address of the same interface
 the packet came from.
 NFQUEUE works without changes.
+
+
+## nftables
+
+nftables are fine except one very big problem.
+nft requires tons of RAM to load large nf sets (ip lists) with subnets/intervals. Most of the home routers can't afford that.
+For example, even a 256 Mb system can't load a 100K ip list. nft process will OOM.
+nf sets do not support overlapping intervals and that's why nft process applies very RAM consuming algorithm to merge intervals so they don't overlap.
+There're equivalents to iptables for all other functions. Interface and protocol anonymous sets allow not to write multiple similar rules.
+Flow offloading is built-in into new linux kernels and nft versions.
+
 
 ## When it will not work
 
@@ -564,6 +575,9 @@ if remote resolving causes trouble configure clients to use local name resolutio
 
 ## Ways to get a list of blocked IP
 
+nftables can't work with ipsets. Native nf sets require lots of RAM to load large ip lists with subnets and intervals.
+In case you're on a low RAM system and need large lists it may be required to fall back to iptables+ipset.
+
 1. Enter the blocked domains to `ipset/zapret-hosts-user.txt` and run `ipset/get_user.sh`
 At the output, you get `ipset/zapret-ip-user.txt` with IP addresses.
 
@@ -642,6 +656,12 @@ When using large regulator lists estimate the amount of RAM on the router !
 
 The file `/opt/zapret/config` is used by various components of the system and contains basic settings.
 It needs to be viewed and edited if necessary.
+
+Which firewall type use on linux systems : `nftables` or `iptables`.
+On traditional systems `nftables` is selected by default if nft is installed.
+On openwrt by default `nftables` is selected on `firewall4` based systems.
+
+`FWTYPE=iptables`
 
 Main mode :
 
@@ -739,8 +759,9 @@ temp directory. Used by ipset/*.sh scripts for large lists processing.
 /tmp by default. Can be reassigned if /tmp is tmpfs and RAM is low.
 TMPDIR=/opt/zapret/tmp
 
-ipset options :
+ipset and nfset options :
 
+`SET_MAXELEM=262144`
 `IPSET_OPT="hashsize 262144 maxelem 2097152`
 
 Kernel automatically increases hashsize if ipset is too large for the current hashsize.
@@ -770,6 +791,11 @@ In openwrt there's default network 'lan'. Only traffic coming from this network 
 To override this behaviour set the following variable :
 `OPENWRT_LAN="lan lan2 lan3"`
 
+The `INIT_APPLY_FW=1` parameter enables the init script to independently apply iptables rules.
+With other values or if the parameter is commented out, the rules will not be applied.
+This is useful if you have a firewall management system, in the settings of which you should tie the rules.
+Not applicable to `OpenWRT` if used with `firewall3+iptables`.
+
 The following settings are not relevant for openwrt :
 
 If your system works as a router, then you need to enter the names of the internal and external interfaces:
@@ -781,10 +807,6 @@ IMPORTANT: configuring routing, masquerade, etc. not a zapret task.
 Only modes that intercept transit traffic are enabled.
 It's possible to specify multiple interfaces like this : `IFACE_LAN="eth0 eth1 eth2"`
 
-The `INIT_APPLY_FW=1` parameter enables the init script to independently apply iptables rules.
-With other values or if the parameter is commented out, the rules will not be applied.
-This is useful if you have a firewall management system, in the settings of which you should tie the rules.
-
 
 ## Screwing to the firewall control system or your launch system
 
@@ -795,16 +817,40 @@ In this case, the rules for iptables should be screwed to your firewall separate
 The following calls allow you to apply or remove iptables rules separately:
 
 ```
- /opt/zapret/init.d/sysv/zapret start-fw
- /opt/zapret/init.d/sysv/zapret stop-fw
+ /opt/zapret/init.d/sysv/zapret start_fw
+ /opt/zapret/init.d/sysv/zapret stop_fw
+ /opt/zapret/init.d/sysv/zapret restart_fw
 ```
 
 And you can start or stop the demons separately from the firewall:
 
 ```
- /opt/zapret/init.d/sysv/zapret start-daemons
- /opt/zapret/init.d/sysv/zapret stop-daemons
+ /opt/zapret/init.d/sysv/zapret start_daemons
+ /opt/zapret/init.d/sysv/zapret stop_daemons
+ /opt/zapret/init.d/sysv/zapret restart_daemons
 ```
+
+nftables nearly eliminate conflicts betweeen firewall control systems because they allow
+separate tables and netfilter hooks. `zapret` nf table is used for zapret purposes.
+If your system does not touch it everything will likely be OK.
+
+Some additional nftables-only calls exist :
+
+Lookup `lanif`, `wanif`, `wanif6` and `flow table` interface sets.
+```
+ /opt/zapret/init.d/sysv/zapret list_ifsets
+```
+
+Renew `lanif`, `wanif`, `wanif6` and `flow table` interface sets.
+Taken from `IFACE_LAN`, `IFACE_WAN` config variables on traditional Linux systems.
+Autoselected on `OpenWRT`. `lanif` can be extended using `OPENWRT_LAN` config variable.
+ /opt/zapret/init.d/sysv/zapret reload_ifsets
+
+Calls `nft -t list table inet zapret`.
+```
+ /opt/zapret/init.d/sysv/zapret list_table
+```
+
 
 ## Installation
 

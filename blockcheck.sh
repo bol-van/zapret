@@ -4,6 +4,12 @@ EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
 ZAPRET_BASE="$EXEDIR"
 
+[ -f "$ZAPRET_BASE/config" ] && . "$ZAPRET_BASE/config"
+. "$ZAPRET_BASE/common/base.sh"
+. "$ZAPRET_BASE/common/dialog.sh"
+. "$ZAPRET_BASE/common/elevate.sh"
+. "$ZAPRET_BASE/common/fwtype.sh"
+
 [ -n "$QNUM" ] || QNUM=59780
 [ -n "$TPPORT" ] || TPPORT=993
 [ -n "$TPWS_UID" ] || TPWS_UID=1
@@ -32,14 +38,6 @@ DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
 
 
-exists()
-{
-	which $1 >/dev/null 2>/dev/null
-}
-whichq()
-{
-	which $1 2>/dev/null
-}
 killwait()
 {
 	# $1 - signal (-9, -2, ...)
@@ -57,53 +55,6 @@ exitp()
 	echo press enter to continue
 	read A
 	exit $1
-}
-
-read_yes_no()
-{
-	# $1 - default (Y/N)
-	local A
-	read A
-	[ -z "$A" ] || ([ "$A" != "Y" ] && [ "$A" != "y" ] && [ "$A" != "N" ] && [ "$A" != "n" ]) && A=$1
-	[ "$A" = "Y" ] || [ "$A" = "y" ] || [ "$A" = "1" ]
-}
-ask_yes_no()
-{
-	# $1 - default (Y/N or 0/1)
-	# $2 - text
-	local DEFAULT=$1
-	[ "$1" = "1" ] && DEFAULT=Y
-	[ "$1" = "0" ] && DEFAULT=N
-	[ -z "$DEFAULT" ] && DEFAULT=N
-	$ECHON "$2 (default : $DEFAULT) (Y/N) ? "
-	read_yes_no $DEFAULT
-}
-ask_yes_no_var()
-{
-	# $1 - variable name for answer : 0/1
-	# $2 - text
-	local DEFAULT
-	eval DEFAULT="\$$1"
-	if ask_yes_no "$DEFAULT" "$2"; then
-		eval $1=1
-	else
-		eval $1=0
-	fi
-}
-
-
-require_root()
-{
-	local exe
-	echo \* checking privileges
-	[ $(id -u) -ne "0" ] && {
-		echo root is required
-		exe="$EXEDIR/$(basename "$0")"
-		exists sudo && exec sudo "$exe"
-		exists su && exec su root -c "$exe"
-		echo su or sudo not found
-		exitp 2
-	}
 }
 
 IPT()
@@ -165,29 +116,11 @@ check_system()
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
-			local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
-			[ -L "$INIT" ] && INIT=$(readlink "$INIT")
-			INIT=$(basename "$INIT")
-			if [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] ; then
-				SUBSYS=openwrt
-				# new openwrt version abandon iptables and use nftables instead
-				# no iptables/ip6tables/ipt-kmods are installed by default
-				# fw4 firewall is used, fw3 is symbolic link to fw4
-				# no more firewall includes
-				# make sure nft was not just installed by user but all the system is based on fw4
-				if [ -x /sbin/fw4 ] && exists nft && [ "$FWTYPE" != "iptables" ] ; then
-					FWTYPE=nftables
-				else
-					FWTYPE=iptables
-				fi
-			else
-				# generic linux
-				if exists nft && [ "$FWTYPE" != "iptables" ]; then
-					FWTYPE=nftables
-				else
-					FWTYPE=iptables
-				fi
-			fi
+			linux_fwtype
+			[ "$FWTYPE" = iptables -o "$FWTYPE" = nftables ] || {
+				echo firewall type $FWTYPE not supported in $UNAME
+				exitp 5
+			}
 			;;
 		FreeBSD)
 			PKTWS="$DVTWS"
@@ -403,10 +336,10 @@ pktws_ipt_prepare()
 		nftables)
 			nft add table inet $NFT_TABLE
 			[ "$IPV" = 6 -a -n "$IP6_DEFRAG_DISABLE" ] && {
-				nft "add chain inet $NFT_TABLE predefrag { type filter hook output priority -401; }"
+				nft "add chain inet $NFT_TABLE predefrag { type filter hook output priority -402; }"
 				nft "add rule inet $NFT_TABLE predefrag meta nfproto ipv${IPV} exthdr frag exists notrack"
 			}
-			nft "add chain inet $NFT_TABLE premangle { type filter hook output priority -151; }"
+			nft "add chain inet $NFT_TABLE premangle { type filter hook output priority -152; }"
 			nft "add rule inet $NFT_TABLE premangle meta nfproto ipv${IPV} tcp dport $1 mark and 0x40000000 != 0x40000000 queue num $QNUM bypass"
 			;;
 		ipfw)
@@ -447,7 +380,7 @@ tpws_ipt_prepare()
 		nftables)
 			nft add table inet $NFT_TABLE
 			# -101 = pre dstnat
-			nft "add chain inet $NFT_TABLE output { type nat hook output priority -101; }"
+			nft "add chain inet $NFT_TABLE output { type nat hook output priority -102; }"
 			nft "add rule inet $NFT_TABLE output tcp dport $1 skuid != $TPWS_UID dnat ip${IPVV} to $LOCALHOST_IPT:$TPPORT"
 			;;
 		ipfw)
@@ -801,9 +734,7 @@ configure_curl_opt()
 
 linux_ipv6_defrag_can_be_disabled()
 {
-	local V1=$(sed -nre 's/^Linux version ([0-9]+)\.[0-9]+.*$/\1/p' /proc/version)
-	local V2=$(sed -nre 's/^Linux version [0-9]+\.([0-9]+).*$/\1/p' /proc/version)
-	[ -n "$V1" -a -n "$V2" ] && [ "$V1" -gt 4 -o "$V1" = 4 -a "$V2" -ge 16 ]
+	linux_min_version 4 16
 }
 
 configure_defrag()
@@ -836,7 +767,7 @@ configure_defrag()
 			fi
 			[ -n "$IP6_DEFRAG_DISABLE" ] && {
 				local ipexe="$(readlink -f $(whichq ip6tables))"
-				if [ "${ipexe#*nft}" != "$ipexe" ]; then
+				if contains "$ipexe" nft; then
 					echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6tables-nft is used. current ip6tables point to : $ipexe"
 				else
 					echo "WARNING ! ipv6 ipfrag tests may have no effect if ip6table_raw kernel module is not loaded with parameter : raw_before_defrag=1"

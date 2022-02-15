@@ -5,269 +5,64 @@
 EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
 IPSET_DIR="$EXEDIR/ipset"
+ZAPRET_CONFIG="$EXEDIR/config"
+ZAPRET_BASE="$EXEDIR"
 
-GET_LIST_PREFIX=/ipset/get_
-
-SYSTEMD_DIR=/lib/systemd
-[ -d "$SYSTEMD_DIR" ] || SYSTEMD_DIR=/usr/lib/systemd
-[ -d "$SYSTEMD_DIR" ] && SYSTEMD_SYSTEM_DIR="$SYSTEMD_DIR/system"
-
-INIT_SCRIPT=/etc/init.d/zapret
-
-exists()
-{
-	which $1 >/dev/null 2>/dev/null
-}
-whichq()
-{
-	which $1 2>/dev/null
-}
-
-exitp()
-{
-	echo
-	echo press enter to continue
-	read A
-	exit $1
-}
-
-require_root()
-{
-	local exe
-	echo \* checking privileges
-	[ $(id -u) -ne "0" ] && {
-		echo root is required
-		exe="$EXEDIR/$(basename "$0")"
-		exists sudo && exec sudo "$exe"
-		exists su && exec su root -c "$exe"
-		echo su or sudo not found
-		exitp 2
-	}
-}
-
-
-check_system()
-{
-	echo \* checking system
-
-	SYSTEM=""
-	SYSTEMCTL=$(whichq systemctl)
-
-	local UNAME=$(uname)
-	if [ "$UNAME" = "Linux" ]; then
-		# do not use 'exe' because it requires root
-		local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
-		[ -L "$INIT" ] && INIT=$(readlink "$INIT")
-		INIT=$(basename "$INIT")
-		# some distros include systemctl without systemd
-		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
-			SYSTEM=systemd
-		elif exists rc-update && [ "$INIT" = "openrc-init" ]; then
-			SYSTEM=openrc
-		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] ; then
-			SYSTEM=openwrt
-		else
-			echo system is not either systemd, openrc or openwrt based
-			echo check readme.txt for manual setup info.
-			SYSTEM=linux
-		fi
-	elif [ "$UNAME" = "Darwin" ]; then
-		SYSTEM=macos
-		# MacOS echo from /bin/sh does not support -n
-		ECHON=printf
-	else
-		echo easy installer only supports Linux and MacOS. check readme.txt for supported systems and manual setup info.
-		exitp 5
-	fi
-	echo system is based on $SYSTEM
-}
-
-
-crontab_del()
-{
-	exists crontab || return
-
-	echo \* removing crontab entry
-
-	CRONTMP=/tmp/cron.tmp
-	crontab -l >$CRONTMP 2>/dev/null
-	if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
-		echo removing following entries from crontab :
-		grep "$GET_LIST_PREFIX" $CRONTMP
-		grep -v "$GET_LIST_PREFIX" $CRONTMP >$CRONTMP.2
-		crontab $CRONTMP.2
-		rm -f $CRONTMP.2
-	fi
-	rm -f $CRONTMP
-}
-
-
-service_stop_systemd()
-{
-	echo \* stopping zapret service
-
-	"$SYSTEMCTL" daemon-reload
-	"$SYSTEMCTL" disable zapret
-	"$SYSTEMCTL" stop zapret
-}
-
-service_remove_systemd()
-{
-	echo \* removing zapret service
-
-	rm -f "$SYSTEMD_SYSTEM_DIR/zapret.service"
-	"$SYSTEMCTL" daemon-reload
-}
-
-timer_remove_systemd()
-{
-	echo \* removing zapret-list-update timer
-
-	"$SYSTEMCTL" daemon-reload
-	"$SYSTEMCTL" disable zapret-list-update.timer
-	"$SYSTEMCTL" stop zapret-list-update.timer
-	rm -f "$SYSTEMD_SYSTEM_DIR/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR/zapret-list-update.timer"
-	"$SYSTEMCTL" daemon-reload
-}
-
-
+. "$ZAPRET_CONFIG"
+. "$ZAPRET_BASE/common/base.sh"
+. "$ZAPRET_BASE/common/elevate.sh"
+. "$ZAPRET_BASE/common/fwtype.sh"
+. "$ZAPRET_BASE/common/ipt.sh"
+. "$ZAPRET_BASE/common/nft.sh"
+. "$ZAPRET_BASE/common/pf.sh"
+. "$ZAPRET_BASE/common/installer.sh"
 
 remove_systemd()
 {
+	clear_ipset
 	service_stop_systemd
 	service_remove_systemd
 	timer_remove_systemd
+	nft_del_table
 	crontab_del
 }
 
-
-service_remove_sysv()
-{
-	echo \* removing zapret service
-
-	[ -x "$INIT_SCRIPT" ] && {
-		"$INIT_SCRIPT" disable
-		"$INIT_SCRIPT" stop
-	}
-	rm -f "$INIT_SCRIPT"
-}
-
-service_remove_openrc()
-{
-	echo \* removing zapret service
-
-	[ -x "$INIT_SCRIPT" ] && {
-		rc-update del zapret
-		"$INIT_SCRIPT" stop
-	}
-	rm -f "$INIT_SCRIPT"
-}
-
-
 remove_openrc()
 {
+	clear_ipset
 	service_remove_openrc
+	nft_del_table
 	crontab_del
 }
 
 remove_linux()
 {
-	crontab_del
+	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
+
+	clear_ipset
+
+	echo \* executing sysv init stop
+	"$INIT_SCRIPT_SRC" stop
 	
+	nft_del_table
+	crontab_del
+
 	echo
 	echo '!!! WARNING. YOUR UNINSTALL IS INCOMPLETE !!!'
 	echo 'you must manually remove zapret auto start from your system'
 }
 
-
-openwrt_fw_section_find()
-{
-	# $1 - fw include postfix
-	# echoes section number
-	
-	i=0
-	while true
-	do
-		path=$(uci -q get firewall.@include[$i].path)
-		[ -n "$path" ] || break
-		[ "$path" = "$OPENWRT_FW_INCLUDE$1" ] && {
-	 		echo $i
-	 		return 0
-		}
-		i=$(($i+1))
-	done
-	return 1
-}
-openwrt_fw_section_del()
-{
-	# $1 - fw include postfix
-
-	local id=$(openwrt_fw_section_find $1)
-	[ -n "$id" ] && {
-		uci delete firewall.@include[$id] && uci commit firewall
-		rm -f "$OPENWRT_FW_INCLUDE$1"
-	}
-}
-
-remove_openwrt_firewall()
-{
-	echo \* removing firewall script
-	
-	openwrt_fw_section_del
-	# from old zapret versions. now we use single include
-	openwrt_fw_section_del 6
-
-	# free some RAM
-	"$IPSET_DIR/create_ipset.sh" clear
-}
-
-restart_openwrt_firewall()
-{
-	echo \* restarting firewall
-
-	fw3 -q restart || {
-		echo could not restart firewall
-		exitp 30
-	}
-}
-
-remove_openwrt_iface_hook()
-{
-	echo \* removing ifup hook
-	
-	rm -f /etc/hotplug.d/iface/??-zapret
-}
-
-
-
 remove_openwrt()
 {
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 
-	remove_openwrt_firewall
-	restart_openwrt_firewall
+	clear_ipset
 	service_remove_sysv
+	remove_openwrt_firewall
 	remove_openwrt_iface_hook
+	nft_del_table
+	restart_openwrt_firewall
 	crontab_del
-}
-
-
-service_remove_macos()
-{
-	echo \* removing zapret service
-
-	rm -f /Library/LaunchDaemons/zapret.plist
-	zapret_stop_daemons
-}
-
-remove_macos_firewall()
-{
-	echo \* removing zapret PF hooks
-
-	pf_anchors_clear
-	pf_anchors_del
-	pf_anchor_root_del
-	pf_anchor_root_reload
 }
 
 remove_macos()

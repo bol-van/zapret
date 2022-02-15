@@ -4,16 +4,18 @@
 }
 
 . "$IPSET_DIR/../config"
+. "$IPSET_DIR/../common/base.sh"
 
 [ -z "$TMPDIR" ] && TMPDIR=/tmp
 [ -z "$GZIP_LISTS" ] && GZIP_LISTS=1
 
-[ -z "$IPSET_OPT" ] && IPSET_OPT="hashsize 262144 maxelem 2097152"
-[ -z "$IPSET_OPT_EXCLUDE" ] && IPSET_OPT_EXCLUDE="hashsize 1024 maxelem 65536"
+[ -z "$SET_MAXELEM" ] && SET_MAXELEM=262144
+[ -z "$IPSET_OPT" ] && IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
+[ -z "$SET_MAXELEM_EXCLUDE" ] && SET_MAXELEM_EXCLUDE=65536
+[ -z "$IPSET_OPT_EXCLUDE" ] && IPSET_OPT_EXCLUDE="hashsize 1024 maxelem $SET_MAXELEM_EXCLUDE"
 
 [ -z "$IPFW_TABLE_OPT" ] && IPFW_TABLE_OPT="algo addr:radix"
 [ -z "$IPFW_TABLE_OPT_EXCLUDE" ] && IPFW_TABLE_OPT_EXCLUDE="algo addr:radix"
-
 
 ZIPSET=zapret
 ZIPSET6=zapret6
@@ -43,10 +45,6 @@ ZUSERLIST_EXCLUDE="$IPSET_DIR/zapret-hosts-user-exclude.txt"
 [ -z "$MDIG_THREADS" ] && MDIG_THREADS=30
 
 
-exists()
-{
- which "$1" >/dev/null 2>/dev/null
-}
 
 # BSD grep is damn slow with -f option. prefer GNU grep (ggrep) if present
 # MacoS in cron does not include /usr/local/bin to PATH
@@ -55,9 +53,9 @@ if [ -x /usr/local/bin/ggrep ] ; then
 elif [ -x /usr/local/bin/grep ] ; then
  GREP=/usr/local/bin/grep
 elif exists ggrep; then
- GREP=$(which ggrep)
+ GREP=$(whichq ggrep)
 else
- GREP=$(which grep)
+ GREP=$(whichq grep)
 fi
 
 # GNU awk is faster
@@ -109,7 +107,7 @@ zzcat()
 {
  if [ -f "$1.gz" ]; then
  	gunzip -c "$1.gz"
- else
+ elif [ -f "$1" ]; then
  	cat "$1"
  fi
 }
@@ -127,7 +125,11 @@ zzsize()
 {
  local f="$1"
  [ -f "$1.gz" ] && f="$1.gz"
- wc -c <"$f" | xargs
+ if [ -f "$f" ]; then
+  wc -c <"$f" | xargs
+ else
+  $ECHON -n 0
+ fi
 }
 
 digger()

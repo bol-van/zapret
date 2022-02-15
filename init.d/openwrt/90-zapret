@@ -2,7 +2,7 @@
 
 ZAPRET=/etc/init.d/zapret
 
-[ "$ACTION" = "ifup" ] && [ -x "$ZAPRET" ] && "$ZAPRET" enabled && {
+[ -n "$INTERFACE" -a -n "$ACTION" -a -x "$ZAPRET" ] && "$ZAPRET" enabled && {
 	SCRIPT=$(readlink "$ZAPRET")
 	if [ -n "$SCRIPT" ]; then
 		EXEDIR=$(dirname "$SCRIPT")
@@ -11,11 +11,29 @@ ZAPRET=/etc/init.d/zapret
 		ZAPRET_BASE=/opt/zapret
 	fi
 	. "$ZAPRET_BASE/config"
-	[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
-	for lan in $OPENWRT_LAN; do
-		[ "$INTERFACE" = "$lan" ] && {
-			"$ZAPRET" restart
-			break
-		}
-	done
+	[ "$ACTION" = "ifup" ] && {
+		[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
+		for lan in $OPENWRT_LAN; do
+			[ "$INTERFACE" = "$lan" ] && {
+				logger -t zapret restarting daemons due to $ACTION of $INTERFACE
+				"$ZAPRET" restart_daemons
+				break
+			}
+		done
+	}
+	. "$ZAPRET_BASE/common/base.sh"
+	. "$ZAPRET_BASE/common/fwtype.sh"
+	linux_fwtype
+	case "$FWTYPE" in
+		nftables)
+			logger -t zapret reloading nftables ifsets due to $ACTION of $INTERFACE
+			"$ZAPRET" reload_ifsets
+			;;
+		iptables)
+			openwrt_fw3 || {
+				logger -t zapret reloading iptables due to $ACTION of $INTERFACE
+				"$ZAPRET" restart_fw
+			}
+			;;
+	esac
 }

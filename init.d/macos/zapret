@@ -20,26 +20,26 @@ case "$1" in
 		"$0" start
 		;;
 
-	start-fw)
+	start-fw|start_fw)
 		zapret_apply_firewall
 		;;
-	stop-fw)
+	stop-fw|stop_fw)
 		zapret_unapply_firewall
 		;;
-	restart-fw)
+	restart-fw|stop_fw)
 		zapret_restart_firewall
 		;;
-	reload-fw-tables)
+	reload-fw-tables|reload_fw_tables)
 		pf_table_reload
 		;;
 	
-	start-daemons)
+	start-daemons|start_daemons)
 		zapret_run_daemons
 		;;
-	stop-daemons)
+	stop-daemons|stop_daemons)
 		zapret_stop_daemons
 		;;
-	restart-daemons)
+	restart-daemons|restart_daemons)
 		zapret_restart_daemons
 		;;
 		

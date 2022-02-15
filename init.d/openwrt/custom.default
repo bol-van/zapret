@@ -4,8 +4,6 @@
 
 zapret_custom_daemons()
 {
-	# stop logic is managed by procd
-
 	# PLACEHOLDER
 	echo !!! NEED ATTENTION !!!
 	echo Start daemon\(s\)
@@ -15,19 +13,8 @@ zapret_custom_daemons()
 }
 zapret_custom_firewall()
 {
-	# $1 - 1 - run, 0 - stop
-
 	# PLACEHOLDER
 	echo !!! NEED ATTENTION !!!
 	echo Configure iptables for required actions
-	echo Study how other sections work
-}
-zapret_custom_firewall_nft()
-{
-	# stop logic is not required
-
-	# PLACEHOLDER
-	echo !!! NEED ATTENTION !!!
-	echo Configure nftables for required actions
 	echo Study how other sections work
 }

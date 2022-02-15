@@ -18,7 +18,7 @@ DESC=anti-zapret
 do_start()
 {
 	zapret_run_daemons
-	[ "$INIT_APPLY_FW" != "1" ] || zapret_apply_firewall
+	[ "$INIT_APPLY_FW" != "1" ] || { zapret_apply_firewall; }
 }
 do_stop()
 {
@@ -40,32 +40,42 @@ case "$1" in
 		do_start
 		;;
 
-	start-fw)
+	start-fw|start_fw)
 		zapret_apply_firewall
 		;;
-	stop-fw)
+	stop-fw|stop_fw)
 		zapret_unapply_firewall
 		;;
 
-	restart-fw)
+	restart-fw|restart_fw)
 		zapret_unapply_firewall
 		zapret_apply_firewall
 		;;
 	
-	start-daemons)
+	start-daemons|start_daemons)
 		zapret_run_daemons
 		;;
-	stop-daemons)
+	stop-daemons|stop_daemons)
 		zapret_stop_daemons
 		;;
-	restart-daemons)
+	restart-daemons|restart_daemons)
 		zapret_stop_daemons
 		zapret_run_daemons
+		;;
+
+	reload-ifsets|reload_ifsets)	
+		zapret_reload_ifsets
+		;;
+	list-ifsets|list_ifsets)	
+		zapret_list_ifsets
+		;;
+	list-table|list_table)	
+		zapret_list_table
 		;;
 		
   *)
 	N=/etc/init.d/$NAME
-	echo "Usage: $N {start|stop|restart|start-fw|stop-fw|restart-fw|start-daemons|stop-daemons|restart-daemons}" >&2
+	echo "Usage: $N {start|stop|restart|start-fw|stop-fw|restart-fw|start-daemons|stop-daemons|restart-daemons|reload-ifsets|list-ifsets|list-table}" >&2
 	exit 1
 	;;
 esac
