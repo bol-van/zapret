@@ -235,7 +235,7 @@ nft_fw_tpws4()
 }
 nft_fw_tpws6()
 {
-	local script ifaces DLAN
+	local script DLAN
 	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
 	_nft_fw_tpws6 "$1" $2 "$DLAN" always_apply_wan_filter
 }
