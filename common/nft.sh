@@ -82,7 +82,7 @@ cat << EOF | nft -f -
 	flush chain inet $ZAPRET_NFT_TABLE localnet_protect
 	add rule inet  $ZAPRET_NFT_TABLE localnet_protect ip daddr $TPWS_LOCALHOST4 return comment "route_localnet allow access to tpws"
 	add rule inet  $ZAPRET_NFT_TABLE localnet_protect ip daddr 127.0.0.0/8 drop comment "route_localnet remote access protection"
-	add rule inet  $ZAPRET_NFT_TABLE input iifname != lo jump localnet_protect
+	add rule inet  $ZAPRET_NFT_TABLE input iif != lo jump localnet_protect
 	add chain inet $ZAPRET_NFT_TABLE postrouting { type filter hook postrouting priority -151; }
 	flush chain inet $ZAPRET_NFT_TABLE postrouting
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
