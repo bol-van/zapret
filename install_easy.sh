@@ -739,11 +739,11 @@ check_prerequisites_openwrt()
 
 	case "$FWTYPE" in
 		iptables)
-			PKGS="ipset iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
+			PKGS="$PKGS ipset iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
 			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS ip6tables-mod-nat ip6tables-extra"
 			;;
 		nftables)
-			PKGS="nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
+			PKGS="$PKGS nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
 			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS kmod-nft-nat6"
 			;;
 	esac
