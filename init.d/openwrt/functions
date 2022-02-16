@@ -95,7 +95,7 @@ fw_nfqws_post_x()
 	network_find_wan${4}_all ifaces
 	call_for_multiple_items network_get_device DWAN "$ifaces"
 
-	_fw_nfqws_post${4} $1 "$2" $3 "$(unique $DWAN)"
+	[ -n "$DWAN" ] && _fw_nfqws_post${4} $1 "$2" $3 "$(unique $DWAN)"
 }
 fw_nfqws_post4()
 {
@@ -119,7 +119,7 @@ fw_tpws_x()
 	network_find_wan${4}_all ifaces
 	call_for_multiple_items network_get_device DWAN "$ifaces"
 
-	_fw_tpws${4} $1 "$2" $3 "$DLAN" "$(unique $DWAN)"
+	[ -n "$DWAN" ] && _fw_tpws${4} $1 "$2" $3 "$DLAN" "$(unique $DWAN)"
 }
 fw_tpws4()
 {
