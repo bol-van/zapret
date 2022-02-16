@@ -101,6 +101,8 @@ nft_create_or_update_flowtable()
 	# can be called multiple times to add interfaces. interfaces can only be added , not removed
 	local flags=$1 devices
 	shift
+	# warning ! tested on nft 1.0.1  . 0.9.6 has bug not allowing quotes in flowtable device list
+	# dont want to make KOSTIL here, pls upgrade
 	make_quoted_comma_list devices "$@"
 	[ -n "$devices" ] && devices="devices={$devices};"
 	[ -n "$flags" ] && flags="flags $flags;"
@@ -334,7 +336,7 @@ _nft_fw_tpws6()
                 _set_route_localnet 1 $3
 		for i in $3; do
 			_dnat6_target $i DNAT6
-			[ -n "$DNAT6" -a "$DNAT6" != '-' ] && nft_add_rule dnat_pre iifname $i meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to [$DNAT6]:$port
+			[ -n "$DNAT6" -a "$DNAT6" != '-' ] && nft_add_rule dnat_pre iifname \"$i\" meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to [$DNAT6]:$port
 			shift
 		done
 	}
