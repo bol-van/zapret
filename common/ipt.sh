@@ -83,6 +83,167 @@ filter_apply_ipset_target()
 }
 
 
+prepare_tpws_fw4()
+{
+	# otherwise linux kernel will treat 127.0.0.0/8 as "martian" ip and refuse routing to it
+	# NOTE : kernels <3.6 do not have this feature. consider upgrading or change DNAT to REDIRECT and do not bind to 127.0.0.0/8
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		iptables -N input_rule_zapret 2>/dev/null
+		ipt input_rule_zapret -d $TPWS_LOCALHOST4 -j RETURN
+		ipta input_rule_zapret -d 127.0.0.0/8 -j DROP
+		ipt INPUT ! -i lo -j input_rule_zapret
+
+		prepare_route_localnet
+	}
+}
+unprepare_tpws_fw4()
+{
+	[ "$DISABLE_IPV4" = "1" ] || {
+		unprepare_route_localnet
+
+		ipt_del INPUT ! -i lo -j input_rule_zapret
+		iptables -F input_rule_zapret 2>/dev/null
+		iptables -X input_rule_zapret 2>/dev/null
+	}
+}
+unprepare_tpws_fw()
+{
+	unprepare_tpws_fw4
+}
+
+
+ipt_print_op()
+{
+	if [ "$1" = "1" ]; then
+		echo "Adding ip$4tables rule for $3 : $2"
+	else
+		echo "Deleting ip$4tables rule for $3 : $2"
+	fi
+}
+
+_fw_tpws4()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - tpws port
+	# $4 - lan interface names space separated
+	# $5 - wan interface names space separated
+	[ "$DISABLE_IPV4" = "1" ] || {
+		local i rule
+
+		[ "$1" = 1 ] && prepare_tpws_fw4
+
+		ipt_print_op $1 "$2" "tpws (port $3)"
+
+		rule="-p tcp $2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
+		for i in $4 ; do
+			ipt_add_del $1 PREROUTING -t nat -i $i $rule
+	 	done
+
+		rule="-m owner ! --uid-owner $WS_USER $rule"
+		if [ -n "$5" ]; then
+			for i in $5; do
+				ipt_add_del $1 OUTPUT -t nat -o $i $rule
+			done
+		else
+			ipt_add_del $1 OUTPUT -t nat $rule
+		fi
+	}
+}
+_fw_tpws6()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv6
+	# $3 - tpws port
+	# $4 - lan interface names space separated
+	# $5 - wan interface names space separated
+
+	[ "$DISABLE_IPV6" = "1" ] || {
+		local i rule DNAT6
+
+		ipt_print_op $1 "$2" "tpws (port $3)" 6
+
+		rule="-p tcp $2 $IPSET_EXCLUDE6 dst"
+		for i in $4 ; do
+			_dnat6_target $i DNAT6
+			[ -n "$DNAT6" -a "$DNAT6" != "-" ] && ipt6_add_del $1 PREROUTING -t nat -i $i $rule -j DNAT --to [$DNAT6]:$3
+	 	done
+
+		rule="-m owner ! --uid-owner $WS_USER $rule -j DNAT --to [::1]:$3"
+		if [ -n "$5" ]; then
+			for i in $5; do
+				ipt6_add_del $1 OUTPUT -t nat -o $i $rule
+			done
+		else
+			ipt6_add_del $1 OUTPUT -t nat $rule
+		fi
+	}
+}
+fw_tpws()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - iptable filter for ipv6
+	# $4 - tpws port
+	fw_tpws4 $1 "$2" $4
+	fw_tpws6 $1 "$3" $4
+}
+
+
+_fw_nfqws_post4()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - queue number
+	# $4 - wan interface names space separated
+	[ "$DISABLE_IPV4" = "1" ] || {
+		local i
+
+		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)"
+
+		rule="-p tcp $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		if [ -n "$4" ] ; then
+			for i in $4; do
+				ipt_add_del $1 POSTROUTING -t mangle -o $i $rule
+			done
+		else
+			ipt_add_del $1 POSTROUTING -t mangle $rule
+		fi
+	}
+}
+_fw_nfqws_post6()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv6
+	# $3 - queue number
+	# $4 - wan interface names space separated
+	[ "$DISABLE_IPV6" = "1" ] || {
+		local i
+
+		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)" 6
+
+		rule="-p tcp $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		if [ -n "$4" ] ; then
+			for i in $4; do
+				ipt6_add_del $1 POSTROUTING -t mangle -o $i $rule
+			done
+		else
+			ipt6_add_del $1 POSTROUTING -t mangle $rule
+		fi
+	}
+}
+fw_nfqws_post()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - iptable filter for ipv6
+	# $4 - queue number
+	fw_nfqws_post4 $1 "$2" $4
+	fw_nfqws_post6 $1 "$3" $4
+}
+
+
 zapret_do_firewall_ipt()
 {
 	# $1 - 1 - add, 0 - del

@@ -164,7 +164,8 @@ nft_add_nfqws_flow_exempt_rule()
 {
 	# $1 - rule (must be all filters in one var)
 	nft_add_rule flow_offload $(nft_clean_nfqws_rule $1) return comment \"direct flow offloading exemption\"
-	nft_add_rule flow_offload $(nft_reverse_nfqws_rule $1) return comment \"reverse flow offloading exemption\"
+	# do not need this because of oifname @wanif/@wanif6 filter in forward chain
+	#nft_add_rule flow_offload $(nft_reverse_nfqws_rule $1) return comment \"reverse flow offloading exemption\"
 }
 
 nft_hw_offload_supported()
@@ -181,7 +182,11 @@ nft_hw_offload_supported()
 nft_apply_flow_offloading()
 {
 	# ft can be absent
-	nft_add_rule flow_offload meta l4proto "{ tcp, udp }" flow add @ft 2>/dev/null && nft_add_rule forward jump flow_offload
+	nft_add_rule flow_offload meta l4proto "{ tcp, udp }" flow add @ft 2>/dev/null && {
+		# allow only outgoing packets to initiate flow offload
+		nft_add_rule forward oifname @wanif jump flow_offload
+		nft_add_rule forward oifname @wanif6 jump flow_offload
+	}
 }
 
 
@@ -260,7 +265,8 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 	case "$FLOWOFFLOAD" in
 		software)
 			ALLDEVS=$(unique $1 $2 $3)
-			nft_create_or_update_flowtable '' $ALLDEVS
+			# unbound flowtable may cause error in older nft version
+			nft_create_or_update_flowtable '' $ALLDEVS 2>/dev/null
 			;;
 		hardware)
 			ALLDEVS=$(unique $1 $2 $3)
@@ -284,6 +290,93 @@ nft_only()
 			;;
 	esac
 }
+
+
+nft_print_op()
+{
+	echo "Adding nftables ipv$3 rule for $2 : $1"
+}
+_nft_fw_tpws4()
+{
+	# $1 - filter ipv4
+	# $2 - tpws port
+	# $4 - not-empty if wan interface filtering required
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		local filter="$1" port="$2"
+		nft_print_op "$filter" "tpws (port $2)" 4
+		nft_add_rule dnat_output skuid != $WS_USER ${3:+oifname @wanif }meta l4proto tcp $filter ip daddr != @nozapret dnat ip to $TPWS_LOCALHOST4:$port
+		nft_add_rule dnat_pre iifname @lanif meta l4proto tcp $filter ip daddr != @nozapret dnat ip to $TPWS_LOCALHOST4:$port
+		prepare_route_localnet
+	}
+}
+_nft_fw_tpws6()
+{
+	# $1 - filter ipv6
+	# $2 - tpws port
+	# $3 - lan interface names space separated
+	# $4 - not-empty if wan interface filtering required
+
+	[ "$DISABLE_IPV6" = "1" ] || {
+		local filter="$1" port="$2" DNAT6 i
+		nft_print_op "$filter" "tpws (port $port)" 6
+		nft_add_rule dnat_output skuid != $WS_USER ${4:+oifname @wanif6 }meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to [::1]:$port
+                _set_route_localnet 1 $3
+		for i in $3; do
+			_dnat6_target $i DNAT6
+			[ -n "$DNAT6" -a "$DNAT6" != '-' ] && nft_add_rule dnat_pre iifname $i meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to [$DNAT6]:$port
+			shift
+		done
+	}
+}
+nft_fw_tpws()
+{
+	# $1 - filter ipv4
+	# $2 - filter ipv6
+	# $3 - tpws port
+
+	nft_fw_tpws4 "$1" $3
+	nft_fw_tpws6 "$2" $3
+}
+
+_nft_fw_nfqws_post4()
+{
+	# $1 - filter ipv4
+	# $2 - queue number
+	# $3 - not-empty if wan interface filtering required
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		local filter="$1" port="$2" rule
+		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 4
+		rule="${3:+oifname @wanif }meta l4proto tcp $filter ip daddr != @nozapret"
+		nft_add_rule postrouting $rule queue num $port bypass
+		nft_add_nfqws_flow_exempt_rule "$rule"
+	}
+}
+_nft_fw_nfqws_post6()
+{
+	# $1 - filter ipv6
+	# $2 - queue number
+	# $3 - not-empty if wan interface filtering required
+
+	[ "$DISABLE_IPV6" = "1" ] || {
+		local filter="$1" port="$2" rule
+		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 6
+		rule="${3:+oifname @wanif6 }meta l4proto tcp $filter ip6 daddr != @nozapret6"
+		nft_add_rule postrouting $rule queue num $port bypass
+		nft_add_nfqws_flow_exempt_rule "$rule"
+	}
+}
+nft_fw_nfqws_post()
+{
+	# $1 - filter ipv4
+	# $2 - filter ipv6
+	# $3 - queue number
+
+	nft_fw_nfqws_post4 "$1" $3
+	nft_fw_nfqws_post6 "$2" $3
+}
+
 
 zapret_reload_ifsets()
 {

@@ -49,3 +49,63 @@ wait_ifup()
 	do :; done
 	false
 }
+
+_dnat6_target()
+{
+	# $1 - interface name
+	# $2 - var to store target ip6
+	# get target ip address for DNAT. prefer link locals
+	# tpws should be as inaccessible from outside as possible
+	# link local address can appear not immediately after ifup
+	# DNAT6_TARGET=- means attempt was made but address was not found (to avoid multiple re-attempts)
+
+	local DNAT6_TARGET DVAR=DNAT6_TARGET_$1
+	DVAR=$(echo $DVAR | sed 's/[^a-zA-Z0-9_]/_/g')
+	eval DNAT6_TARGET="\$$DVAR"
+	[ -n "$2" ] && eval $2=''
+	[ -n "$DNAT6_TARGET" ] || {
+		local ct=0
+		while
+			DNAT6_TARGET=$(get_ipv6_linklocal $1)
+			[ -n "$DNAT6_TARGET" ] && break
+			[ "$ct" -ge "$LINKLOCAL_WAIT_SEC" ] && break
+			echo $1: waiting for the link local for another $(($LINKLOCAL_WAIT_SEC - $ct)) seconds ...
+			ct=$(($ct+1))
+			sleep 1
+		do :; done
+
+		[ -n "$DNAT6_TARGET" ] || {
+		    	echo $1: no link local. getting global
+			DNAT6_TARGET=$(get_ipv6_global $1)
+			[ -n "$DNAT6_TARGET" ] || {
+				echo $1: could not get any address
+				DNAT6_TARGET=-
+			}
+		}
+		eval $DVAR="$DNAT6_TARGET"
+	}
+	[ -n "$2" ] && eval $2="$DNAT6_TARGET"
+}
+
+_set_route_localnet()
+{
+	# $1 - 1 = enable, 0 = disable
+	# $2,$3,... - interface names
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		local enable="$1"
+		shift
+		while [ -n "$1" ]; do
+			sysctl -q -w net.ipv4.conf.$1.route_localnet="$enable"
+			shift
+		done
+	}
+}
+prepare_route_localnet()
+{
+	set_route_localnet 1 "$@"
+}
+unprepare_route_localnet()
+{
+	set_route_localnet 0 "$@"
+}
