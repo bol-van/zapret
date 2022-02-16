@@ -101,7 +101,7 @@ nft_create_or_update_flowtable()
 	# can be called multiple times to add interfaces. interfaces can only be added , not removed
 	local flags=$1 devices
 	shift
-	make_comma_list devices "$@"
+	make_quoted_comma_list devices "$@"
 	[ -n "$devices" ] && devices="devices={$devices};"
 	[ -n "$flags" ] && flags="flags $flags;"
 	nft add flowtable inet $ZAPRET_NFT_TABLE ft "{ hook ingress priority -1; $flags $devices }"
@@ -172,7 +172,7 @@ nft_hw_offload_supported()
 {
 	# $1,$2,... - interface names
 	local devices res=1
-	make_comma_list devices "$@"
+	make_quoted_comma_list devices "$@"
 	[ -n "$devices" ] && devices="devices={$devices};"
 	nft add table ${ZAPRET_NFT_TABLE}_test && nft add flowtable ${ZAPRET_NFT_TABLE}_test ft "{ flags offload; $devices }" 2>/dev/null && res=0
 	nft delete table ${ZAPRET_NFT_TABLE}_test 2>/dev/null
@@ -235,7 +235,7 @@ nft_script_add_ifset_element()
 	# $2 - space separated elements
 	local elements
 	[ -n "$2" ] && {
-		make_separator_list elements ' ' '"' $2
+		make_quoted_comma_list elements $2
 		script="${script}
 add element inet $ZAPRET_NFT_TABLE $1 { $elements }"
 	}

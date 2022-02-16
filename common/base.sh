@@ -83,6 +83,14 @@ make_comma_list()
 	shift
 	make_separator_list $var , '' "$@"
 }
+make_quoted_comma_list()
+{
+	# $1 - var name to receive result
+	# $2,$3,... - elements
+	local var="$1"
+	shift
+	make_separator_list $var , '"' "$@"
+}
 unique()
 {
 	local i
