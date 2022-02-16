@@ -130,25 +130,6 @@ fw_tpws6()
 	fw_tpws_x $1 "$2" $3 6
 }
 
-nft_fw_tpws4()
-{
-	_nft_fw_tpws4 "$1" $2 always_apply_wan_filter
-}
-nft_fw_tpws6()
-{
-	local script ifaces DLAN
-	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
-	_nft_fw_tpws6 "$1" $2 "$DLAN" always_apply_wan_filter
-}
-nft_fw_nfqws_post4()
-{
-	_nft_fw_nfqws_post4 "$1" $2 always_apply_wan_filter
-}
-nft_fw_nfqws_post6()
-{
-	_nft_fw_nfqws_post6 "$1" $2 always_apply_wan_filter
-}
-
 
 create_ipset()
 {
@@ -248,12 +229,21 @@ nft_fill_ifsets_overload()
 	nft_fill_ifsets "$DLAN" "$DWAN" "$DWAN6"
 }
 
+nft_fw_tpws4()
+{
+	_nft_fw_tpws4 "$1" $2 always_apply_wan_filter
+}
 nft_fw_tpws6()
 {
-	# $1 - filter ipv6
-	# $2 - tpws port
-
-	local DLAN
+	local script ifaces DLAN
 	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
-	_nft_fw_tpws6 "$1" $2 "$DLAN"
+	_nft_fw_tpws6 "$1" $2 "$DLAN" always_apply_wan_filter
+}
+nft_fw_nfqws_post4()
+{
+	_nft_fw_nfqws_post4 "$1" $2 always_apply_wan_filter
+}
+nft_fw_nfqws_post6()
+{
+	_nft_fw_nfqws_post6 "$1" $2 always_apply_wan_filter
 }
