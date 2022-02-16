@@ -235,7 +235,7 @@ nft_script_add_ifset_element()
 	# $2 - space separated elements
 	local elements
 	[ -n "$2" ] && {
-		make_comma_list elements $2
+		make_separator_list elements ' ' '"' $2
 		script="${script}
 add element inet $ZAPRET_NFT_TABLE $1 { $elements }"
 	}
@@ -246,7 +246,7 @@ nft_fill_ifsets()
 	# $2 - space separated wan interface names
 	# $3 - space separated wan6 interface names
 
-	local script i ALLDEVS
+	local script i j ALLDEVS devs
 
 	# if large sets exist nft works very ineffectively
 	# looks like it analyzes the whole table blob to find required data pieces
@@ -274,7 +274,17 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 			nft_create_or_update_flowtable 'offload' 2>/dev/null
 			# then add elements. some of them can cause error because unsupported
 			for i in $ALLDEVS; do
-				nft_hw_offload_supported $i && nft_create_or_update_flowtable 'offload' $i
+				if nft_hw_offload_supported $i; then
+					nft_create_or_update_flowtable 'offload' $i
+				else
+					# bridge members must be added instead of the bridge itself
+					devs=$(resolve_lower_devices $i)
+					[ -n "$devs" ] && nft_hw_offload_supported $devs && {
+						for j in $devs; do
+							nft_create_or_update_flowtable 'offload' $j
+						done
+					}
+				fi
 			done
 			;;
 	esac

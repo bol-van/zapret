@@ -49,23 +49,31 @@ end_with_newline()
 	local c=$(tail -c 1)
 	[ "$c" = "" ]
 }
-make_separator_list()
+
+append_separator_list()
 {
 	# $1 - var name to receive result
 	# $2 - separator
-	# $3,$4,... - elements
-	local var="$1" sep="$2" i
+	# $3 - quoter
+	# $4,$5,... - elements
+	local _var="$1" sep="$2" quo="$3" i
 
-	shift; shift
+	eval i="\$$_var"
+	shift; shift; shift
 	while [ -n "$1" ]; do
 		if [ -n "$i" ] ; then
-			i=$i$sep$1
+			i="$i$sep$quo$1$quo"
 		else
-			i=$1
+			i="$quo$1$quo"
 		fi
 		shift
 	done
-	eval $var=$i
+	eval $_var="\$i"
+}
+make_separator_list()
+{
+	eval $1=''
+	append_separator_list "$@"
 }
 make_comma_list()
 {
@@ -73,7 +81,7 @@ make_comma_list()
 	# $2,$3,... - elements
 	local var="$1"
 	shift
-	make_separator_list $var , "$@"
+	make_separator_list $var , '' "$@"
 }
 unique()
 {
