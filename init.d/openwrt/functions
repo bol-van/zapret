@@ -112,7 +112,7 @@ fw_tpws_x()
 	# $3 - tpws port
 	# $4 - ip version : 4 or 6
 
-	local script ifaces DLAN DWAN
+	local ifaces DLAN DWAN
 
 	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
 
@@ -216,7 +216,7 @@ flow_offloading_unexempt()
 
 nft_fill_ifsets_overload()
 {
-	local script ifaces DLAN DWAN DWAN6
+	local ifaces DLAN DWAN DWAN6
 
 	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
 
@@ -235,7 +235,7 @@ nft_fw_tpws4()
 }
 nft_fw_tpws6()
 {
-	local script DLAN
+	local DLAN
 	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
 	_nft_fw_tpws6 "$1" $2 "$DLAN" always_apply_wan_filter
 }
