@@ -99,14 +99,17 @@ nft_create_or_update_flowtable()
 	# $1 = flags ('offload' for hw offload)
 	# $2,$3,$4,... - interfaces
 	# can be called multiple times to add interfaces. interfaces can only be added , not removed
-	local flags=$1 devices
+	local flags=$1 devices makelist
 	shift
-	# warning ! tested on nft 1.0.1  . 0.9.6 has bug not allowing quotes in flowtable device list
-	# dont want to make KOSTIL here, pls upgrade
-	make_quoted_comma_list devices "$@"
-	[ -n "$devices" ] && devices="devices={$devices};"
+	# warning ! nft versions at least up to 1.0.1 do not allow interface names starting with digit in flowtable and do not allow quoting
+	# warning ! openwrt fixes this in post-21.x snapshots with special nft patch
+	# warning ! in traditional linux distros nft is unpatched and will fail with quoted interface definitions if unfixed
 	[ -n "$flags" ] && flags="flags $flags;"
-	nft add flowtable inet $ZAPRET_NFT_TABLE ft "{ hook ingress priority -1; $flags $devices }"
+	for makelist in make_quoted_comma_list make_comma_list; do
+		$makelist devices "$@"
+		[ -n "$devices" ] && devices="devices={$devices};"
+		nft add flowtable inet $ZAPRET_NFT_TABLE ft "{ hook ingress priority -1; $flags $devices }" && break
+	done
 }
 nft_flush_ifsets()
 {
