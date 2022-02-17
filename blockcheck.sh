@@ -256,7 +256,7 @@ curl_supports_tls13()
 curl_supports_tlsmax()
 {
 	# supported only in OpenSSL and LibreSSL
-	curl --version | grep -Fq -e OpenSSL -e LibreSSL || return 1
+	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS || return 1
 	# supported since curl 7.54
 	curl --tls-max 1.2 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
