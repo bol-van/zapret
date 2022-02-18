@@ -1022,6 +1022,9 @@ INIT_FW_PRE_DOWN_HOOK="/etc/firewall.zapret.hook.pre_down"
 INIT_FW_POST_DOWN_HOOK="/etc/firewall.zapret.hook.post_down"
 
 Эти настройки доступны в config.
+Может быть полезно, если вам нужно использовать nftables set-ы, например ipban/ipban6.
+nfset-ы принадлежат только одной таблице, следовательно вам придется писать правила для таблицы zapret,
+а значит нужно синхронизироваться с применением/снятием правил со стороны zapret скриптов.
 
 Вариант custom
 --------------
