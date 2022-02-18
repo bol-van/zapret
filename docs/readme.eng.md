@@ -869,6 +869,9 @@ INIT_FW_PRE_DOWN_HOOK="/etc/firewall.zapret.hook.pre_down"
 INIT_FW_POST_DOWN_HOOK="/etc/firewall.zapret.hook.post_down"
 ```
 
+Hooks are extremely useful if you need nftables sets populated by zapret scripts.
+nfsets can only belong to one table. You have to write rule there and synchorize them with zapret scripts.
+
 ## Installation
 
 ### Checking ISP
