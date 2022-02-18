@@ -148,7 +148,7 @@ nft_del_firewall()
 {
 	nft_del_chains
 	nft_del_flowtable
-	nft_flush_ifsets
+	# leave ifsets and ipsets because they may be used by custom rules
 }
 
 nft_add_rule()
