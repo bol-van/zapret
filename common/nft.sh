@@ -61,10 +61,6 @@ nft_del_all_chains_from_table()
 	done
 }
 
-nft_del_chains()
-{
-	nft_del_all_chains_from_table "inet $ZAPRET_NFT_TABLE"
-}
 nft_create_chains()
 {
 cat << EOF | nft -f -
@@ -88,6 +84,21 @@ cat << EOF | nft -f -
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif6 { type ifname; }
+EOF
+}
+nft_del_chains()
+{
+	# do not delete all chains because of additional user hooks
+	# they must be inside zapret table to use nfsets
+
+cat << EOF | nft -f - 2>/dev/null
+	delete chain inet $ZAPRET_NFT_TABLE dnat_output
+	delete chain inet $ZAPRET_NFT_TABLE dnat_pre
+	delete chain inet $ZAPRET_NFT_TABLE forward
+	delete chain inet $ZAPRET_NFT_TABLE input
+	delete chain inet $ZAPRET_NFT_TABLE postrouting
+	delete chain inet $ZAPRET_NFT_TABLE flow_offload
+	delete chain inet $ZAPRET_NFT_TABLE localnet_protect
 EOF
 }
 nft_del_flowtable()
