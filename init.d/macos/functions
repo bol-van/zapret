@@ -119,6 +119,9 @@ zapret_do_firewall()
 {
 	# $1 - 1 - add, 0 - del
 
+	[ "$1" = 1 -a -n "$INIT_FW_PRE_UP_HOOK" ] && $INIT_FW_PRE_UP_HOOK
+	[ "$1" = 0 -a -n "$INIT_FW_PRE_DOWN_HOOK" ] && $INIT_FW_PRE_DOWN_HOOK
+
 	case "${MODE_OVERRIDE:-$MODE}" in
 		tpws|filter|custom)
 			if [ "$1" = "1" ] ; then
@@ -130,13 +133,10 @@ zapret_do_firewall()
 				pf_anchors_clear
 			fi
 			;;
-		tpws-socks)
-			;;
-		*)
-			echo "unsupported MODE=$MODE"
-			return 1
-			;;
 	esac
+
+	[ "$1" = 1 -a -n "$INIT_FW_POST_UP_HOOK" ] && $INIT_FW_POST_UP_HOOK
+	[ "$1" = 0 -a -n "$INIT_FW_POST_DOWN_HOOK" ] && $INIT_FW_POST_DOWN_HOOK
 
 	return 0
 }

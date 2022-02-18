@@ -859,6 +859,15 @@ Calls `nft -t list table inet zapret`.
  /opt/zapret/init.d/sysv/zapret list_table
 ```
 
+It's also possible to hook with your script to any stage of zapret firewall processing.
+The following settings are available in the zapret config file :
+
+```
+INIT_FW_PRE_UP_HOOK="/etc/firewall.zapret.hook.pre_up"
+INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
+INIT_FW_PRE_DOWN_HOOK="/etc/firewall.zapret.hook.pre_down"
+INIT_FW_POST_DOWN_HOOK="/etc/firewall.zapret.hook.post_down"
+```
 
 ## Installation
 

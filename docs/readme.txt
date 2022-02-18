@@ -1014,6 +1014,15 @@ nftables сводят практически на нет конфликты ме
 Просмотр таблицы без содержимого set-ов. Вызывает nft -t list table inet zapret
  /opt/zapret/init.d/sysv/zapret list_table
 
+Так же возможно прицепиться своим скриптом к любой стадии применения и снятия фаервола со стороны zapret скриптов :
+
+INIT_FW_PRE_UP_HOOK="/etc/firewall.zapret.hook.pre_up"
+INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
+INIT_FW_PRE_DOWN_HOOK="/etc/firewall.zapret.hook.pre_down"
+INIT_FW_POST_DOWN_HOOK="/etc/firewall.zapret.hook.post_down"
+
+Эти настройки доступны в config.
+
 Вариант custom
 --------------
 
