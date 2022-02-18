@@ -71,7 +71,7 @@ FLOWOFFLOAD=donttouch
 #IFACE_WAN=eth1
 
 # should start/stop command of init scripts apply firewall rules ?
-# not applicable to older openwrt with fw3 firewall
+# not applicable to openwrt with firewall3+iptables
 INIT_APPLY_FW=1
 # firewall apply hooks
 #INIT_FW_PRE_UP_HOOK="/etc/firewall.zapret.hook.pre_up"
