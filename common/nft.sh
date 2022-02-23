@@ -84,7 +84,7 @@ cat << EOF | nft -f -
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif6 { type ifname; }
-	add map inet $ZAPRET_NFT_TABLE tpws6 { type ifname: ipv6_addr . inet_service; }
+	add map inet $ZAPRET_NFT_TABLE link_local { type ifname : ipv6_addr; }
 EOF
 }
 nft_del_chains()
@@ -129,19 +129,19 @@ cat << EOF | nft -f -  2>/dev/null
 	flush set inet $ZAPRET_NFT_TABLE lanif
 	flush set inet $ZAPRET_NFT_TABLE wanif
 	flush set inet $ZAPRET_NFT_TABLE wanif6
-	flush map inet $ZAPRET_NFT_TABLE tpws6
+	flush map inet $ZAPRET_NFT_TABLE link_local
 EOF
 }
-nft_flush_tpws6()
+nft_flush_link_local()
 {
-	nft flush map inet $ZAPRET_NFT_TABLE tpws6 2>/dev/null
+	nft flush map inet $ZAPRET_NFT_TABLE link_local 2>/dev/null
 }
 nft_list_ifsets()
 {
 	nft list set inet $ZAPRET_NFT_TABLE lanif
 	nft list set inet $ZAPRET_NFT_TABLE wanif
 	nft list set inet $ZAPRET_NFT_TABLE wanif6
-	nft list map inet $ZAPRET_NFT_TABLE tpws6
+	nft list map inet $ZAPRET_NFT_TABLE link_local
 	nft list flowtable inet $ZAPRET_NFT_TABLE ft 2>/dev/null
 }
 
@@ -149,14 +149,14 @@ nft_create_firewall()
 {
 	nft_create_table
 	nft_del_flowtable
-	nft_flush_tpws6
+	nft_flush_link_local
 	nft_create_chains
 }
 nft_del_firewall()
 {
 	nft_del_chains
 	nft_del_flowtable
-	nft_flush_tpws6
+	nft_flush_link_local
 	# leave ifsets and ipsets because they may be used by custom rules
 }
 
@@ -363,10 +363,11 @@ _nft_fw_tpws6()
 		nft_print_op "$filter" "tpws (port $port)" 6
 		nft_add_rule dnat_output skuid != $WS_USER ${4:+oifname @wanif6 }meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to [::1]:$port
 		[ -n "$3" ] && {
-			nft_add_rule dnat_pre meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to iifname map @tpws6
+			nft_add_rule dnat_pre meta l4proto tcp $filter ip6 daddr != @nozapret6 dnat ip6 to iifname map @link_local:$port
 			for i in $3; do
 				_dnat6_target $i DNAT6
-				[ -n "$DNAT6" -a "$DNAT6" != '-' ] && nft_add_set_element tpws6 "$i : $DNAT6 . $port"
+				# can be multiple tpws processes on different ports
+				[ -n "$DNAT6" -a "$DNAT6" != '-' ] && nft_add_set_element link_local "$i : $DNAT6"
 			done
 		}
 	}

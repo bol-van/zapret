@@ -120,8 +120,7 @@ nf sets do not support overlapping intervals and that's why nft process applies 
 There're equivalents to iptables for all other functions. Interface and protocol anonymous sets allow not to write multiple similar rules.
 Flow offloading is built-in into new linux kernels and nft versions.
 
-Zapret scripts are written for `nft 0.9.4` and higher. Older versions will fail.
-`nft 1.0.2` is recommended.
+nft version `1.0.2` or higher is recommended.
 
 
 ## When it will not work
