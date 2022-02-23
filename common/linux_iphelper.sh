@@ -91,7 +91,6 @@ _set_route_localnet()
 {
 	# $1 - 1 = enable, 0 = disable
 	# $2,$3,... - interface names
-
 	[ "$DISABLE_IPV4" = "1" ] || {
 		local enable="$1"
 		shift

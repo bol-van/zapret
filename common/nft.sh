@@ -437,21 +437,9 @@ zapret_list_table()
 	return 0
 }
 
-zapret_apply_firewall_nft()
+zapret_apply_firewall_rules_nft()
 {
-	echo Applying nftables
-
 	local mode="${MODE_OVERRIDE:-$MODE}"
-
-	[ "$mode" = "tpws-socks" ] && return 0
-
-	local first_packet_only="ct original packets 1-4"
-	local desync="mark and $DESYNC_MARK == 0"
-	local f4 f6 qn qns qn6 qns6
-
-	create_ipset no-update
-	nft_create_firewall
-	nft_fill_ifsets_overload
 
 	case "$mode" in
 		tpws)
@@ -508,6 +496,25 @@ zapret_apply_firewall_nft()
 	    		existf zapret_custom_firewall_nft && zapret_custom_firewall_nft
 			;;
 	esac
+}
+
+zapret_apply_firewall_nft()
+{
+	echo Applying nftables
+
+	local mode="${MODE_OVERRIDE:-$MODE}"
+
+	[ "$mode" = "tpws-socks" ] && return 0
+
+	local first_packet_only="ct original packets 1-4"
+	local desync="mark and $DESYNC_MARK == 0"
+	local f4 f6 qn qns qn6 qns6
+
+	create_ipset no-update
+	nft_create_firewall
+	nft_fill_ifsets_overload
+
+	zapret_apply_firewall_rules_nft
 
 	[ "$FLOWOFFLOAD" = 'software' -o "$FLOWOFFLOAD" = 'hardware' ] && nft_apply_flow_offloading
 

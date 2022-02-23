@@ -244,26 +244,9 @@ fw_nfqws_post()
 }
 
 
-zapret_do_firewall_ipt()
+zapret_do_firewall_rules_ipt()
 {
-	# $1 - 1 - add, 0 - del
-
-	if [ "$1" = 1 ]; then
-		echo Applying iptables
-	else
-		echo Clearing iptables
-	fi
-
 	local mode="${MODE_OVERRIDE:-$MODE}"
-
-	[ "$mode" = "tpws-socks" ] && return 0
-
-	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
-	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	local f4 f6 qn qns qn6 qns6
-
-	# always create ipsets. ip_exclude ipset is required
-	[ "$1" = 1 ] && create_ipset no-update
 
 	case "$mode" in
 		tpws)
@@ -321,6 +304,30 @@ zapret_do_firewall_ipt()
 	    		existf zapret_custom_firewall && zapret_custom_firewall $1
 			;;
 	esac
+}
+
+zapret_do_firewall_ipt()
+{
+	# $1 - 1 - add, 0 - del
+
+	if [ "$1" = 1 ]; then
+		echo Applying iptables
+	else
+		echo Clearing iptables
+	fi
+
+	local mode="${MODE_OVERRIDE:-$MODE}"
+
+	[ "$mode" = "tpws-socks" ] && return 0
+
+	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
+	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
+	local f4 f6 qn qns qn6 qns6
+
+	# always create ipsets. ip_exclude ipset is required
+	[ "$1" = 1 ] && create_ipset no-update
+
+	zapret_do_firewall_rules_ipt "$@"
 
 	if [ "$1" = 1 ] ; then
 		existf flow_offloading_exempt && flow_offloading_exempt
