@@ -861,7 +861,7 @@ install_openwrt()
 	install_binaries
 	check_dns
 
-	FWTYPE_OLD=$FWTYPE
+	local FWTYPE_OLD=$FWTYPE
 
 	echo \* stopping current firewall rules/daemons
 	"$INIT_SCRIPT_SRC" stop_fw
