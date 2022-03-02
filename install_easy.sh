@@ -854,12 +854,14 @@ install_openwrt()
 	FW_SCRIPT_SRC="$EXEDIR/init.d/openwrt/firewall.zapret"
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	OPENWRT_IFACE_HOOK="$EXEDIR/init.d/openwrt/90-zapret"
-	
+
 	check_bins
 	require_root
 	check_location copy_openwrt
 	install_binaries
 	check_dns
+
+	FWTYPE_OLD=$FWTYPE
 
 	echo \* stopping current firewall rules/daemons
 	"$INIT_SCRIPT_SRC" stop_fw
@@ -873,7 +875,7 @@ install_openwrt()
 	ask_config_offload
 	# stop and reinstall sysv init
 	install_sysv_init
-	remove_openwrt_firewall
+	[ "$FWTYPE_OLD" != "$FWTYPE" -a "$FWTYPE_OLD" = iptables -a -n "$OPENWRT_FW3" ] && remove_openwrt_firewall
 	# free some RAM
 	clear_ipset
 	download_list
