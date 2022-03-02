@@ -23,7 +23,7 @@ check_need_to_reload_tpws6()
 }
 
 
-[ -n "$INTERFACE" -a -n "$ACTION" -a -x "$ZAPRET" ] && "$ZAPRET" enabled && {
+[ -n "$INTERFACE" ] && [ "$ACTION" = ifup -o "$ACTION" = ifdown ] && [ -x "$ZAPRET" ] && "$ZAPRET" enabled && {
 	SCRIPT=$(readlink "$ZAPRET")
 	if [ -n "$SCRIPT" ]; then
 		EXEDIR=$(dirname "$SCRIPT")
