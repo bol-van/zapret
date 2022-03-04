@@ -26,7 +26,7 @@ zapret_custom_firewall()
 
 	zapret_do_firewall_rules_ipt $1
 
-	f4="--dport $MY_DPORT"
+	f4="-p tcp --dport $MY_DPORT"
 	f6=$f4
 	filter_apply_ipset_target f4 f6
 	fw_tpws $1 "$f4" "$f6" $MY_TPPORT

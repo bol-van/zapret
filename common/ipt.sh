@@ -50,11 +50,11 @@ filter_apply_port_target()
 	# $1 - var name of iptables filter
 	local f
 	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		f="-m multiport --dports 80,443"
+		f="-p tcp -m multiport --dports 80,443"
 	elif [ "$MODE_HTTPS" = "1" ]; then
-		f="--dport 443"
+		f="-p tcp --dport 443"
 	elif [ "$MODE_HTTP" = "1" ]; then
-		f="--dport 80"
+		f="-p tcp --dport 80"
 	else
 		echo WARNING !!! HTTP and HTTPS are both disabled
 	fi
@@ -136,7 +136,7 @@ _fw_tpws4()
 
 		ipt_print_op $1 "$2" "tpws (port $3)"
 
-		rule="-p tcp $2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
+		rule="$2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
 		for i in $4 ; do
 			ipt_add_del $1 PREROUTING -t nat -i $i $rule
 	 	done
@@ -164,7 +164,7 @@ _fw_tpws6()
 
 		ipt_print_op $1 "$2" "tpws (port $3)" 6
 
-		rule="-p tcp $2 $IPSET_EXCLUDE6 dst"
+		rule="$2 $IPSET_EXCLUDE6 dst"
 		for i in $4 ; do
 			_dnat6_target $i DNAT6
 			[ -n "$DNAT6" -a "$DNAT6" != "-" ] && ipt6_add_del $1 PREROUTING -t nat -i $i $rule -j DNAT --to [$DNAT6]:$3
@@ -202,7 +202,7 @@ _fw_nfqws_post4()
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)"
 
-		rule="-p tcp $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		rule="$2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
 		if [ -n "$4" ] ; then
 			for i in $4; do
 				ipt_add_del $1 POSTROUTING -t mangle -o $i $rule
@@ -223,7 +223,7 @@ _fw_nfqws_post6()
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)" 6
 
-		rule="-p tcp $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		rule="$2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
 		if [ -n "$4" ] ; then
 			for i in $4; do
 				ipt6_add_del $1 POSTROUTING -t mangle -o $i $rule
@@ -270,13 +270,13 @@ zapret_do_firewall_rules_ipt()
 				fw_nfqws_post4 $1 "$f4 $desync" $qn
 			else
 				if [ -n "$qn" ]; then
-					f4="--dport 80"
+					f4="-p tcp --dport 80"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
 					filter_apply_ipset_target4 f4
 					fw_nfqws_post4 $1 "$f4 $desync" $qn
 				fi
 				if [ -n "$qns" ]; then
-					f4="--dport 443 $first_packet_only"
+					f4="-p tcp --dport 443 $first_packet_only"
 					filter_apply_ipset_target4 f4
 					fw_nfqws_post4 $1 "$f4 $desync" $qns
 				fi
@@ -288,13 +288,13 @@ zapret_do_firewall_rules_ipt()
 				fw_nfqws_post6 $1 "$f6 $desync" $qn6
 			else
 				if [ -n "$qn6" ]; then
-					f6="--dport 80"
+					f6="-p tcp --dport 80"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
 					filter_apply_ipset_target6 f6
 					fw_nfqws_post6 $1 "$f6 $desync" $qn6
 				fi
 				if [ -n "$qns6" ]; then
-					f6="--dport 443 $first_packet_only"
+					f6="-p tcp --dport 443 $first_packet_only"
 					filter_apply_ipset_target6 f6
 					fw_nfqws_post6 $1 "$f6 $desync" $qns6
 				fi
