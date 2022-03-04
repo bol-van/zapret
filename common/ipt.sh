@@ -248,6 +248,10 @@ zapret_do_firewall_rules_ipt()
 {
 	local mode="${MODE_OVERRIDE:-$MODE}"
 
+	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
+	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
+	local f4 f6 qn qns qn6 qns6
+
 	case "$mode" in
 		tpws)
 			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
@@ -319,10 +323,6 @@ zapret_do_firewall_ipt()
 	local mode="${MODE_OVERRIDE:-$MODE}"
 
 	[ "$mode" = "tpws-socks" ] && return 0
-
-	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
-	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	local f4 f6 qn qns qn6 qns6
 
 	# always create ipsets. ip_exclude ipset is required
 	[ "$1" = 1 ] && create_ipset no-update

@@ -441,6 +441,10 @@ zapret_apply_firewall_rules_nft()
 {
 	local mode="${MODE_OVERRIDE:-$MODE}"
 
+	local first_packet_only="ct original packets 1-4"
+	local desync="mark and $DESYNC_MARK == 0"
+	local f4 f6 qn qns qn6 qns6
+
 	case "$mode" in
 		tpws)
 			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
@@ -506,10 +510,6 @@ zapret_apply_firewall_nft()
 
 	[ "$mode" = "tpws-socks" ] && return 0
 
-	local first_packet_only="ct original packets 1-4"
-	local desync="mark and $DESYNC_MARK == 0"
-	local f4 f6 qn qns qn6 qns6
-
 	create_ipset no-update
 	nft_create_firewall
 	nft_fill_ifsets_overload
@@ -537,6 +537,6 @@ zapret_do_firewall_nft()
 	else
 		zapret_apply_firewall_nft
 	fi
-	
+
 	return 0
 }
