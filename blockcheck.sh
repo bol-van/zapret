@@ -25,6 +25,7 @@ ZAPRET_BASE="$EXEDIR"
 [ -n "$CURL_MAX_TIME" ] || CURL_MAX_TIME=5
 [ -n "$MIN_TTL" ] || MIN_TTL=1
 [ -n "$MAX_TTL" ] || MAX_TTL=12
+[ -n "$USER_AGENT" ] || USER_AGENT="Mozilla"
 
 HDRTEMP=/tmp/zapret-hdr.txt
 
@@ -304,7 +305,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl -${1}ISs --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
+	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
@@ -312,7 +313,7 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl -${1}ISs --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
+	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
 }
 
 pktws_ipt_prepare()
