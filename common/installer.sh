@@ -81,7 +81,7 @@ check_system()
 	OPENWRT_FW3=
 
 	local info
-	local UNAME=$(uname)
+	UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
 		# do not use 'exe' because it requires root
 		local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)

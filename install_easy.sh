@@ -333,7 +333,7 @@ ask_config_tmpdir()
 
 nft_flow_offload()
 {
-	[ "$FWTYPE" = nftables -a "$MODE" != "tpws-socks" ] && [ "$FLOWOFFLOAD" = software -o "$FLOWOFFLOAD" = hardware ]
+	[ "$UNAME" = Linux -a "$FWTYPE" = nftables -a "$MODE" != "tpws-socks" ] && [ "$FLOWOFFLOAD" = software -o "$FLOWOFFLOAD" = hardware ]
 }
 
 ask_iface()
@@ -386,8 +386,6 @@ select_mode_iface()
 	# custom mode can also benefit from interface names (depends on custom script code)
 
 	if [ "$SYSTEM" = "openwrt" ] || [ "$MODE" = "filter" ]; then return; fi
-
-	echo
 
 	case "$MODE" in
 		tpws-socks)
