@@ -90,13 +90,14 @@ create_ipset()
 		FAMILY=inet
 	fi
 	ipset create $2 $3 $4 family $FAMILY 2>/dev/null || {
-		[ "$NO_UPDATE" = "1" ] && return
+		[ "$NO_UPDATE" = "1" ] && return 0
 	}
 	ipset flush $2
 	[ "$DO_CLEAR" = "1" ] || {
 		for f in "$5" "$6" ; do
 			ipset_restore "$2" "$f"
 		done
+		ipset_post_hook "$2"
 	}
 	return 0
 }
@@ -150,12 +151,12 @@ create_nfset()
 	local policy
 	[ $SAVERAM = "1" ] && policy="policy memory;"
 	nft_create_set $2 "type ipv${1}_addr; size $3; flags interval; auto-merge; $policy" || {
-		[ "$NO_UPDATE" = "1" ] && return
+		[ "$NO_UPDATE" = "1" ] && return 0
 		nft flush set inet $ZAPRET_NFT_TABLE $2
 	}
 	[ "$DO_CLEAR" = "1" ] || {
 		nfset_restore $2 $4 $5
-		return
+		ipset_post_hook "$2"
 	}
 	return 0
 }
@@ -180,7 +181,7 @@ create_ipfw_table()
 
 	local name=$1
 	ipfw table "$name" create $2 2>/dev/null || {
-		[ "$NO_UPDATE" = "1" ] && return
+		[ "$NO_UPDATE" = "1" ] && return 0
 	}
 	ipfw -q table $1 flush
 	shift
@@ -191,7 +192,9 @@ create_ipfw_table()
 			populate_ipfw_table $name "$1"
 			shift
 		done
+		ipset_post_hook $name
 	}
+	return 0
 }
 
 print_reloading_backend()
@@ -208,6 +211,11 @@ print_reloading_backend()
 	echo $s
 }
 
+ipset_post_hook()
+{
+	[ -n "$IPSET_POST_HOOK" ] && $IPSET_POST_HOOK "$1"
+}
+
 
 oom_adjust_high
 get_fwtype
@@ -219,6 +227,7 @@ if [ -n "$LISTS_RELOAD" ] ; then
 	else
 		echo executing custom ip list reload command : $LISTS_RELOAD
 		$LISTS_RELOAD
+		ipset_post_hook
 	fi
 else
 	case "$FWTYPE" in
