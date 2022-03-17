@@ -810,13 +810,14 @@ ip2net фильтрует входные данные, выкидывая неп
 Альтернативой ipset является использование tpws или nfqws со списком доменов.
 Может быть только один hostlist.
 
-Поддерживаются 2 варианта :
+Поддерживаются следующие варианты :
 1) Внесите домены для дурения в ipset/zapret-hosts-users.txt. Удалите ipset/zapret-hosts.txt.gz.
-Тогда init скрипт будет запускать tpws с листом zapret-hosts-users.txt.
+Тогда init скрипт будет запускать tpws/nfqws с листом zapret-hosts-users.txt.
 
-2) Список доменов РКН может быть получен скриптом ipset/get_reestr_hostlist.sh - кладется в ipset/zapret-hosts.txt.gz.
+2) Список доменов РКН может быть получен скриптами ipset/get_reestr_hostlist.sh или ipset/get_antizapret_domains.sh
+- кладется в ipset/zapret-hosts.txt.gz.
 Этот скрипт автоматически добавляет к списку РКН домены из zapret-hosts-user.txt и исключает zapret-hosts-exclude.txt.
-init скрипт будет запускать tpws с листом zapret-hosts.txt.gz.
+init скрипт будет запускать tpws/nfqws с листом zapret-hosts.txt.gz.
 
 При фильтрации по именам доменов демон должен запускаться без фильтрации по ipset.
 tpws и nfqws решают нужно ли применять дурение в зависимости от поля Host: в http запросе или SNI в TLS ClientHello.
