@@ -9,7 +9,7 @@
 
 # options for ipsets
 # maximum number of elements in sets. also used for nft sets
-SET_MAXELEM=262144
+SET_MAXELEM=522288
 # too low hashsize can cause memory allocation errors on low RAM systems , even if RAM is enough
 # too large hashsize will waste lots of RAM
 IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
