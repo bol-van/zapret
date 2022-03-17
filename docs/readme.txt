@@ -684,13 +684,13 @@ IP https и IP без домена заносятся в ipset ipban, остал
 
 Cкрипты с названием get_antifilter_* оперируют списками адресов и масок подсетей с сайтов antifilter.network и antifilter.download :
 
-5) ipset/get_antifilter_ip.sh. получает лист https://antifilter.network/download/ip.lst.
+5) ipset/get_antifilter_ip.sh. получает лист https://antifilter.download/list/ip.lst.
 
 6) ipset/get_antifilter_ipsmart.sh. получает лист https://antifilter.network/download/ipsmart.lst.
 это умная суммаризация отдельных адресов из ip.lst по маскам от /32 до /22
 количество префиксов измеряется всего лишь десятками тысяч, потому это лучшее решение для роутера с 64 Mb RAM
 
-7) ipset/get_antifilter_ipsum.sh. получает лист https://antifilter.network/download/ipsum.lst.
+7) ipset/get_antifilter_ipsum.sh. получает лист https://antifilter.download/list/ipsum.lst.
 это суммаризация отдельных адресов из ip.lst по маске /24
 количество префиксов измеряется всего лишь десятками тысяч, потому можно использовать на роутерах с 64 Mb RAM
 
