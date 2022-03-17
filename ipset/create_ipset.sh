@@ -19,6 +19,7 @@ NFSET_TEMP="$TMPDIR/nfset_temp.txt"
 NFSET_SAVERAM_MIN_FILESIZE=16384
 NFSET_SAVERAM_CHUNK_SIZE=1000
 
+IPSET_HOOK_TEMP="$TMPDIR/ipset_hook.txt"
 
 while [ -n "$1" ]; do
 	[ "$1" = "no-update" ] && NO_UPDATE=1
@@ -54,9 +55,14 @@ ipset_restore_chunked()
 
 ipset_get_script()
 {
+	# $1 - ipset name
+	sed -nEe "s/^.+$/add $1 &/p"
+}
+ipset_get_script_from_file()
+{
 	# $1 - filename
 	# $2 - ipset name
-	zzcat "$1" | sort -u | sed -nEe "s/^.+$/add $2 &/p"
+	zzcat "$1" | sort -u | ipset_get_script $2
 }
 ipset_restore()
 {
@@ -75,11 +81,11 @@ ipset_restore()
 	echo $T
 
 	if [ "$svram" = "1" ]; then
-		ipset_get_script "$2" "$1" >"$IPSET_CMD"
+		ipset_get_script_from_file "$2" "$1" >"$IPSET_CMD"
 		ipset_restore_chunked "$IPSET_CMD" $IPSET_SAVERAM_CHUNK_SIZE
 		rm -f "$IPSET_CMD"
 	else
-		ipset_get_script "$2" "$1" | ipset -! restore
+		ipset_get_script_from_file "$2" "$1" | ipset -! restore
 	fi
 }
 create_ipset()
@@ -97,7 +103,7 @@ create_ipset()
 		for f in "$5" "$6" ; do
 			ipset_restore "$2" "$f"
 		done
-		ipset_post_hook "$2"
+		[ -n "$IPSET_HOOK" ] && $IPSET_HOOK $2 | ipset_get_script $2 | ipset -! restore
 	}
 	return 0
 }
@@ -139,7 +145,13 @@ nfset_restore()
 	# $2,$3,... - filenames
 
 	echo "Adding to nfset $1 : $2 $3 $4 $5"
-	nfset_get_script_multi "$@" | nft -f -
+	local hookfile
+	[ -n "$IPSET_HOOK" ] && {
+		$IPSET_HOOK $1 >"$IPSET_HOOK_TEMP"
+		[ -s "$IPSET_HOOK_TEMP" ] && hookfile=$IPSET_HOOK_TEMP
+	}
+	nfset_get_script_multi "$@" $hookfile | nft -f -
+	rm -f "$IPSET_HOOK_TEMP"
 }
 create_nfset()
 {
@@ -156,7 +168,6 @@ create_nfset()
 	}
 	[ "$DO_CLEAR" = "1" ] || {
 		nfset_restore $2 $4 $5
-		ipset_post_hook "$2"
 	}
 	return 0
 }
@@ -192,7 +203,7 @@ create_ipfw_table()
 			populate_ipfw_table $name "$1"
 			shift
 		done
-		ipset_post_hook $name
+		[ -n "$IPSET_HOOK" ] && $IPSET_HOOK $name | add_ipfw_table $name
 	}
 	return 0
 }
@@ -211,11 +222,6 @@ print_reloading_backend()
 	echo $s
 }
 
-ipset_post_hook()
-{
-	[ -n "$IPSET_POST_HOOK" ] && $IPSET_POST_HOOK "$1"
-}
-
 
 oom_adjust_high
 get_fwtype
@@ -227,7 +233,7 @@ if [ -n "$LISTS_RELOAD" ] ; then
 	else
 		echo executing custom ip list reload command : $LISTS_RELOAD
 		$LISTS_RELOAD
-		ipset_post_hook
+		[ -n "$IPSET_HOOK" ] && $IPSET_HOOK
 	fi
 else
 	case "$FWTYPE" in
