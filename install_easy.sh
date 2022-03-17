@@ -291,13 +291,25 @@ ask_config_offload()
 	[ "$FWTYPE" = nftables ] || is_ipt_flow_offload_avail && {
 		echo
 		echo flow offloading can greatly increase speed on slow devices and high speed links \(usually 150+ mbits\)
-		echo unfortuantely its not compatible with most nfqws options. nfqws traffic must be exempted from flow offloading.
-		echo donttouch = disable system flow offloading setting if nfqws mode was selected, dont touch it otherwise and dont configure selective flow offloading
-		echo none = always disable system flow offloading setting and dont configure selective flow offloading
-		echo software = always disable system flow offloading setting and configure selective software flow offloading
-		echo hardware = always disable system flow offloading setting and configure selective hardware flow offloading
+		if [ "$SYSTEM" = openwrt ]; then
+			echo unfortuantely its not compatible with most nfqws options. nfqws traffic must be exempted from flow offloading.
+			echo donttouch = disable system flow offloading setting if nfqws mode was selected, dont touch it otherwise and dont configure selective flow offloading
+			echo none = always disable system flow offloading setting and dont configure selective flow offloading
+			echo software = always disable system flow offloading setting and configure selective software flow offloading
+			echo hardware = always disable system flow offloading setting and configure selective hardware flow offloading
+		else
+			echo offloading is applicable only to forwarded traffic. it has no effect on outgoing traffic
+			echo hardware flow offloading is available only on specific supporting hardware. most likely will not work on a generic system
+		fi
+		echo offloading breaks traffic shaper
 		echo select flow offloading :
-		ask_list FLOWOFFLOAD "donttouch none software hardware" donttouch && write_config_var FLOWOFFLOAD
+		local options="none software hardware"
+		local default="none"
+		[ "$SYSTEM" = openwrt ] && {
+			options="donttouch none software hardware"
+			default="donttouch"
+		}
+		ask_list FLOWOFFLOAD "$options" $default && write_config_var FLOWOFFLOAD
 	}
 }
 
@@ -317,6 +329,11 @@ ask_config_tmpdir()
 		    write_config_var TMPDIR
 		}
 	}
+}
+
+nft_flow_offload()
+{
+	[ "$UNAME" = Linux -a "$FWTYPE" = nftables -a "$MODE" != "tpws-socks" ] && [ "$FLOWOFFLOAD" = software -o "$FLOWOFFLOAD" = hardware ]
 }
 
 ask_iface()
@@ -346,12 +363,16 @@ ask_iface()
 ask_iface_lan()
 {
 	echo LAN interface :
-	ask_iface IFACE_LAN "NONE"
+	local opt
+	nft_flow_offload || opt=NONE
+	ask_iface IFACE_LAN $opt
 }
 ask_iface_wan()
 {
 	echo WAN interface :
-	ask_iface IFACE_WAN "ANY"
+	local opt
+	nft_flow_offload || opt=ANY
+	ask_iface IFACE_WAN $opt
 }
 
 select_mode_iface()
@@ -366,8 +387,6 @@ select_mode_iface()
 
 	if [ "$SYSTEM" = "openwrt" ] || [ "$MODE" = "filter" ]; then return; fi
 
-	echo
-	
 	case "$MODE" in
 		tpws-socks)
 			echo "select LAN interface to allow socks access from your LAN. select NONE for localhost only."
@@ -388,6 +407,12 @@ select_mode_iface()
 			echo "select LAN interface for your custom script (how it works depends on your code)"
 			ask_iface_lan
 			;;
+		*)
+			nft_flow_offload && {
+				echo "select LAN interface for nftables flow offloading"
+				ask_iface_lan
+			}
+			;;
 	esac
 
 	case "$MODE" in
@@ -403,6 +428,12 @@ select_mode_iface()
 		custom)
 			echo "select WAN interface for your custom script (how it works depends on your code)"
 			ask_iface_wan
+			;;
+		*)
+			nft_flow_offload && {
+				echo "select WAN interface for nftables flow offloading"
+				ask_iface_wan
+			}
 			;;
 	esac
 }
@@ -659,6 +690,7 @@ install_systemd()
 	check_prerequisites_linux
 	install_binaries
 	select_ipv6
+	ask_config_offload
 	ask_config
 	service_install_systemd
 	download_list
@@ -683,6 +715,7 @@ _install_sysv()
 	check_prerequisites_linux
 	install_binaries
 	select_ipv6
+	ask_config_offload
 	ask_config
 	$1
 	download_list
@@ -717,6 +750,7 @@ install_linux()
 	check_prerequisites_linux
 	install_binaries
 	select_ipv6
+	ask_config_offload
 	ask_config
 	download_list
 	crontab_del_quiet
