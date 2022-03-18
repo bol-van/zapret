@@ -9,3 +9,5 @@ IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
 getexclude
 
 "$IPSET_DIR/create_ipset.sh"
+
+[ "$MODE_FILTER" = hostlist ] && hup_zapret_daemons
