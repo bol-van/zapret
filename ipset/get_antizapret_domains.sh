@@ -15,7 +15,7 @@ ZURL=https://antizapret.prostovpn.org/domains-export.txt
 ZDOM="$TMPDIR/zapret.txt"
 
 
-curl -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL" >"$ZDOM" ||
+curl -H "Accept-Encoding: gzip" -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL" | gunzip - >"$ZDOM" ||
 {
  echo domain list download failed   
  exit 2
