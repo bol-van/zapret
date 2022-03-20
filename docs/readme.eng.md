@@ -169,6 +169,7 @@ nfqws takes the following parameters:
  --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
  --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
  --dpi-desync-fake-unknown=<filename>   ; file containing unknown protocol fake payload. default is 256 zeroes
+ --dpi-desync-fake-quic=<filename>      ; file containing fake QUIC Initial
  --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload
  --dpi-desync-cutoff=[n|d|s]N           ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
@@ -420,9 +421,12 @@ Set conntrack timeouts appropriately.
 UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
 Only desync modes `fake`,`hopbyhop`,`destopt`,`ipfrag1` and `ipfrag2` are applicable.
 `fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2`.
-No protocol recognition is implemented yet so only `--dpi-desync-any-protocol` will work.
-Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th
-parameter of `--ctrack-timeouts`.
+
+QUIC initial packets are recognized. Decryption and hostname extraction is not supported so `--hostlist` parameter will not work.
+For other protocols desync use `--dpi-desync-any-protocol`.
+
+Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th parameter of `--ctrack-timeouts`.
+
 Fake attack is useful only for stateful DPI and useless for stateless dealing with each packet independently.
 By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-unknown-udp`.
 

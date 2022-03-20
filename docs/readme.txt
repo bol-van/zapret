@@ -215,6 +215,7 @@ nfqws
  --dpi-desync-fake-http=<filename>	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-tls=<filename>	; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-unknown=<filename>	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
+ --dpi-desync-fake-quic=<filename>      ; файл, содержащий фейковый QUIC Initial
  --dpi-desync-fake-unknown-udp=<filename> ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
  --dpi-desync-cutoff=[n|d|s]N           ; применять dpi desync только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
  --hostlist=<filename>			; применять дурение только к хостам из листа
@@ -454,8 +455,8 @@ window size итоговый размер окна стал максимальн
 Атаки на udp более ограничены в возможностях. udp нельзя фрагментировать иначе, чем на уровне ip.
 Для UDP действуют только режимы десинхронизации fake,hopbyhop,destopt,ipfrag1,ipfrag2.
 Возможно сочетание fake,hopbyhop,destopt с ipfrag2.
-Обязательно указание --dpi-desync-any-protocol, иначе десинхронизация работать не будет,
-поскольку протокол неизвестен, а никакие протоколы пока не определяются.
+Поддерживается определение пакетов QUIC Initial без расшифровки содержимого и имени хоста, то есть параметр
+--hostlist не будет работать. Для десинхронизации других протоколов обязательно указывать --dpi-desync-any-protocol.
 Реализован conntrack для udp. Можно пользоваться --dpi-desync-cutoff. Таймаут conntrack для udp
 можно изменить 4-м параметром в --ctrack-timeouts.
 Атака fake полезна только для stateful DPI, она бесполезна для анализа на уровне отдельных пакетов.

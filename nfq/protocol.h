@@ -9,3 +9,4 @@ bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_hos
 bool IsTLSClientHello(const uint8_t *data, size_t len);
 bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext);
 bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host);
+bool IsQUICInitial(uint8_t *data, size_t len);

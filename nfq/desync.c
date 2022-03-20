@@ -656,8 +656,19 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		size_t fake_size;
 		bool b;
 
-		if (!params.desync_any_proto) return res;
-		DLOG("applying tampering to unknown protocol\n")
+		if (IsQUICInitial(data_payload,len_payload))
+		{
+			DLOG("packet contains QUIC initial\n")
+			fake = params.fake_quic;
+			fake_size = params.fake_quic_size;
+		}
+		else
+		{
+			if (!params.desync_any_proto) return res;
+			DLOG("applying tampering to unknown protocol\n")
+			fake = params.fake_unknown_udp;
+			fake_size = params.fake_unknown_udp_size;
+		}
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;
 		uint8_t fooling_orig = FOOL_NONE;
@@ -666,9 +677,6 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
 		else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
 		extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
-
-		fake = params.fake_unknown_udp;
-		fake_size = params.fake_unknown_udp_size;
 
 		if (params.debug)
 		{
