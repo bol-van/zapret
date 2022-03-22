@@ -63,6 +63,10 @@ nft_del_all_chains_from_table()
 
 nft_create_chains()
 {
+	# NOTE : postrouting hook has priority 101 to hook packets already processed by nat
+	# NOTE : this is the only way to implement ipfrag for forwarded packets if nat is present
+	# NOTE : to avoid retracking and sport changing use notrack for nfqws generated packets
+	# NOTE : this also prevents defragmentation of ipv6 fragmented frames in kernels 4.16+
 cat << EOF | nft -f -
 	add chain inet $ZAPRET_NFT_TABLE dnat_output { type nat hook output priority -101; }
 	flush chain inet $ZAPRET_NFT_TABLE dnat_output
@@ -79,7 +83,9 @@ cat << EOF | nft -f -
 	add rule inet  $ZAPRET_NFT_TABLE localnet_protect ip daddr $TPWS_LOCALHOST4 return comment "route_localnet allow access to tpws"
 	add rule inet  $ZAPRET_NFT_TABLE localnet_protect ip daddr 127.0.0.0/8 drop comment "route_localnet remote access protection"
 	add rule inet  $ZAPRET_NFT_TABLE input iif != lo jump localnet_protect
-	add chain inet $ZAPRET_NFT_TABLE postrouting { type filter hook postrouting priority -151; }
+	add chain inet $ZAPRET_NFT_TABLE postrouting { type filter hook postrouting priority 101; }
+	add chain inet $ZAPRET_NFT_TABLE predefrag { type filter hook output priority -401; }
+	add rule inet $ZAPRET_NFT_TABLE predefrag mark and $DESYNC_MARK !=0 notrack comment "do not track nfqws generated packets to avoid nat tampering and defragmentation"
 	flush chain inet $ZAPRET_NFT_TABLE postrouting
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif { type ifname; }
@@ -98,6 +104,7 @@ cat << EOF | nft -f - 2>/dev/null
 	delete chain inet $ZAPRET_NFT_TABLE forward
 	delete chain inet $ZAPRET_NFT_TABLE input
 	delete chain inet $ZAPRET_NFT_TABLE postrouting
+	delete chain inet $ZAPRET_NFT_TABLE predefrag
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload
 	delete chain inet $ZAPRET_NFT_TABLE localnet_protect
 EOF

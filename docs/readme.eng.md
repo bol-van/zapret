@@ -478,6 +478,13 @@ It must be done manually, `blockcheck.sh` cannot auto fix this for you.
 
 Or just move to `nftables`. You can create hooks with any priority there.
 
+Looks like there's no way to do ipfrag using iptables for forwarded traffic if NAT is present.
+`MASQUERADE` is terminating target, after it `NFQUEUE` does not work.
+nfqws sees packets with internal network source address. If fragmented NAT does not process them.
+This results in attempt to send packets to internet with internal IP address.
+You need to use nftables instead with hook priority 101 or higher.
+
+
 ## tpws
 
 tpws is transparent proxy.
