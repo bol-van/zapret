@@ -650,10 +650,7 @@ download_list()
 
 		# can be txt or txt.gz
 		"$IPSET_DIR/clear_lists.sh"
-		"$GET_LIST" || {
-			echo could not download ip list
-			exitp 25
-		}
+		"$GET_LIST"
 	}
 }
 
