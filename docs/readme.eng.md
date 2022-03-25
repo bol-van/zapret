@@ -422,7 +422,7 @@ UDP attacks are limited. Its not possible to fragment UDP on transport level, on
 Only desync modes `fake`,`hopbyhop`,`destopt`,`ipfrag1` and `ipfrag2` are applicable.
 `fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2`.
 
-QUIC initial packets are recognized. Decryption and hostname extraction is not supported so `--hostlist` parameter will not work.
+QUIC initial packets are recognized. Decryption and hostname extraction is supported so `--hostlist` parameter will work.
 For other protocols desync use `--dpi-desync-any-protocol`.
 
 Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th parameter of `--ctrack-timeouts`.

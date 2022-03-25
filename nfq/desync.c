@@ -655,12 +655,37 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		const uint8_t *fake;
 		size_t fake_size;
 		bool b;
+		char host[256];
+		bool bHaveHost=false;
 
 		if (IsQUICInitial(data_payload,len_payload))
 		{
 			DLOG("packet contains QUIC initial\n")
 			fake = params.fake_quic;
 			fake_size = params.fake_quic_size;
+
+			bool bIsCryptoHello;
+			bHaveHost=QUICExtractHostFromInitial(data_payload,len_payload,host,sizeof(host),&bIsCryptoHello);
+			if (bIsCryptoHello)
+			{
+				if (params.desync_skip_nosni && !bHaveHost)
+				{
+					DLOG("not applying tampering to QUIC ClientHello without hostname in the SNI\n")
+					return res;
+				}
+			}
+			else
+			{
+				if (params.desync_any_proto)
+				{
+					DLOG("QUIC initial without CRYPTO frame. applying tampering because desync_any_proto is set\n")
+				}
+				else
+				{
+					DLOG("not applying tampering to QUIC initial without CRYPTO frame\n")
+					return res;
+				}
+			}
 		}
 		else
 		{
@@ -668,6 +693,16 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 			DLOG("applying tampering to unknown protocol\n")
 			fake = params.fake_unknown_udp;
 			fake_size = params.fake_unknown_udp_size;
+		}
+
+		if (bHaveHost)
+		{
+			DLOG("hostname: %s\n",host)
+			if (params.hostlist && !SearchHostList(params.hostlist,host,params.debug))
+			{
+				DLOG("not applying tampering to this request\n")
+				return res;
+			}
 		}
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;

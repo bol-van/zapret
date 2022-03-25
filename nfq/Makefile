@@ -4,7 +4,7 @@ CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
 CFLAGS_MAC = -mmacosx-version-min=10.8
 LIBS = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
-SRC_FILES = *.c
+SRC_FILES = *.c crypto/*.c
 
 all: nfqws
 

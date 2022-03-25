@@ -43,17 +43,64 @@ bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_hos
 	}
 	return false;
 }
+
+
+
+static uint8_t tvb_get_varint(const uint8_t *tvb, uint64_t *value)
+{
+	switch (*tvb >> 6)
+	{
+	case 0: /* 0b00 => 1 byte length (6 bits Usable) */
+		if (value) *value = *tvb & 0x3F;
+		return 1;
+	case 1: /* 0b01 => 2 bytes length (14 bits Usable) */
+		if (value) *value = ntohs(*(uint16_t*)tvb) & 0x3FFF;
+		return 2;
+	case 2: /* 0b10 => 4 bytes length (30 bits Usable) */
+		if (value) *value = ntohl(*(uint32_t*)tvb) & 0x3FFFFFFF;
+		return 4;
+	case 3: /* 0b11 => 8 bytes length (62 bits Usable) */
+		if (value) *value = pntoh64(tvb) & 0x3FFFFFFFFFFFFFFF;
+		return 8;
+	}
+	return 0;
+}
+static uint8_t tvb_get_size(uint8_t tvb)
+{
+	switch(tvb >> 6)
+	{
+		case 0: /* 0b00 => 1 byte length (6 bits Usable) */
+			return 1;
+		case 1: /* 0b01 => 2 bytes length (14 bits Usable) */
+			return 2;
+		case 2: /* 0b10 => 4 bytes length (30 bits Usable) */
+			return 4;
+		case 3: /* 0b11 => 8 bytes length (62 bits Usable) */
+			return 8;
+	}
+	return 0;
+}
+
+bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, size_t *hello_len)
+{
+	size_t offset = 1;
+	uint64_t coff, clen;
+	if (len < 3 || *data != 6) return false;
+	offset += tvb_get_varint(data + offset, &coff);
+	if (offset >= len) return false;
+	offset += tvb_get_varint(data + offset, &clen);
+	if (offset >= len || data[offset] != 0x01 || (offset + coff + clen) > len) return false;
+	if (hello_offset) *hello_offset = offset + coff;
+	if (hello_len) *hello_len = (size_t)clen;
+	return true;
+}
 bool IsTLSClientHello(const uint8_t *data, size_t len)
 {
 	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (ntohs(*(uint16_t*)(data + 3)) + 5) <= len;
 }
-bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
+bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
 {
 	// +0
-	// u8	ContentType: Handshake
-	// u16	Version: TLS1.0
-	// u16	Length
-	// +5 
 	// u8	HandshakeType: ClientHello
 	// u24	Length
 	// u16	Version
@@ -68,11 +115,11 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 
 	size_t l, ll;
 
-	l = 1 + 2 + 2 + 1 + 3 + 2 + 32;
+	l = 1 + 3 + 2 + 32;
 	// SessionIDLength
 	if (len < (l + 1)) return false;
-	ll = data[6] << 16 | data[7] << 8 | data[8]; // HandshakeProtocol length
-	if (len < (ll + 9)) return false;
+	ll = data[1] << 16 | data[2] << 8 | data[3]; // HandshakeProtocol length
+	if (len < (ll + 4)) return false;
 	l += data[l] + 1;
 	// CipherSuitesLength
 	if (len < (l + 2)) return false;
@@ -109,12 +156,17 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 
 	return false;
 }
-bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
 {
-	const uint8_t *ext;
-	size_t elen;
-
-	if (!TLSFindExt(data, len, 0, &ext, &elen)) return false;
+	// +0
+	// u8	ContentType: Handshake
+	// u16	Version: TLS1.0
+	// u16	Length
+	if (!IsTLSClientHello(data, len)) return false;
+	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext);
+}
+static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, size_t len_host)
+{
 	// u16	data+0 - name list length
 	// u8	data+2 - server name type. 0=host_name
 	// u16	data+3 - server name length
@@ -130,11 +182,27 @@ bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len
 	}
 	return true;
 }
+bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+{
+	const uint8_t *ext;
+	size_t elen;
+
+	if (!TLSFindExt(data, len, 0, &ext, &elen)) return false;
+	return TLSExtractHostFromExt(ext, elen, host, len_host);
+}
+bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host)
+{
+	const uint8_t *ext;
+	size_t elen;
+
+	if (!TLSFindExtInHandshake(data, len, 0, &ext, &elen)) return false;
+	return TLSExtractHostFromExt(ext, elen, host, len_host);
+}
 
 
-#define QUIC_MAX_CID_LENGTH  20
 /* Returns the QUIC draft version or 0 if not applicable. */
-static inline uint8_t quic_draft_version(uint32_t version) {
+uint8_t QUICDraftVersion(uint32_t version)
+{
 	/* IETF Draft versions */
 	if ((version >> 8) == 0xff0000) {
 		return (uint8_t)version;
@@ -176,13 +244,286 @@ static inline uint8_t quic_draft_version(uint32_t version) {
 	}
 	return 0;
 }
+
+static inline bool is_quic_draft_max(uint32_t draft_version, uint8_t max_version)
+{
+	return draft_version && draft_version <= max_version;
+}
+static bool is_quic_ver_less_than(uint32_t version, uint8_t max_version)
+{
+	return is_quic_draft_max(QUICDraftVersion(version), max_version);
+}
+static bool is_version_with_v1_labels(uint32_t version)
+{
+	if (((version & 0xFFFFFF00) == 0x51303500)  /* Q05X */ ||
+		((version & 0xFFFFFF00) == 0x54303500)) /* T05X */
+		return true;
+	return is_quic_ver_less_than(version, 34);
+}
+
+
+static bool quic_hkdf_expand_label(uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
+{
+	uint8_t hkdflabel[64];
+
+	size_t label_size = strlen(label);
+	if (label_size > 255) return false;
+	size_t hkdflabel_size = 2 + 1 + label_size + 1;
+	if (hkdflabel_size > sizeof(hkdflabel)) return false;
+
+	*(uint16_t*)hkdflabel = htons(out_len);
+	hkdflabel[2] = (uint8_t)label_size;
+	memcpy(hkdflabel + 3, label, label_size);
+	hkdflabel[3 + label_size] = 0;
+	return !hkdfExpand(SHA256, secret, secret_len, hkdflabel, hkdflabel_size, out, out_len);
+}
+
+
+static bool quic_derive_initial_secret(const quic_cid_t *cid, uint8_t *client_initial_secret, uint32_t version)
+{
+	/*
+	 * https://tools.ietf.org/html/draft-ietf-quic-tls-29#section-5.2
+	 *
+	 * initial_salt = 0xafbfec289993d24c9e9786f19c6111e04390a899
+	 * initial_secret = HKDF-Extract(initial_salt, client_dst_connection_id)
+	 *
+	 * client_initial_secret = HKDF-Expand-Label(initial_secret,
+	 *                                           "client in", "", Hash.length)
+	 * server_initial_secret = HKDF-Expand-Label(initial_secret,
+	 *                                           "server in", "", Hash.length)
+	 *
+	 * Hash for handshake packets is SHA-256 (output size 32).
+	 */
+	static const uint8_t handshake_salt_draft_22[20] = {
+		0x7f, 0xbc, 0xdb, 0x0e, 0x7c, 0x66, 0xbb, 0xe9, 0x19, 0x3a,
+		0x96, 0xcd, 0x21, 0x51, 0x9e, 0xbd, 0x7a, 0x02, 0x64, 0x4a
+	};
+	static const uint8_t handshake_salt_draft_23[20] = {
+		0xc3, 0xee, 0xf7, 0x12, 0xc7, 0x2e, 0xbb, 0x5a, 0x11, 0xa7,
+		0xd2, 0x43, 0x2b, 0xb4, 0x63, 0x65, 0xbe, 0xf9, 0xf5, 0x02,
+	};
+	static const uint8_t handshake_salt_draft_29[20] = {
+		0xaf, 0xbf, 0xec, 0x28, 0x99, 0x93, 0xd2, 0x4c, 0x9e, 0x97,
+		0x86, 0xf1, 0x9c, 0x61, 0x11, 0xe0, 0x43, 0x90, 0xa8, 0x99
+	};
+	static const uint8_t handshake_salt_v1[20] = {
+		0x38, 0x76, 0x2c, 0xf7, 0xf5, 0x59, 0x34, 0xb3, 0x4d, 0x17,
+		0x9a, 0xe6, 0xa4, 0xc8, 0x0c, 0xad, 0xcc, 0xbb, 0x7f, 0x0a
+	};
+	static const uint8_t hanshake_salt_draft_q50[20] = {
+		0x50, 0x45, 0x74, 0xEF, 0xD0, 0x66, 0xFE, 0x2F, 0x9D, 0x94,
+		0x5C, 0xFC, 0xDB, 0xD3, 0xA7, 0xF0, 0xD3, 0xB5, 0x6B, 0x45
+	};
+	static const uint8_t hanshake_salt_draft_t50[20] = {
+		0x7f, 0xf5, 0x79, 0xe5, 0xac, 0xd0, 0x72, 0x91, 0x55, 0x80,
+		0x30, 0x4c, 0x43, 0xa2, 0x36, 0x7c, 0x60, 0x48, 0x83, 0x10
+	};
+	static const uint8_t hanshake_salt_draft_t51[20] = {
+		0x7a, 0x4e, 0xde, 0xf4, 0xe7, 0xcc, 0xee, 0x5f, 0xa4, 0x50,
+		0x6c, 0x19, 0x12, 0x4f, 0xc8, 0xcc, 0xda, 0x6e, 0x03, 0x3d
+	};
+	static const uint8_t handshake_salt_v2_draft_00[20] = {
+		0xa7, 0x07, 0xc2, 0x03, 0xa5, 0x9b, 0x47, 0x18, 0x4a, 0x1d,
+		0x62, 0xca, 0x57, 0x04, 0x06, 0xea, 0x7a, 0xe3, 0xe5, 0xd3
+	};
+
+	int err;
+	const uint8_t *salt;
+	uint8_t secret[USHAMaxHashSize];
+	uint8_t draft_version = QUICDraftVersion(version);
+
+	if (version == 0x51303530) {
+		salt = hanshake_salt_draft_q50;
+	}
+	else if (version == 0x54303530) {
+		salt = hanshake_salt_draft_t50;
+	}
+	else if (version == 0x54303531) {
+		salt = hanshake_salt_draft_t51;
+	}
+	else if (is_quic_draft_max(draft_version, 22)) {
+		salt = handshake_salt_draft_22;
+	}
+	else if (is_quic_draft_max(draft_version, 28)) {
+		salt = handshake_salt_draft_23;
+	}
+	else if (is_quic_draft_max(draft_version, 32)) {
+		salt = handshake_salt_draft_29;
+	}
+	else if (is_quic_draft_max(draft_version, 34)) {
+		salt = handshake_salt_v1;
+	}
+	else {
+		salt = handshake_salt_v2_draft_00;
+	}
+
+	err = hkdfExtract(SHA256, salt, 20, cid->cid, cid->len, secret);
+	if (err) return false;
+
+	if (client_initial_secret && !quic_hkdf_expand_label(secret, SHA256HashSize, "tls13 client in", client_initial_secret, SHA256HashSize))
+		return false;
+
+	return true;
+}
+bool QUICIsLongHeader(const uint8_t *data, size_t len)
+{
+	return len>=9 && !!(*data & 0x80);
+}
+uint32_t QUICExtractVersion(const uint8_t *data, size_t len)
+{
+	// long header, fixed bit, type=initial
+	return QUICIsLongHeader(data, len) ? ntohl(*(uint32_t*)(data + 1)) : 0;
+}
+bool QUICExtractDCID(const uint8_t *data, size_t len, quic_cid_t *cid)
+{
+	if (!QUICIsLongHeader(data,len) || !data[5] || data[5] > QUIC_MAX_CID_LENGTH || (6+data[5])>len) return false;
+	cid->len = data[5];
+	memcpy(&cid->cid, data + 6, data[5]);
+	return true;
+}
+bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, size_t *clean_len)
+{
+	uint32_t ver = QUICExtractVersion(data, data_len);
+	if (!ver) return false;
+
+	quic_cid_t dcid;
+	if (!QUICExtractDCID(data, data_len, &dcid)) return false;
+
+	uint8_t client_initial_secret[SHA256HashSize];
+	if (!quic_derive_initial_secret(&dcid, client_initial_secret, ver)) return false;
+
+	uint8_t aeskey[16], aesiv[12], aeshp[16];
+	bool v1_label = is_version_with_v1_labels(ver);
+	if (!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic key" : "tls13 quicv2 key", aeskey, sizeof(aeskey)) ||
+		!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic iv" : "tls13 quicv2 iv", aesiv, sizeof(aesiv)) ||
+		!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic hp" : "tls13 quicv2 hp", aeshp, sizeof(aeshp)))
+	{
+		return false;
+	}
+
+	uint64_t payload_len,token_len;
+	size_t pn_offset;
+	pn_offset = 1 + 4 + 1 + data[5];
+	if (pn_offset >= data_len) return false;
+	pn_offset += 1 + data[pn_offset];
+	if ((pn_offset + 8) > data_len) return false;
+	pn_offset += tvb_get_varint(data + pn_offset, &token_len);
+	pn_offset += token_len;
+	if ((pn_offset + 8) > data_len) return false;
+	pn_offset += tvb_get_varint(data + pn_offset, &payload_len);
+	if (payload_len<20 || (pn_offset + payload_len)>data_len) return false;
+
+	aes_init_keygen_tables();
+
+	uint8_t sample_enc[16];
+	aes_context ctx;
+	if (aes_setkey(&ctx, 1, aeshp, sizeof(aeshp)) || aes_cipher(&ctx, data + pn_offset + 4, sample_enc)) return false;
+
+	uint8_t mask[5];
+	memcpy(mask, sample_enc, sizeof(mask));
+
+	uint8_t packet0 = data[0] ^ (mask[0] & 0x0f);
+	uint32_t pkn_len = (packet0 & 0x03) + 1;
+
+	uint8_t pkn_bytes[4];
+	memcpy(pkn_bytes, data + pn_offset, pkn_len);
+	uint32_t pkn = 0;
+	for (uint32_t i = 0; i < pkn_len; i++) pkn |= (uint32_t)(pkn_bytes[i] ^ mask[1 + i]) << (8 * (pkn_len - 1 - i));
+
+ 	phton64(aesiv + sizeof(aesiv) - 8, pntoh64(aesiv + sizeof(aesiv) - 8) ^ pkn);
+
+	size_t cryptlen = payload_len - pkn_len - 16;
+	if (cryptlen > *clean_len) return false;
+	*clean_len = cryptlen;
+	const uint8_t *decrypt_begin = data + pn_offset + pkn_len;
+
+	return !aes_gcm_decrypt(clean, decrypt_begin, cryptlen, aeskey, sizeof(aeskey), aesiv, sizeof(aesiv));
+}
+
+bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len)
+{
+	if (*defrag_len<10) return false;
+	uint8_t *defrag_data = defrag+10;
+	size_t defrag_data_len = *defrag_len-10;
+
+	uint8_t ft;
+	uint64_t offset,sz,szmax=0,zeropos=0,pos=0;
+	bool found=false;
+
+	while(pos<clean_len)
+	{
+		ft = clean[pos];
+		pos++;
+		if (ft>1) // 00 - padding, 01 - ping
+		{
+			if (ft!=6) return false; // dont want to know all possible frame type formats
+
+			if (pos>=clean_len) return false;
+
+			if ((pos+tvb_get_size(clean[pos])>clean_len)) return false;
+			pos += tvb_get_varint(clean+pos, &offset);
+
+			if ((pos+tvb_get_size(clean[pos])>clean_len)) return false;
+			pos += tvb_get_varint(clean+pos, &sz);
+			if ((pos+sz)>clean_len) return false;
+
+
+			if (ft==6)
+			{
+ 				if ((offset+sz)>defrag_data_len) return false;
+				if (zeropos < offset)
+					// make sure no uninitialized gaps exist in case of not full fragment coverage
+					memset(defrag_data+zeropos,0,offset-zeropos);
+				if ((offset+sz) > zeropos)
+					zeropos=offset+sz;
+				memcpy(defrag_data+offset,clean+pos,sz);
+				if ((offset+sz) > szmax) szmax = offset+sz;
+				found=true;
+			}
+
+			pos+=sz;
+		}
+	}
+	if (found)
+	{
+		defrag[0] = 6;
+		defrag[1] = 0; // offset
+		// 2..9 - length 64 bit
+		// +10 - data start
+		phton64(defrag+2,szmax);
+		defrag[2] |= 0xC0; // 64 bit value
+		*defrag_len = (size_t)(szmax+10);
+	}
+	return found;
+}
+
+
+bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host, size_t len_host, bool *bIsCryptoHello)
+{
+	if (bIsCryptoHello) *bIsCryptoHello=false;
+
+	uint8_t clean[1500];
+	size_t clean_len = sizeof(clean);
+	if (!QUICDecryptInitial(data,data_len,clean,&clean_len)) return false;
+
+	uint8_t defrag[1500];
+	size_t defrag_len = sizeof(defrag);
+	if (!QUICDefragCrypto(clean,clean_len,defrag,&defrag_len)) return false;
+
+	size_t hello_offset, hello_len;
+	if (!IsQUICCryptoHello(defrag, defrag_len, &hello_offset, &hello_len)) return false;
+	if (bIsCryptoHello) *bIsCryptoHello=true;
+
+	return TLSHelloExtractHostFromHandshake(defrag + hello_offset, hello_len, host, len_host);
+}
+
 bool IsQUICInitial(uint8_t *data, size_t len)
 {
 	// long header, fixed bit, type=initial
 	if (len < 512 || (data[0] & 0xF0) != 0xC0) return false;
 	uint8_t *p = data + 1;
 	uint32_t ver = ntohl(*(uint32_t*)p);
-	if (quic_draft_version(ver) < 11) return false;
+	if (QUICDraftVersion(ver) < 11) return false;
 	p += 4;
 	if (!*p || *p > QUIC_MAX_CID_LENGTH) return false;
 	return true;
