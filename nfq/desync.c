@@ -664,18 +664,32 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 			fake = params.fake_quic;
 			fake_size = params.fake_quic_size;
 
-			bool bIsCryptoHello;
-			bHaveHost=QUICExtractHostFromInitial(data_payload,len_payload,host,sizeof(host),&bIsCryptoHello);
+			bool bIsCryptoHello, bDecryptOK;
+			bHaveHost=QUICExtractHostFromInitial(data_payload,len_payload,host,sizeof(host), &bDecryptOK,&bIsCryptoHello);
 			if (bIsCryptoHello)
 			{
+				// decrypted and payload is ClientHello
 				if (params.desync_skip_nosni && !bHaveHost)
 				{
 					DLOG("not applying tampering to QUIC ClientHello without hostname in the SNI\n")
 					return res;
 				}
 			}
+			else if (!bDecryptOK)
+			{
+				// could not decrypt
+				if (params.desync_skip_nosni)
+				{
+					DLOG("not applying tampering to QUIC initial that could not be decrypted\n")
+					return res;
+				}
+				else
+					// consider this case the same way as absence of the SNI. DPI also might not be able to decrypt this and get SNI
+					DLOG("QUIC initial decryption failed. still applying tampering because desync_skip_nosni is not set\n")
+			}
 			else
 			{
+				// decrypted and payload is not ClientHello
 				if (params.desync_any_proto)
 				{
 					DLOG("QUIC initial without CRYPTO frame. applying tampering because desync_any_proto is set\n")

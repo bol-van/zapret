@@ -444,6 +444,10 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 
 bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len)
 {
+	// Crypto frame can be split into multiple chunks
+	// quiche (chromium) randomly splits it and pads with zero/one bytes to force support the standard
+	// mozilla does not split
+
 	if (*defrag_len<10) return false;
 	uint8_t *defrag_data = defrag+10;
 	size_t defrag_data_len = *defrag_len-10;
@@ -477,8 +481,8 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 				zeropos=offset+sz;
 			memcpy(defrag_data+offset,clean+pos,sz);
 			if ((offset+sz) > szmax) szmax = offset+sz;
-			found=true;
 
+			found=true;
 			pos+=sz;
 		}
 	}
@@ -496,13 +500,16 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 }
 
 
-bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host, size_t len_host, bool *bIsCryptoHello)
+bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host, size_t len_host, bool *bDecryptOK, bool *bIsCryptoHello)
 {
 	if (bIsCryptoHello) *bIsCryptoHello=false;
+	if (bDecryptOK) *bDecryptOK=false;
 
 	uint8_t clean[1500];
 	size_t clean_len = sizeof(clean);
 	if (!QUICDecryptInitial(data,data_len,clean,&clean_len)) return false;
+
+	if (bDecryptOK) *bDecryptOK=true;
 
 	uint8_t defrag[1500];
 	size_t defrag_len = sizeof(defrag);
