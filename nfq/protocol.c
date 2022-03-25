@@ -462,7 +462,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 
 			if (pos>=clean_len) return false;
 
-			if ((pos+tvb_get_size(clean[pos])>clean_len)) return false;
+			if ((pos+tvb_get_size(clean[pos])>=clean_len)) return false;
 			pos += tvb_get_varint(clean+pos, &offset);
 
 			if ((pos+tvb_get_size(clean[pos])>clean_len)) return false;
