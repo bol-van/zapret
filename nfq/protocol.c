@@ -86,10 +86,12 @@ bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, si
 	size_t offset = 1;
 	uint64_t coff, clen;
 	if (len < 3 || *data != 6) return false;
+	if ((offset+tvb_get_size(data[offset])) >= len) return false;
 	offset += tvb_get_varint(data + offset, &coff);
-	if (offset >= len) return false;
+	// offset must be 0 if it's a full segment, not just a chunk
+	if (coff || (offset+tvb_get_size(data[offset])) >= len) return false;
 	offset += tvb_get_varint(data + offset, &clen);
-	if (offset >= len || data[offset] != 0x01 || (offset + coff + clen) > len) return false;
+	if (data[offset] != 0x01 || (offset + coff + clen) > len) return false;
 	if (hello_offset) *hello_offset = offset + coff;
 	if (hello_len) *hello_len = (size_t)clen;
 	return true;
