@@ -469,19 +469,15 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 			pos += tvb_get_varint(clean+pos, &sz);
 			if ((pos+sz)>clean_len) return false;
 
-
-			if (ft==6)
-			{
- 				if ((offset+sz)>defrag_data_len) return false;
-				if (zeropos < offset)
-					// make sure no uninitialized gaps exist in case of not full fragment coverage
-					memset(defrag_data+zeropos,0,offset-zeropos);
-				if ((offset+sz) > zeropos)
-					zeropos=offset+sz;
-				memcpy(defrag_data+offset,clean+pos,sz);
-				if ((offset+sz) > szmax) szmax = offset+sz;
-				found=true;
-			}
+			if ((offset+sz)>defrag_data_len) return false;
+			if (zeropos < offset)
+				// make sure no uninitialized gaps exist in case of not full fragment coverage
+				memset(defrag_data+zeropos,0,offset-zeropos);
+			if ((offset+sz) > zeropos)
+				zeropos=offset+sz;
+			memcpy(defrag_data+offset,clean+pos,sz);
+			if ((offset+sz) > szmax) szmax = offset+sz;
+			found=true;
 
 			pos+=sz;
 		}
