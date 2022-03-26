@@ -247,6 +247,10 @@ static bool is_quic_version_with_v1_labels(uint32_t version)
 		return true;
 	return is_quic_draft_max(QUICDraftVersion(version), 34);
 }
+static bool is_quic_v2(uint32_t version)
+{
+    return version == 0x709A50C4;
+}
 
 
 static bool quic_hkdf_expand_label(const uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
@@ -424,7 +428,18 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	*clean_len = cryptlen;
 	const uint8_t *decrypt_begin = data + pn_offset + pkn_len;
 
-	return !aes_gcm_decrypt(clean, decrypt_begin, cryptlen, aeskey, sizeof(aeskey), aesiv, sizeof(aesiv));
+	uint8_t atag[16],header[256];
+	size_t header_len = pn_offset + pkn_len;
+	if (header_len > sizeof(header)) return false; // not likely header will be so large
+	memcpy(header, data, header_len);
+	header[0] = packet0;
+	for(uint8_t i = 0; i < pkn_len; i++) header[header_len - 1 - i] = (uint8_t)(pkn >> (8 * i));
+
+	if (aes_gcm_crypt(DECRYPT, clean, decrypt_begin, cryptlen, aeskey, sizeof(aeskey), aesiv, sizeof(aesiv), header, header_len, atag, sizeof(atag)))
+		return false;
+
+	// check if message was decrypted correctly : good keys , no data corruption
+	return !memcmp(data + pn_offset + pkn_len + cryptlen, atag, 16);
 }
 
 bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len)
@@ -509,12 +524,38 @@ bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host
 
 bool IsQUICInitial(const uint8_t *data, size_t len)
 {
-	// long header, fixed bit, type=initial
-	if (len < 512 || (data[0] & 0xF0) != 0xC0) return false;
-	const uint8_t *p = data + 1;
-	uint32_t ver = ntohl(*(uint32_t*)p);
+	// too small packets are not likely to be initials with client hello
+	if (len < 256) return false;
+
+	// this also ensures long header
+	uint32_t ver = QUICExtractVersion(data,len);
 	if (QUICDraftVersion(ver) < 11) return false;
-	p += 4;
-	if (!*p || *p > QUIC_MAX_CID_LENGTH) return false;
-	return true;
+
+	// quic v1 : initial packets are 00b
+	// quic v2 : initial packets are 01b
+	if ((data[0] & 0x30) != (is_quic_v2(ver) ? 0x10 : 0x00)) return false;
+
+	uint64_t offset=5, sz;
+
+	// DCID. must be present
+	if (!data[offset] || data[offset] > QUIC_MAX_CID_LENGTH) return false;
+	offset += 1 + data[offset];
+
+	// SCID
+	if (data[offset] > QUIC_MAX_CID_LENGTH) return false;
+	offset += 1 + data[offset];
+
+	// token length
+	offset += tvb_get_varint(data + offset, &sz);
+	offset += sz;
+	if (offset >= len) return false;
+
+	// payload length
+	if ((offset + tvb_get_size(data[offset])) >= len) return false;
+	tvb_get_varint(data + offset, &sz);
+	offset += sz;
+	if (offset > len) return false;
+
+	// client hello cannot be too small. likely ACK
+	return sz>=96;
 }

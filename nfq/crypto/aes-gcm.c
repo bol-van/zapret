@@ -1,38 +1,13 @@
 #include "aes-gcm.h"
 
-int aes_gcm_encrypt(unsigned char* output, const unsigned char* input, size_t input_length, const unsigned char* key, const size_t key_len, const unsigned char * iv, const size_t iv_len) {
-
-	int ret = 0;                // our return value
-	gcm_context ctx;            // includes the AES context structure
-
-	size_t tag_len = 0;
-	unsigned char * tag_buf = NULL;
+int aes_gcm_crypt(int mode, uint8_t *output, const uint8_t *input, size_t input_length, const uint8_t *key, const size_t key_len, const uint8_t *iv, const size_t iv_len, const uint8_t *adata, size_t adata_len, uint8_t *atag, size_t atag_len)
+{
+	int ret = 0;
+	gcm_context ctx;
 
 	gcm_setkey(&ctx, key, (const uint)key_len);
-
-	ret = gcm_crypt_and_tag(&ctx, ENCRYPT, iv, iv_len, NULL, 0,
-		input, output, input_length, tag_buf, tag_len);
-
+	ret = gcm_crypt_and_tag(&ctx, mode, iv, iv_len, adata, adata_len, input, output, input_length, atag, atag_len);
 	gcm_zero_ctx(&ctx);
 
-	return(ret);
-}
-
-int aes_gcm_decrypt(unsigned char* output, const unsigned char* input, size_t input_length, const unsigned char* key, const size_t key_len, const unsigned char * iv, const size_t iv_len) {
-
-	int ret = 0;                // our return value
-	gcm_context ctx;            // includes the AES context structure
-
-	size_t tag_len = 0;
-	unsigned char * tag_buf = NULL;
-
-	gcm_setkey(&ctx, key, (const uint)key_len);
-
-	ret = gcm_crypt_and_tag(&ctx, DECRYPT, iv, iv_len, NULL, 0,
-		input, output, input_length, tag_buf, tag_len);
-
-	gcm_zero_ctx(&ctx);
-
-	return(ret);
-
+	return ret;
 }
