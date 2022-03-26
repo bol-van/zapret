@@ -67,18 +67,7 @@ static uint8_t tvb_get_varint(const uint8_t *tvb, uint64_t *value)
 }
 static uint8_t tvb_get_size(uint8_t tvb)
 {
-	switch(tvb >> 6)
-	{
-		case 0: /* 0b00 => 1 byte length (6 bits Usable) */
-			return 1;
-		case 1: /* 0b01 => 2 bytes length (14 bits Usable) */
-			return 2;
-		case 2: /* 0b10 => 4 bytes length (30 bits Usable) */
-			return 4;
-		case 3: /* 0b11 => 8 bytes length (62 bits Usable) */
-			return 8;
-	}
-	return 0;
+	return 1 << (tvb >> 6);
 }
 
 bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, size_t *hello_len)
@@ -91,8 +80,8 @@ bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, si
 	// offset must be 0 if it's a full segment, not just a chunk
 	if (coff || (offset+tvb_get_size(data[offset])) >= len) return false;
 	offset += tvb_get_varint(data + offset, &clen);
-	if (data[offset] != 0x01 || (offset + coff + clen) > len) return false;
-	if (hello_offset) *hello_offset = offset + coff;
+	if (data[offset] != 0x01 || (offset + clen) > len) return false;
+	if (hello_offset) *hello_offset = offset;
 	if (hello_len) *hello_len = (size_t)clen;
 	return true;
 }
@@ -247,24 +236,20 @@ uint8_t QUICDraftVersion(uint32_t version)
 	return 0;
 }
 
-static inline bool is_quic_draft_max(uint32_t draft_version, uint8_t max_version)
+static bool is_quic_draft_max(uint32_t draft_version, uint8_t max_version)
 {
 	return draft_version && draft_version <= max_version;
 }
-static bool is_quic_ver_less_than(uint32_t version, uint8_t max_version)
-{
-	return is_quic_draft_max(QUICDraftVersion(version), max_version);
-}
-static bool is_version_with_v1_labels(uint32_t version)
+static bool is_quic_version_with_v1_labels(uint32_t version)
 {
 	if (((version & 0xFFFFFF00) == 0x51303500)  /* Q05X */ ||
 		((version & 0xFFFFFF00) == 0x54303500)) /* T05X */
 		return true;
-	return is_quic_ver_less_than(version, 34);
+	return is_quic_draft_max(QUICDraftVersion(version), 34);
 }
 
 
-static bool quic_hkdf_expand_label(uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
+static bool quic_hkdf_expand_label(const uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
 {
 	uint8_t hkdflabel[64];
 
@@ -395,7 +380,7 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	if (!quic_derive_initial_secret(&dcid, client_initial_secret, ver)) return false;
 
 	uint8_t aeskey[16], aesiv[12], aeshp[16];
-	bool v1_label = is_version_with_v1_labels(ver);
+	bool v1_label = is_quic_version_with_v1_labels(ver);
 	if (!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic key" : "tls13 quicv2 key", aeskey, sizeof(aeskey)) ||
 		!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic iv" : "tls13 quicv2 iv", aesiv, sizeof(aesiv)) ||
 		!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic hp" : "tls13 quicv2 hp", aeshp, sizeof(aeshp)))
@@ -408,10 +393,10 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	pn_offset = 1 + 4 + 1 + data[5];
 	if (pn_offset >= data_len) return false;
 	pn_offset += 1 + data[pn_offset];
-	if ((pn_offset + 8) > data_len) return false;
+	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
 	pn_offset += tvb_get_varint(data + pn_offset, &token_len);
 	pn_offset += token_len;
-	if ((pn_offset + 8) > data_len) return false;
+	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
 	pn_offset += tvb_get_varint(data + pn_offset, &payload_len);
 	if (payload_len<20 || (pn_offset + payload_len)>data_len) return false;
 
@@ -425,12 +410,12 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	memcpy(mask, sample_enc, sizeof(mask));
 
 	uint8_t packet0 = data[0] ^ (mask[0] & 0x0f);
-	uint32_t pkn_len = (packet0 & 0x03) + 1;
+	uint8_t pkn_len = (packet0 & 0x03) + 1;
 
 	uint8_t pkn_bytes[4];
 	memcpy(pkn_bytes, data + pn_offset, pkn_len);
 	uint32_t pkn = 0;
-	for (uint32_t i = 0; i < pkn_len; i++) pkn |= (uint32_t)(pkn_bytes[i] ^ mask[1 + i]) << (8 * (pkn_len - 1 - i));
+	for (uint8_t i = 0; i < pkn_len; i++) pkn |= (uint32_t)(pkn_bytes[i] ^ mask[1 + i]) << (8 * (pkn_len - 1 - i));
 
  	phton64(aesiv + sizeof(aesiv) - 8, pntoh64(aesiv + sizeof(aesiv) - 8) ^ pkn);
 
@@ -522,11 +507,11 @@ bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host
 	return TLSHelloExtractHostFromHandshake(defrag + hello_offset, hello_len, host, len_host);
 }
 
-bool IsQUICInitial(uint8_t *data, size_t len)
+bool IsQUICInitial(const uint8_t *data, size_t len)
 {
 	// long header, fixed bit, type=initial
 	if (len < 512 || (data[0] & 0xF0) != 0xC0) return false;
-	uint8_t *p = data + 1;
+	const uint8_t *p = data + 1;
 	uint32_t ver = ntohl(*(uint32_t*)p);
 	if (QUICDraftVersion(ver) < 11) return false;
 	p += 4;

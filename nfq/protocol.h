@@ -21,7 +21,7 @@ typedef struct quic_cid {
 	uint8_t      cid[QUIC_MAX_CID_LENGTH];
 } quic_cid_t;
 
-bool IsQUICInitial(uint8_t *data, size_t len);
+bool IsQUICInitial(const uint8_t *data, size_t len);
 bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, size_t *hello_len);
 bool QUICIsLongHeader(const uint8_t *data, size_t len);
 uint32_t QUICExtractVersion(const uint8_t *data, size_t len);
