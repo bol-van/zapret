@@ -551,7 +551,7 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	if (offset >= len) return false;
 
 	// payload length
-	if ((offset + tvb_get_size(data[offset])) >= len) return false;
+	if ((offset + tvb_get_size(data[offset])) > len) return false;
 	tvb_get_varint(data + offset, &sz);
 	offset += sz;
 	if (offset > len) return false;
