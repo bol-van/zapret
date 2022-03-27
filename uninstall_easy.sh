@@ -73,6 +73,7 @@ remove_macos()
 }
 
 
+fix_sbin_path
 check_system
 require_root
 

@@ -979,6 +979,7 @@ install_macos()
 # build binaries, do not use precompiled
 [ "$1" = "make" ] && FORCE_BUILD=1
 
+fix_sbin_path
 check_system
 
 [ "$SYSTEM" = "macos" ] && . "$EXEDIR/init.d/macos/functions"

@@ -996,10 +996,10 @@ sigpipe()
 	exit 1
 }
 
-
+fix_sbin_path
 check_system
-check_prerequisites
 require_root
+check_prerequisites
 check_dns
 ask_params
 

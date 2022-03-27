@@ -174,3 +174,11 @@ call_for_multiple_items()
 	done
 	eval $2=\"$items\"
 }
+
+fix_sbin_path()
+{
+	local IFS=':'
+	printf "%s\n" $PATH | grep -Fxq '/usr/sbin' || PATH="/usr/sbin:$PATH"
+	printf "%s\n" $PATH | grep -Fxq '/sbin' || PATH="/sbin:$PATH"
+	export PATH
+}
