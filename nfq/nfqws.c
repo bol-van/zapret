@@ -889,7 +889,7 @@ int main(int argc, char **argv)
 #endif
 			break;
 		case 20: /* dpi-desync-repeats */
-			if (sscanf(optarg,"%u",&params.desync_repeats)<1 || params.desync_repeats<=0 || params.desync_repeats>20)
+			if (sscanf(optarg,"%u",&params.desync_repeats)<1 || !params.desync_repeats || params.desync_repeats>20)
 			{
 				fprintf(stderr, "dpi-desync-repeats must be within 1..20\n");
 				exit_clean(1);
