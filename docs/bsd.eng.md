@@ -209,7 +209,7 @@ One possible solution would be to modify '/etc/inc/filter.inc' as follows :
 	.................
 	/* MOD */
 	$natrules .= "# ZAPRET redirection\n";
-	$natrules .= "rdr-anchor \"zapret/*\"\n";
+	$natrules .= "rdr-anchor \"zapret\"\n";
 
 	$natrules .= "# TFTP proxy\n";
 	$natrules .= "rdr-anchor \"tftp-proxy/*\"\n";
@@ -237,7 +237,7 @@ nat-anchor "natearly/*" all
 nat-anchor "natrules/*" all
 ...................
 no rdr proto carp all
-rdr-anchor "zapret/*" all
+rdr-anchor "zapret" all
 rdr-anchor "tftp-proxy/*" all
 rdr-anchor "miniupnpd" all
 [root@pfSense /]# pfctl -s nat -a zapret
