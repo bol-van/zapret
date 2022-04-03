@@ -9,6 +9,7 @@ ZAPRET_CONFIG="$EXEDIR/config"
 ZAPRET_BASE="$EXEDIR"
 
 . "$ZAPRET_CONFIG"
+. "$ZAPRET_BASE/common/dialog.sh"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/elevate.sh"
 . "$ZAPRET_BASE/common/fwtype.sh"
