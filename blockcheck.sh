@@ -169,14 +169,12 @@ check_prerequisites()
 					progs="$progs iptables ip6tables"
 					ipt_has_nfq || {
 						echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
-						[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install iptables-mod-nfqueue'
 						exitp 6
 					}
 					;;
 				nftables)
 					nft_has_nfq || {
 						echo nftables queue support is not available. pls install modules.
-						[ "$SUBSYS" = openwrt ] && echo 'OpenWRT : opkg update ; opkg install kmod-nft-queue'
 						exitp 6
 					}
 					;;
