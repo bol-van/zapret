@@ -110,6 +110,7 @@ check_system()
 
 	UNAME=$(uname)
 	SUBSYS=
+	local s
 
 	# can be passed FWTYPE=iptables to override default nftables preference
 	case "$UNAME" in
@@ -126,6 +127,7 @@ check_system()
 			PKTWS="$DVTWS"
 			PKTWSD=dvtws
 			FWTYPE=ipfw
+			[ -f /etc/platform ] && read SUBSYS </etc/platform
 			;;
 		*)
 			echo $UNAME not supported
@@ -670,15 +672,21 @@ check_domain()
 		}
 	done
 
-	echo
+	if [ "$SUBSYS" = "pfSense" ] ; then
+		echo
+		echo "tpws tests are not possible on pfSense"
+		report_append "ipv${IPV} $4 $1 : automated tpws tests are not possible on pfSense. check docs/bsd.txt"
+	else
+		echo
 
-	echo preparing tpws redirection
-	tpws_ipt_prepare $2
+		echo preparing tpws redirection
+		tpws_ipt_prepare $2
 
-	tpws_check_domain_bypass $1 $3 $4
+		tpws_check_domain_bypass $1 $3 $4
 
-	echo clearing tpws redirection
-	tpws_ipt_unprepare $2
+		echo clearing tpws redirection
+		tpws_ipt_unprepare $2
+	fi
 
 	echo
 
