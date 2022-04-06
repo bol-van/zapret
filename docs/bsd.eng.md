@@ -169,7 +169,8 @@ pfsense is based on FreeBSD.
 Binaries from `binaries/freebsd-x64` are compiled in FreeBSD 11 and should work. Use `install_bin.sh`.
 pfsense uses pf firewall which does not support divert.
 Fortunately ipfw and ipdivert modules are present and can be kldload-ed.
-It's also necessary to change firewall order using sysctl commands.
+In older versions it's also necessary to change firewall order using sysctl commands.
+In newer versions those sysctl parameters are absent but the system behaves as required without them.
 Sometimes pf may limit dvtws abilities. It scrubs ip fragments disabling dvtws ipfrag2 desync mode.
 
 There's autostart script example in `init.d/pfsense`. It should be placed to `/usr/local/etc/rc.d` and edited.
@@ -221,6 +222,7 @@ Write the anchor code to '/etc/zapret.anchor':
 rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
 rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::20c:29ff:5ae3:4821 port 988
 ```
+Replace `fe80::20c:29ff:5ae3:4821` with your link local address of the LAN interface or remove the line if ipv6 is not needed.
 
 Autostart '/usr/local/etc/rc.d/zapret.sh' :
 ```
