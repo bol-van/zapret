@@ -150,10 +150,10 @@ fi
 ----------------------------------------------
 
 Теперь можно в описания интерфейсов внести в соответствующий раздел :
---- /etc/config/nework ---
+--- /etc/config/network ---
 config interface 'wan'
         ........
         option exec_on_up '/etc/init.d/redsocks start'
---------------------------
+---------------------------
 reboot. Заходим снова, смотрим, что есть redsocks, есть ssh, опять проверяем curl -4 https://rutracker.org.
 Пробуем зайти на https://rutracker.org с компа внутри локалки.
