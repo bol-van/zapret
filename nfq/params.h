@@ -23,6 +23,8 @@
 #define IPFRAG_UDP_DEFAULT 8
 #define IPFRAG_TCP_DEFAULT 32
 
+#define UDPLEN_INCREMENT_DEFAULT 	2
+
 struct params_s
 {
 	bool debug;
@@ -50,6 +52,7 @@ struct params_s
 	strpool *hostlist;
 	uint8_t fake_http[1432],fake_tls[1432],fake_unknown[1432],fake_unknown_udp[1472],fake_quic[1472];
 	size_t fake_http_size,fake_tls_size,fake_unknown_size,fake_unknown_udp_size,fake_quic_size;
+	uint16_t udplen_increment;
 	bool droproot;
 	uid_t uid;
 	gid_t gid;

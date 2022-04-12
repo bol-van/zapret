@@ -505,7 +505,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -530,6 +530,7 @@ static void exithelp()
 		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-quic=<filename>\t; file containing fake QUIC Initial\n"
 		" --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload\n"
+		" --dpi-desync-udplen-increment=<int>\t; increase udp packet length by N bytes (default %u)\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
@@ -539,7 +540,8 @@ static void exithelp()
 		DPI_DESYNC_MAX_FAKE_LEN,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
-		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT
+		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
+		UDPLEN_INCREMENT_DEFAULT
 	);
 	exit(1);
 }
@@ -627,6 +629,7 @@ int main(int argc, char **argv)
 	params.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
 	params.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
 	params.wssize_cutoff_mode = params.desync_cutoff_mode = 'n'; // packet number by default
+	params.udplen_increment = UDPLEN_INCREMENT_DEFAULT;
 
 	if (can_drop_root()) // are we root ?
 	{
@@ -680,8 +683,9 @@ int main(int argc, char **argv)
 		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=30
 		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=31
 		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=32
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=33
-		{"hostlist",required_argument,0,0},		// optidx=34
+		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=33
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=34
+		{"hostlist",required_argument,0,0},		// optidx=35
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -966,14 +970,17 @@ int main(int argc, char **argv)
 			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
-		case 33: /* desync-cutoff */
+		case 33: /* dpi-desync-udplen-increment */
+			params.udplen_increment = (uint16_t)atoi(optarg);
+			break;
+		case 34: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 34: /* hostlist */
+		case 35: /* hostlist */
 			if (!LoadHostList(&params.hostlist, optarg))
 				exit_clean(1);
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));

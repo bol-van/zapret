@@ -67,7 +67,7 @@ bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 }
 bool desync_valid_first_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_FAKE || mode==DESYNC_RST || mode==DESYNC_RSTACK || mode==DESYNC_HOPBYHOP || mode==DESYNC_DESTOPT || mode==DESYNC_IPFRAG1;
+	return mode==DESYNC_FAKE || mode==DESYNC_FAKE_KNOWN || mode==DESYNC_RST || mode==DESYNC_RSTACK || mode==DESYNC_HOPBYHOP || mode==DESYNC_DESTOPT || mode==DESYNC_IPFRAG1;
 }
 bool desync_only_first_stage(enum dpi_desync_mode mode)
 {
@@ -75,7 +75,15 @@ bool desync_only_first_stage(enum dpi_desync_mode mode)
 }
 bool desync_valid_second_stage(enum dpi_desync_mode mode)
 {
+	return mode==DESYNC_NONE || mode==DESYNC_DISORDER || mode==DESYNC_DISORDER2 || mode==DESYNC_SPLIT || mode==DESYNC_SPLIT2 || mode==DESYNC_IPFRAG2 || mode==DESYNC_UDPLEN;
+}
+bool desync_valid_second_stage_tcp(enum dpi_desync_mode mode)
+{
 	return mode==DESYNC_NONE || mode==DESYNC_DISORDER || mode==DESYNC_DISORDER2 || mode==DESYNC_SPLIT || mode==DESYNC_SPLIT2 || mode==DESYNC_IPFRAG2;
+}
+bool desync_valid_second_stage_udp(enum dpi_desync_mode mode)
+{
+	return mode==DESYNC_NONE || mode==DESYNC_UDPLEN || mode==DESYNC_IPFRAG2;
 }
 enum dpi_desync_mode desync_mode_from_string(const char *s)
 {
@@ -83,6 +91,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_NONE;
 	else if (!strcmp(s,"fake"))
 		return DESYNC_FAKE;
+	else if (!strcmp(s,"fakeknown"))
+		return DESYNC_FAKE_KNOWN;
 	else if (!strcmp(s,"rst"))
 		return DESYNC_RST;
 	else if (!strcmp(s,"rstack"))
@@ -105,6 +115,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_DESTOPT;
 	else if (!strcmp(s,"ipfrag1"))
 		return DESYNC_IPFRAG1;
+	else if (!strcmp(s,"udplen"))
+		return DESYNC_UDPLEN;
 	return DESYNC_INVALID;
 }
 
@@ -262,6 +274,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		char host[256];
 		bool bHaveHost=false;
 		bool bIsHttp;
+		bool bKnownProtocol = false;
 		uint8_t *p, *phost;
 
 		if ((bIsHttp = IsHttp(data_payload,len_payload)))
@@ -277,6 +290,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 				DLOG("not applying tampering to HTTP without Host:\n")
 				return res;
 			}
+			bKnownProtocol = true;
 		}
 		else if (IsTLSClientHello(data_payload,len_payload))
 		{
@@ -294,6 +308,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					return res;
 				}
 			}
+			bKnownProtocol = true;
 		}
 		else
 		{
@@ -367,6 +382,13 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		b = false;
 		switch(desync_mode)
 		{
+			case DESYNC_FAKE_KNOWN:
+				if (!bKnownProtocol)
+				{
+					DLOG("not applying fake because of unknown protocol\n");
+					desync_mode = params.desync_mode2;
+					break;
+				}
 			case DESYNC_FAKE:
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
@@ -393,7 +415,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 			case DESYNC_DESTOPT:
 			case DESYNC_IPFRAG1:
 				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
-				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
+				if (ip6hdr && (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_tcp(params.desync_mode2)))
 				{
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 						ttl_orig,fooling_orig,0,0,
@@ -414,7 +436,7 @@ packet_process_result dpi_desync_tcp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		{
 			if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
 				return res;
-			if (params.desync_mode2==DESYNC_NONE)
+			if (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_tcp(params.desync_mode2))
 			{
 					if (params.desync_retrans)
 					{
@@ -657,6 +679,7 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 		bool b;
 		char host[256];
 		bool bHaveHost=false;
+		bool bKnownProtocol=false;
 
 		if (IsQUICInitial(data_payload,len_payload))
 		{
@@ -700,6 +723,7 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					return res;
 				}
 			}
+			bKnownProtocol = true;
 		}
 		else
 		{
@@ -738,24 +762,32 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 		pkt1_len = sizeof(pkt1);
 		b = false;
-
 		switch(desync_mode)
 		{
+			case DESYNC_FAKE_KNOWN:
+				if (!bKnownProtocol)
+				{
+					DLOG("not applying fake because of unknown protocol\n");
+					desync_mode = params.desync_mode2;
+					break;
+				}
 			case DESYNC_FAKE:
-				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, params.desync_fooling_mode, fake, fake_size, pkt1, &pkt1_len))
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, params.desync_fooling_mode, 0, fake, fake_size, pkt1, &pkt1_len))
 					return res;
 				DLOG("sending fake request : ");
 				hexdump_limited_dlog(fake,fake_size,PKTDATA_MAXDUMP); DLOG("\n")
+				if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
+					return res;
 				b = true;
 				break;
 			case DESYNC_HOPBYHOP:
 			case DESYNC_DESTOPT:
 			case DESYNC_IPFRAG1:
 				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
-				if (ip6hdr && params.desync_mode2==DESYNC_NONE)
+				if (ip6hdr && (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(params.desync_mode2)))
 				{
 					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
-						ttl_orig,fooling_orig,
+						ttl_orig,fooling_orig,0,
 						data_payload, len_payload, pkt1, &pkt1_len))
 					{
 						return res;
@@ -767,14 +799,13 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 					return drop;
 				}
 				desync_mode = params.desync_mode2;
+				break;
 		}
 
 		if (b)
 		{
-			if (params.desync_mode2==DESYNC_NONE)
+			if (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(params.desync_mode2))
 			{
-				if (!rawsend_rep((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
-					return res;
 				DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
 				#ifdef __FreeBSD__
 				// FreeBSD tend to pass ipv6 frames with wrong checksum
@@ -793,6 +824,14 @@ packet_process_result dpi_desync_udp_packet(uint8_t *data_pkt, size_t len_pkt, s
 
 		switch(desync_mode)
 		{
+			case DESYNC_UDPLEN:
+				pkt1_len = sizeof(pkt1);
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, params.udplen_increment, data_payload, len_payload, pkt1, &pkt1_len))
+					return res;
+				DLOG("resending original packet with increased by %u length\n", params.udplen_increment);
+				if (!rawsend((struct sockaddr *)&dst, params.desync_fwmark, pkt1, pkt1_len))
+					return res;
+				return drop;
 			case DESYNC_IPFRAG2:
 				{
 

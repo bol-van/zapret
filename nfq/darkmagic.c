@@ -298,10 +298,12 @@ bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
 	uint8_t fooling,
+	uint16_t padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t ip_payload_len = sizeof(struct udphdr) + len;
+	uint16_t datalen = len + padlen;
+	uint16_t ip_payload_len = sizeof(struct udphdr) + datalen;
 	uint16_t pktlen = sizeof(struct ip) + ip_payload_len;
 	if (pktlen>*buflen) return false;
 
@@ -309,10 +311,12 @@ bool prepare_udp_segment4(
 	struct udphdr *udp = (struct udphdr*)(ip+1);
 	uint8_t *payload = (uint8_t*)(udp+1);
 
+
 	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_UDP, ttl);
-	fill_udphdr(udp, src->sin_port, dst->sin_port, len);
+	fill_udphdr(udp, src->sin_port, dst->sin_port, datalen);
 
 	memcpy(payload,data,len);
+	memset(payload+len,0,padlen);
 	udp4_fix_checksum(udp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
 	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
 
@@ -323,10 +327,12 @@ bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
 	uint8_t fooling,
+	uint16_t padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t transport_payload_len = sizeof(struct udphdr) + len;
+	uint16_t datalen = len + padlen;
+	uint16_t transport_payload_len = sizeof(struct udphdr) + datalen;
 	uint16_t ip_payload_len = transport_payload_len +
 		8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) +
 		16*!!(fooling & FOOL_HOPBYHOP2) +
@@ -384,9 +390,10 @@ bool prepare_udp_segment6(
 	uint8_t *payload = (uint8_t*)(udp+1);
 
 	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
-	fill_udphdr(udp, src->sin6_port, dst->sin6_port, len);
+	fill_udphdr(udp, src->sin6_port, dst->sin6_port, datalen);
 
 	memcpy(payload,data,len);
+	memset(payload+len,0,padlen);
 	udp6_fix_checksum(udp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
 	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
 
@@ -397,13 +404,14 @@ bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
 	uint8_t fooling,
+	uint16_t padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,fooling,data,len,buf,buflen) :
+		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,fooling,padlen,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,fooling,data,len,buf,buflen) :
+		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,fooling,padlen,data,len,buf,buflen) :
 		false;
 }
 
