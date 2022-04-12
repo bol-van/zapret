@@ -1,4 +1,4 @@
-﻿zapret v.46
+﻿zapret v.47
 
 English
 -------
@@ -200,7 +200,7 @@ nfqws
  --hostnospace				; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
  --hostspell=HoST			; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
  --domcase				; домен после Host: сделать таким : TeSt.cOm
- --dpi-desync=[<mode0>,]<mode>[,<mode2]	; атака по десинхронизации DPI. mode : synack fake rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2
+ --dpi-desync=[<mode0>,]<mode>[,<mode2]	; атака по десинхронизации DPI. mode : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
  --dpi-desync-fwmark=<int|0xHEX>        ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; установить ttl для десинхронизирующих пакетов
  --dpi-desync-ttl6=<int>                ; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение ttl
@@ -217,6 +217,7 @@ nfqws
  --dpi-desync-fake-unknown=<filename>	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
  --dpi-desync-fake-quic=<filename>      ; файл, содержащий фейковый QUIC Initial
  --dpi-desync-fake-unknown-udp=<filename> ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
+ --dpi-desync-udplen-increment=<int>    ; насколько увеличивать длину udp пейлоада в режиме udplen
  --dpi-desync-cutoff=[n|d|s]N           ; применять dpi desync только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
  --hostlist=<filename>			; применять дурение только к хостам из листа
 
@@ -232,6 +233,7 @@ nfqws
 пакет сброса соединения (варианты rst, rstack), разбитый на части оригинальный пакет с перепутанным
 порядком следования сегментов + обрамление первого сегмента фейками (disorder),
 то же самое без перепутывания порядка сегментов (split).
+fakeknown отличается от fake тем, что применяется только к распознанному протоколу.
 В литературе такие атаки еще называют TCB desynchronization и TCB teardown.
 Надо, чтобы фейковые пакеты дошли до DPI, но не дошли до сервера.
 На вооружении есть следующие возможности : установить низкий TTL, посылать пакет с инвалидной чексуммой,
@@ -453,8 +455,11 @@ window size итоговый размер окна стал максимальн
 
 ПОДДЕРЖКА UDP
 Атаки на udp более ограничены в возможностях. udp нельзя фрагментировать иначе, чем на уровне ip.
-Для UDP действуют только режимы десинхронизации fake,hopbyhop,destopt,ipfrag1,ipfrag2.
-Возможно сочетание fake,hopbyhop,destopt с ipfrag2.
+Для UDP действуют только режимы десинхронизации fake,hopbyhop,destopt,ipfrag1,ipfrag2,udplen.
+Возможно сочетание fake,hopbyhop,destopt с ipfrag2 и udplen.
+udplen увеличивает размер udp пакета на указанное в --dpi-desync-udplen-increment количество байтов.
+Паддинг заполняется нулями. Предназначено для обмана DPI, ориентирующегося на размеры пакетов.
+Может сработать, если пользовательсткий протокол не привязан жестко к размеру udp пейлоада.
 Поддерживается определение пакетов QUIC Initial с расшифровкой содержимого и имени хоста, то есть параметр
 --hostlist будет работать. Для десинхронизации других протоколов обязательно указывать --dpi-desync-any-protocol.
 Реализован conntrack для udp. Можно пользоваться --dpi-desync-cutoff. Таймаут conntrack для udp

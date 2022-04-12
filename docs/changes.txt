@@ -222,3 +222,8 @@ nfqws: hop-by-hop ipv6 desync and fooling
 v46
 
 big startup script refactoring to support nftables and new openwrt snapshot builds with firewall4
+
+v47
+
+nfqws: QUIC initial decryption
+nfqws: udplen, fakeknown dpi desync modes

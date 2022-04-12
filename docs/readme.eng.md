@@ -152,7 +152,7 @@ nfqws takes the following parameters:
  --pidfile=<filename>  			; write pid to file
  --user=<username>      		; drop root privs
  --uid=uid[:gid]			; drop root privs
- --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2
+ --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
  --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
  --dpi-desync-ttl=<int>                 ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                ; set ipv6 hop limit for desync packet. by default ttl value is used
@@ -183,8 +183,9 @@ WARNING. `--wsize` parameter is now not used anymore in scripts. TCP split can b
 
 After completion of the tcp 3-way handshake, the first data packet from the client goes.
 It usually has `GET / ...` or TLS ClientHello. We drop this packet, replacing with something else.
-It can be a fake version with another harmless but valid http or https request (fake), tcp reset packet (rst,rstack),
-split into 2 segments original packet with fake segment in the middle (disorder).
+It can be a fake version with another harmless but valid http or https request (`fake`), tcp reset packet (`rst`,`rstack`),
+split into 2 segments original packet with fake segment in the middle (`split`).
+`fakeknown` sends fake only in response to known application protocol.
 In articles these attack have names **TCB desynchronization** and **TCB teardown**.
 Fake packet must reach DPI, but do not reach the destination server.
 The following means are available: set a low TTL, send a packet with bad checksum,
@@ -420,7 +421,11 @@ Set conntrack timeouts appropriately.
 
 UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
 Only desync modes `fake`,`hopbyhop`,`destopt`,`ipfrag1` and `ipfrag2` are applicable.
-`fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2`.
+`fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2` and `udplen`.
+
+`udplen` increases udp payload size by `--dpi-desync-udplen-increment` bytes. Padding is filled with zeroes.
+This option can resist DPIs that track outgoing UDP packet sizes.
+Requires that application protocol does not depend on udp payload size.
 
 QUIC initial packets are recognized. Decryption and hostname extraction is supported so `--hostlist` parameter will work.
 For other protocols desync use `--dpi-desync-any-protocol`.
