@@ -672,6 +672,24 @@ check_dns()
 	return 0
 }
 
+check_virt()
+{
+	echo \* checking virtualization
+	if exists systemd-detect-virt; then
+		local vm=$(systemd-detect-virt --vm)
+		if [ "$vm" = "none" ]; then
+			echo running on bare metal
+		else
+			echo "!!! WARNING. $vm virtualization detected !!!"
+			echo '!!! WARNING. vmware and virtualbox are known to break most of the DPI bypass techniques when network is NATed using internal hypervisor NAT !!!'
+			echo '!!! WARNING. if this is your case make sure you are bridged not NATed !!!'
+		fi
+	else
+		echo cannot detect
+	fi
+}
+
+
 install_systemd()
 {
 	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
@@ -681,6 +699,7 @@ install_systemd()
 	check_readonly_system
 	check_location copy_all
 	check_dns
+	check_virt
 	service_stop_systemd
 	select_fwtype
 	check_prerequisites_linux
@@ -706,6 +725,7 @@ _install_sysv()
 	check_readonly_system
 	check_location copy_all
 	check_dns
+	check_virt
 	service_stop_sysv
 	select_fwtype
 	check_prerequisites_linux
@@ -742,6 +762,7 @@ install_linux()
 	require_root
 	check_location copy_all
 	check_dns
+	check_virt
 	select_fwtype
 	check_prerequisites_linux
 	install_binaries
