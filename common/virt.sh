@@ -19,7 +19,7 @@ get_virt()
 			fi
 			;;
 	esac
-	echo "$vm"
+	echo "$vm" | awk '{print tolower($0)}'
 }
 check_virt()
 {
