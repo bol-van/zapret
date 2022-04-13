@@ -9,6 +9,7 @@ ZAPRET_BASE="$EXEDIR"
 . "$ZAPRET_BASE/common/dialog.sh"
 . "$ZAPRET_BASE/common/elevate.sh"
 . "$ZAPRET_BASE/common/fwtype.sh"
+. "$ZAPRET_BASE/common/virt.sh"
 
 [ -n "$QNUM" ] || QNUM=59780
 [ -n "$TPPORT" ] || TPPORT=993
@@ -1005,6 +1006,7 @@ check_system
 require_root
 check_prerequisites
 check_dns
+check_virt
 ask_params
 
 PID=

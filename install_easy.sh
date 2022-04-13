@@ -15,6 +15,7 @@ ZAPRET_BASE="$EXEDIR"
 . "$ZAPRET_BASE/common/dialog.sh"
 . "$ZAPRET_BASE/common/ipt.sh"
 . "$ZAPRET_BASE/common/installer.sh"
+. "$ZAPRET_BASE/common/virt.sh"
 
 # install target
 ZAPRET_TARGET=/opt/zapret
@@ -670,36 +671,6 @@ check_dns()
 	}
 	echo system DNS is working
 	return 0
-}
-
-check_virt()
-{
-	echo \* checking virtualization
-	local vm s v
-	if exists systemd-detect-virt; then
-		vm=$(systemd-detect-virt --vm)
-	elif [ -f /sys/class/dmi/id/product_name ]; then
-		read s </sys/class/dmi/id/product_name
-		for v in KVM QEMU VMware VMW VirtualBox Xen Bochs Parallels BHYVE Hyper-V; do
-			case "$s" in
-				"$v"*)
-				vm=$v
-				break
-    			;;
-			esac
-		done
-	fi
-	if [ -n "$vm" ]; then
-		if [ "$vm" = "none" ]; then
-			echo running on bare metal
-		else
-			echo "!!! WARNING. $vm virtualization detected !!!"
-			echo '!!! WARNING. vmware and virtualbox are known to break most of the DPI bypass techniques when network is NATed using internal hypervisor NAT !!!'
-			echo '!!! WARNING. if this is your case make sure you are bridged not NATed !!!'
-		fi
-	else
-		echo cannot detect
-	fi
 }
 
 
