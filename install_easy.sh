@@ -675,8 +675,21 @@ check_dns()
 check_virt()
 {
 	echo \* checking virtualization
+	local vm s v
 	if exists systemd-detect-virt; then
-		local vm=$(systemd-detect-virt --vm)
+		vm=$(systemd-detect-virt --vm)
+	elif [ -f /sys/class/dmi/id/product_name ]; then
+		read s </sys/class/dmi/id/product_name
+		for v in KVM QEMU VMware VMW VirtualBox Xen Bochs Parallels BHYVE Hyper-V; do
+			case "$s" in
+				"$v"*)
+				vm=$v
+				break
+    			;;
+			esac
+		done
+	fi
+	if [ -n "$vm" ]; then
 		if [ "$vm" = "none" ]; then
 			echo running on bare metal
 		else
@@ -911,6 +924,7 @@ install_openwrt()
 	check_location copy_openwrt
 	install_binaries
 	check_dns
+	check_virt
 
 	local FWTYPE_OLD=$FWTYPE
 
