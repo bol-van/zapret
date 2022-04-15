@@ -1320,6 +1320,8 @@ curl можно выкинуть, если для получения ip лист
  rm /tmp/zapret-master.zip
 
 Если места совсем мало :
+ opkg update
+ opkg install netcat
  cd /tmp
  nc -l -p 1111 >zapret.tar.gz
 На linux системе скачать и распаковать zapret. Оставить необходимый минимум файлов.
