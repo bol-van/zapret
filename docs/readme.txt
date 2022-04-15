@@ -1320,17 +1320,12 @@ curl можно выкинуть, если для получения ip лист
  rm /tmp/zapret-master.zip
 
 Если места совсем мало :
- opkg update
- opkg install netcat
- cd /tmp
- nc -l -p 1111 >zapret.tar.gz
 На linux системе скачать и распаковать zapret. Оставить необходимый минимум файлов.
 Запаковать в архив zapret.tar.gz.
- md5sum zapret.tar.gz
- nc <router_ip> 1111 <zapret.tar.gz
+ nc -l -p 1111 <zapret.tar.gz
 На роутере
- md5sum zapret.tar.gz
-Проверить соответствие hash.
+ cd /tmp
+ nc <linux_system_ip> 1111 >zapret.tar.gz
 
 Не стоит работать с распакованной версией zapret на windows. Потеряются ссылки и chmod.
 
