@@ -842,7 +842,7 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 									}
 									if (params.debug>=2)
 									{
-										printf("socks5 hostname resolved to : \n");
+										printf("socks5 hostname resolved to :\n");
 										print_addrinfo(ai);
 									}
 									memcpy(&ss,ai->ai_addr,ai->ai_addrlen);
