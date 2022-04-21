@@ -756,6 +756,12 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
+						if (m->ip==htonl(1)) // special ip 0.0.0.1
+						{
+							VPRINT("socks4a protocol not supported")
+							socks4_send_rep(conn->fd, S4_REP_FAILED);
+							return false;
+						}
 						ss.ss_family = AF_INET;
 						((struct sockaddr_in*)&ss)->sin_port = m->port;
 						((struct sockaddr_in*)&ss)->sin_addr.s_addr = m->ip;
@@ -810,14 +816,14 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 
 									if (params.no_resolve)
 									{
-										DBGPRINT("socks5 hostname resolving disabled")
+										VPRINT("socks5 hostname resolving disabled")
 										socks5_send_rep(conn->fd,S5_REP_NOT_ALLOWED_BY_RULESET);
 										return false;
 									}
 									port=S5_PORT_FROM_DD(m,rd);
 									if (!port)
 									{
-										DBGPRINT("socks5 no port is given")
+										VPRINT("socks5 no port is given")
 										socks5_send_rep(conn->fd,S5_REP_HOST_UNREACHABLE);
 										return false;
 									}
@@ -830,13 +836,13 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 									r=getaddrinfo(sdom,sport,&hints,&ai);
 									if (r)
 									{
-										DBGPRINT("socks5 getaddrinfo error %d",r)
+										VPRINT("socks5 getaddrinfo error %d",r)
 										socks5_send_rep(conn->fd,S5_REP_HOST_UNREACHABLE);
 										return false;
 									}
 									if (params.debug>=2)
 									{
-										printf("socks5 hostname resolved to :\n");
+										printf("socks5 hostname resolved to : \n");
 										print_addrinfo(ai);
 									}
 									memcpy(&ss,ai->ai_addr,ai->ai_addrlen);
