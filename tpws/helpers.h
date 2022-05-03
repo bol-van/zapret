@@ -27,3 +27,7 @@ bool is_private6(const struct sockaddr_in6* a);
 
 int set_keepalive(int fd);
 int get_so_error(int fd);
+
+static inline uint16_t pntoh16(const uint8_t *p) {
+	return ((uint16_t)p[0] << 8) | (uint16_t)p[1];
+}
