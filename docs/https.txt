@@ -91,9 +91,6 @@ redsocks {
 
 После чего перезапускаем : /etc/init.d/redsocks restart
 Смотрим появился ли листенер : netstat -tnlp | grep 1099
-Автостарт redsocks при таком конфиге не работает, потому что на момент запуска сеть не инициализирована, и у нас даже нет 127.0.0.1.
-Вместо штатного автостарта будем вешаться на события поднятия интерфейса. Разберем это позже.
-Пока что отключим автостарт : /etc/init.d/redsocks disable
 
 В zapret для перенаправления DNAT на интерфейс lo используется 127.0.0.127.
 Ко всем остальным адресам из 127.0.0.0/8 DNAT может быть заблокирован. Читайте readme.txt про route_localnet.
@@ -191,29 +188,3 @@ curl -4 https://rutracker.org
 /etc/init.d/redsocks start
 curl -4 https://rutracker.org
 # должно выдать страницу
-
-
-* Автозапуск redsocks
-
-Небольшой скриптик, вешающийся на события поднятия и опускания интерфейсов.
-
---- /etc/hotplug.d/iface/99-exec-on-updown ---
-#!/bin/sh
-if [ "$ACTION" = ifup ]; then
-cmd=$(uci get network.$INTERFACE.exec_on_up)
-[ -n "$cmd" ] && $cmd
-fi
-if [ "$ACTION" = ifdown ]; then
-cmd=$(uci get network.$INTERFACE.exec_on_down)
-[ -n "$cmd" ] && $cmd
-fi
-----------------------------------------------
-
-Теперь можно в описания интерфейсов внести в соответствующий раздел :
---- /etc/config/network ---
-config interface 'wan'
-        ........
-        option exec_on_up '/etc/init.d/redsocks start'
----------------------------
-reboot. Заходим снова, смотрим, что есть redsocks, есть ssh, опять проверяем curl -4 https://rutracker.org.
-Пробуем зайти на https://rutracker.org с компа внутри локалки.
