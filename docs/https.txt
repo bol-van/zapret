@@ -1,4 +1,8 @@
-﻿Прозрачный заворот https на роутере через socks
+﻿!!! Данная инструкция написана для систем openwrt, основанных на iptables+firewall3
+!!! В новых версиях openwrt переходит на nftables+firewall4, инструкция неприменима в виде "как есть".
+!!! Требуется переписать правила iptables на nftables, либо снести firewall4 и установить firewall3
+
+Прозрачный заворот https на роутере через socks
 
 Tor поддерживает "из коробки" режим transparent proxy. Это можно использовать в теории, но практически - только на роутерах с 128 мб памяти и выше. Таких роутеров не так много. В основном объем памяти 32 или 64 мб. И тор еще и тормозной.
 Другой вариант напрашивается, если у вас есть доступ к какой-нибудь unix системе с SSH, где сайты не блокируются. Например, у вас есть VPS вне России. Именно так и поступил.
@@ -10,6 +14,7 @@ Tor поддерживает "из коробки" режим transparent proxy.
 Буду рассматривать систему на базе openwrt, где уже установлена система обхода dpi "zapret".
 По крайней мере нужно иметь заполненный ipset 'zapret', устанавливать tpws или nfqws не обязательно.
 Более того, если они на вашей системе не срабатывают, то можно соксифицировать не только https, но и http.
+
 
 * Сделать так, чтобы все время при загрузке системы на некотором порту возникал socks
 
@@ -64,6 +69,7 @@ start_service() {
 Включить автозагрузку : /etc/init.d/socks_vps enable
 Проверка : curl -4 --socks5 127.0.0.1:1098 https://rutracker.org
 
+
 * Организовать прозрачную соксификацию
 
 Установить пакет redsocks.
@@ -92,7 +98,12 @@ redsocks {
 Вместо штатного автостарта будем вешаться на события поднятия интерфейса. Разберем это позже.
 Пока что отключим автостарт : /etc/init.d/redsocks disable
 
+
 * Завертывание соединений через iptables
+
+!! Версии OpenWRT до 21.02 включительно используют iptables + fw3. Более новые перешили на nftables по умолчанию.
+!! В новых OpenWRT можно снести firewall4 и nftables, заменив их на firewall3 + iptables
+!! Инструкция относится только к openwrt, где используется iptables.
 
 Будем завертывать любые tcp соединения на ip из ipset "ipban" и https на ip из ipset "zapret".
 
@@ -123,7 +134,63 @@ config include
         option reload '1'
 ----------------------------
 
-Перезапуск : /etc/init.d/firewall restart
+Перезапуск firewall : /etc/init.d/firewall restart
+
+
+* Завертывание соединений через nftables
+
+!! Только для версий OpenWRT старше 21.02
+
+nftables не могут использовать ipset. Вместо ipset существует аналог - nfset.
+nfset является частью таблицы nftable и принадлежит только к ней. Адресация nfset из другой nftable невозможна.
+Скрипты ipset/* в случае nftables используют nfset-ы в таблице zapret.
+Чтобы использовать эти nfset-ы в своих правилах, необходимо синхронизироваться с их созданием и вносить свои цепочки в nftable "zapret".
+Для этого существуют хуки - скрипты, вызываемые из zapret на определенных стадиях инициализации фаервола.
+
+Раскоментируейте в /opt/zapret/config строчку
+INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
+
+Создайте файл /etc/firewall.zapret.hook.post_up и присвойте ему chmod 755.
+
+--- /etc/firewall.zapret.hook.post_up ---
+#!/bin/sh
+
+SOXIFIER_PORT=1099
+
+. /lib/functions/network.sh
+. /opt/zapret/config
+
+ZAPRET_NFT_TABLE=zapret
+
+cat << EOF | nft -f - 2>/dev/null
+ delete chain inet $ZAPRET_NFT_TABLE my_output
+ delete chain inet $ZAPRET_NFT_TABLE my_prerouting
+EOF
+
+[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
+for lan in $OPENWRT_LAN; do
+ network_get_device DEVICE lan
+ sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+done
+
+cat << EOF | nft -f -
+ add chain inet $ZAPRET_NFT_TABLE my_output { type nat hook output priority -102; }
+ flush chain inet $ZAPRET_NFT_TABLE my_output
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 dnat ip to 127.0.0.1:$SOXIFIER_PORT
+
+ add chain inet $ZAPRET_NFT_TABLE my_prerouting { type nat hook prerouting priority -102; }
+ flush chain inet $ZAPRET_NFT_TABLE my_prerouting
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif tcp dport 443 dnat ip to 127.0.0.1:$SOXIFIER_PORT
+EOF
+----------------------------
+
+Перезапуск firewall : /etc/init.d/zapret restart_fw
+
+
+* Проверка
+
 Все, теперь можно проверять :
 /etc/init.d/redsocks stop
 curl -4 https://rutracker.org
@@ -132,6 +199,7 @@ curl -4 https://rutracker.org
 /etc/init.d/redsocks start
 curl -4 https://rutracker.org
 # должно выдать страницу
+
 
 * Автозапуск redsocks
 
