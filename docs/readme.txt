@@ -1338,7 +1338,7 @@ Openwrt является одной из немногих относительн
 
 Если не работает автономный обход, приходится перенаправлять трафик через сторонний хост.
 Предлагается использовать прозрачный редирект через socks5 посредством iptables+redsocks, либо iptables+iproute+vpn.
-Настройка варианта с redsocks на openwrt описана в https.txt.
+Настройка варианта с redsocks на openwrt описана в redsocks.txt.
 Настройка варианта с iproute+wireguard - в wireguard_iproute_openwrt.txt.
 
 
