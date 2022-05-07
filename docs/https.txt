@@ -96,7 +96,7 @@ redsocks {
 Пока что отключим автостарт : /etc/init.d/redsocks disable
 
 В zapret для перенаправления DNAT на интерфейс lo используется 127.0.0.127.
-Ко всем остальным адресам из 127.0.0.0/8 DNAT заблокирован. Читайте readme.txt про route_localnet.
+Ко всем остальным адресам из 127.0.0.0/8 DNAT может быть заблокирован. Читайте readme.txt про route_localnet.
 
 * Завертывание соединений через iptables
 
@@ -120,8 +120,8 @@ for ext_iface in $wan_iface; do
     ipt OUTPUT -t nat -o $ext_device -p tcp -m set --match-set ipban dst -j REDIRECT --to-port $SOXIFIER_PORT
 done
 
-network_get_device DEVICE lan
-sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
+prepare_route_localnet
+
 ipt prerouting_lan_rule -t nat -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 ipt prerouting_lan_rule -t nat -p tcp -m set --match-set ipban dst -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 ----------------------------
@@ -163,11 +163,7 @@ cat << EOF | nft -f - 2>/dev/null
  delete chain inet $ZAPRET_NFT_TABLE my_prerouting
 EOF
 
-[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
-for lan in $OPENWRT_LAN; do
- network_get_device DEVICE lan
- sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
-done
+prepare_route_localnet
 
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type nat hook output priority -102; }
