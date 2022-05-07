@@ -6,7 +6,7 @@ Tor поддерживает "из коробки" режим transparent proxy.
 1) Выделять IP, на которые надо проксировать трафик. У нас уже имеется ipset "zapret", технология создания которого отработана.
 2) Сделать так, чтобы все время при загрузке системы на некотором порту возникал socks.
 3) Установить transparent соксификатор. Redsocks прекрасно подошел на эту роль.
-4) Завернуть через iptables трафик с порта назначения 443 и на ip адреса из ipset 'zapret' на соксификатор
+4) Завернуть через iptables или nftables трафик с порта назначения 443 и на ip адреса из ipset/nfset 'zapret' на соксификатор
 Буду рассматривать систему на базе openwrt, где уже установлена система обхода dpi "zapret".
 По крайней мере нужно иметь заполненный ipset 'zapret', устанавливать tpws или nfqws не обязательно.
 Более того, если они на вашей системе не срабатывают, то можно соксифицировать не только https, но и http.
@@ -173,12 +173,12 @@ cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type nat hook output priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
  add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 dnat ip to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret dnat to 127.0.0.1:$SOXIFIER_PORT
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type nat hook prerouting priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
  add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif tcp dport 443 dnat ip to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif tcp dport 443 ip daddr @zapret dnat to 127.0.0.1:$SOXIFIER_PORT
 EOF
 ----------------------------
 
