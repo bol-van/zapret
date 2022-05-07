@@ -177,8 +177,8 @@ cat << EOF | nft -f -
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type nat hook prerouting priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
- add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_prerouting oifname @wanif tcp dport 443 ip daddr @zapret dnat to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret dnat to 127.0.0.1:$SOXIFIER_PORT
 EOF
 ----------------------------
 
