@@ -81,19 +81,22 @@ base {
 	redirector = iptables;
 }
 redsocks {
-        local_ip = 127.0.0.1;
+        local_ip = 127.0.0.127;
         local_port = 1099;
         ip = 127.0.0.1;
         port = 1098;
         type = socks5;
 }
 ---------------------------
+
 После чего перезапускаем : /etc/init.d/redsocks restart
 Смотрим появился ли листенер : netstat -tnlp | grep 1099
 Автостарт redsocks при таком конфиге не работает, потому что на момент запуска сеть не инициализирована, и у нас даже нет 127.0.0.1.
 Вместо штатного автостарта будем вешаться на события поднятия интерфейса. Разберем это позже.
 Пока что отключим автостарт : /etc/init.d/redsocks disable
 
+В zapret для перенаправления DNAT на интерфейс lo используется 127.0.0.127.
+Ко всем остальным адресам из 127.0.0.0/8 DNAT заблокирован. Читайте readme.txt про route_localnet.
 
 * Завертывание соединений через iptables
 
@@ -119,8 +122,8 @@ done
 
 network_get_device DEVICE lan
 sysctl -w net.ipv4.conf.$DEVICE.route_localnet=1
-ipt prerouting_lan_rule -t nat -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to 127.0.0.1:$SOXIFIER_PORT
-ipt prerouting_lan_rule -t nat -p tcp -m set --match-set ipban dst -j DNAT --to 127.0.0.1:$SOXIFIER_PORT
+ipt prerouting_lan_rule -t nat -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ipt prerouting_lan_rule -t nat -p tcp -m set --match-set ipban dst -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 ----------------------------
 
 Внести параметр "reload" в указанное место :
@@ -153,10 +156,7 @@ INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
 
 SOXIFIER_PORT=1099
 
-. /lib/functions/network.sh
-. /opt/zapret/config
-
-ZAPRET_NFT_TABLE=zapret
+. /opt/zapret/init.d/openwrt/functions
 
 cat << EOF | nft -f - 2>/dev/null
  delete chain inet $ZAPRET_NFT_TABLE my_output
@@ -172,13 +172,13 @@ done
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type nat hook output priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret dnat to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta l4proto tcp ip daddr @ipban dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type nat hook prerouting priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif meta l4proto tcp ip daddr @ipban dnat to 127.0.0.1:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret dnat to 127.0.0.1:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif meta l4proto tcp ip daddr @ipban dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 EOF
 ----------------------------
 
