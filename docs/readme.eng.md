@@ -927,8 +927,7 @@ The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extro
 Its not possible to use nfqws and tpws in transparent proxy mode without root privileges.
 Without root tpws can run in --socks mode.
 
-I have no NFQUEUE presence statistics in stock android kernels, but its present on my MTK device.
-If NFQUEUE is present nfqws works.
+Android has NFQUEUE and nfqws should work.
 
 There's no ipset support unless you run custom kernel. In common case task of bringing up ipset
 on android is ranging from "not easy" to "almost impossible", unless you find working kernel
