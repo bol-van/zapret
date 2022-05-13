@@ -1,0 +1,26 @@
+nftables test cheat sheet
+simplified rule to test nfqws and tpws
+
+
+For DNAT :
+
+# run tpws as user "tpws". its required to avoid loops.
+
+nft delete table inet ztest
+nft create table inet ztest
+nft add chain inet ztest pre "{type nat hook prerouting priority dstnat;}"
+nft add rule inet ztest pre tcp dport "{80,443}" redirect to :988
+nft add chain inet ztest out "{type nat hook output priority -100;}"
+nft add rule inet ztest out tcp dport "{80,443}" skuid != tpws redirect to :988
+
+
+For dpi desync attack :
+
+nft delete table inet ztest
+nft create table inet ztest
+nft add chain inet ztest post "{type filter hook postrouting priority mangle;}"
+nft add rule inet ztest post tcp dport "{80,443}" queue num 200 bypass
+
+
+show rules   : nft list table inet ztest
+delete table : nft delete table inet ztest
