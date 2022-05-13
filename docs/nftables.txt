@@ -1,5 +1,5 @@
 nftables test cheat sheet
-simplified rule to test nfqws and tpws
+simplified rules to test nfqws and tpws
 
 
 For DNAT :
