@@ -851,6 +851,7 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 
 static int rawsend_sock4=-1, rawsend_sock6=-1;
+static bool b_bind_fix4=false, b_bind_fix6=false;
 static void rawsend_clean_sock(int *sock)
 {
 	if (sock && *sock!=-1)
@@ -934,7 +935,28 @@ static int rawsend_socket_raw(int domain, int proto)
 	return fd;
 }
 
-static int rawsend_socket(sa_family_t family,uint32_t fwmark)
+static bool set_socket_fwmark(int sock, uint32_t fwmark)
+{
+#ifdef BSD
+#ifdef SO_USER_COOKIE
+	if (setsockopt(sock, SOL_SOCKET, SO_USER_COOKIE, &fwmark, sizeof(fwmark)) == -1)
+	{
+		perror("rawsend: setsockopt(SO_USER_COOKIE)");
+		return false;
+	}
+#endif
+#elif defined(__linux__)
+	if (setsockopt(sock, SOL_SOCKET, SO_MARK, &fwmark, sizeof(fwmark)) == -1)
+	{
+		perror("rawsend: setsockopt(SO_MARK)");
+		return false;
+	}
+
+#endif
+	return true;
+}
+
+static int rawsend_socket(sa_family_t family)
 {
 	int yes=1;
 	int *sock = rawsend_family_sock(family);
@@ -971,20 +993,8 @@ static int rawsend_socket(sa_family_t family,uint32_t fwmark)
 			goto exiterr;
 		}
 #endif
-#ifdef SO_USER_COOKIE
-		if (setsockopt(*sock, SOL_SOCKET, SO_USER_COOKIE, &fwmark, sizeof(fwmark)) == -1)
-		{
-			perror("rawsend: setsockopt(SO_MARK)");
-			goto exiterr;
-		}
-#endif
 #endif
 #ifdef __linux__
-		if (setsockopt(*sock, SOL_SOCKET, SO_MARK, &fwmark, sizeof(fwmark)) == -1)
-		{
-			perror("rawsend: setsockopt(SO_MARK)");
-			goto exiterr;
-		}
 		if (setsockopt(*sock, SOL_SOCKET, SO_PRIORITY, &pri, sizeof(pri)) == -1)
 		{
 			perror("rawsend: setsockopt(SO_PRIORITY)");
@@ -995,6 +1005,16 @@ static int rawsend_socket(sa_family_t family,uint32_t fwmark)
 			perror("rawsend: setsockopt(IP_NODEFRAG)");
 			goto exiterr;
 		}
+		if (family==AF_INET && setsockopt(*sock, IPPROTO_IP, IP_FREEBIND, &yes, sizeof(yes)) == -1)
+		{
+			perror("rawsend: setsockopt(IP_FREEBIND)");
+			goto exiterr;
+		}
+		if (family==AF_INET6 && setsockopt(*sock, SOL_IPV6, IPV6_FREEBIND, &yes, sizeof(yes)) == -1)
+		{
+			perror("rawsend: setsockopt(IPV6_FREEBIND)");
+			// dont error because it's supported only from kernel 4.15
+		}
 #endif
 	}
 	return *sock;
@@ -1002,14 +1022,17 @@ exiterr:
 	rawsend_clean_sock(sock);
 	return -1;
 }
-bool rawsend_preinit(uint32_t fwmark)
+bool rawsend_preinit(bool bind_fix4, bool bind_fix6)
 {
-	return rawsend_socket(AF_INET,fwmark)!=-1 && rawsend_socket(AF_INET6,fwmark)!=-1;
+	b_bind_fix4 = bind_fix4;
+	b_bind_fix6 = bind_fix6;
+	return rawsend_socket(AF_INET)!=-1 && rawsend_socket(AF_INET6)!=-1;
 }
-bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t len)
+bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len)
 {
-	int sock=rawsend_socket(dst->sa_family,fwmark);
+	int sock=rawsend_socket(dst->sa_family);
 	if (sock==-1) return false;
+	if (!set_socket_fwmark(sock,fwmark)) return false;
 
 	int salen = dst->sa_family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 	struct sockaddr_storage dst2;
@@ -1028,7 +1051,7 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 			v = ((struct ip6_hdr *)data)->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 			if (setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &v, sizeof(v)) == -1)
 				perror("rawsend: setsockopt(IPV6_HOPLIMIT)");
-[5~			// the only way to control source address is bind. make it equal to ip6_hdr
+			// the only way to control source address is bind. make it equal to ip6_hdr
 			if (bind(sock, (struct sockaddr*)&sa_src, salen) < 0)
 				perror("rawsend bind: ");
 			//printf("BSD v6 RAWSEND "); print_sockaddr((struct sockaddr*)&sa_src); printf(" -> "); print_sockaddr((struct sockaddr*)&dst2); printf("\n");
@@ -1059,6 +1082,44 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t 
 		((struct ip*)data)->ip_off = htons(((struct ip*)data)->ip_off);
 	}
 #endif
+
+#if defined(__linux__)
+	struct sockaddr_storage sa_src;
+	switch(dst->sa_family)
+	{
+		case AF_INET:
+			if (!b_bind_fix4) goto nofix;
+			extract_endpoints(data,NULL,NULL,NULL, &sa_src, NULL);
+			break;
+		case AF_INET6:
+			if (!b_bind_fix6) goto nofix;
+			extract_endpoints(NULL,data,NULL,NULL, &sa_src, NULL);
+			break;
+		default:
+			return false; // should not happen
+	}
+	//printf("family %u dev %s bind : ",  dst->sa_family, ifout); print_sockaddr((struct sockaddr *)&sa_src); printf("\n");
+	if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, ifout, ifout ? strlen(ifout)+1 : 0) == -1)
+	{
+		perror("rawsend: setsockopt(SO_BINDTODEVICE)");
+		return false;
+	}
+	if (bind(sock, (const struct sockaddr*)&sa_src, dst->sa_family==AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)))
+	{
+		perror("rawsend: bind (ignoring)");
+		// do not fail. this can happen regardless of IP_FREEBIND
+		// rebind to any address
+		memset(&sa_src,0,sizeof(sa_src));
+		sa_src.ss_family = dst->sa_family;
+		if (bind(sock, (const struct sockaddr*)&sa_src, dst->sa_family==AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)))
+		{
+			perror("rawsend: bind to any");
+			return false;
+		}
+	}
+nofix:
+#endif
+
 	// normal raw socket sendto
 	ssize_t bytes = sendto(sock, data, len, 0, (struct sockaddr*)&dst2, salen);
 #if defined(__FreeBSD) && __FreeBSD__<=10

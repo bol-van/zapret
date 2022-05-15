@@ -7,6 +7,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <net/if.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -37,6 +38,7 @@ struct params_s
 #elif defined(BSD)
 	uint16_t port; // divert port
 #endif
+	char bind_fix4,bind_fix6;
 	bool hostcase, hostnospace, domcase;
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;

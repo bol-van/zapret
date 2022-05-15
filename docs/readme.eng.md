@@ -140,6 +140,8 @@ nfqws takes the following parameters:
 ```
  --debug=0|1				; 1=print debug info
  --qnum=<nfqueue_number>
+ --bind-fix4                            ; apply outgoing interface selection fix for generated ipv4 packets
+ --bind-fix6                            ; apply outgoing interface selection fix for generated ipv6 packets
  --wsize=<winsize>[:<scale_factor>]	; change window size in SYN,ACK packets. default is not to change scale factor (OBSOLETE !)
  --wssize=<winsize>[:<scale_factor>]	; change window size in outgoing packets. default scale factor is 0. (see CONNTRACK)
  --wssize-cutoff=[n|d|s]N               ; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N

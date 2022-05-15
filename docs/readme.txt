@@ -197,6 +197,8 @@ nfqws
  --user=<username>			; менять uid процесса
  --uid=uid[:gid]			; менять uid процесса
  --qnum=N				; номер очереди N
+ --bind-fix4                            ; пытаться решить проблему неверного выбора исходящего интерфейса для сгенерированных ipv4 пакетов
+ --bind-fix6                            ; пытаться решить проблему неверного выбора исходящего интерфейса для сгенерированных ipv6 пакетов
  --wsize=<winsize>[:<scale_factor>]	; менять tcp window size на указанный размер в SYN,ACK. если не задан scale_factor, то он не меняется (устарело !)
  --wssize=<winsize>[:<scale_factor>]	; менять tcp window size на указанный размер в исходящих пакетах. scale_factor по умолчанию 0. (см. conntrack !)
  --wssize-cutoff=[n|d|s]N               ; изменять server window size в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N

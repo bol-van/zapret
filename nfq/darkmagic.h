@@ -118,9 +118,9 @@ uint32_t *tcp_find_timestamps(struct tcphdr *tcp);
 uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
 
 // auto creates internal socket and uses it for subsequent calls
-bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const void *data,size_t len);
+bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len);
 // should pre-do it if dropping privileges. otherwise its not necessary
-bool rawsend_preinit(uint32_t fwmark);
+bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 // cleans up socket autocreated by rawsend
 void rawsend_cleanup();
 

@@ -78,11 +78,7 @@ static void onusr1(int sig)
 
 
 
-#ifdef __linux__
-static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt, uint32_t *mark)
-#else
-static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt)
-#endif
+static packet_process_result processPacketData(uint32_t *mark, const char *ifout, uint8_t *data_pkt, size_t len_pkt)
 {
 	struct ip *ip = NULL;
 	struct ip6_hdr *ip6hdr = NULL;
@@ -143,7 +139,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 
 		if (len) { DLOG("TCP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
 
-		res = dpi_desync_tcp_packet(data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_with_th, data, len);
+		res = dpi_desync_tcp_packet(*mark, ifout, data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_with_th, data, len);
 		// in my FreeBSD divert tests only ipv4 packets were reinjected with correct checksum
 		// ipv6 packets were with incorrect checksum
 #ifdef __FreeBSD__
@@ -168,7 +164,7 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 		}
 		if (len) { DLOG("UDP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
 
-		res = dpi_desync_udp_packet(data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
+		res = dpi_desync_udp_packet(*mark, ifout, data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
 		if (res==modify || res!=frag && ip6hdr)
@@ -187,23 +183,35 @@ static packet_process_result processPacketData(uint8_t *data_pkt, size_t len_pkt
 
 
 #ifdef __linux__
-static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
-	struct nfq_data *nfa, void *cookie)
+static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *cookie)
 {
 	int id;
 	int len;
 	struct nfqnl_msg_packet_hdr *ph;
 	uint8_t *data;
+	uint32_t ifidx;
+	char ifout[IFNAMSIZ+1];
 
 	ph = nfq_get_msg_packet_hdr(nfa);
 	id = ph ? ntohl(ph->packet_id) : 0;
 
 	uint32_t mark = nfq_get_nfmark(nfa);
 	len = nfq_get_payload(nfa, &data);
-	DLOG("packet: id=%d len=%d\n", id, len)
+
+	*ifout=0;
+	if (params.bind_fix4 || params.bind_fix6)
+	{
+		ifidx = nfq_get_outdev(nfa);
+		if (ifidx) if_indextoname(ifidx,ifout);
+
+		DLOG("packet: id=%d len=%d ifout=%s(%u)\n", id, len, ifout, ifidx)
+	}
+	else
+		// save some syscalls
+		DLOG("packet: id=%d len=%d\n", id, len)
 	if (len >= 0)
 	{
-		switch (processPacketData(data, len, &mark))
+		switch (processPacketData(&mark, ifout, data, len))
 		{
 		case modify: 
 			DLOG("packet: id=%d pass modified\n", id);
@@ -265,6 +273,10 @@ static int nfq_main()
 		fprintf(stderr, "can't set queue flags. its OK on linux <3.6\n");
 		// dot not fail. not supported on old linuxes <3.6 
 	}
+
+	printf("initializing raw sockets bind-fix4=%u bind-fix6=%u\n",params.bind_fix4,params.bind_fix6);
+	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
+		goto exiterr;
 
 	if (params.droproot && !droproot(params.uid, params.gid))
 		goto exiterr;
@@ -378,8 +390,8 @@ static int dvt_main()
 #endif
 	fdmax = (fd[0]>fd[1] ? fd[0] : fd[1]) + 1;
 
-	printf("initializing raw sockets with sockarg 0x%08X (%u)\n", params.desync_fwmark, params.desync_fwmark);
-	if (!rawsend_preinit(params.desync_fwmark))
+	printf("initializing raw sockets\n");
+	if (!rawsend_preinit(false,false))
 		goto exiterr;
 
 	if (params.droproot && !droproot(params.uid, params.gid))
@@ -420,8 +432,9 @@ static int dvt_main()
 				}
 				else if (rd>0)
 				{
+					uint32_t mark=0;
 					DLOG("packet: id=%u len=%zd\n", id, rd)
-					ppr = processPacketData(buf, rd);
+					ppr = processPacketData(&mark, NULL, buf, rd);
 					switch (ppr)
 					{
 					case pass:
@@ -497,6 +510,10 @@ static void exithelp()
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
 		" --user=<username>\t\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t\t; drop root privs\n"
+#ifdef __linux__
+		" --bind-fix4\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
+		" --bind-fix6\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
+#endif
 		" --wsize=<window_size>[:<scale_factor>]\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
@@ -686,6 +703,10 @@ int main(int argc, char **argv)
 		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=33
 		{"dpi-desync-cutoff",required_argument,0,0},// optidx=34
 		{"hostlist",required_argument,0,0},		// optidx=35
+#ifdef __linux__
+		{"bind-fix4",no_argument,0,0},		// optidx=36
+		{"bind-fix6",no_argument,0,0},		// optidx=37
+#endif
 		{NULL,0,NULL,0}
 	};
 	if (argc < 2) exithelp();
@@ -986,6 +1007,14 @@ int main(int argc, char **argv)
 			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
 			params.hostfile[sizeof(params.hostfile)-1]='\0';
 			break;
+#ifdef __linux__
+		case 36: /* bind-fix4 */
+			params.bind_fix4 = true;
+			break;
+		case 37: /* bind-fix6 */
+			params.bind_fix6 = true;
+			break;
+#endif
 		}
 	}
 	// not specified - use desync_ttl value instead
