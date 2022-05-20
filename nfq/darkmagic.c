@@ -885,7 +885,7 @@ static int rawsend_socket_divert(sa_family_t family)
 	// from my point of view disabling direct ability to send ip frames is not security. its SHIT
 
 	int fd = socket(family, SOCK_RAW, IPPROTO_DIVERT);
-	if (!set_socket_buffers(fd,4096,RAW_SNDBUF))
+	if (fd!=-1 && !set_socket_buffers(fd,4096,RAW_SNDBUF))
 	{
 		close(fd);
 		return -1;
@@ -1026,10 +1026,12 @@ bool rawsend_preinit(bool bind_fix4, bool bind_fix6)
 {
 	b_bind_fix4 = bind_fix4;
 	b_bind_fix6 = bind_fix6;
-	return rawsend_socket(AF_INET)!=-1 && rawsend_socket(AF_INET6)!=-1;
+	// allow ipv6 disabled systems
+	return rawsend_socket(AF_INET)!=-1 && (rawsend_socket(AF_INET6)!=-1 || errno==EAFNOSUPPORT);
 }
 bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len)
 {
+	ssize_t bytes;
 	int sock=rawsend_socket(dst->sa_family);
 	if (sock==-1) return false;
 	if (!set_socket_fwmark(sock,fwmark)) return false;
@@ -1121,7 +1123,7 @@ nofix:
 #endif
 
 	// normal raw socket sendto
-	ssize_t bytes = sendto(sock, data, len, 0, (struct sockaddr*)&dst2, salen);
+	bytes = sendto(sock, data, len, 0, (struct sockaddr*)&dst2, salen);
 #if defined(__FreeBSD) && __FreeBSD__<=10
 	// restore byte order
 	if (dst->sa_family==AF_INET && len>=sizeof(struct ip))
