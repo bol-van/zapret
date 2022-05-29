@@ -129,7 +129,7 @@ _fw_tpws4()
 	# $3 - tpws port
 	# $4 - lan interface names space separated
 	# $5 - wan interface names space separated
-	[ "$DISABLE_IPV4" = "1" ] || {
+	[ "$DISABLE_IPV4" = "1" -o -z "$2" ] || {
 		local i rule
 
 		[ "$1" = 1 ] && prepare_tpws_fw4
@@ -159,7 +159,7 @@ _fw_tpws6()
 	# $4 - lan interface names space separated
 	# $5 - wan interface names space separated
 
-	[ "$DISABLE_IPV6" = "1" ] || {
+	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || {
 		local i rule DNAT6
 
 		ipt_print_op $1 "$2" "tpws (port $3)" 6
@@ -197,7 +197,7 @@ _fw_nfqws_post4()
 	# $2 - iptable filter for ipv4
 	# $3 - queue number
 	# $4 - wan interface names space separated
-	[ "$DISABLE_IPV4" = "1" ] || {
+	[ "$DISABLE_IPV4" = "1" -o -z "$2" ] || {
 		local i
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)"
@@ -218,7 +218,7 @@ _fw_nfqws_post6()
 	# $2 - iptable filter for ipv6
 	# $3 - queue number
 	# $4 - wan interface names space separated
-	[ "$DISABLE_IPV6" = "1" ] || {
+	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || {
 		local i
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)" 6
