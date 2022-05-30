@@ -449,8 +449,9 @@ copy_openwrt()
 	local BINDIR="$1/binaries/$ARCH"
 	
 	[ -d "$2" ] || mkdir -p "$2"
-	
-	mkdir "$2/tpws" "$2/nfq" "$2/ip2net" "$2/mdig" "$2/binaries" "$2/binaries/$ARCH" "$2/init.d" "$2/tmp"
+
+	mkdir "$2/tpws" "$2/nfq" "$2/ip2net" "$2/mdig" "$2/binaries" "$2/binaries/$ARCH" "$2/init.d" "$2/tmp" "$2/files"
+	cp -R "$1/files/fake" "$2/files"
 	cp -R "$1/common" "$1/ipset" "$2"
 	cp -R "$1/init.d/openwrt" "$2/init.d"
 	cp "$1/config" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$1/blockcheck.sh" "$2"
