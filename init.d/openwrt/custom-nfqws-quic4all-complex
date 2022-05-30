@@ -1,11 +1,11 @@
 # this custom script in addition to MODE=nfqws runs desync to all QUIC initial packets, without ipset/hostlist filtering
-# and also sends special fake on outgoing packets with short header and udp.length>=600
+# and also sends special fake on the first outgoing packet with short header and udp.length>600
 # need to add to config : NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
 # need to add to config : NFQWS_OPT_DESYNC_QUIC_SHORT_HEADER="--dpi-desync=fake --dpi-desync-any-protocol --dpi-desync-fake-unknown-udp=/opt/zapret/files/fake/quic_short_header.bin --dpi-desync-cutoff=n2"
 # NOTE : do not use TTL fooling. chromium QUIC engine breaks sessions if TTL expired in transit received
 
-# this hack is for russian TSPU QUIC blocking
-# without additional short header fake connections randomly hang
+# this hack was first intended for TSPU but it appeared that it's overkill
+# it's enough to send short header fake before initial
 
 QNUM2=$(($QNUM+10))
 QNUM3=$(($QNUM+11))
