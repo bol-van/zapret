@@ -634,7 +634,8 @@ int main(int argc, char **argv)
 	memcpy(params.fake_tls,fake_tls_clienthello_default,params.fake_tls_size);
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
-	params.fake_quic_size = 256;
+	params.fake_quic_size = 620; // must be 601+ for TSPU hack
+	params.fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
 	params.fake_unknown_size = 256;
 	params.fake_unknown_udp_size = 64;
 	params.wscale=-1; // default - dont change scale factor (client)
