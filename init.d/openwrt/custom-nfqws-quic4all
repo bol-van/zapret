@@ -1,5 +1,6 @@
 # this custom script in addition to MODE=nfqws runs desync to all QUIC initial packets, without ipset/hostlist filtering
 # need to add to config : NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
+# russian TSPU version  : NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake --dpi-desync-fake-quic=/opt/zapret/files/fake/quic_short_header.bin"
 # NOTE : do not use TTL fooling. chromium QUIC engine breaks sessions if TTL expired in transit received
 
 QNUM2=$(($QNUM+10))
