@@ -5,7 +5,6 @@
 # NOTE : do not use TTL fooling. chromium QUIC engine breaks sessions if TTL expired in transit received
 
 # this hack was first intended for TSPU but it appeared that it's overkill
-# it's enough to send short header fake before initial
 
 QNUM2=$(($QNUM+10))
 QNUM3=$(($QNUM+11))
