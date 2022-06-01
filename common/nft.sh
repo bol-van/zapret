@@ -109,10 +109,11 @@ cat << EOF | nft -f - 2>/dev/null
 	delete chain inet $ZAPRET_NFT_TABLE forward
 	delete chain inet $ZAPRET_NFT_TABLE input
 	delete chain inet $ZAPRET_NFT_TABLE postrouting
-	delete chain inet $ZAPRET_NFT_TABLE predefrag
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload
 	delete chain inet $ZAPRET_NFT_TABLE localnet_protect
 EOF
+# unfortunately this approach breaks udp desync of the connection initiating packet (new, first one)
+#	delete chain inet $ZAPRET_NFT_TABLE predefrag
 }
 nft_del_flowtable()
 {
