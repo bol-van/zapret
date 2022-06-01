@@ -5,6 +5,11 @@ EXEDIR="$(cd "$EXEDIR"; pwd)"
 BINS=binaries
 BINDIR="$EXEDIR/$BINS"
 
+exists()
+{
+	which "$1" >/dev/null 2>/dev/null
+}
+
 check_dir()
 {
 	local dir="$BINDIR/$1"
@@ -13,8 +18,15 @@ check_dir()
 	if [ -f "$exe" ]; then
 		if [ -x "$exe" ]; then
 			# ash and dash try to execute invalid executables as a script. they interpret binary garbage with possible negative consequences
-			# find do not use shell exec
-			out=$(echo 0.0.0.0 | find "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
+			# bash do not do this
+			if exists bash; then
+				out=$(echo 0.0.0.0 | bash -c "$exe" 2>/dev/null)
+			else
+				# find do not use its own shell exec
+				# it uses execvp(). in musl libc it does not call shell, in glibc it DOES call /bin/sh
+				# that's why prefer bash if present
+				out=$(echo 0.0.0.0 | find "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
+			fi
 			[ -n "$out" ]
 		else
 			echo "$exe is not executable. set proper chmod."
