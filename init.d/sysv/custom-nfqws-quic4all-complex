@@ -57,9 +57,9 @@ zapret_custom_firewall_nft()
 	zapret_apply_firewall_rules_nft
 
 	f="udp dport 443"
-	nft_fw_nfqws_post $1 "$f $desync $first_packets_only" "$f $desync $first_packets_only" $QNUM2
+	nft_fw_nfqws_post "$f $desync $first_packets_only" "$f $desync $first_packets_only" $QNUM2
 	# this for ipv4 only. do not have access to ipv6 enabled TSPU to test
-	nft_fw_nfqws_post $1 "$f $desync $udplen $short_header4" "" $QNUM3
+	nft_fw_nfqws_post "$f $desync $udplen $short_header4" "" $QNUM3
 	# add flow offload exemption for the whole stream because we dont know when short_header rule triggers
 	nft_add_flow_offload_exemption "$f" "" "QUIC exemption for complex TSPU hack"
 }
