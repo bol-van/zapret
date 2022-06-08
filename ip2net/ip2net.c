@@ -105,16 +105,12 @@ static inline const struct in6_addr *mask_from_bitcount6(uint32_t zct)
 // result = a & b
 static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct in6_addr *result)
 {
-	// POSSIBLE GCC COMPILER BUG . when using uint64_t and -O2/-O3 optimizations this function gets inlined with the wrong code and produces wrong results
-#if defined(__GNUC__) && !defined(__llvm__) && !defined(__NO_INLINE__)
-	((uint32_t*)result->s6_addr)[0] = ((uint32_t*)a->s6_addr)[0] & ((uint32_t*)b->s6_addr)[0];
-	((uint32_t*)result->s6_addr)[1] = ((uint32_t*)a->s6_addr)[1] & ((uint32_t*)b->s6_addr)[1];
-	((uint32_t*)result->s6_addr)[2] = ((uint32_t*)a->s6_addr)[2] & ((uint32_t*)b->s6_addr)[2];
-	((uint32_t*)result->s6_addr)[3] = ((uint32_t*)a->s6_addr)[3] & ((uint32_t*)b->s6_addr)[3];
-#else
-	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
-	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
-#endif
+	uint64_t a_addr[2], b_addr[2];
+	memcpy(a_addr, a->s6_addr, 16);
+	memcpy(b_addr, b->s6_addr, 16);
+	a_addr[0] &= b_addr[0];
+	a_addr[1] &= b_addr[1];
+	memcpy(result->s6_addr, a_addr, 16);
 }
 
 static void rtrim(char *s)
