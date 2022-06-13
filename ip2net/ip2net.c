@@ -102,7 +102,14 @@ static inline const struct in6_addr *mask_from_bitcount6(uint32_t zct)
 }
 
 
-// result = a & b
+/*
+// this is "correct" solution for strict aliasing feature
+// but I don't like this style of coding
+// write what I don't mean to force smart optimizer to do what it's best
+// it produces better code sometimes but not on all compilers/versions/archs
+// sometimes it even generates real memcpy calls (mips32,arm32)
+// so I will not do it
+
 static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct in6_addr *result)
 {
 	uint64_t a_addr[2], b_addr[2];
@@ -111,6 +118,24 @@ static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct i
 	a_addr[0] &= b_addr[0];
 	a_addr[1] &= b_addr[1];
 	memcpy(result->s6_addr, a_addr, 16);
+}
+*/
+
+// YES, from my point of view C should work as a portable assembler. It must do what I instruct it to do.
+// that's why I disable strict aliasing for this function. I observed gcc can miscompile with O2/O3 setting if inlined and not coded "correct"
+// result = a & b
+#if defined(__GNUC__) && !defined(__llvm__)
+__attribute__((optimize ("no-strict-aliasing")))
+#endif
+static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct in6_addr *result)
+{
+#ifdef __SIZEOF_INT128__
+	// gcc and clang have 128 bit int types on some 64-bit archs. take some advantage
+	*((unsigned __int128*)result->s6_addr) = *((unsigned __int128*)a->s6_addr) & *((unsigned __int128*)b->s6_addr);
+#else
+	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
+	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
+#endif
 }
 
 static void rtrim(char *s)
