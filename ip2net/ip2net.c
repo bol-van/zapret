@@ -57,8 +57,41 @@ static uint32_t unique(uint32_t *pu, uint32_t ct)
 
 
 
+#if defined(__GNUC__) && !defined(__llvm__)
+__attribute__((optimize ("no-strict-aliasing")))
+#endif
 static int cmp6(const void * a, const void * b, void *arg)
 {
+	// this function is critical to sort performance
+	// on big endian systems cpu byte order is equal to network byte order
+	// no conversion required. it's possible to improve speed by using big size compares
+	// assume that a and b are properly aligned
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__==__ORDER_BIG_ENDIAN__)
+#ifdef __SIZEOF_INT128__
+	// the fastest possible way (MIPS64/PPC64 only ?)
+	const unsigned __int128 *pa = (unsigned __int128*)((struct in6_addr *)a)->s6_addr;
+	const unsigned __int128 *pb = (unsigned __int128*)((struct in6_addr *)b)->s6_addr;
+	return *pa < *pb ? -1 : *pa == *pb ? 0 : 1;
+#else
+	const uint64_t *pa = (uint64_t*)((struct in6_addr *)a)->s6_addr;
+	const uint64_t *pb = (uint64_t*)((struct in6_addr *)b)->s6_addr;
+
+	if (pa[0] < pb[0])
+		return -1;
+	else if (pa[0] == pb[0])
+	{
+		if (pa[1] < pb[1])
+			return -1;
+		else if (pa[1] > pb[1])
+			return 1;
+		else
+			return 0;
+	}
+	else
+		return 1; // pa[0] > pb[0]
+#endif
+#else
+	// little endian or unknown. reversing byte order voids performance improvement. so do byte comparision
 	for (uint8_t i = 0; i < sizeof(((struct in6_addr *)0)->s6_addr); i++)
 	{
 		if (((struct in6_addr *)a)->s6_addr[i] < ((struct in6_addr *)b)->s6_addr[i])
@@ -67,6 +100,7 @@ static int cmp6(const void * a, const void * b, void *arg)
 			return 1;
 	}
 	return 0;
+#endif
 }
 // make presorted array unique. return number of unique items.
 static uint32_t unique6(struct in6_addr *pu, uint32_t ct)
@@ -124,6 +158,7 @@ static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct i
 // YES, from my point of view C should work as a portable assembler. It must do what I instruct it to do.
 // that's why I disable strict aliasing for this function. I observed gcc can miscompile with O2/O3 setting if inlined and not coded "correct"
 // result = a & b
+// assume that a and b are properly aligned
 #if defined(__GNUC__) && !defined(__llvm__)
 __attribute__((optimize ("no-strict-aliasing")))
 #endif
