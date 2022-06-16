@@ -65,33 +65,42 @@ static int cmp6(const void * a, const void * b, void *arg)
 	// this function is critical to sort performance
 	// on big endian systems cpu byte order is equal to network byte order
 	// no conversion required. it's possible to improve speed by using big size compares
+	// on little endian systems byte conversion also gives better result than byte comparision
+	// 64-bit archs often have cpu command to reverse byte order
 	// assume that a and b are properly aligned
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__==__ORDER_BIG_ENDIAN__)
-#ifdef __SIZEOF_INT128__
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__==__ORDER_BIG_ENDIAN__) && defined(__SIZEOF_INT128__)
 	// the fastest possible way (MIPS64/PPC64 only ?)
 	const unsigned __int128 *pa = (unsigned __int128*)((struct in6_addr *)a)->s6_addr;
 	const unsigned __int128 *pb = (unsigned __int128*)((struct in6_addr *)b)->s6_addr;
 	return *pa < *pb ? -1 : *pa == *pb ? 0 : 1;
+#elif defined(__BYTE_ORDER__) && ((__BYTE_ORDER__==__ORDER_BIG_ENDIAN__) || (__BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__))
+	uint64_t am,al,bm,bl;
+#if __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__
+	am = __builtin_bswap64(((uint64_t*)((struct in6_addr *)a)->s6_addr)[0]);
+	al = __builtin_bswap64(((uint64_t*)((struct in6_addr *)a)->s6_addr)[1]);
+	bm = __builtin_bswap64(((uint64_t*)((struct in6_addr *)b)->s6_addr)[0]);
+	bl = __builtin_bswap64(((uint64_t*)((struct in6_addr *)b)->s6_addr)[1]);
 #else
-	const uint64_t *pa = (uint64_t*)((struct in6_addr *)a)->s6_addr;
-	const uint64_t *pb = (uint64_t*)((struct in6_addr *)b)->s6_addr;
-
-	if (pa[0] < pb[0])
+	am = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[0];
+	al = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[1];
+	bm = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[0];
+	bl = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[1];
+#endif
+	if (am < bm)
 		return -1;
-	else if (pa[0] == pb[0])
+	else if (am == bm)
 	{
-		if (pa[1] < pb[1])
+		if (al < bl)
 			return -1;
-		else if (pa[1] > pb[1])
+		else if (al > bl)
 			return 1;
 		else
 			return 0;
 	}
 	else
-		return 1; // pa[0] > pb[0]
-#endif
+		return 1;
 #else
-	// little endian or unknown. reversing byte order voids performance improvement. so do byte comparision
+	// fallback case
 	for (uint8_t i = 0; i < sizeof(((struct in6_addr *)0)->s6_addr); i++)
 	{
 		if (((struct in6_addr *)a)->s6_addr[i] < ((struct in6_addr *)b)->s6_addr[i])
