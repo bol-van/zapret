@@ -92,7 +92,7 @@ static int cmp6(const void * a, const void * b, void *arg)
 		aa = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[1];
 		bb = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[1];
 #endif
-		return aa < bb ? -1 : aa < bb ? 1 : 0;
+		return aa < bb ? -1 : aa > bb ? 1 : 0;
 	}
 	
 #else
