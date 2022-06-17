@@ -4,9 +4,12 @@
 // errors, verbose >stderr
 // transparent for valid ip or ip/subnet of allowed address family
 
+// can be compiled in mingw using posix thread compiler version
+
 #define _GNU_SOURCE
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,10 +17,18 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <getopt.h>
+#ifdef _WIN32
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x600
+#include <winsock2.h>
+#include <ws2ipdef.h>
+#include <ws2tcpip.h>
+#else
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#endif
 #include <time.h>
 
 #define RESOLVER_EAGAIN_ATTEMPTS 2
@@ -56,8 +67,10 @@ static const char* eai_str(int r)
 		return "EAI_SERVICE";
 	case EAI_SOCKTYPE:
 		return "EAI_SOCKTYPE";
+#ifdef EAI_SYSTEM
 	case EAI_SYSTEM:
 		return "EAI_SYSTEM";
+#endif
 	default:
 		return "UNKNOWN";
 	}
@@ -362,5 +375,13 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
+#ifdef _WIN32
+	WSADATA wsaData;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData))
+	{
+		fprintf(stderr,"WSAStartup failed. error %u\n",GetLastError());
+		return 1;
+	}
+#endif
 	return run_threads();
 }
