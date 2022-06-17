@@ -62,43 +62,39 @@ __attribute__((optimize ("no-strict-aliasing")))
 #endif
 static int cmp6(const void * a, const void * b, void *arg)
 {
-	// this function is critical to sort performance
+	// this function is critical for sort performance
 	// on big endian systems cpu byte order is equal to network byte order
 	// no conversion required. it's possible to improve speed by using big size compares
 	// on little endian systems byte conversion also gives better result than byte comparision
 	// 64-bit archs often have cpu command to reverse byte order
 	// assume that a and b are properly aligned
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__==__ORDER_BIG_ENDIAN__) && defined(__SIZEOF_INT128__)
-	// the fastest possible way (MIPS64/PPC64 only ?)
-	const unsigned __int128 *pa = (unsigned __int128*)((struct in6_addr *)a)->s6_addr;
-	const unsigned __int128 *pb = (unsigned __int128*)((struct in6_addr *)b)->s6_addr;
-	return *pa < *pb ? -1 : *pa == *pb ? 0 : 1;
-#elif defined(__BYTE_ORDER__) && ((__BYTE_ORDER__==__ORDER_BIG_ENDIAN__) || (__BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__))
-	uint64_t am,al,bm,bl;
+
+#if defined(__BYTE_ORDER__) && ((__BYTE_ORDER__==__ORDER_BIG_ENDIAN__) || (__BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__))
+
+	uint64_t aa,bb;
 #if __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__
-	am = __builtin_bswap64(((uint64_t*)((struct in6_addr *)a)->s6_addr)[0]);
-	al = __builtin_bswap64(((uint64_t*)((struct in6_addr *)a)->s6_addr)[1]);
-	bm = __builtin_bswap64(((uint64_t*)((struct in6_addr *)b)->s6_addr)[0]);
-	bl = __builtin_bswap64(((uint64_t*)((struct in6_addr *)b)->s6_addr)[1]);
+	aa = __builtin_bswap64(((uint64_t*)((struct in6_addr *)a)->s6_addr)[0]);
+	bb = __builtin_bswap64(((uint64_t*)((struct in6_addr *)b)->s6_addr)[0]);
 #else
-	am = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[0];
-	al = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[1];
-	bm = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[0];
-	bl = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[1];
+	aa = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[0];
+	bb = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[0];
 #endif
-	if (am < bm)
+	if (aa < bb)
 		return -1;
-	else if (am == bm)
-	{
-		if (al < bl)
-			return -1;
-		else if (al > bl)
-			return 1;
-		else
-			return 0;
-	}
-	else
+	else if (aa > bb)
 		return 1;
+	else
+	{
+#if __BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__
+		aa = __builtin_bswap64(((uint64_t*)((struct in6_addr *)a)->s6_addr)[1]);
+		bb = __builtin_bswap64(((uint64_t*)((struct in6_addr *)b)->s6_addr)[1]);
+#else
+		aa = ((uint64_t*)((struct in6_addr *)a)->s6_addr)[1];
+		bb = ((uint64_t*)((struct in6_addr *)b)->s6_addr)[1];
+#endif
+		return aa < bb ? -1 : aa < bb ? 1 : 0;
+	}
+	
 #else
 	// fallback case
 	for (uint8_t i = 0; i < sizeof(((struct in6_addr *)0)->s6_addr); i++)
@@ -111,6 +107,7 @@ static int cmp6(const void * a, const void * b, void *arg)
 	return 0;
 #endif
 }
+
 // make presorted array unique. return number of unique items.
 static uint32_t unique6(struct in6_addr *pu, uint32_t ct)
 {
