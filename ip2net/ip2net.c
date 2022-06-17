@@ -3,14 +3,22 @@
 // valid ip/bitcount and ip1-ip2 are passed through without modification
 // ips are groupped into subnets
 
+// can be compiled in mingw. msvc not supported because of absent getopt
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <Ws2ipdef.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#endif
 #include <getopt.h>
 #include "qsort.h"
 
