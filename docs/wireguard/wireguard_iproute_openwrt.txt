@@ -131,7 +131,7 @@ iface wgvps inet static
 --- Поднятие клиента ---
 
 # opkg update
-# opkg install wireguard
+# opkg install wireguard-tools
 
 Добавляем записи в конфиги.
 
@@ -145,7 +145,7 @@ config interface 'wgvps'
 	option mtu '1420'
 
 config wireguard_wgvps
-	option public_key 'EELdA2XzjcKxtriOCPBXMOgxlkgpbRdIyjtc3aIpkxg=
+	option public_key 'EELdA2XzjcKxtriOCPBXMOgxlkgpbRdIyjtc3aIpkxg='
 	list allowed_ips '0.0.0.0/0'
 	option endpoint_host '91.15.68.202'
 	option endpoint_port '12345'
@@ -250,6 +250,41 @@ ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -j MARK --set-m
 ------------------------------------------------
 
 # fw3 restart
+
+--- Маркировка трафика nftables ---
+
+В новых openwrt по умолчанию установлен nftables, iptables отсутствует.
+Есть вариант снести nftables + fw4 и заменить их на iptables + fw3.
+
+Поскольку для маркировки трафика используется nfset, принадлежащий таблице zapret, цепочки необходимо помещать в ту же таблицу.
+Для синхронизации лучше всего использовать хук
+INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
+Параметр нужно раскоментировать в /opt/zapret/config. Далее надо создать указанный файл и дать ему chmod 755.
+
+--/etc/firewall.zapret.hook.post_up----------------------------
+#!/bin/sh
+
+ZAPRET_NFT_TABLE=zapret
+
+cat << EOF | nft -f - 2>/dev/null
+ delete chain inet $ZAPRET_NFT_TABLE my_output
+ delete chain inet $ZAPRET_NFT_TABLE my_prerouting
+EOF
+
+cat << EOF | nft -f -
+ add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
+ flush chain inet $ZAPRET_NFT_TABLE my_output
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 meta mark set mark or 0x800
+
+ add chain inet $ZAPRET_NFT_TABLE my_prerouting { type filter hook prerouting priority mangle; }
+ flush chain inet $ZAPRET_NFT_TABLE my_prerouting
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 meta mark set mark or 0x800
+EOF
+------------------------------------------------
+
+/etc/init.d/zapret restart_fw
 
 
 --- По поводу двойного NAT ---
