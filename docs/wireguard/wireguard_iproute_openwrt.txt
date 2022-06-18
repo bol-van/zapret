@@ -221,7 +221,7 @@ config rule
 *) Разрешение принимать icmp от vpn сервера, включая пинги. ICMP жизненно важны для правильного функционирования ip сети !
 *) И обязательно проткнуть дырку в фаерволе, чтобы принимать пакеты wireguard со стороны инетовского ip vpn сервера.
    
-# fw3 restart
+# /etc/init.d/firewall restart
 # ifup wgvps
 # ifconfig wgvps
 # ping 192.168.254.1
@@ -254,7 +254,7 @@ ipt PREROUTING -t mangle -i $DEVICE -p tcp --dport 443 -m set --match-set zapret
 ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
 ------------------------------------------------
 
-# fw3 restart
+# /etc/init.d/firewall restart
 
 --- Маркировка трафика nftables ---
 
@@ -388,7 +388,7 @@ ipt PREROUTING -t mangle ! -i $DEVICE -j CONNMARK --restore-mark --nfmask 0x800 
 ipt PREROUTING -t mangle -i $DEVICE -m conntrack --ctstate NEW -j CONNMARK --set-xmark 0x800/0x800
 ------------------------------------------------
 
-# fw3 restart
+# /etc/init.d/firewall restart
 
 Вариант nftables :
 
@@ -449,7 +449,7 @@ config rule
         option name 'IPERF'
 ------------------------------------------------
 
-# fw3 restart
+# /etc/init.d/firewall restart
 # /etc/init.d/zapret restart_fw
 
 --/etc/network/interfaces.d/wgvps-------------
@@ -491,7 +491,7 @@ config rule
 	option set_mark '0x0800/0x0800'
 ------------------------------------------------
 
-# fw3 restart
+# /etc/init.d/firewall restart
 
 Теперь все с полем dscp "1" идет на vpn. Клиент сам решает какой трафик ему нужно забрасывать
 на vpn, перенастраивать роутер не нужно.
@@ -562,7 +562,7 @@ config rule
         option dest_port '28000-28009'
 ------------------------------------------------
 
-fw3 reload
+/etc/init.d/firewall reload
 
 
 На сервере :
