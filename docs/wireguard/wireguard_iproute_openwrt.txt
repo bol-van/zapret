@@ -283,12 +283,12 @@ cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
  add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type filter hook prerouting priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
  add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
 EOF
 ------------------------------------------------
 
@@ -408,7 +408,7 @@ cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
  add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
  add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta mark set mark or 0x1000
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type filter hook prerouting priority mangle; }
@@ -416,7 +416,7 @@ cat << EOF | nft -f -
  add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname $DEVICE ct state new ct mark set ct mark or 0x800
  add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname != $DEVICE meta mark set ct mark and 0x800
  add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
 
  add chain inet $ZAPRET_NFT_TABLE my_nat { type nat hook postrouting priority 100 ; }
  flush chain inet $ZAPRET_NFT_TABLE my_nat
