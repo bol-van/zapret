@@ -402,8 +402,10 @@ restart_openwrt_firewall()
 {
 	echo \* restarting firewall
 
-	fw3 -q restart || {
-		echo could not restart firewall
+	local FW=fw4
+	[ -n "$OPENWRT_FW3" ] && FW=fw3
+	$FW -q restart || {
+		echo could not restart firewall $FW
 		exitp 30
 	}
 }
