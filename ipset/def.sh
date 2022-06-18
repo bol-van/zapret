@@ -222,6 +222,13 @@ getexclude()
  return 0
 }
 
+_get_ipban()
+{
+ [ -f "$ZUSERLIST_IPBAN" ] && {
+  [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST_IPBAN" 4 | cut_local | sort -u > "$ZIPLIST_USER_IPBAN"
+  [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST_IPBAN" 6 | cut_local6 | sort -u > "$ZIPLIST_USER_IPBAN6"
+ }
+}
 getuser()
 {
  getexclude || return
@@ -229,10 +236,13 @@ getuser()
   [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST" 4 | cut_local | sort -u > "$ZIPLIST_USER"
   [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST" 6 | cut_local6 | sort -u > "$ZIPLIST_USER6"
  }
- [ -f "$ZUSERLIST_IPBAN" ] && {
-  [ "$DISABLE_IPV4" != "1" ] && filedigger "$ZUSERLIST_IPBAN" 4 | cut_local | sort -u > "$ZIPLIST_USER_IPBAN"
-  [ "$DISABLE_IPV6" != "1" ] && filedigger "$ZUSERLIST_IPBAN" 6 | cut_local6 | sort -u > "$ZIPLIST_USER_IPBAN6"
- }
+ _get_ipban
+ return 0
+}
+getipban()
+{
+ getexclude || return
+ _get_ipban
  return 0
 }
 

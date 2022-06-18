@@ -7,7 +7,7 @@ IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
 
 # useful in case ipban set is used in custom scripts
 FAIL=
-getuser || FAIL=1
+getipban || FAIL=1
 "$IPSET_DIR/create_ipset.sh"
 [ -n "$FAIL" ] && exit
 
