@@ -387,9 +387,8 @@ ipt PREROUTING -t mangle -i $DEVICE -m conntrack --ctstate NEW -j CONNMARK --set
 --/etc/firewall.zapret.hook.post_up----------------------------
 #!/bin/sh
 
-. /opt/zapret/init.d/openwrt/functions
-
 ZAPRET_NFT_TABLE=zapret
+DEVICE=wgvps
 
 cat << EOF | nft -f - 2>/dev/null
  delete chain inet $ZAPRET_NFT_TABLE my_output
@@ -397,9 +396,6 @@ cat << EOF | nft -f - 2>/dev/null
  delete chain inet $ZAPRET_NFT_TABLE my_nat
 EOF
 
-network_get_device DEVICE wgvps
-
-[ -n "$DEVICE" ] &&
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
