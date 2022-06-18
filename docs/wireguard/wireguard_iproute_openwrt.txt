@@ -399,6 +399,7 @@ EOF
 
 network_get_device DEVICE wgvps
 
+[ -n "$DEVICE" ] &&
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
