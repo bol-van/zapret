@@ -284,7 +284,7 @@ cat << EOF | nft -f -
 EOF
 ------------------------------------------------
 
-/etc/init.d/zapret restart_fw
+# /etc/init.d/zapret restart_fw
 
 
 --- По поводу двойного NAT ---
@@ -350,6 +350,10 @@ connmark относится к соединению, fwmark - к пакету. �
 Если к нам приходит пакет с какого-то другого интерфейса, то восстанавливаем его connmark в fwmark по маске 0x800.
 И теперь он подпадает под правило ip rule, заворачиваясь на wgvps, что и требовалось.
 
+Альтернативное решение - использовать на VPSке для проброса портов не только DNAT, но и SNAT/MASQUERADE. Тогда source address
+будет заменен на 192.168.254.1. Он по таблице маршрутизации пойдет на wgvps. Но в этом случае клиентские программы,
+на которые осуществляется проброс портов, не будут видеть реальный IP подключенца.
+
 --/etc/firewall.user----------------------------
 . /opt/zapret/init.d/openwrt/functions
 
@@ -376,8 +380,52 @@ ipt PREROUTING -t mangle ! -i $DEVICE -j CONNMARK --restore-mark --nfmask 0x800 
 ipt PREROUTING -t mangle -i $DEVICE -m conntrack --ctstate NEW -j CONNMARK --set-xmark 0x800/0x800
 ------------------------------------------------
 
-
 # fw3 restart
+
+Вариант nftables :
+
+--/etc/firewall.zapret.hook.post_up----------------------------
+#!/bin/sh
+
+. /opt/zapret/init.d/openwrt/functions
+
+ZAPRET_NFT_TABLE=zapret
+
+cat << EOF | nft -f - 2>/dev/null
+ delete chain inet $ZAPRET_NFT_TABLE my_output
+ delete chain inet $ZAPRET_NFT_TABLE my_prerouting
+ delete chain inet $ZAPRET_NFT_TABLE my_nat
+EOF
+
+network_get_device DEVICE wgvps
+
+cat << EOF | nft -f -
+ add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
+ flush chain inet $ZAPRET_NFT_TABLE my_output
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta mark set mark or 0x1000
+
+ add chain inet $ZAPRET_NFT_TABLE my_prerouting { type filter hook prerouting priority mangle; }
+ flush chain inet $ZAPRET_NFT_TABLE my_prerouting
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname $DEVICE ct state new ct mark set ct mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname != $DEVICE meta mark set ct mark and 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 meta mark set mark or 0x800
+
+ add chain inet $ZAPRET_NFT_TABLE my_nat { type nat hook postrouting priority 100 ; }
+ flush chain inet $ZAPRET_NFT_TABLE my_nat
+ add rule inet $ZAPRET_NFT_TABLE my_nat oifname $DEVICE mark and 0x1000 == 0x1000 masquerade
+EOF
+------------------------------------------------
+
+# /etc/init.d/zapret restart_fw
+
+К сожалению, здесь возможности nftables немного хромают. Полноценного эквивалента CONNMARK --restore-mark --nfmask
+не существует. Оригинал iptables предполагал копирование одного бита 0x800 из connmark в mark.
+Лучшее, что можно сделать в nftables, это копирование одного бита с занулением всех остальных.
+Сложные выражения типа "meta mark set mark and ~0x800 or (ct mark and 0x800)" nft не понимает.
+Об этом же говорит попытка перевода через iptables-translate.
 
 Сейчас уже можно с vpn сервера пингануть ip адрес внутри локалки клиента. Пинги должны ходить.
 
@@ -397,16 +445,13 @@ config rule
 ------------------------------------------------
 
 # fw3 restart
+# /etc/init.d/zapret restart_fw
 
 --/etc/network/interfaces.d/wgvps-------------
 	post-up iptables -t nat -A PREROUTING -i eth0 -p tcp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
-	post-up iptables -t nat -A POSTROUTING -o $IFACE -d 192.168.2.2 -p tcp -m multiport --dports 5001,5201 -j MASQUERADE
 	post-up iptables -t nat -A PREROUTING -i eth0 -p udp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
-	post-up iptables -t nat -A POSTROUTING -o $IFACE -d 192.168.2.2 -p udp -m multiport --dports 5001,5201 -j MASQUERADE
 	post-down iptables -t nat -D PREROUTING -i eth0 -p tcp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
-	post-down iptables -t nat -D POSTROUTING -o $IFACE -d 192.168.2.2 -p tcp -m multiport --dports 5001,5201 -j MASQUERADE
 	post-down iptables -t nat -D PREROUTING -i eth0 -p udp -m multiport --dports 5001,5201 -j DNAT --to-destination 192.168.2.2
-	post-down iptables -t nat -D POSTROUTING -o $IFACE -d 192.168.2.2 -p udp -m multiport --dports 5001,5201 -j MASQUERADE
 ----------------------------------------------
 
 # ifdown wgvps ; ifup wgvps
