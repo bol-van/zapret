@@ -231,11 +231,33 @@ config rule
 # ping 192.168.254.3
 
 
+--- Подготовка zapret ---
+
+Выполните install_easy.sh. Он настроит режим обхода DPI. Если обход DPI не нужен - выберите MODE=filter.
+Так же он заресолвит домены из ipset/zapret-hosts-user-ipban.txt и внесет крон-джоб для периодического обновления ip.
+
+Если вы используете в своих правилах ipset zapret, то он ресолвится и обновляется только, если выбран режим фильтрации обхода DPI по ipset.
+По сути он вам нужен исключительно, если обход DPI не помогает. Например, удается как-то пробить http, но не удается пробить https.
+И при этом вы хотите, чтобы на VPN направлялись только ip из скачанного ip листа, в добавок к заресолвленному ipset/zapret-hosts-user.txt.
+Именно этот случай и рассмотрен в данном примере. Если это не так, то убирайте правила с портом 443 из нижеприведенных правил iptables/nftables.
+Если не хотите ограничиваться листом, и хотите направлять все на порт 443, то уберите фильтры из правил iptables/nftables,
+связанные с ipset/nfset "zapret".
+
+Фильтрация по именам доменов (MODE_FILTER=hostlist) невозможна средствами iptables/nftables. Она производится исключительно в tpws и nfqws
+по результатам анализа протокола прикладного уровня, иногда достаточно сложного, связанного с дешифировкой пакета (QUIC).
+Скачиваются листы с именами доменов, не ip адресами. ipset/zapret-hosts-user.txt не ресолвится, а используется как hostlist.
+Потому вам нельзя расчитывать на ipset zapret.
+Тем не менее при выборе этого режима фильтрации , либо вовсе при ее отсутствии (MODE_FILTER=none), ipset/zapret-hosts-user-ipban.txt
+все равно ресолвится. Вы всегда можете расчитывать на ipset/nfset "ipban", "nozapret".
+
+"nozapret" - это ipset/nfset, связанный с системой исключения ip. Сюда загоняется все из ipset/zapret-hosts-user-exclude.txt после ресолвинга.
+
+
 --- Маркировка трафика ---
 
 Завернем на vpn все из ipset zapret на tcp:443 и все из ipban.
 OUTPUT относится к исходящим с роутера пакетам, PREROUTING - ко всем остальным.
-Если с самого роутера ничего заруливать не надо, можно опустить все до команд с PREROUTING.
+Если с самого роутера ничего заруливать не надо, можно опустить часть, отвечающую за OUTPUT.
 
 --/etc/firewall.user----------------------------
 . /opt/zapret/init.d/openwrt/functions
@@ -245,13 +267,13 @@ create_ipset no-update
 network_find_wan_all wan_iface
 for ext_iface in $wan_iface; do
 	network_get_device DEVICE $ext_iface
-	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
 done
 
 network_get_device DEVICE lan
-ipt PREROUTING -t mangle -i $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+ipt PREROUTING -t mangle -i $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
+ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
 ------------------------------------------------
 
 # /etc/init.d/firewall restart
@@ -264,6 +286,7 @@ ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -j MARK --set-m
 будут устанавливаться без сжатия squashfs. Убедитесь, что у вас достаточно места.
 Либо сразу настраивайте образ через image builder.
 
+Фаервол fw4 работает в одноименной nftable - "inet fw4". "inet" означает, что таблица принимает и ipv4, и ipv6.
 Поскольку для маркировки трафика используется nfset, принадлежащий таблице zapret, цепочки необходимо помещать в ту же таблицу.
 Для синхронизации лучше всего использовать хук
 INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
@@ -282,18 +305,36 @@ EOF
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban ip daddr != @nozapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret ip daddr != @nozapret meta mark set mark or 0x800
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type filter hook prerouting priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban ip daddr != @nozapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret ip daddr != @nozapret meta mark set mark or 0x800
 EOF
 ------------------------------------------------
 
 # /etc/init.d/zapret restart_fw
 
+Проверка правил :
+# /etc/init.d/zapret list_table
+или
+# nft -t list table inet zapret
+
+Должны быть цепочки my_prerouting и my_output.
+
+Проверка заполнения nfsets :
+# nft list set inet zapret zapret
+# nft list set inet zapret ipban
+# nft list set inet zapret nozapret
+
+Проверка заполнения множеств lanif, wanif, wanif6, link_local :
+# /etc/init.d/zapret list_ifsets
+
+Должны присутствовать имена интерфейсов во множествах lanif, wanif.
+wanif6 заполняется только при включении ipv6.
+link_local нужен только для tpws при включении ipv6.
 
 --- По поводу двойного NAT ---
 
@@ -370,14 +411,14 @@ create_ipset no-update
 network_find_wan_all wan_iface
 for ext_iface in $wan_iface; do
 	network_get_device DEVICE $ext_iface
-	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
+	ipt OUTPUT -t mangle -o $DEVICE -m set --match-set ipban dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
 	ipt OUTPUT -t mangle -o $DEVICE -j MARK --set-mark 0x1000/0x1000
 done
 
 network_get_device DEVICE lan
-ipt PREROUTING -t mangle -i $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -j MARK --set-mark 0x800/0x800
-ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -j MARK --set-mark 0x800/0x800
+ipt PREROUTING -t mangle -i $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
+ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
 
 # do masquerade for OUTPUT to ensure correct outgoing address
 ipt postrouting_tunvps_rule -t nat -m mark --mark 0x1000/0x1000 -j MASQUERADE
@@ -407,16 +448,16 @@ EOF
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type route hook output priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif ip daddr @ipban ip daddr != @nozapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret ip daddr != @nozapret meta mark set mark or 0x800
  add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta mark set mark or 0x1000
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type filter hook prerouting priority mangle; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
  add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname $DEVICE ct state new ct mark set ct mark or 0x800
  add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname != $DEVICE meta mark set ct mark and 0x800
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban meta mark set mark or 0x800
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif ip daddr @ipban ip daddr != @nozapret meta mark set mark or 0x800
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret ip daddr != @nozapret meta mark set mark or 0x800
 
  add chain inet $ZAPRET_NFT_TABLE my_nat { type nat hook postrouting priority 100 ; }
  flush chain inet $ZAPRET_NFT_TABLE my_nat
