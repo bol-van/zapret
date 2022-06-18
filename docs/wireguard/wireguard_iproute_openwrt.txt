@@ -51,12 +51,11 @@ Wireguard может дать 50 mbps там, где openvpn еле тащит 1
 Wireguard был включен в ядро linux с версии 5.6.
 Если у вас ядро >=5.6, то достаточно установить пакет wireguard-tools.
 
-Иначе вам придется собрать wireguard самому.
+Иначе вам придется собрать wireguard самому. Ядро должно быть не ниже 3.10.
 На сервере должны быть установлены заголовки ядра (linux-headers-...) и компилятор gcc.
-Качаем последний tar.xz с wireguard отсюда : https://git.zx2c4.com/WireGuard/
 
-# tar xf WireGuard*.tar.xz
-# cd WireGuard-*/src
+# git clone --depth 1 https://git.zx2c4.com/wireguard-linux-compat
+# cd wireguard-linux-compat/src
 # make
 # strip --strip-debug wireguard.ko
 # sudo make install
