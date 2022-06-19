@@ -119,8 +119,8 @@ done
 
 prepare_route_localnet
 
-ipt prerouting_lan_rule -t nat -p tcp --dport 443 -m set --match-set zapret dst -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
-ipt prerouting_lan_rule -t nat -p tcp -m set --match-set ipban dst -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ipt prerouting_lan_rule -t nat -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ipt prerouting_lan_rule -t nat -p tcp -m set --match-set ipban dst -m set ! --match-set nozapret -j DNAT --to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 ----------------------------
 
 Внести параметр "reload" в указанное место :
