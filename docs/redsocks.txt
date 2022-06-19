@@ -113,8 +113,8 @@ create_ipset no-update
 network_find_wan_all wan_iface
 for ext_iface in $wan_iface; do
     network_get_device ext_device $ext_iface
-    ipt OUTPUT -t nat -o $ext_device -p tcp --dport 443 -m set --match-set zapret dst -j REDIRECT --to-port $SOXIFIER_PORT
-    ipt OUTPUT -t nat -o $ext_device -p tcp -m set --match-set ipban dst -j REDIRECT --to-port $SOXIFIER_PORT
+    ipt OUTPUT -t nat -o $ext_device -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j REDIRECT --to-port $SOXIFIER_PORT
+    ipt OUTPUT -t nat -o $ext_device -p tcp -m set --match-set ipban dst -m set ! --match-set nozapret dst -j REDIRECT --to-port $SOXIFIER_PORT
 done
 
 prepare_route_localnet
@@ -165,13 +165,13 @@ prepare_route_localnet
 cat << EOF | nft -f -
  add chain inet $ZAPRET_NFT_TABLE my_output { type nat hook output priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_output
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta l4proto tcp ip daddr @ipban dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif meta l4proto tcp ip daddr @ipban ip daddr != @nozapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_output oifname @wanif tcp dport 443 ip daddr @zapret ip daddr != @nozapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 
  add chain inet $ZAPRET_NFT_TABLE my_prerouting { type nat hook prerouting priority -102; }
  flush chain inet $ZAPRET_NFT_TABLE my_prerouting
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif meta l4proto tcp ip daddr @ipban dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
- add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif meta l4proto tcp ip daddr @ipban ip daddr != @nozapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
+ add rule inet $ZAPRET_NFT_TABLE my_prerouting iifname @lanif tcp dport 443 ip daddr @zapret ip daddr != @nozapret dnat to $TPWS_LOCALHOST4:$SOXIFIER_PORT
 EOF
 ----------------------------
 
