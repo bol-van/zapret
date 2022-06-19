@@ -101,7 +101,7 @@ redsocks {
 !! В новых OpenWRT можно снести firewall4 и nftables, заменив их на firewall3 + iptables
 !! Инструкция относится только к openwrt, где используется iptables.
 
-Будем завертывать любые tcp соединения на ip из ipset "ipban" и https на ip из ipset "zapret".
+Будем завертывать любые tcp соединения на ip из ipset "ipban" и https на ip из ipset "zapret", за исключение ip из ipset "nozapret".
 
 --- /etc/firewall.user -----
 SOXIFIER_PORT=1099
