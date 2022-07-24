@@ -943,6 +943,9 @@ Example : `--uid 1:3003`
 
 In iptables use : `! --uid-owner 1` instead of `! --uid-owner tpws`.
 
+Nfqws should be executed with `--uid 1`. Otherwise on newer androids kernel may partially hang.
+Looks like processes with certain uids can be suspended. Suspended nfqueue handler is a big problem.
+
 Write your own shell script with iptables and tpws, run it using your root manager.
 Autorun scripts are here :
 
