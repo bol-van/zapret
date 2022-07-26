@@ -3,6 +3,7 @@
 #include "gzip.h"
 #include "params.h"
 
+
 static bool addpool(strpool **hostlist, char **s, const char *end)
 {
 	char *p;
@@ -22,20 +23,16 @@ static bool addpool(strpool **hostlist, char **s, const char *end)
 }
 
 
-bool LoadHostList(strpool **hostlist, char *filename)
+bool AppendHostList(strpool **hostlist, char *filename)
 {
 	char *p, *e, s[256], *zbuf;
 	size_t zsize;
 	int ct = 0;
 	FILE *F;
 	int r;
-	
-	if (*hostlist)
-	{
-		StrPoolDestroy(hostlist);
-		*hostlist = NULL;
-	}
-	
+
+	printf("Loading hostlist %s\n",filename);
+
 	if (!(F = fopen(filename, "rb")))
 	{
 		fprintf(stderr, "Could not open %s\n", filename);
@@ -92,8 +89,25 @@ bool LoadHostList(strpool **hostlist, char *filename)
 	return true;
 }
 
+bool LoadHostLists(strpool **hostlist, struct str_list_head *file_list)
+{
+	struct str_list *file;
 
-bool SearchHostList(strpool *hostlist, const char *host, bool debug)
+	if (*hostlist)
+	{
+		StrPoolDestroy(hostlist);
+		*hostlist = NULL;
+	}
+
+	LIST_FOREACH(file, file_list, next)
+	{
+		if (!AppendHostList(hostlist, file->str)) return false;
+	}
+	return true;
+}
+
+
+bool SearchHostList(strpool *hostlist, const char *host)
 {
 	if (hostlist)
 	{
@@ -102,11 +116,27 @@ bool SearchHostList(strpool *hostlist, const char *host, bool debug)
 		while (p)
 		{
 			bInHostList = StrPoolCheckStr(hostlist, p);
-			if (debug) VPRINT("Hostlist check for %s : %s", p, bInHostList ? "positive" : "negative")
+			if (params.debug) printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
 			if (bInHostList) return true;
 			p = strchr(p, '.');
 			if (p) p++;
 		}
 	}
 	return false;
+}
+
+// return : true = apply fooling, false = do not apply
+bool HostlistCheck(strpool *hostlist, strpool *hostlist_exclude, const char *host)
+{
+	if (hostlist_exclude)
+	{
+		if (params.debug) printf("Checking exclude hostlist\n");
+		if (SearchHostList(hostlist_exclude, host)) return false;
+	}
+	if (hostlist)
+	{
+		if (params.debug) printf("Checking include hostlist\n");
+		return SearchHostList(hostlist, host);
+	}
+	return true;
 }

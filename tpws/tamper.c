@@ -48,7 +48,7 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 	{
 		VPRINT("Data block looks like http request start : %s", *method)
 		// cpu saving : we search host only if and when required. we do not research host every time we need its position
-		if (params.hostlist && find_host(&pHost,segment,*size))
+		if ((params.hostlist || params.hostlist_exclude) && find_host(&pHost,segment,*size))
 		{
 			p = pHost + 5;
 			while (p < (segment + *size) && (*p == ' ' || *p == '\t')) p++;
@@ -58,7 +58,7 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 			Host[pp - p] = '\0';
 			VPRINT("Requested Host is : %s", Host)
 			for(p = Host; *p; p++) *p=tolower(*p);
-			bBypass = !SearchHostList(params.hostlist,Host,!!params.debug);
+			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host);
 		}
 		if (!bBypass)
 		{
@@ -218,10 +218,10 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 
 			VPRINT("packet contains TLS ClientHello")
 			// we need host only if hostlist is present
-			if (params.hostlist && TLSHelloExtractHost((uint8_t*)segment,*size,host,sizeof(host)))
+			if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,host,sizeof(host)))
 			{
 				VPRINT("hostname: %s",host)
-				if (!SearchHostList(params.hostlist,host,!!params.debug))
+				if (!HostlistCheck(params.hostlist, params.hostlist_exclude, host))
 				{
 					VPRINT("Not acting on this request")
 					return;

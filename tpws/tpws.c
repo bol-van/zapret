@@ -43,8 +43,8 @@ bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	if (params.hostlist)
-		printf("Will reload hostlist on next request\n");
+	if (params.hostlist || params.hostlist_exclude)
+		printf("Will reload hostlists on next request\n");
 	bHup = true;
 }
 // should be called in normal execution
@@ -52,13 +52,11 @@ void dohup()
 {
 	if (bHup)
 	{
-		if (params.hostlist)
+		if (!LoadHostLists(&params.hostlist, &params.hostlist_files) ||
+			!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
 		{
-			if (!LoadHostList(&params.hostlist, params.hostfile))
-			{
-				// what will we do without hostlist ?? sure, gonna die
-				exit(1);
-			}
+			// what will we do without hostlist ?? sure, gonna die
+			exit(1);
 		}
 		bHup = false;
 	}
@@ -144,8 +142,9 @@ static void exithelp()
 #endif
 		" --debug=0|1|2\t\t\t; 0(default)=silent 1=verbose 2=debug\n"
 		"\nTAMPERING:\n"
-		" --hostlist=<filename>\t\t; only act on host in the list (one host per line, subdomains auto apply)\n"
-		" --split-http-req=method|host\n"
+		" --hostlist=<filename>\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude=<filename>\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --split-http-req=method|host\t; split at specified logical part of plain http request\n"
 		" --split-pos=<numeric_offset>\t; split at specified pos. split-http-req takes precedence for http.\n"
 		" --split-any-protocol\t\t; split not only http and https\n"
 		" --hostcase\t\t\t; change Host: => host:\n"
@@ -163,6 +162,13 @@ static void exithelp()
 }
 static void cleanup_params()
 {
+	strlist_destroy(&params.hostlist_files);
+	strlist_destroy(&params.hostlist_exclude_files);
+	if (params.hostlist_exclude)
+	{
+		StrPoolDestroy(&params.hostlist_exclude);
+		params.hostlist_exclude = NULL;
+	}
 	if (params.hostlist)
 	{
 		StrPoolDestroy(&params.hostlist);
@@ -208,6 +214,9 @@ void parse_params(int argc, char *argv[])
 	params.maxconn = DEFAULT_MAX_CONN;
 	params.max_orphan_time = DEFAULT_MAX_ORPHAN_TIME;
 	params.binds_last = -1;
+	LIST_INIT(&params.hostlist_files);
+	LIST_INIT(&params.hostlist_exclude_files);
+
 #if defined(__OpenBSD__) || defined(__APPLE__)
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
 #endif
@@ -249,17 +258,18 @@ void parse_params(int argc, char *argv[])
 		{ "hosttab",no_argument,0,0 },// optidx=28
 		{ "unixeol",no_argument,0,0 },// optidx=29
 		{ "hostlist",required_argument,0,0 },// optidx=30
-		{ "pidfile",required_argument,0,0 },// optidx=31
-		{ "debug",optional_argument,0,0 },// optidx=32
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=33
-		{ "local-sndbuf",required_argument,0,0 },// optidx=34
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=35
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=36
-		{ "socks",no_argument,0,0 },// optidx=37
-		{ "no-resolve",no_argument,0,0 },// optidx=38
-		{ "skip-nodelay",no_argument,0,0 },// optidx=39
+		{ "hostlist-exclude",required_argument,0,0 },// optidx=31
+		{ "pidfile",required_argument,0,0 },// optidx=32
+		{ "debug",optional_argument,0,0 },// optidx=33
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=34
+		{ "local-sndbuf",required_argument,0,0 },// optidx=35
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=36
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=37
+		{ "socks",no_argument,0,0 },// optidx=38
+		{ "no-resolve",no_argument,0,0 },// optidx=39
+		{ "skip-nodelay",no_argument,0,0 },// optidx=40
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=40
+		{ "enable-pf",no_argument,0,0 },// optidx=41
 #endif
 		{ NULL,0,NULL,0 }
 	};
@@ -460,42 +470,51 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 30: /* hostlist */
-			if (!LoadHostList(&params.hostlist, optarg))
+			if (!strlist_add(&params.hostlist_files, optarg))
+			{
+				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
-			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
-			params.hostfile[sizeof(params.hostfile)-1]='\0';
+			}
 			params.tamper = true;
 			break;
-		case 31: /* pidfile */
+		case 31: /* hostlist-exclude */
+			if (!strlist_add(&params.hostlist_exclude_files, optarg))
+			{
+				fprintf(stderr, "strlist_add failed\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 32: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 32:
+		case 33:
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
-		case 33: /* local-rcvbuf */
+		case 34: /* local-rcvbuf */
 			params.local_rcvbuf = atoi(optarg)/2;
 			break;
-		case 34: /* local-sndbuf */
+		case 35: /* local-sndbuf */
 			params.local_sndbuf = atoi(optarg)/2;
 			break;
-		case 35: /* remote-rcvbuf */
+		case 36: /* remote-rcvbuf */
 			params.remote_rcvbuf = atoi(optarg)/2;
 			break;
-		case 36: /* remote-sndbuf */
+		case 37: /* remote-sndbuf */
 			params.remote_sndbuf = atoi(optarg)/2;
 			break;
-		case 37: /* socks */
+		case 38: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 38: /* no-resolve */
+		case 39: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 39: /* skip-nodelay */
+		case 40: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 40: /* enable-pf */
+		case 41: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif
@@ -513,6 +532,17 @@ void parse_params(int argc, char *argv[])
 	if (params.skip_nodelay && (params.split_http_req || params.split_pos))
 	{
 		fprintf(stderr, "Cannot split with --skip-nodelay\n");
+		exit_clean(1);
+	}
+
+	if (!LoadHostLists(&params.hostlist, &params.hostlist_files))
+	{
+		fprintf(stderr, "Include hostlist load failed\n");
+		exit_clean(1);
+	}
+	if (!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
+	{
+		fprintf(stderr, "Exclude hostlist load failed\n");
 		exit_clean(1);
 	}
 }

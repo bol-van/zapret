@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 #include "strpool.h"
 
 enum splithttpreq { split_none = 0, split_method, split_host };
@@ -42,9 +43,11 @@ struct params_s
 	enum splithttpreq split_http_req;
 	bool split_any_protocol;
 	int split_pos;
-	char hostfile[256];
+
 	char pidfile[256];
-	strpool *hostlist;
+
+	strpool *hostlist, *hostlist_exclude;
+	struct str_list_head hostlist_files, hostlist_exclude_files;
 
 	int debug;
 

@@ -48,7 +48,7 @@ static bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	if (params.hostlist)
+	if (params.hostlist || params.hostlist_exclude)
 		printf("Will reload hostlist on next request\n");
 	bHup = true;
 }
@@ -57,13 +57,11 @@ static void dohup()
 {
 	if (bHup)
 	{
-		if (params.hostlist)
+		if (!LoadHostLists(&params.hostlist, &params.hostlist_files) ||
+			!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
 		{
-			if (!LoadHostList(&params.hostlist, params.hostfile))
-			{
-				// what will we do without hostlist ?? sure, gonna die
-				exit(1);
-			}
+			// what will we do without hostlist ?? sure, gonna die
+			exit(1);
 		}
 		bHup = false;
 	}
@@ -549,7 +547,8 @@ static void exithelp()
 		" --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload\n"
 		" --dpi-desync-udplen-increment=<int>\t; increase udp packet length by N bytes (default %u)\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply)\n",
+		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude=<filename>\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
@@ -565,12 +564,20 @@ static void exithelp()
 
 static void cleanup_params()
 {
+	ConntrackPoolDestroy(&params.conntrack);
+
+	strlist_destroy(&params.hostlist_files);
+	strlist_destroy(&params.hostlist_exclude_files);
+	if (params.hostlist_exclude)
+	{
+		StrPoolDestroy(&params.hostlist_exclude);
+		params.hostlist_exclude = NULL;
+	}
 	if (params.hostlist)
 	{
 		StrPoolDestroy(&params.hostlist);
 		params.hostlist = NULL;
 	}
-	ConntrackPoolDestroy(&params.conntrack);
 }
 static void exithelp_clean()
 {
@@ -649,6 +656,9 @@ int main(int argc, char **argv)
 	params.wssize_cutoff_mode = params.desync_cutoff_mode = 'n'; // packet number by default
 	params.udplen_increment = UDPLEN_INCREMENT_DEFAULT;
 
+	LIST_INIT(&params.hostlist_files);
+	LIST_INIT(&params.hostlist_exclude_files);
+
 	if (can_drop_root()) // are we root ?
 	{
 		params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
@@ -704,9 +714,10 @@ int main(int argc, char **argv)
 		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=33
 		{"dpi-desync-cutoff",required_argument,0,0},// optidx=34
 		{"hostlist",required_argument,0,0},		// optidx=35
+		{"hostlist-exclude",required_argument,0,0},	// optidx=36
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=36
-		{"bind-fix6",no_argument,0,0},		// optidx=37
+		{"bind-fix4",no_argument,0,0},		// optidx=37
+		{"bind-fix6",no_argument,0,0},		// optidx=38
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1003,16 +1014,24 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 35: /* hostlist */
-			if (!LoadHostList(&params.hostlist, optarg))
+			if (!strlist_add(&params.hostlist_files, optarg))
+			{
+				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
-			strncpy(params.hostfile,optarg,sizeof(params.hostfile));
-			params.hostfile[sizeof(params.hostfile)-1]='\0';
+			}
+			break;
+		case 36: /* hostlist-exclude */
+			if (!strlist_add(&params.hostlist_exclude_files, optarg))
+			{
+				fprintf(stderr, "strlist_add failed\n");
+				exit_clean(1);
+			}
 			break;
 #ifdef __linux__
-		case 36: /* bind-fix4 */
+		case 37: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 37: /* bind-fix6 */
+		case 38: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif
@@ -1027,6 +1046,17 @@ int main(int argc, char **argv)
 		exit_clean(1);
 	}
 #endif
+
+	if (!LoadHostLists(&params.hostlist, &params.hostlist_files))
+	{
+		fprintf(stderr, "Include hostlist load failed\n");
+		exit_clean(1);
+	}
+	if (!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
+	{
+		fprintf(stderr, "Exclude hostlist load failed\n");
+		exit_clean(1);
+	}
 
 	if (daemon) daemonize();
 

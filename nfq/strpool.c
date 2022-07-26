@@ -74,3 +74,34 @@ void StrPoolDestroy(strpool **p)
 	}
 	*p = NULL;
 }
+
+
+
+
+bool strlist_add(struct str_list_head *head, const char *filename)
+{
+	struct str_list *entry = malloc(sizeof(struct str_list));
+	if (!entry) return false;
+	entry->str = strdup(filename);
+	if (!entry->str)
+	{
+		free(entry);
+		return false;
+	}
+	LIST_INSERT_HEAD(head, entry, next);
+	return true;
+}
+static void strlist_entry_destroy(struct str_list *entry)
+{
+	if (entry->str)	free(entry->str);
+	free(entry);
+}
+void strlist_destroy(struct str_list_head *head)
+{
+	struct str_list *entry;
+	while (entry = LIST_FIRST(head))
+	{
+		LIST_REMOVE(entry, next);
+		strlist_entry_destroy(entry);
+	}
+}

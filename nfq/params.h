@@ -50,14 +50,15 @@ struct params_s
 	uint8_t desync_fooling_mode;
 	uint32_t desync_fwmark; // unused in BSD
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
-	char hostfile[256];
-	strpool *hostlist;
 	uint8_t fake_http[1432],fake_tls[1432],fake_unknown[1432],fake_unknown_udp[1472],fake_quic[1472];
 	size_t fake_http_size,fake_tls_size,fake_unknown_size,fake_unknown_udp_size,fake_quic_size;
 	uint16_t udplen_increment;
 	bool droproot;
 	uid_t uid;
 	gid_t gid;
+
+	strpool *hostlist, *hostlist_exclude;
+	struct str_list_head hostlist_files, hostlist_exclude_files;
 
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;
 	t_conntrack conntrack;

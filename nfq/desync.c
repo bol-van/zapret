@@ -323,7 +323,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		if (bHaveHost)
 		{
 			DLOG("hostname: %s\n",host)
-			if (params.hostlist && !SearchHostList(params.hostlist,host,params.debug))
+			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host))
 			{
 				DLOG("not applying tampering to this request\n")
 				return res;
@@ -738,7 +738,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		if (bHaveHost)
 		{
 			DLOG("hostname: %s\n",host)
-			if (params.hostlist && !SearchHostList(params.hostlist,host,params.debug))
+			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host))
 			{
 				DLOG("not applying tampering to this request\n")
 				return res;
