@@ -9,6 +9,7 @@
 . "$ZAPRET_BASE/common/ipt.sh"
 . "$ZAPRET_BASE/common/nft.sh"
 . "$ZAPRET_BASE/common/linux_fw.sh"
+. "$ZAPRET_BASE/common/list.sh"
 
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$TPPORT" ] || TPPORT=988
