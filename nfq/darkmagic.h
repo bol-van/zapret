@@ -73,21 +73,21 @@ bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
 	uint8_t fooling,
-	uint16_t padlen,
+	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
 	uint8_t fooling,
-	uint16_t padlen,
+	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
 	uint8_t fooling,
-	uint16_t padlen,
+	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
 

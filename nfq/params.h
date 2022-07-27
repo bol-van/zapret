@@ -52,7 +52,7 @@ struct params_s
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
 	uint8_t fake_http[1432],fake_tls[1432],fake_unknown[1432],fake_unknown_udp[1472],fake_quic[1472];
 	size_t fake_http_size,fake_tls_size,fake_unknown_size,fake_unknown_udp_size,fake_quic_size;
-	uint16_t udplen_increment;
+	int udplen_increment;
 	bool droproot;
 	uid_t uid;
 	gid_t gid;

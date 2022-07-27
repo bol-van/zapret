@@ -831,8 +831,11 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 			case DESYNC_UDPLEN:
 				pkt1_len = sizeof(pkt1);
 				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, params.udplen_increment, data_payload, len_payload, pkt1, &pkt1_len))
+				{
+					DLOG("could not construct packet with modified length. too large ?\n");
 					return res;
-				DLOG("resending original packet with increased by %u length\n", params.udplen_increment);
+				}
+				DLOG("resending original packet with increased by %d length\n", params.udplen_increment);
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return res;
 				return drop;

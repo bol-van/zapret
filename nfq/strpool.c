@@ -99,7 +99,7 @@ static void strlist_entry_destroy(struct str_list *entry)
 void strlist_destroy(struct str_list_head *head)
 {
 	struct str_list *entry;
-	while (entry = LIST_FIRST(head))
+	while ((entry = LIST_FIRST(head)))
 	{
 		LIST_REMOVE(entry, next);
 		strlist_entry_destroy(entry);

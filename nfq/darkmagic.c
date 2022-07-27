@@ -294,15 +294,23 @@ bool prepare_tcp_segment(
 }
 
 
+// padlen<0 means payload shrinking
 bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
 	uint8_t fooling,
-	uint16_t padlen,
+	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t datalen = len + padlen;
+	if ((len+padlen)<=0) padlen=-(int)len+1; // do not allow payload to be less that 1 byte
+	if ((len+padlen)>0xFFFF) padlen=0xFFFF-len; // do not allow payload size to exceed u16 range
+	if (padlen<0)
+	{
+		len+=padlen;
+		padlen=0;
+	}
+	uint16_t datalen = (uint16_t)(len + padlen);
 	uint16_t ip_payload_len = sizeof(struct udphdr) + datalen;
 	uint16_t pktlen = sizeof(struct ip) + ip_payload_len;
 	if (pktlen>*buflen) return false;
@@ -327,11 +335,18 @@ bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
 	uint8_t fooling,
-	uint16_t padlen,
+	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t datalen = len + padlen;
+	if ((len+padlen)<=0) padlen=-(int)len+1; // do not allow payload to be less that 1 byte
+	if ((len+padlen)>0xFFFF) padlen=0xFFFF-len; // do not allow payload size to exceed u16 range
+	if (padlen<0)
+	{
+		len+=padlen;
+		padlen=0;
+	}
+	uint16_t datalen = (uint16_t)(len + padlen);
 	uint16_t transport_payload_len = sizeof(struct udphdr) + datalen;
 	uint16_t ip_payload_len = transport_payload_len +
 		8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) +
@@ -404,7 +419,7 @@ bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
 	uint8_t fooling,
-	uint16_t padlen,
+	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {

@@ -545,7 +545,7 @@ static void exithelp()
 		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-quic=<filename>\t; file containing fake QUIC Initial\n"
 		" --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload\n"
-		" --dpi-desync-udplen-increment=<int>\t; increase udp packet length by N bytes (default %u)\n"
+		" --dpi-desync-udplen-increment=<int>\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-exclude=<filename>\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n",
@@ -1004,7 +1004,11 @@ int main(int argc, char **argv)
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
 		case 33: /* dpi-desync-udplen-increment */
-			params.udplen_increment = (uint16_t)atoi(optarg);
+			if (sscanf(optarg,"%d",&params.udplen_increment)<1 || params.udplen_increment>0x7FFF || params.udplen_increment<-0x8000)
+			{
+				fprintf(stderr, "dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
+				exit_clean(1);
+			}
 			break;
 		case 34: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
