@@ -9,6 +9,7 @@
 . "$ZAPRET_BASE/common/ipt.sh"
 . "$ZAPRET_BASE/common/nft.sh"
 . "$ZAPRET_BASE/common/linux_fw.sh"
+. "$ZAPRET_BASE/common/list.sh"
 
 
 user_exists()
@@ -74,9 +75,6 @@ NFQWS_OPT_DESYNC_HTTPS6="${NFQWS_OPT_DESYNC_HTTPS6:-$NFQWS_OPT_DESYNC_HTTPS}"
 [ -n "$TPPORT" ] || TPPORT=988
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
 TPWS_LOCALHOST4=127.0.0.127
-HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
-[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"
-[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts-user.txt"
 
 TPWS_OPT_BASE="$USEROPT"
 TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
@@ -144,12 +142,6 @@ nft_fill_ifsets_overload()
 	nft_fill_ifsets "$IFACE_LAN" "$IFACE_WAN" "$IFACE_WAN"
 }
 
-
-filter_apply_hostlist_target()
-{
-	# $1 - var name of tpws or nfqws params
-	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
-}
 
 run_daemon()
 {

@@ -227,3 +227,9 @@ v47
 
 nfqws: QUIC initial decryption
 nfqws: udplen, fakeknown dpi desync modes
+
+v48
+
+nfqws, tpws : multiple --hostlist and --hostlist-exclude support
+launch system, ipset : no more list merging. all lists are passed separately to nfqws and tpws
+nfqws : udplen fooling supports packet shrinking (negative increment value)

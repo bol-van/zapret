@@ -174,7 +174,8 @@ nfqws takes the following parameters:
  --dpi-desync-fake-quic=<filename>      ; file containing fake QUIC Initial
  --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload
  --dpi-desync-cutoff=[n|d|s]N           ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
- --hostlist=<filename>                  ; apply fooling only to the listed hosts (one host per line, subdomains auto apply)
+ --hostlist=<filename>                  ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude=<filename>          ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
 ```
 
 The manipulation parameters can be combined in any way.
@@ -523,7 +524,8 @@ tpws is transparent proxy.
 				; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
  --max-orphan-time=<sec>	; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds
 
- --hostlist=<filename>          ; only act on host in the list (one host per line, subdomains auto apply, gzip lists supported)
+ --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --split-http-req=method|host	; split http request at specified logical position.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
@@ -662,13 +664,25 @@ LISTS_RELOAD=-  disables reloading ip list backend.
 
 ## Domain name filtering
 
-An alternative to ipset is to use tpws or nfqws with a list of domains. Only one list is supported.
+An alternative to ipset is to use tpws or nfqws with a list(s) of domains.
+Both `tpws` and `nfqws` take any number of include (`--hostlist`) and exclude (`--hostlist-exclude`) domain lists.
+All lists of the same type are combined internally leaving only 2 lists : include and exclude.
 
-Enter the blocked domains to `ipset/zapret-hosts-users.txt`. Remove `ipset/zapret-hosts.txt.gz`.
-Then the init script will run tpws with the `zapret-hosts-users.txt` list.
+Exclude list is checked first. Fooling is cancelled if domain belongs to exclude list.
+If include list is present and domain does not belong to that list fooling is also cancelled.
+Empty list means absent list. Otherwise fooling goes on.
 
-Other option ( Roskomnadzor list - `get_hostlist.sh` ) is russian specific.
-You can write your own replacement for `get_hostlist.sh`.
+Launch system looks for 2 include lists :
+`ipset/zapret-hosts-users.txt.gz` or `ipset/zapret-hosts-users.txt`
+`ipset/zapret-hosts.txt.gz` or `ipset/zapret-hosts.txt`
+and 1 exclude list
+`ipset/zapret-hosts-users-exclude.txt.gz` or `ipset/zapret-hosts-users-exclude.txt`
+
+If `MODE_FILTER=hostlist` all present lists are passed to `nfqws` or `tpws`.
+If all include lists are empty it works like no include lists exist at all.
+If you need "all except" mode you dont have to delete zapret-hosts-users.txt. Just make it empty.
+
+Subdomains auto apply. For example, "ru" in the list affects "*.ru" .
 
 When filtering by domain name, daemons should run without filtering by ipset.
 When using large regulator lists estimate the amount of RAM on the router !
@@ -942,10 +956,6 @@ Its recommended to use gid 3003 (AID_INET), otherwise tpws will not have inet ac
 Example : `--uid 1:3003`
 
 In iptables use : `! --uid-owner 1` instead of `! --uid-owner tpws`.
-
-Nfqws should be executed with `--uid 1`. Otherwise on some devices and newer androids
-kernel may partially hang. Looks like processes with certain uids can be suspended.
-With buggy chineese cellular interface driver this can lead to device hang.
 
 Write your own shell script with iptables and tpws, run it using your root manager.
 Autorun scripts are here :

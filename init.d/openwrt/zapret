@@ -43,9 +43,6 @@ PIDDIR=/var/run
 NFQWS_OPT_BASE="--user=$WS_USER --dpi-desync-fwmark=$DESYNC_MARK"
 
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
-HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt.gz"
-[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts.txt"
-[ -f "$HOSTLIST" ] || HOSTLIST="$ZAPRET_BASE/ipset/zapret-hosts-user.txt"
 TPWS_OPT_BASE="--user=$WS_USER"
 TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
 TPWS_OPT_BASE6="--bind-addr=::1"
@@ -99,12 +96,6 @@ stop_tpws()
 	stop_daemon $1 "$TPWS"
 }
 
-
-filter_apply_hostlist_target()
-{
-	# $1 - var name of tpws or nfqws params
-	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
-}
 
 tpws_apply_socks_binds()
 {

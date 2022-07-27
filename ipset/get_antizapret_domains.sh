@@ -21,24 +21,13 @@ curl -H "Accept-Encoding: gzip" -k --fail --max-time 600 --connect-timeout 5 --r
  exit 2
 }
 
-composite_list()
-{
- # combine reestr and user list
- if [ -f "$ZUSERLIST_EXCLUDE" ]; then
-	nice -n 5 $GREP -xvFf "$ZUSERLIST_EXCLUDE" "$ZDOM"
- else
-	cat "$ZDOM"
- fi
- [ -f "$ZUSERLIST" ] && $AWK '{ print tolower($0) }' <"$ZUSERLIST"
-}
-
 dlsize=$(LANG=C wc -c "$ZDOM" | xargs | cut -f 1 -d ' ')
 if test $dlsize -lt 102400; then
  echo list file is too small. can be bad.
  exit 2
 fi
 
-composite_list | sort -u | zz "$ZHOSTLIST"
+sort -u "$ZDOM" | zz "$ZHOSTLIST"
 
 rm -f "$ZDOM"
 

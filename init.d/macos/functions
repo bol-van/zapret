@@ -4,13 +4,10 @@
 . "$ZAPRET_BASE/config"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/pf.sh"
+. "$ZAPRET_BASE/common/list.sh"
 
 IPSET_DIR=$ZAPRET_BASE/ipset
 . "$IPSET_DIR/def.sh"
-
-HOSTLIST="$ZHOSTLIST.gz"
-[ -f "$HOSTLIST" ] || HOSTLIST="$ZHOSTLIST"
-[ -f "$HOSTLIST" ] || HOSTLIST="$ZUSERLIST"
 
 PIDDIR=/var/run
 [ -n "$TPPORT" ] || TPPORT=988
@@ -59,12 +56,6 @@ do_daemon()
 {
 	# $1 - 1 - run, 0 - stop
 	on_off_function run_daemon stop_daemon "$@"
-}
-
-filter_apply_hostlist_target()
-{
-	# $1 - var name of tpws or nfqws params
-	[ "$MODE_FILTER" = "hostlist" ] && eval $1="\"\$$1 --hostlist=$HOSTLIST\""
 }
 
 tpws_apply_binds()
