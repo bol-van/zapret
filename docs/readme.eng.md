@@ -957,15 +957,14 @@ Example : `--uid 1:3003`
 
 In iptables use : `! --uid-owner 1` instead of `! --uid-owner tpws`.
 
+Nfqws should be executed with `--uid 1`. Otherwise on some devices or firmwares kernel may partially hang. Looks like processes with certain uids can be suspended. With buggy chineese cellular interface driver this can lead to device hang.
+
 Write your own shell script with iptables and tpws, run it using your root manager.
 Autorun scripts are here :
 
 magisk  : `/data/adb/service.d`
 
 supersu : `/system/su.d`
-
-I haven't checked whether android can kill iptable rules at its own will during wifi connection/disconnection,
-mobile data on/off, ...
 
 How to run tpws on root-less android.
 You can't write to `/system`, `/data`, can't run from sd card.
