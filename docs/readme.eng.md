@@ -673,9 +673,13 @@ If include list is present and domain does not belong to that list fooling is al
 Empty list means absent list. Otherwise fooling goes on.
 
 Launch system looks for 2 include lists :
+
 `ipset/zapret-hosts-users.txt.gz` or `ipset/zapret-hosts-users.txt`
+
 `ipset/zapret-hosts.txt.gz` or `ipset/zapret-hosts.txt`
+
 and 1 exclude list
+
 `ipset/zapret-hosts-users-exclude.txt.gz` or `ipset/zapret-hosts-users-exclude.txt`
 
 If `MODE_FILTER=hostlist` all present lists are passed to `nfqws` or `tpws`.
