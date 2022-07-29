@@ -1027,7 +1027,7 @@ static int rawsend_socket(sa_family_t family)
 		}
 		if (family==AF_INET6 && setsockopt(*sock, SOL_IPV6, IPV6_FREEBIND, &yes, sizeof(yes)) == -1)
 		{
-			perror("rawsend: setsockopt(IPV6_FREEBIND)");
+			//perror("rawsend: setsockopt(IPV6_FREEBIND)");
 			// dont error because it's supported only from kernel 4.15
 		}
 #endif
