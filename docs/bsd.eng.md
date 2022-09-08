@@ -192,14 +192,20 @@ Then it becomes possible to install all the required software including git to d
 
 kldload ipfw
 kldload ipdivert
+
+# for older pfsense versions. newer do not have these sysctls
 sysctl net.inet.ip.pfil.outbound=ipfw,pf
 sysctl net.inet.ip.pfil.inbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.outbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
+
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 pkill ^dvtws$
 dvtws --daemon --port 989 --dpi-desync=split2
+
+# required for newer pfsense versions (2.6.0 tested) to return ipfw to functional state
+pfctl -d ; pfctl -e
 ```
 
 I could not make tpws work from ipfw. Looks like there's some conflict between two firewalls.
