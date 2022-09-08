@@ -6,10 +6,15 @@
 
 kldload ipfw
 kldload ipdivert
+
+# for older pfsense versions. newer do not have these sysctls
 sysctl net.inet.ip.pfil.outbound=ipfw,pf
 sysctl net.inet.ip.pfil.inbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.outbound=ipfw,pf
 sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
+
+# required for newer pfsense versions (2.6.0 tested) to return ipfw to functional state
+pfctl -d ; pfctl -e
 
 # add ipfw rules and start daemon
 
