@@ -780,7 +780,6 @@ check_prerequisites_openwrt()
 			;;
 		nftables)
 			PKGS="$PKGS nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
-			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS kmod-nft-nat6"
 			;;
 	esac
 
