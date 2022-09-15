@@ -771,7 +771,7 @@ check_prerequisites_openwrt()
 {
 	echo \* checking prerequisites
 
-	local PKGS="curl" PKGS UPD=0
+	local PKGS="curl" UPD=0
 
 	case "$FWTYPE" in
 		iptables)
