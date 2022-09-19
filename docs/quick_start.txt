@@ -35,6 +35,7 @@ zapret дополнительные пакеты в сжатый образ squa
 
 6) На чистой openwrt потребуются дополнительные пакеты. 
 opkg update
+opkg install curl
 Требуемые пакеты для iptables :
 opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra
 Требуемые пакеты для iptables ipv6 :
