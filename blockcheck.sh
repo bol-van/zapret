@@ -33,7 +33,7 @@ HDRTEMP=/tmp/zapret-hdr.txt
 NFT_TABLE=blockcheck
 
 [ -n "$DNSCHECK_DNS" ] || DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
-[ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org nnmclub.to startmail.com"
+[ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org facebook.com startmail.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -86,11 +86,8 @@ ipt6_has_frag()
 ipt_has_nfq()
 {
 	# cannot just check /proc/net/ip_tables_targets because of iptables-nft or modules not loaded yet
-	local ipt
-	for ipt in iptables ip6tables; do
-		$ipt -A OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null || return 1
-		$ipt -D OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null
-	done
+	iptables -A OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null || return 1
+	iptables -D OUTPUT -t mangle -p 255 -j NFQUEUE --queue-num $QNUM --queue-bypass 2>/dev/null
 	return 0
 }
 nft_has_nfq()
