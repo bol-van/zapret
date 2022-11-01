@@ -231,6 +231,17 @@ nft_hw_offload_supported()
 	return $res
 }
 
+nft_hw_offload_find_supported()
+{
+	# $1,$2,... - interface names
+	local supported_list
+	while [ -n "$1" ]; do
+		nft_hw_offload_supported "$1" && append_separator_list supported_list ' ' '' "$1"
+		shift
+	done
+	echo $supported_list
+}
+
 nft_apply_flow_offloading()
 {
 	# ft can be absent
@@ -330,8 +341,11 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 					nft_create_or_update_flowtable 'offload' $i
 				else
 					# bridge members must be added instead of the bridge itself
+					# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
 					devs=$(resolve_lower_devices $i)
-					[ -n "$devs" ] && nft_hw_offload_supported $devs && {
+					[ -n "$devs" ] && {
+						# select devices that support offload
+						devs=$(nft_hw_offload_find_supported $devs)
 						for j in $devs; do
 							nft_create_or_update_flowtable 'offload' $j
 						done
