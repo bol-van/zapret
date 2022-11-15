@@ -309,6 +309,10 @@ nft_fill_ifsets()
 	# $1 - space separated lan interface names
 	# $2 - space separated wan interface names
 	# $3 - space separated wan6 interface names
+	# 4,5,6 is needed for pppoe+openwrt case. looks like it's not easily possible to resolve ethernet device behind a pppoe interface
+	# $4 - space separated lan physical interface names (optional)
+	# $5 - space separated wan physical interface names (optional)
+	# $6 - space separated wan6 physical interface names (optional)
 
 	local script i j ALLDEVS devs
 
@@ -333,7 +337,7 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 			nft_create_or_update_flowtable '' $ALLDEVS 2>/dev/null
 			;;
 		hardware)
-			ALLDEVS=$(unique $1 $2 $3)
+			ALLDEVS=$(unique $1 $2 $3 $4 $5 $6)
 			# first create unbound flowtable. may cause error in older nft version
 			nft_create_or_update_flowtable 'offload' 2>/dev/null
 			# then add elements. some of them can cause error because unsupported

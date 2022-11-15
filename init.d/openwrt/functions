@@ -217,17 +217,20 @@ flow_offloading_unexempt()
 
 nft_fill_ifsets_overload()
 {
-	local ifaces DLAN DWAN DWAN6
+	local ifaces DLAN DWAN DWAN6 PDLAN PDWAN PDWAN6
 
 	call_for_multiple_items network_get_device DLAN "$OPENWRT_LAN"
+	call_for_multiple_items network_get_physdev PDLAN "$OPENWRT_LAN"
 
 	network_find_wan4_all ifaces
 	call_for_multiple_items network_get_device DWAN "$ifaces"
+	call_for_multiple_items network_get_physdev PDWAN "$ifaces"
 
 	network_find_wan6_all ifaces
 	call_for_multiple_items network_get_device DWAN6 "$ifaces"
+	call_for_multiple_items network_get_physdev PDWAN6 "$ifaces"
 
-	nft_fill_ifsets "$DLAN" "$DWAN" "$DWAN6"
+	nft_fill_ifsets "$DLAN" "$DWAN" "$DWAN6" "$PDLAN" "$PDWAN" "$PDWAN6"
 }
 
 nft_fw_tpws4()
