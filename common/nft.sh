@@ -246,6 +246,7 @@ nft_apply_flow_offloading()
 {
 	# ft can be absent
 	nft_add_rule flow_offload meta l4proto "{ tcp, udp }" flow add @ft 2>/dev/null && {
+		nft_add_rule flow_offload meta l4proto "{ tcp, udp }" counter comment \"if offload works here must not be too much traffic\"
 		# allow only outgoing packets to initiate flow offload
 		nft_add_rule forward oifname @wanif jump flow_offload
 		nft_add_rule forward oifname @wanif6 jump flow_offload
