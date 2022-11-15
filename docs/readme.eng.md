@@ -846,9 +846,12 @@ The following settings are not relevant for openwrt :
 
 If your system works as a router, then you need to enter the names of the internal and external interfaces:
 ```
-IFACE_LAN = eth0
-IFACE_WAN = eth1
+IFACE_LAN=eth0
+IFACE_WAN=eth1
+IFACE_WAN6="henet ipsec0"
 ```
+Multiple interfaces are space separated. IF IFACE_WAN6 is omitted then IFACE_WAN value is taken.
+
 IMPORTANT: configuring routing, masquerade, etc. not a zapret task.
 Only modes that intercept transit traffic are enabled.
 It's possible to specify multiple interfaces like this : `IFACE_LAN="eth0 eth1 eth2"`

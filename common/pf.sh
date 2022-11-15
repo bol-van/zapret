@@ -172,8 +172,8 @@ pf_anchor_zapret_v6_tpws()
 	echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $1"
 	for t in $tbl; do
 		rule="route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
-		if [ -n "$IFACE_WAN" ] ; then
-			for wan in $IFACE_WAN; do
+		if [ -n "${IFACE_WAN6:-$IFACE_WAN}" ] ; then
+			for wan in ${IFACE_WAN6:-$IFACE_WAN}; do
 				echo "pass out on $wan $rule"
 			done
 		else

@@ -111,7 +111,7 @@ fw_nfqws_post4()
 }
 fw_nfqws_post6()
 {
-	_fw_nfqws_post6  $1 "$2" $3 "$IFACE_WAN"
+	_fw_nfqws_post6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
 }
 fw_tpws4()
 {
@@ -119,7 +119,7 @@ fw_tpws4()
 }
 fw_tpws6()
 {
-	_fw_tpws6 $1 "$2" $3 "$IFACE_LAN" "$IFACE_WAN"
+	_fw_tpws6 $1 "$2" $3 "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
 }
 nft_fw_tpws4()
 {
@@ -127,7 +127,7 @@ nft_fw_tpws4()
 }
 nft_fw_tpws6()
 {
-	_nft_fw_tpws6 "$1" $2 "$IFACE_LAN" "$IFACE_WAN"
+	_nft_fw_tpws6 "$1" $2 "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
 }
 nft_fw_nfqws_post4()
 {
@@ -135,11 +135,11 @@ nft_fw_nfqws_post4()
 }
 nft_fw_nfqws_post6()
 {
-	_nft_fw_nfqws_post6 "$1" $2 "$IFACE_WAN"
+	_nft_fw_nfqws_post6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
 }
 nft_fill_ifsets_overload()
 {
-	nft_fill_ifsets "$IFACE_LAN" "$IFACE_WAN" "$IFACE_WAN"
+	nft_fill_ifsets "$IFACE_LAN" "$IFACE_WAN" "${IFACE_WAN6:-$IFACE_WAN}"
 }
 
 

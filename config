@@ -66,11 +66,13 @@ FLOWOFFLOAD=donttouch
 #OPENWRT_LAN="lan lan2 lan3"
 
 # for routers based on desktop linux and macos. has no effect in openwrt.
-# CHOOSE LAN and optinally WAN NETWORK INTERFACES
+# CHOOSE LAN and optinally WAN/WAN6 NETWORK INTERFACES
 # or leave them commented if its not router
 # it's possible to specify multiple interfaces like this : IFACE_LAN="eth0 eth1 eth2"
+# if IFACE_WAN6 is not defined it take the value of IFACE_WAN
 #IFACE_LAN=eth0
 #IFACE_WAN=eth1
+#IFACE_WAN6="ipsec0 wireguard0 he_net"
 
 # should start/stop command of init scripts apply firewall rules ?
 # not applicable to openwrt with firewall3+iptables
