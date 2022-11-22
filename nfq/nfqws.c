@@ -276,6 +276,8 @@ static int nfq_main()
 	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
 		goto exiterr;
 
+	sec_harden();
+
 	if (params.droproot && !droproot(params.uid, params.gid))
 		goto exiterr;
 	print_id();

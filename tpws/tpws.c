@@ -943,11 +943,11 @@ int main(int argc, char *argv[])
 	}
 
 	set_ulimit();
+	sec_harden();
 
 	if (params.droproot && !droproot(params.uid,params.gid))
 		goto exiterr;
 	print_id();
-
 	//splice() causes the process to receive the SIGPIPE-signal if one part (for
 	//example a socket) is closed during splice(). I would rather have splice()
 	//fail and return -1, so blocking SIGPIPE.
