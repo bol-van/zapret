@@ -30,7 +30,12 @@ SYS_execve,SYS_execveat,
 #ifdef SYS_exec_with_loader
 SYS_exec_with_loader,
 #endif
+#ifdef SYS_clone
 SYS_clone,
+#endif
+#ifdef SYS_clone2
+SYS_clone2,
+#endif
 #ifdef SYS_clone3
 SYS_clone3,
 #endif
