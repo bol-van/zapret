@@ -133,7 +133,7 @@ static bool set_seccomp()
 	set_filter(&prog.filter[idx++], BPF_LD + BPF_W + BPF_ABS, 0, 0, syscall_nr);
 	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JGT + BPF_K, 1 + BLOCKED_SYSCALL_COUNT, 0, __X32_SYSCALL_BIT - 1); // fail
 #else
-	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JEQ + BPF_K, 0, 1 + BLOCKED_SYSCALL_COUNT, ARCH_NR); // fail
+	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JEQ + BPF_K, 0, 2 + BLOCKED_SYSCALL_COUNT, ARCH_NR); // fail
 	set_filter(&prog.filter[idx++], BPF_LD + BPF_W + BPF_ABS, 0, 0, syscall_nr);
 #endif
 
