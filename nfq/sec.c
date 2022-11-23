@@ -14,13 +14,10 @@
 #include <linux/seccomp.h>
 #include <linux/filter.h>
 #include <syscall.h>
+#include <errno.h>
 
 /************ SECCOMP ************/
-#ifdef __X32_SYSCALL_BIT
-#define X32_SYSCALL_BIT __X32_SYSCALL_BIT
-#else
-#define X32_SYSCALL_BIT 0x40000000
-#endif
+
 // block most of the undesired syscalls to harden against code execution
 static long blocked_syscalls[] = {
 #ifdef SYS_execv
@@ -116,18 +113,28 @@ static void set_filter(struct sock_filter *filter, __u16 code, __u8 jt, __u8 jf,
 	filter->k = k;
 }
 // deny all blocked syscalls
-bool set_seccomp()
+static bool set_seccomp()
 {
-#define SECCOMP_PROG_SIZE (6 + BLOCKED_SYSCALL_COUNT)
-	struct sock_fprog prog = { .len = SECCOMP_PROG_SIZE };
-	int res,i,idx=0;
+#ifdef __X32_SYSCALL_BIT
+ #define SECCOMP_PROG_SIZE (6 + BLOCKED_SYSCALL_COUNT)
+#else
+ #define SECCOMP_PROG_SIZE (5 + BLOCKED_SYSCALL_COUNT)
+#endif
+	struct sock_filter sockf[SECCOMP_PROG_SIZE];
+	struct sock_fprog prog = { .len = SECCOMP_PROG_SIZE, .filter = sockf };
+	int i,idx=0;
 
-	prog.filter = calloc(SECCOMP_PROG_SIZE, sizeof(*prog.filter));
-	if (!prog.filter) return false;
 	set_filter(&prog.filter[idx++], BPF_LD + BPF_W + BPF_ABS, 0, 0, arch_nr);
+#ifdef __X32_SYSCALL_BIT
+	// x86 only
 	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JEQ + BPF_K, 0, 3 + BLOCKED_SYSCALL_COUNT, ARCH_NR); // fail
 	set_filter(&prog.filter[idx++], BPF_LD + BPF_W + BPF_ABS, 0, 0, syscall_nr);
-	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JGT + BPF_K, 1 + BLOCKED_SYSCALL_COUNT, 0, X32_SYSCALL_BIT - 1); // fail
+	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JGT + BPF_K, 1 + BLOCKED_SYSCALL_COUNT, 0, __X32_SYSCALL_BIT - 1); // fail
+#else
+	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JEQ + BPF_K, 0, 1 + BLOCKED_SYSCALL_COUNT, ARCH_NR); // fail
+	set_filter(&prog.filter[idx++], BPF_LD + BPF_W + BPF_ABS, 0, 0, syscall_nr);
+#endif
+
 /*
 	// ! THIS IS NOT WORKING BECAUSE perror() in glibc dups() stderr
 	set_filter(&prog.filter[idx++], BPF_JMP + BPF_JEQ + BPF_K, 0, 3, SYS_write); // special check for write call
@@ -141,12 +148,8 @@ bool set_seccomp()
 	}
 	set_filter(&prog.filter[idx++], BPF_RET + BPF_K, 0, 0, SECCOMP_RET_ALLOW); // success case
 	set_filter(&prog.filter[idx++], BPF_RET + BPF_K, 0, 0, SECCOMP_RET_KILL); // fail case
-	res=prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog);
-	free(prog.filter);
-	return res>=0;
+	return prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog) >= 0;
 }
-
-
 
 bool sec_harden()
 {
@@ -159,11 +162,13 @@ bool sec_harden()
 	if (!set_seccomp())
 	{
 		perror("seccomp");
+		if (errno==EINVAL) fprintf(stderr,"seccomp: this can be safely ignored if kernel does not support seccomp\n");
 		return false;
 	}
 #endif
 	return true;
 }
+
 
 
 
