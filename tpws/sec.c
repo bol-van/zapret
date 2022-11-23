@@ -25,7 +25,10 @@ static long blocked_syscalls[] = {
 #ifdef SYS_execv
 SYS_execv,
 #endif
-SYS_execve,SYS_execveat,
+SYS_execve,
+#ifdef SYS_execveat
+SYS_execveat,
+#endif
 #ifdef SYS_exec_with_loader
 SYS_exec_with_loader,
 #endif
@@ -80,7 +83,10 @@ SYS_symlinkat,
 SYS_link,
 #endif
 SYS_linkat,
-SYS_pkey_mprotect,SYS_mprotect,
+#ifdef SYS_pkey_mprotect
+SYS_pkey_mprotect,
+#endif
+SYS_mprotect,
 SYS_truncate,
 #ifdef SYS_truncate64
 SYS_truncate64,
@@ -103,7 +109,10 @@ SYS_rmdir,
 #ifdef SYS_rename
 SYS_rename,
 #endif
-SYS_renameat,SYS_renameat2
+#ifdef SYS_renameat2
+SYS_renameat2,
+#endif
+SYS_renameat
 };
 #define BLOCKED_SYSCALL_COUNT (sizeof(blocked_syscalls)/sizeof(*blocked_syscalls))
 
