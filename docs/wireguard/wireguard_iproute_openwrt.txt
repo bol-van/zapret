@@ -445,7 +445,7 @@ ipt postrouting_tunvps_rule -t nat -m mark --mark 0x1000/0x1000 -j MASQUERADE
 # incoming from wgvps
 network_get_device DEVICE wgvps
 ipt PREROUTING -t mangle ! -i $DEVICE -j CONNMARK --restore-mark --nfmask 0x800 --ctmask 0x800
-ipt PREROUTING -t mangle -i $DEVICE -m conntrack --ctstate NEW -j CONNMARK --set-xmark 0x800/0x800
+ipt PREROUTING -t mangle -i $DEVICE -m conntrack --ctstate NEW -j CONNMARK --set-mark 0x800/0x800
 ------------------------------------------------
 
 # /etc/init.d/firewall restart
