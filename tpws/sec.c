@@ -122,7 +122,7 @@ SYS_process_vm_readv,
 #ifdef SYS_process_vm_writev
 SYS_process_vm_writev,
 #endif
-#ifdef SYS_process_vm_madvise
+#ifdef SYS_process_madvise
 SYS_process_madvise,
 #endif
 #ifdef SYS_tkill
