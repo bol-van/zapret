@@ -50,6 +50,9 @@ SYS_fork,
 #ifdef SYS_vfork
 SYS_vfork,
 #endif
+#ifdef SYS_uselib
+SYS_uselib,
+#endif
 #ifdef SYS_unlink
 SYS_unlink,
 #endif
@@ -112,7 +115,23 @@ SYS_rename,
 #ifdef SYS_renameat2
 SYS_renameat2,
 #endif
-SYS_renameat
+SYS_renameat,
+#ifdef SYS_process_vm_readv
+SYS_process_vm_readv,
+#endif
+#ifdef SYS_process_vm_writev
+SYS_process_vm_writev,
+#endif
+#ifdef SYS_process_vm_madvise
+SYS_process_madvise,
+#endif
+#ifdef SYS_tkill
+SYS_tkill,
+#endif
+#ifdef SYS_tgkill
+SYS_tgkill,
+#endif
+SYS_kill, SYS_ptrace
 };
 #define BLOCKED_SYSCALL_COUNT (sizeof(blocked_syscalls)/sizeof(*blocked_syscalls))
 
