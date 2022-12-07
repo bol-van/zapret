@@ -116,6 +116,15 @@ SYS_rename,
 SYS_renameat2,
 #endif
 SYS_renameat,
+#ifdef SYS_readdir
+SYS_readdir,
+#endif
+#ifdef SYS_getdents
+SYS_getdents,
+#endif
+#ifdef SYS_getdents64
+SYS_getdents64,
+#endif
 #ifdef SYS_process_vm_readv
 SYS_process_vm_readv,
 #endif
