@@ -338,7 +338,7 @@ pktws_ipt_prepare()
 				nft "add rule inet $NFT_TABLE predefrag meta nfproto ipv${IPV} exthdr frag exists notrack"
 			}
 			nft "add chain inet $NFT_TABLE premangle { type filter hook output priority -152; }"
-			nft "add rule inet $NFT_TABLE premangle meta nfproto ipv${IPV} tcp dport $1 mark and 0x40000000 != 0x40000000 queue num $QNUM bypass"
+			nft "add rule inet $NFT_TABLE premangle meta nfproto ipv${IPV} tcp dport $1 mark and 0x40000000 != 0x40000000 queue num $QNUM"
 			;;
 		ipfw)
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any $1 proto ip${IPV} out not diverted not sockarg
