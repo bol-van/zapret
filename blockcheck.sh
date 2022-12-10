@@ -252,15 +252,6 @@ curl_supports_tls13()
 	curl --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://w3.org 2>/dev/null
 	[ $? != 4 ]
 }
-curl_supports_tlsmax()
-{
-	# supported only in OpenSSL and LibreSSL
-	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS || return 1
-	# supported since curl 7.54
-	curl --tls-max 1.2 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
-	# return code 2 = init failed. likely bad command line options
-	[ $? != 2 ]
-}
 
 hdrfile_http_code()
 {
@@ -303,7 +294,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
+	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
@@ -311,7 +302,7 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
+	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 "https://$2" -o /dev/null 2>&1 
 }
 
 pktws_ipt_prepare()
@@ -724,12 +715,6 @@ configure_ip_version()
 }
 configure_curl_opt()
 {
-	TLSMAX12=
-	TLSMAX13=
-	curl_supports_tlsmax && {
-		TLSMAX12="--tls-max 1.2"
-		TLSMAX13="--tls-max 1.3"
-	}
 	TLS13=
 	curl_supports_tls13 && TLS13=1
 }
@@ -808,8 +793,6 @@ ask_params()
 
 	ENABLE_HTTP=1
 	ask_yes_no_var ENABLE_HTTP "check http"
-
-	[ -z "$TLSMAX12" -a -n "$TLS13" ] && echo "WARNING ! your curl version or TLS library does not support tls-max option. TLS 1.2 tests may use TLS 1.3+ protocols"
 
 	ENABLE_HTTPS_TLS12=1
 	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
