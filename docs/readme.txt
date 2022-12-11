@@ -695,48 +695,46 @@ Cкрипты с названием get_reestr_* оперируют дампом
 банят по IP : вместо этого они банят http запросы с "нехорошим" заголовком "Host:" вне зависимости
 от IP адреса. Поэтому скрипт ресолвит все сам, хотя это и занимает много времени.
 Используется мультипоточный ресолвер mdig (собственная разработка).
-Реестр РКН уже настолько огромен, что однопоточный ресолв займет вечность, а многопоточный хоть и тоже много времени,
-но хотя бы оно конечно.
-На роутерах с небольшим объемом RAM может сработать только с TMPDIR на внешнем носителе
 
 3) ipset/get_reestr_ip.sh
 взять все IP адреса из реестра и загнать в ipset zapret/zapret6
-На роутерах с небольшим объемом RAM может сработать только с TMPDIR на внешнем носителе
 
 4) ipset/get_reestr_combined.sh. для провайдеров, которые блокируют по IP https, а остальное по DPI.
-IP https и IP без домена заносятся в ipset ipban, остальные в ipset zapret.
-На роутерах с небольшим объемом RAM может сработать только с TMPDIR на внешнем носителе
+
+5) ipset/get_reestr_preresolved.sh. то же самое, что и 2), только берется уже заресолвленый список
+со стороннего ресурса.
+
+6) ipset/get_reestr_preresolved_smart.sh. то же самое, что и 5), с добавлением всего диапазона некоторых
+автономных систем (прыгающие IP адреса из cloudflare, facebook, ...) и некоторых поддоменов блокируемых сайтов
 
 Cкрипты с названием get_antifilter_* оперируют списками адресов и масок подсетей с сайтов antifilter.network и antifilter.download :
 
-5) ipset/get_antifilter_ip.sh. получает лист https://antifilter.download/list/ip.lst.
+7) ipset/get_antifilter_ip.sh. получает лист https://antifilter.download/list/ip.lst.
 
-6) ipset/get_antifilter_ipsmart.sh. получает лист https://antifilter.network/download/ipsmart.lst.
-это умная суммаризация отдельных адресов из ip.lst по маскам от /32 до /22
-количество префиксов измеряется всего лишь десятками тысяч, потому это лучшее решение для роутера с 64 Mb RAM
+8) ipset/get_antifilter_ipsmart.sh. получает лист https://antifilter.network/download/ipsmart.lst.
+умная суммаризация отдельных адресов из ip.lst по маскам от /32 до /22
 
-7) ipset/get_antifilter_ipsum.sh. получает лист https://antifilter.download/list/ipsum.lst.
-это суммаризация отдельных адресов из ip.lst по маске /24
-количество префиксов измеряется всего лишь десятками тысяч, потому можно использовать на роутерах с 64 Mb RAM
+9) ipset/get_antifilter_ipsum.sh. получает лист https://antifilter.download/list/ipsum.lst.
+суммаризация отдельных адресов из ip.lst по маске /24
 
-8) ipset/get_antifilter_ipresolve.sh. получает лист https://antifilter.download/list/ipresolve.lst.
-пре-ресолвленный список, аналогичный получаемый при помощи get_reestr_resolve
-сотни тысяч IP, на роутерах с 64 Mb использовать не рекомендуется
+10) ipset/get_antifilter_ipresolve.sh. получает лист https://antifilter.download/list/ipresolve.lst.
+пре-ресолвленный список, аналогичный получаемый при помощи get_reestr_resolve. только ipv4.
 
-9) ipset/get_antifilter_allyouneed.sh. получает лист https://antifilter.download/list/allyouneed.lst.
+11) ipset/get_antifilter_allyouneed.sh. получает лист https://antifilter.download/list/allyouneed.lst.
 Суммарный список префиксов, созданный из ipsum.lst и subnet.lst.
-количество префиксов измеряется всего лишь десятками тысяч, потому можно использовать на роутерах с 64 Mb RAM
 
 Все варианты рассмотренных скриптов автоматически создают и заполняют ipset.
-Варианты 2-9 дополнительно вызывают вариант 1.
+Варианты 2-11 дополнительно вызывают вариант 1.
 
-10) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
+12) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
 Если переменная не определена, то ресолвятся лишь листы для ipset nozapret/nozapret6.
 
 Листы РКН все время изменяются. Возникают новые тенденции. Требования к RAM могут меняться.
 Поэтому необходима нечастая, но все же регулярная ревизия что же вообще у вас происходит на роутере.
 Или вы можете узнать о проблеме лишь когда у вас начнет постоянно пропадать wifi, и вам придется
 его перезагружать каждые 2 часа (метод кувалды).
+
+Самый щадящие варианты по RAM - get_antifilter_allyouneed.sh, get_antifilter_ipsum.sh.
 
 Листы zapret-ip.txt и zapret-ipban.txt сохраняются в сжатом виде в файлы .gz.
 Это позволяет снизить их размер во много раз и сэкономить место на роутере.
