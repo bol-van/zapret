@@ -42,7 +42,7 @@ dig_reestr()
 
 getuser && {
 
- curl -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL_REESTR" -o "$ZREESTR" ||
+ curl -H "Accept-Encoding: gzip" -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL_REESTR" | gunzip - >"$ZREESTR" ||
  {
   echo reestr list download failed
   exit 2

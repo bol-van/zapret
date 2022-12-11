@@ -15,7 +15,7 @@ ZREESTR="$TMPDIR/zapret.txt"
 #ZURL=https://reestr.rublacklist.net/api/current
 ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
-curl -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL" >"$ZREESTR" ||
+curl -H "Accept-Encoding: gzip" -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL_REESTR" | gunzip - >"$ZREESTR" ||
 {
  echo reestr list download failed   
  exit 2
