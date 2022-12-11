@@ -9,7 +9,7 @@ ZREESTR="$TMPDIR/zapret.txt"
 ZDIG="$TMPDIR/zapret-dig.txt"
 ZIPLISTTMP="$TMPDIR/zapret-ip.txt"
 #ZURL=https://reestr.rublacklist.net/api/current
-ZURL=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
+ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
 
 getuser && {
  # both disabled
