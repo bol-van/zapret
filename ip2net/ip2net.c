@@ -49,7 +49,7 @@ static int ucmp(const void * a, const void * b, void *arg)
 }
 static uint32_t mask_from_bitcount(uint32_t zct)
 {
-	return ~((1 << zct) - 1);
+	return zct<32 ? ~((1 << zct) - 1) : 0;
 }
 // make presorted array unique. return number of unique items.
 // 1,1,2,3,3,0,0,0 (ct=8) => 1,2,3,0 (ct=4)
