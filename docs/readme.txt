@@ -696,37 +696,32 @@ Cкрипты с названием get_reestr_* оперируют дампом
 от IP адреса. Поэтому скрипт ресолвит все сам, хотя это и занимает много времени.
 Используется мультипоточный ресолвер mdig (собственная разработка).
 
-3) ipset/get_reestr_ip.sh
-взять все IP адреса из реестра и загнать в ipset zapret/zapret6
-
-4) ipset/get_reestr_combined.sh. для провайдеров, которые блокируют по IP https, а остальное по DPI.
-
-5) ipset/get_reestr_preresolved.sh. то же самое, что и 2), только берется уже заресолвленый список
+3) ipset/get_reestr_preresolved.sh. то же самое, что и 2), только берется уже заресолвленый список
 со стороннего ресурса.
 
-6) ipset/get_reestr_preresolved_smart.sh. то же самое, что и 5), с добавлением всего диапазона некоторых
+4) ipset/get_reestr_preresolved_smart.sh. то же самое, что и 5), с добавлением всего диапазона некоторых
 автономных систем (прыгающие IP адреса из cloudflare, facebook, ...) и некоторых поддоменов блокируемых сайтов
 
 Cкрипты с названием get_antifilter_* оперируют списками адресов и масок подсетей с сайтов antifilter.network и antifilter.download :
 
-7) ipset/get_antifilter_ip.sh. получает лист https://antifilter.download/list/ip.lst.
+5) ipset/get_antifilter_ip.sh. получает лист https://antifilter.download/list/ip.lst.
 
-8) ipset/get_antifilter_ipsmart.sh. получает лист https://antifilter.network/download/ipsmart.lst.
+6) ipset/get_antifilter_ipsmart.sh. получает лист https://antifilter.network/download/ipsmart.lst.
 умная суммаризация отдельных адресов из ip.lst по маскам от /32 до /22
 
-9) ipset/get_antifilter_ipsum.sh. получает лист https://antifilter.download/list/ipsum.lst.
+7) ipset/get_antifilter_ipsum.sh. получает лист https://antifilter.download/list/ipsum.lst.
 суммаризация отдельных адресов из ip.lst по маске /24
 
-10) ipset/get_antifilter_ipresolve.sh. получает лист https://antifilter.download/list/ipresolve.lst.
+8) ipset/get_antifilter_ipresolve.sh. получает лист https://antifilter.download/list/ipresolve.lst.
 пре-ресолвленный список, аналогичный получаемый при помощи get_reestr_resolve. только ipv4.
 
-11) ipset/get_antifilter_allyouneed.sh. получает лист https://antifilter.download/list/allyouneed.lst.
+9) ipset/get_antifilter_allyouneed.sh. получает лист https://antifilter.download/list/allyouneed.lst.
 Суммарный список префиксов, созданный из ipsum.lst и subnet.lst.
 
 Все варианты рассмотренных скриптов автоматически создают и заполняют ipset.
-Варианты 2-11 дополнительно вызывают вариант 1.
+Варианты 2-9 дополнительно вызывают вариант 1.
 
-12) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
+10) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
 Если переменная не определена, то ресолвятся лишь листы для ipset nozapret/nozapret6.
 
 Листы РКН все время изменяются. Возникают новые тенденции. Требования к RAM могут меняться.

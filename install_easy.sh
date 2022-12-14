@@ -244,7 +244,7 @@ select_getlist()
 				GETLISTS="get_antizapret_domains.sh get_reestr_hostlist.sh"
 				GETLIST_DEF="get_antizapret_domains.sh"
 			else
-				GETLISTS="get_user.sh get_antifilter_ip.sh get_antifilter_ipsmart.sh get_antifilter_ipsum.sh get_antifilter_ipresolve.sh get_antifilter_allyouneed.sh get_reestr_ip.sh get_reestr_combined.sh get_reestr_resolve.sh get_reestr_preresolved.sh get_reestr_preresolved_smart.sh"
+				GETLISTS="get_user.sh get_antifilter_ip.sh get_antifilter_ipsmart.sh get_antifilter_ipsum.sh get_antifilter_ipresolve.sh get_antifilter_allyouneed.sh get_reestr_resolve.sh get_reestr_preresolved.sh get_reestr_preresolved_smart.sh"
 				GETLIST_DEF="get_antifilter_allyouneed.sh"
 			fi
 			ask_list GETLIST "$GETLISTS" "$GETLIST_DEF" && write_config_var GETLIST
@@ -820,23 +820,6 @@ check_prerequisites_openwrt()
 				UPD=1
 			}
 			opkg install --force-overwrite coreutils-sort
-		fi
-	}
-	is_linked_to_busybox grep && {
-		echo
-		echo your system uses default busybox grep. its damn infinite slow with -f option
-		echo get_combined.sh will be severely impacted
-		echo installer can install GNU grep but it requires about 0.5 Mb space
-		if ask_yes_no N "do you want to install GNU grep"; then
-			[ "$UPD" = "0" ] && {
-				opkg update
-				UPD=1
-			}
-			opkg install --force-overwrite grep
-
-			# someone reported device partially fail if /bin/grep is absent
-			# grep package deletes /bin/grep
-			[ -f /bin/grep ] || ln -s busybox /bin/grep
 		fi
 	}
 }
