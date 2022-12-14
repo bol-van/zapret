@@ -152,15 +152,12 @@ opkg update
 opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra ipset curl
 (ipv6) opkg install ip6tables-mod-nat
 (опционально) opkg install gzip
-(опционально) opkg install grep
 (опционально) opkg install coreutils-sort
 
 ЭКОНОМИЯ МЕСТА :
 
 gzip от busybox в разы медленней полноценного варианта. gzip используется скриптами получения листов.
 sort от busybox медленней полноценного варианта и жрет намного больше памяти. sort используется скриптами получения листов.
-grep от busybox катастрофически медленный с опцией -f. она применяется в get_reestr_combined.sh. если вы не собираетесь
-пользоваться этим скриптом, gnu grep можно не устанавливать
 iptables-mod-nfqueue можно выкинуть, если не будем пользоваться nfqws
 curl можно выкинуть, если для получения ip листа будет использоваться только get_user.sh
 
