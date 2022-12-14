@@ -15,7 +15,7 @@ dl()
 {
   # $1 - url
   # $2 - file
-  curl -vH "Accept-Encoding: gzip" -k --fail --max-time 180 --connect-timeout 10 --retry 4 --max-filesize 33554432 "$1" | gunzip - >"$TMPLIST" ||
+  curl -H "Accept-Encoding: gzip" -k --fail --max-time 180 --connect-timeout 10 --retry 4 --max-filesize 33554432 "$1" | gunzip - >"$TMPLIST" ||
   {
    echo list download failed : $1
    exit 2
