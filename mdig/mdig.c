@@ -4,12 +4,9 @@
 // errors, verbose >stderr
 // transparent for valid ip or ip/subnet of allowed address family
 
-// can be compiled in mingw using posix thread compiler version
-
 #define _GNU_SOURCE
 
 #include <stdio.h>
-#include <stdint.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,18 +14,10 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <getopt.h>
-#ifdef _WIN32
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x600
-#include <winsock2.h>
-#include <ws2ipdef.h>
-#include <ws2tcpip.h>
-#else
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#endif
 #include <time.h>
 
 #define RESOLVER_EAGAIN_ATTEMPTS 2
@@ -67,10 +56,8 @@ static const char* eai_str(int r)
 		return "EAI_SERVICE";
 	case EAI_SOCKTYPE:
 		return "EAI_SOCKTYPE";
-#ifdef EAI_SYSTEM
 	case EAI_SYSTEM:
 		return "EAI_SYSTEM";
-#endif
 	default:
 		return "UNKNOWN";
 	}
@@ -102,6 +89,7 @@ static struct
 	pthread_mutex_t flock;
 	pthread_mutex_t slock; // stats lock
 	int stats_every, stats_ct, stats_ct_ok; // stats
+	FILE *F_log_resolved, *F_log_failed;
 } glob;
 
 // get next domain. return 0 if failure
@@ -117,12 +105,15 @@ static char interlocked_get_dom(char *dom, size_t size)
 }
 static void interlocked_fprintf(FILE *stream, const char * format, ...)
 {
-	va_list args;
-	va_start(args, format);
-	pthread_mutex_lock(&glob.flock);
-	vfprintf(stream, format, args);
-	pthread_mutex_unlock(&glob.flock);
-	va_end(args);
+	if (stream)
+	{
+		va_list args;
+		va_start(args, format);
+		pthread_mutex_lock(&glob.flock);
+		vfprintf(stream, format, args);
+		pthread_mutex_unlock(&glob.flock);
+		va_end(args);
+	}
 }
 
 #define ELOG(format, ...) interlocked_fprintf(stderr,  "[%d] " format "\n", tid, ##__VA_ARGS__)
@@ -255,11 +246,14 @@ static void *t_resolver(void *arg)
 					break;
 				}
 			}
-			else
+			else if (glob.verbose)
 			{
-				invalid_domain_beautify(dom);
-				VLOG("invalid domain : %s", dom);
+				char dom2[sizeof(dom)];
+				strcpy(dom2,dom);
+				invalid_domain_beautify(dom2);
+				VLOG("invalid domain : %s", dom2);
 			}
+			interlocked_fprintf(is_ok ? glob.F_log_resolved : glob.F_log_failed,"%s\n",dom);
 		}
 		stat_plus(is_ok);
 	}
@@ -319,23 +313,29 @@ static void exithelp()
 		" --family=<4|6|46>\t; ipv4, ipv6, ipv4+ipv6\n"
 		" --verbose\t\t; print query progress to stderr\n"
 		" --stats=N\t\t; print resolve stats to stderr every N domains\n"
+		" --log-resolved=<file>\t; log successfully resolved domains to a file\n"
+		" --log-failed=<file>\t; log failed domains to a file\n"
 	);
 	exit(1);
 }
 int main(int argc, char **argv)
 {
-	int v, option_index = 0;
+	int r, v, option_index = 0;
+	char fn1[256],fn2[256];
 
 	static const struct option long_options[] = {
-			{"threads",required_argument,0,0},	// optidx=0
-			{"family",required_argument,0,0},	// optidx=1
-			{"verbose",no_argument,0,0},		// optidx=2
-			{"stats",required_argument,0,0},	// optidx=3
-			{"help",no_argument,0,0},		// optidx=4
+			{"help",no_argument,0,0},		// optidx=0
+			{"threads",required_argument,0,0},	// optidx=1
+			{"family",required_argument,0,0},	// optidx=2
+			{"verbose",no_argument,0,0},		// optidx=3
+			{"stats",required_argument,0,0},	// optidx=4
+			{"log-resolved",required_argument,0,0},	// optidx=5
+			{"log-failed",required_argument,0,0},	// optidx=6
 			{NULL,0,NULL,0}
 	};
 
 	memset(&glob, 0, sizeof(glob));
+	*fn1 = *fn2 = 0;
 	glob.family = FAMILY4;
 	glob.threads = 1;
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -343,7 +343,10 @@ int main(int argc, char **argv)
 		if (v) exithelp();
 		switch (option_index)
 		{
-		case 0: /* threads */
+		case 0: /* help */
+			exithelp();
+			break;
+		case 1: /* threads */
 			glob.threads = optarg ? atoi(optarg) : 0;
 			if (glob.threads <= 0 || glob.threads > 100)
 			{
@@ -351,7 +354,7 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			break;
-		case 1: /* family */
+		case 2: /* family */
 			if (!strcmp(optarg, "4"))
 				glob.family = FAMILY4;
 			else if (!strcmp(optarg, "6"))
@@ -364,24 +367,47 @@ int main(int argc, char **argv)
 				return 1;;
 			}
 			break;
-		case 2: /* verbose */
+		case 3: /* verbose */
 			glob.verbose = '\1';
 			break;
-		case 3: /* stats */
+		case 4: /* stats */
 			glob.stats_every = optarg ? atoi(optarg) : 0;
 			break;
-		case 4: /* help */
-			exithelp();
+		case 5: /* log-resolved */
+			strncpy(fn1,optarg,sizeof(fn1));
+			fn1[sizeof(fn1)-1] = 0;
+			break;
+		case 6: /* log-failed */
+			strncpy(fn2,optarg,sizeof(fn2));
+			fn2[sizeof(fn2)-1] = 0;
 			break;
 		}
 	}
-#ifdef _WIN32
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData))
+
+	if (*fn1)
 	{
-		fprintf(stderr,"WSAStartup failed. error %u\n",GetLastError());
-		return 1;
+		glob.F_log_resolved = fopen(fn1,"wt");
+		if (!glob.F_log_resolved)
+		{
+			fprintf(stderr,"failed to create %s\n",fn1);
+			r=5; goto ex;
+		}
 	}
-#endif
-	return run_threads();
+	if (*fn2)
+	{
+		glob.F_log_failed = fopen(fn2,"wt");
+		if (!glob.F_log_failed)
+		{
+			fprintf(stderr,"failed to create %s\n",fn2);
+			r=5; goto ex;
+		}
+	}
+
+	r = run_threads();
+
+ex:
+	if (glob.F_log_resolved) fclose(glob.F_log_resolved);
+	if (glob.F_log_failed) fclose(glob.F_log_failed);
+
+	return r;
 }
