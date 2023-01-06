@@ -400,7 +400,7 @@ int main(int argc, char **argv)
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
 		fprintf(stderr,"WSAStartup failed\n");
-		r=4; goto ex;
+		return 4;
 	}
 #endif
 
