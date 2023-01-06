@@ -375,7 +375,7 @@ int main(int argc, char **argv)
 			else
 			{
 				fprintf(stderr, "ip family must be 4,6 or 46\n");
-				return 1;;
+				return 1;
 			}
 			break;
 		case 3: /* verbose */
@@ -400,7 +400,7 @@ int main(int argc, char **argv)
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
 		fprintf(stderr,"WSAStartup failed\n");
-		goto ex;
+		r=4; goto ex;
 	}
 #endif
 
