@@ -964,6 +964,105 @@ install_macos()
 	service_start_macos
 }
 
+check_prerequisites_keenetic()
+{
+	echo \* checking prerequisites
+
+	local PKGS="curl" PKGS UPD=0
+
+	case "$FWTYPE" in
+		iptables)
+			PKGS="$PKGS"
+			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS"
+			;;
+		nftables)
+			PKGS="$PKGS"
+			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS"
+			;;
+	esac
+
+	if check_packages_openwrt $PKGS ; then
+		echo everything is present
+	else
+		echo \* installing prerequisites
+
+		opkg update
+		UPD=1
+		opkg install $PKGS || {
+			echo could not install prerequisites
+			exitp 6
+		}
+	fi
+
+	is_linked_to_busybox gzip && {
+		echo
+		echo your system uses default busybox gzip. its several times slower than GNU gzip.
+		echo ip/host list scripts will run much faster with GNU gzip
+		echo installer can install GNU gzip but it requires about 100 Kb space
+		if ask_yes_no N "do you want to install GNU gzip"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite gzip
+		fi
+	}
+	is_linked_to_busybox sort && {
+		echo
+		echo your system uses default busybox sort. its much slower and consumes much more RAM than GNU sort
+		echo ip/host list scripts will run much faster with GNU sort
+		echo installer can install GNU sort but it requires about 100 Kb space
+		if ask_yes_no N "do you want to install GNU sort"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite coreutils-sort
+		fi
+	}
+	is_linked_to_busybox grep && {
+		echo
+		echo your system uses default busybox grep. its damn infinite slow with -f option
+		echo get_combined.sh will be severely impacted
+		echo installer can install GNU grep but it requires about 0.5 Mb space
+		if ask_yes_no N "do you want to install GNU grep"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite grep
+
+			# someone reported device partially fail if /bin/grep is absent
+			# grep package deletes /bin/grep
+			[ -f /bin/grep ] || ln -s busybox /bin/grep
+		fi
+	}
+}
+
+install_keenetic()
+{
+  INIT_SCRIPT_SRC="$EXEDIR/init.d/keenetic/zapret"
+  KEENETIC_NETFILTER_HOOK_SRC="$EXEDIR/init.d/keenetic/netfilter.hook.sh"
+  KEENETIC_NETFILTER_HOOK_DST=/opt/etc/ndm/netfilter.d/zapret.sh
+
+  check_bins
+  require_root
+  check_location copy_all
+  install_binaries
+  check_dns
+  select_fwtype
+  check_prerequisites_keenetic
+  select_ipv6
+  ask_config
+  ask_config_offload
+  service_install_keenetic
+  download_list
+  crontab_del_quiet
+  crontab_add 0 6
+  cron_ensure_running
+  install_keenetic_netfilter_hook
+  service_start_keenetic
+}
 
 # build binaries, do not use precompiled
 [ "$1" = "make" ] && FORCE_BUILD=1
@@ -985,6 +1084,9 @@ case $SYSTEM in
 		;;
 	openwrt)
 		install_openwrt
+		;;
+	keenetic)
+		install_keenetic
 		;;
 	macos)
 		install_macos

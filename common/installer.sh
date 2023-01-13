@@ -107,14 +107,16 @@ check_system()
 		}
 		elif openrc_test; then
 			SYSTEM=openrc
+		elif [ -f "/bin/ndm" ]; then
+			SYSTEM=keenetic
 		else
 			echo system is not either systemd, openrc or openwrt based
 			echo easy installer can set up config settings but can\'t configure auto start
 			echo you have to do it manually. check readme.txt for manual setup info.
 			if ask_yes_no N "do you want to continue"; then
-			    SYSTEM=linux
+					SYSTEM=linux
 			else
-			    exitp 5
+					exitp 5
 			fi
 		fi
 	elif [ "$UNAME" = "Darwin" ]; then
@@ -129,16 +131,16 @@ check_system()
 
 get_free_space_mb()
 {
-    df -m $PWD | awk '/[0-9]%/{print $(NF-2)}'
+		df -m $PWD | awk '/[0-9]%/{print $(NF-2)}'
 }
 get_ram_kb()
 {
-    grep MemTotal /proc/meminfo | awk '{print $2}'
+		grep MemTotal /proc/meminfo | awk '{print $2}'
 }
 get_ram_mb()
 {
-    local R=$(get_ram_kb)
-    echo $(($R/1024))
+		local R=$(get_ram_kb)
+		echo $(($R/1024))
 }
 
 crontab_del()
@@ -201,6 +203,9 @@ cron_ensure_running()
 	[ "$SYSTEM" = "openwrt" ] && {
 		/etc/init.d/cron enable
 		/etc/init.d/cron start
+	}
+	[ "$SYSTEM" = "keenetic" ] && {
+		/opt/etc/init.d/S10cron start
 	}
 }
 
@@ -347,8 +352,8 @@ openwrt_fw_section_find()
 		path=$(uci -q get firewall.@include[$i].path)
 		[ -n "$path" ] || break
 		[ "$path" = "$OPENWRT_FW_INCLUDE$1" ] && {
-	 		echo $i
-	 		return 0
+			echo $i
+			return 0
 		}
 		i=$(($i+1))
 	done
@@ -461,4 +466,44 @@ remove_macos_firewall()
 	pf_anchors_del
 	pf_anchor_root_del
 	pf_anchor_root_reload
+}
+
+install_keenetic_netfilter_hook()
+{
+		echo \* installing netfilter hook
+
+		[ -n "MODE" ] || {
+			echo "should specify MODE in $ZAPRET_CONFIG"
+			exitp 7
+		}
+
+		echo "linking : $KEENETIC_NETFILTER_HOOK_SRC => $KEENETIC_NETFILTER_HOOK_DST"
+		ln -fs "$KEENETIC_NETFILTER_HOOK_SRC" "$KEENETIC_NETFILTER_HOOK_DST"
+}
+
+remove_keenetic_netfilter_hook()
+{
+	rm -f "$KEENETIC_NETFILTER_HOOK_DST"
+}
+
+service_install_keenetic()
+{
+	echo \* installing zapret service
+
+	ln -sf "$ZAPRET_BASE/init.d/keenetic/zapret" /opt/etc/init.d/S99zapret
+}
+
+service_start_keenetic()
+{
+	echo \* starting zapret service
+
+	"$INIT_SCRIPT_SRC" start
+}
+
+service_remove_keenetic()
+{
+	echo \* removing zapret service
+
+	rm -f /opt/etc/init.d/S99zapret
+	zapret_stop_daemons
 }

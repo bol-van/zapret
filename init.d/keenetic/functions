@@ -1,0 +1,46 @@
+#!/bin/sh
+
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
+ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
+. "$ZAPRET_BASE/init.d/sysv/functions"
+
+CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/keenetic/custom"
+[ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
+
+load_kmod()
+{
+	if lsmod | grep "$1" &> /dev/null ;  then
+		echo "$1.ko is already loaded"
+	else
+		if insmod "/lib/modules/$(uname -r)/$1.ko" &> /dev/null; then
+			echo "$1.ko loaded"
+		else
+			echo "Cannot find $1.ko kernel module, aborting"
+			exit 1
+		fi
+	fi
+}
+
+# Fix local source ip issue when quic packets were sent with raw sockets (no Keenetic-specific iptable marks were applied)
+fw_nfqws_quic()
+{
+		# $1 - 1 - add, 0 - del
+		# $2 - iptable filter
+
+		ipt_print_op $1 "$2" "nfqws quic masquerade"
+
+		rule="$2 -d 0/0 -j MASQUERADE"
+		if [ -n "$IFACE_WAN" ] ; then
+			for wan in $IFACE_WAN; do
+				ipt_add_del $1 POSTROUTING -t nat -o $wan $rule
+			done
+		else
+			ipt_add_del $1 POSTROUTING -t nat $rule
+		fi
+}
+
+nft_fw_nfqws_quic()
+{
+	echo "Quic through nft is not supported"
+}

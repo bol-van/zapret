@@ -73,6 +73,17 @@ remove_macos()
 	crontab_del
 }
 
+remove_keenetic()
+{
+  KEENETIC_NETFILTER_HOOK_DST=/opt/etc/ndm/netfilter.d/zapret.sh
+
+  clear_ipset
+  remove_keenetic_netfilter_hook
+  service_remove_keenetic
+  nft_del_table
+  crontab_del
+}
+
 
 fix_sbin_path
 check_system
@@ -95,6 +106,9 @@ case $SYSTEM in
 		;;
 	macos)
 		remove_macos
+		;;
+	keenetic)
+		remove_keenetic
 		;;
 esac
 

@@ -1,0 +1,43 @@
+#!/bin/sh
+
+SCRIPT=$(readlink -f "$0")
+EXEDIR=$(dirname "$SCRIPT")
+ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
+. "$EXEDIR/functions"
+
+do_start()
+{
+	sysctl -w "net.netfilter.nf_conntrack_checksum=0"
+	load_kmod xt_string
+	load_kmod xt_NFQUEUE
+	load_kmod xt_multiport
+	load_kmod xt_owner
+	load_kmod xt_connbytes
+	zapret_run_daemons
+	[ "$INIT_APPLY_FW" != "1" ] || { zapret_apply_firewall; }
+}
+do_stop()
+{
+	sysctl -w "net.netfilter.nf_conntrack_checksum=1"
+	zapret_stop_daemons
+	[ "$INIT_APPLY_FW" != "1" ] || zapret_unapply_firewall
+}
+
+case $1 in
+		start)
+				do_start
+				;;
+		stop|kill)
+				do_stop
+				;;
+	restart)
+		"$0" stop
+		"$0" start
+		;;
+		*)
+				echo -e "Usage: $0 (start|stop|restart)" >&2
+				exit 1
+				;;
+esac
+
+exit 0
