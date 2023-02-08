@@ -647,11 +647,11 @@ timer_install_systemd()
 
 download_list()
 {
-	[ -x "$GET_LIST" ] && {
+	[ -x "$GET_LIST" ] &&	{
 		echo \* downloading blocked ip/host list
 
-		# can be txt or txt.gz. do not clear ip lists if no download option specified
-		[ -n "$GETLIST" ] && "$IPSET_DIR/clear_lists.sh"
+		# can be txt or txt.gz
+		"$IPSET_DIR/clear_lists.sh"
 		"$GET_LIST"
 	}
 }
