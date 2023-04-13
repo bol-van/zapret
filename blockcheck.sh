@@ -549,7 +549,7 @@ pktws_check_domain_bypass()
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local strategy tests='fake' ttls s f e desync pos fooling frag sec="$2"
+	local strategy tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2"
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -558,19 +558,23 @@ pktws_check_domain_bypass()
 	}
 
 	s="--dpi-desync=split2"
+	ok=0
 	pktws_curl_test_update $1 $3 $s
-	[ "$?" != 0 -o "$FORCE" = 1 ] && {
-		tests="$tests split fake,split2 fake,split"
+	ret=$?
+	[ "$ret" = 0 ] && ok=1
+	[ "$ret" != 0 -o "$FORCE" = 1 ] && {
 		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase
 		for pos in 1 3 4 5 10 50 100; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
 			if pktws_curl_test_update $1 $3 $s; then
+				ok=1
 				break
 			elif [ "$sec" = 0 ]; then
 				pktws_curl_test_update $1 $3 $s --hostcase
 			fi
 		done
 	}
+	[ "$ok" = 1 ] || tests="$tests split fake,split2 fake,split"
 
 	pktws_curl_test_update $1 $3 --dpi-desync=disorder2
 	[ "$?" != 0 -o "$FORCE" = 1 ] && tests="$tests disorder fake,disorder2 fake,disorder"
