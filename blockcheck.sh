@@ -406,7 +406,7 @@ pktws_start()
 {
 	case "$UNAME" in
 		Linux)
-			"$NFQWS" --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
+			"$NFQWS" --uid $TPWS_UID:$TPWS_GID --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
 			;;
 		FreeBSD)
 			"$DVTWS" --port=$IPFW_DIVERT_PORT "$@" >/dev/null &
