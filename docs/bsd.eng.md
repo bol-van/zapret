@@ -256,6 +256,36 @@ rdr pass on em1 inet6 proto tcp from any to any port = https -> fe80::20c:29ff:5
 ```
 
 
+## OPNsense
+
+like pfsense, OPNsense is also based on FreeBSD.
+Binaries from `binaries/freebsd-x64` are compiled in FreeBSD 11 and should work. just copy `binaries/freebsd-x64/dvtws` and place it to `/usr/local/sbin/dvtws`
+then chmod it `755` to make it executable.
+
+now open and edit `/boot/loader.conf.local` (Create if not already exist) and add the following lines:
+```
+ipdivert_load="YES"
+net.inet.ip.fw.default_to_accept=1
+```
+
+after this, create a startup script inside  `/usr/local/etc/rc.syshook.d/start/`
+
+ /usr/local/etc/rc.syshook.d/start/99-zapret (chmod 755)
+ ```
+ #!/bin/sh
+ # add ipfw rules and start daemon
+
+ ipfw delete 100
+ # assuming "em1" is the WAN port.
+ ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em1
+ 
+ # Kill dvtws if already running
+ pkill ^dvtws$
+ 
+ # Start dvtws
+ dvtws --daemon --port 989 --dpi-desync=split2
+ ```
+
 ## OpenBSD
 
 In OpenBSD default tpws bind is ipv6 only. to bind to ipv4 specify --bind-addr=0.0.0.0
