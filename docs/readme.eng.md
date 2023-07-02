@@ -781,7 +781,7 @@ NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
 If `NFQWS_OPT_DESYNC_QUIC6` is not specified `NFQWS_OPT_DESYNC_QUIC` is taken.
 
 
-flow offloading control (OpenWRT only)
+flow offloading control (if supported)
 
 ```
 donttouch : disable system flow offloading setting if selected mode is incompatible with it, dont touch it otherwise and dont configure selective flow offloading
