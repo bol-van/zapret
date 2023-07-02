@@ -165,7 +165,7 @@ select_mode_mode()
 			vars="TPWS_OPT"
 			;;
 		nfqws)
-			vars="NFQWS_OPT_DESYNC NFQWS_OPT_DESYNC_HTTP NFQWS_OPT_DESYNC_HTTPS NFQWS_OPT_DESYNC_HTTP6 NFQWS_OPT_DESYNC_HTTPS6"
+			vars="NFQWS_OPT_DESYNC NFQWS_OPT_DESYNC_HTTP NFQWS_OPT_DESYNC_HTTPS NFQWS_OPT_DESYNC_HTTP6 NFQWS_OPT_DESYNC_HTTPS6 NFQWS_OPT_DESYNC_QUIC NFQWS_OPT_DESYNC_QUIC6"
 			;;
 	esac
 	[ -n "$vars" ] && {
@@ -215,6 +215,14 @@ select_mode_https()
 		write_config_var MODE_HTTPS
 	}
 }
+select_mode_quic()
+{
+	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && [ "$MODE" != "tpws" ] && {
+		echo
+		ask_yes_no_var MODE_QUIC "enable quic support"
+		write_config_var MODE_QUIC
+	}
+}
 select_mode_filter()
 {
 	local filter="none ipset hostlist"
@@ -230,6 +238,7 @@ select_mode()
 	select_mode_http
 	select_mode_keepalive
 	select_mode_https
+	select_mode_quic
 	select_mode_filter
 }
 

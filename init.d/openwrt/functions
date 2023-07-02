@@ -34,6 +34,7 @@ NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
 NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
 NFQWS_OPT_DESYNC_HTTP6="${NFQWS_OPT_DESYNC_HTTP6:-$NFQWS_OPT_DESYNC_HTTP}"
 NFQWS_OPT_DESYNC_HTTPS6="${NFQWS_OPT_DESYNC_HTTPS6:-$NFQWS_OPT_DESYNC_HTTPS}"
+NFQWS_OPT_DESYNC_QUIC6="${NFQWS_OPT_DESYNC_QUIC6:-$NFQWS_OPT_DESYNC_QUIC}"
 
 
 
@@ -142,7 +143,7 @@ list_nfqws_rules()
 {
 	# $1 = '' for ipv4, '6' for ipv6
 	ip$1tables -S POSTROUTING -t mangle | \
-		grep -E "NFQUEUE --queue-num $QNUM --queue-bypass|NFQUEUE --queue-num $(($QNUM+1)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+2)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+3)) --queue-bypass" | \
+		grep -E "NFQUEUE --queue-num $QNUM --queue-bypass|NFQUEUE --queue-num $(($QNUM+1)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+2)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+3)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+10)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+11)) --queue-bypass" | \
 		sed -re 's/^-A POSTROUTING (.*) -j NFQUEUE.*$/\1/' -e "s/-m mark ! --mark $DESYNC_MARK\/$DESYNC_MARK//"
 }
 reverse_nfqws_rule()

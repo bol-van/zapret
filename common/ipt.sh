@@ -60,6 +60,13 @@ filter_apply_port_target()
 	fi
 	eval $1="\"\$$1 $f\""
 }
+filter_apply_port_target_quic()
+{
+	# $1 - var name of nftables filter
+	local f
+	f="-p udp --dport 443"
+	eval $1="\"\$$1 $f\""
+}
 filter_apply_ipset_target4()
 {
 	# $1 - var name of ipv4 iptables filter
@@ -302,6 +309,22 @@ zapret_do_firewall_rules_ipt()
 					filter_apply_ipset_target6 f6
 					fw_nfqws_post6 $1 "$f6 $desync" $qns6
 				fi
+			fi
+
+			get_nfqws_qnums_quic qn qn6
+			if [ -n "$qn" ]; then
+				f4=
+				filter_apply_port_target_quic f4
+				f4="$f4 $first_packet_only"
+				filter_apply_ipset_target4 f4
+				fw_nfqws_post4 $1 "$f4 $desync" $qn
+			fi
+			if [ -n "$qn6" ]; then
+				f6=
+				filter_apply_port_target_quic f6
+				f6="$f6 $first_packet_only"
+				filter_apply_ipset_target6 f6
+				fw_nfqws_post6 $1 "$f6 $desync" $qn6
 			fi
 			;;
 		custom)

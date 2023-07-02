@@ -45,6 +45,8 @@ MODE_HTTP=1
 MODE_HTTP_KEEPALIVE=0
 # apply fooling to https
 MODE_HTTPS=1
+# apply fooling to quic
+MODE_QUIC=0
 # none,ipset,hostlist
 MODE_FILTER=none
 
@@ -55,6 +57,8 @@ NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-ttl6=0 --dpi
 #NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 #NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
 #NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
+NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
+#NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
 
 # CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
 TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"

@@ -1,4 +1,4 @@
-﻿zapret v.48
+﻿zapret v.49
 
 English
 -------
@@ -926,6 +926,10 @@ MODE_HTTP_KEEPALIVE=0
 
 MODE_HTTPS=1
 
+Применять ли дурение к QUIC :
+
+MODE_QUIC=0
+
 Режим фильтрации хостов :
 none - применять дурение ко всем хостам
 ipset - ограничить дурение ipset-ом zapret/zapret6
@@ -953,6 +957,11 @@ NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dp
 берется значение NFQWS_OPT_DESYNC.
 Если какая-то из переменных NFQWS_OPT_DESYNC_HTTP6/NFQWS_OPT_DESYNC_HTTPS6 не определена,
 берется значение NFQWS_OPT_DESYNC_HTTP/NFQWS_OPT_DESYNC_HTTPS.
+
+Опции дурения для QUIC :
+NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
+NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
+Если NFQWS_OPT_DESYNC_QUIC6 не задано, то берется NFQWS_OPT_DESYNC_QUIC.
 
 Настройка системы управления выборочным traffic offload (только openwrt)
 donttouch : выборочное управление отключено, используется системная настройка, простой инсталятор выключает системную настройку, если она не совместима с выбранным режимом

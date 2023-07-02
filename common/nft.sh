@@ -270,6 +270,13 @@ nft_filter_apply_port_target()
 	fi
 	eval $1="\"\$$1 $f\""
 }
+nft_filter_apply_port_target_quic()
+{
+	# $1 - var name of nftables filter
+	local f
+	f="udp dport 443"
+	eval $1="\"\$$1 $f\""
+}
 nft_filter_apply_ipset_target4()
 {
 	# $1 - var name of ipv4 nftables filter
@@ -531,6 +538,22 @@ zapret_apply_firewall_rules_nft()
 					nft_filter_apply_ipset_target6 f6
 					nft_fw_nfqws_post6 "$f6 $desync" $qns6
 				fi
+			fi
+
+			get_nfqws_qnums_quic qn qn6
+			if [ -n "$qn" ]; then
+				f4=
+				nft_filter_apply_port_target_quic f4
+				f4="$f4 $first_packet_only"
+				nft_filter_apply_ipset_target4 f4
+				nft_fw_nfqws_post4 "$f4 $desync" $qn
+			fi
+			if [ -n "$qn6" ]; then
+				f6=
+				nft_filter_apply_port_target_quic f6
+				f6="$f6 $first_packet_only"
+				nft_filter_apply_ipset_target6 f6
+				nft_fw_nfqws_post6 "$f6 $desync" $qn6
 			fi
 			;;
 		custom)

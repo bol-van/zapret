@@ -731,6 +731,10 @@ Enable https fooling :
 
 `MODE_HTTPS=1`
 
+Enable quic fooling :
+
+`MODE_QUIC=1`
+
 Host filtering mode :
 ```
 none - apply fooling to all hosts
@@ -766,6 +770,16 @@ If one of `NFQWS_OPT_DESYNC_HTTP6`/`NFQWS_OPT_DESYNC_HTTPS6` is not defined it t
 It means if only `NFQWS_OPT_DESYNC` is defined all four take its value.
 
 If a variable is not defined, the value `NFQWS_OPT_DESYNC` is taken.
+
+Separate QUIC options for ip protocol versions :
+
+```
+NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
+NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
+```
+
+If `NFQWS_OPT_DESYNC_QUIC6` is not specified `NFQWS_OPT_DESYNC_QUIC` is taken.
+
 
 flow offloading control (OpenWRT only)
 

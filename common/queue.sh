@@ -43,3 +43,29 @@ get_nfqws_qnums()
 		eval $4=
 	fi
 }
+
+get_nfqws_qnums_quic()
+{
+	# $1 - var name for ipv4 quic
+	# $2 - var name for ipv6 quic
+	local _qn _qn6
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		_qn=$(($QNUM+10))
+	}
+	[ "$DISABLE_IPV6" = "1" ] || {
+		_qn6=$(($QNUM+11))
+		[ "$DISABLE_IPV4" = "1" ] || {
+			if [ "$NFQWS_OPT_DESYNC_QUIC" = "$NFQWS_OPT_DESYNC_QUIC6" ]; then
+				_qn6=$_qn;
+			fi
+		}
+	}
+	if [ "$MODE_QUIC" = 1 ]; then
+		eval $1=$_qn
+		eval $2=$_qn6
+	else
+		eval $1=
+		eval $2=
+	fi
+}
