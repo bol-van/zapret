@@ -627,17 +627,23 @@ tpws_check_domain_bypass()
 	# $1 - test function
 	# $2 - encrypted test : 1/0
 	# $3 - domain
-	local s pos strategy sec="$2"
+	local s s2 pos strategy sec="$2"
 	if [ "$sec" = 0 ]; then
-		for s in '--hostcase' '--hostspell=hoSt' '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' \
-			'--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
-			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384'; do
+		for s in '--hostcase' '--hostspell=hoSt' '--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
+			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384' ; do
 			tpws_curl_test_update $1 $3 $s
 		done
+		for s2 in '' '--disorder'; do
+			for s in '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' ; do
+				tpws_curl_test_update $1 $3 $s $s2
+			done
+		done
 	else
-		for pos in 1 2 3 4 5 10 50 100; do
-			s="--split-pos=$pos"
-			tpws_curl_test_update $1 $3 $s && break
+		for s2 in '' '--disorder'; do
+			for pos in 1 2 3 4 5 10 50 100; do
+				s="--split-pos=$pos"
+				tpws_curl_test_update $1 $3 $s $s2 && break
+			done
 		done
 	fi
 	report_strategy $1 $3 tpws

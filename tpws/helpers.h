@@ -25,7 +25,10 @@ bool is_localnet(const struct sockaddr *a);
 bool is_linklocal(const struct sockaddr_in6* a);
 bool is_private6(const struct sockaddr_in6* a);
 
-int set_keepalive(int fd);
+bool set_keepalive(int fd);
+bool set_ttl(int fd, int ttl);
+bool set_hl(int fd, int hl);
+bool set_ttl_hl(int fd, int ttl);
 int get_so_error(int fd);
 
 static inline uint16_t pntoh16(const uint8_t *p) {

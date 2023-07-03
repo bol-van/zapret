@@ -43,6 +43,8 @@ struct params_s
 	enum splithttpreq split_http_req;
 	bool split_any_protocol;
 	int split_pos;
+	bool disorder;
+	int ttl_default;
 
 	char pidfile[256];
 

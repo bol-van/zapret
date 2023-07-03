@@ -103,6 +103,18 @@ static bool is_interface_online(const char *ifname)
 	close(sock);
 	return !!(ifr.ifr_flags & IFF_UP);
 }
+static int get_default_ttl()
+{
+	int sock,ttl=0;
+	socklen_t optlen=sizeof(ttl);
+	
+	if ((sock=socket(PF_INET, SOCK_DGRAM, IPPROTO_IP))!=-1)
+	{
+	    getsockopt(sock, IPPROTO_IP, IP_TTL, &ttl, &optlen);
+	    close(sock);
+	}
+	return ttl;
+}
 
 
 static void exithelp()
@@ -147,6 +159,11 @@ static void exithelp()
 		" --split-http-req=method|host\t; split at specified logical part of plain http request\n"
 		" --split-pos=<numeric_offset>\t; split at specified pos. split-http-req takes precedence for http.\n"
 		" --split-any-protocol\t\t; split not only http and https\n"
+#if defined(BSD) && !defined(__APPLE__)
+		" --disorder\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
+#else
+		" --disorder\t\t\t; when splitting simulate sending second fragment first\n"
+#endif
 		" --hostcase\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostdot\t\t\t; add \".\" after Host: name\n"
@@ -204,6 +221,19 @@ static void checkbind_clean()
 }
 
 
+void save_default_ttl()
+{
+	if (!params.ttl_default)
+	{
+    	    params.ttl_default = get_default_ttl();
+	    if (!params.ttl_default)
+	    {
+		    fprintf(stderr, "could not get default ttl\n");
+		    exit_clean(1);
+	    }
+	}
+}
+
 void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
@@ -253,23 +283,24 @@ void parse_params(int argc, char *argv[])
 		{ "split-http-req",required_argument,0,0 },// optidx=23
 		{ "split-pos",required_argument,0,0 },// optidx=24
 		{ "split-any-protocol",optional_argument,0,0},// optidx=25
-		{ "methodspace",no_argument,0,0 },// optidx=26
-		{ "methodeol",no_argument,0,0 },// optidx=27
-		{ "hosttab",no_argument,0,0 },// optidx=28
-		{ "unixeol",no_argument,0,0 },// optidx=29
-		{ "hostlist",required_argument,0,0 },// optidx=30
-		{ "hostlist-exclude",required_argument,0,0 },// optidx=31
-		{ "pidfile",required_argument,0,0 },// optidx=32
-		{ "debug",optional_argument,0,0 },// optidx=33
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=34
-		{ "local-sndbuf",required_argument,0,0 },// optidx=35
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=36
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=37
-		{ "socks",no_argument,0,0 },// optidx=38
-		{ "no-resolve",no_argument,0,0 },// optidx=39
-		{ "skip-nodelay",no_argument,0,0 },// optidx=40
+		{ "disorder",no_argument,0,0 },// optidx=26
+		{ "methodspace",no_argument,0,0 },// optidx=27
+		{ "methodeol",no_argument,0,0 },// optidx=28
+		{ "hosttab",no_argument,0,0 },// optidx=29
+		{ "unixeol",no_argument,0,0 },// optidx=30
+		{ "hostlist",required_argument,0,0 },// optidx=31
+		{ "hostlist-exclude",required_argument,0,0 },// optidx=32
+		{ "pidfile",required_argument,0,0 },// optidx=33
+		{ "debug",optional_argument,0,0 },// optidx=34
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=35
+		{ "local-sndbuf",required_argument,0,0 },// optidx=36
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=37
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=38
+		{ "socks",no_argument,0,0 },// optidx=39
+		{ "no-resolve",no_argument,0,0 },// optidx=40
+		{ "skip-nodelay",no_argument,0,0 },// optidx=41
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=41
+		{ "enable-pf",no_argument,0,0 },// optidx=42
 #endif
 		{ NULL,0,NULL,0 }
 	};
@@ -453,23 +484,27 @@ void parse_params(int argc, char *argv[])
 		case 25: /* split-any-protocol */
 			params.split_any_protocol = true;
 			break;
-		case 26: /* methodspace */
+		case 26: /* disorder */
+			params.disorder = true;
+			save_default_ttl();
+			break;
+		case 27: /* methodspace */
 			params.methodspace = true;
 			params.tamper = true;
 			break;
-		case 27: /* methodeol */
+		case 28: /* methodeol */
 			params.methodeol = true;
 			params.tamper = true;
 			break;
-		case 28: /* hosttab */
+		case 29: /* hosttab */
 			params.hosttab = true;
 			params.tamper = true;
 			break;
-		case 29: /* unixeol */
+		case 30: /* unixeol */
 			params.unixeol = true;
 			params.tamper = true;
 			break;
-		case 30: /* hostlist */
+		case 31: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -477,7 +512,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 31: /* hostlist-exclude */
+		case 32: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -485,36 +520,36 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 32: /* pidfile */
+		case 33: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 33:
+		case 34:
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
-		case 34: /* local-rcvbuf */
+		case 35: /* local-rcvbuf */
 			params.local_rcvbuf = atoi(optarg)/2;
 			break;
-		case 35: /* local-sndbuf */
+		case 36: /* local-sndbuf */
 			params.local_sndbuf = atoi(optarg)/2;
 			break;
-		case 36: /* remote-rcvbuf */
+		case 37: /* remote-rcvbuf */
 			params.remote_rcvbuf = atoi(optarg)/2;
 			break;
-		case 37: /* remote-sndbuf */
+		case 38: /* remote-sndbuf */
 			params.remote_sndbuf = atoi(optarg)/2;
 			break;
-		case 38: /* socks */
+		case 39: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 39: /* no-resolve */
+		case 40: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 40: /* skip-nodelay */
+		case 41: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 41: /* enable-pf */
+		case 42: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif
@@ -849,7 +884,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"could not initialize redirector !!!\n");
 		goto exiterr;
 	}
-	
+
 	for(i=0;i<=params.binds_last;i++)
 	{
 		if (params.debug)
@@ -862,6 +897,7 @@ int main(int argc, char *argv[])
 			perror("socket");
 			goto exiterr;
 		}
+
 #ifndef __OpenBSD__
 // in OpenBSD always IPV6_ONLY for wildcard sockets
 		if ((list[i].salisten.ss_family == AF_INET6) && setsockopt(listen_fd[i], IPPROTO_IPV6, IPV6_V6ONLY, &list[i].ipv6_only, sizeof(int)) == -1)

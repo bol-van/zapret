@@ -172,10 +172,26 @@ bool is_private6(const struct sockaddr_in6* a)
 
 
 
-int set_keepalive(int fd)
+bool set_keepalive(int fd)
 {
 	int yes=1;
 	return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int))!=-1;
+}
+bool set_ttl(int fd, int ttl)
+{
+	return setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl))!=-1;
+}
+bool set_hl(int fd, int hl)
+{
+	return setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &hl, sizeof(hl))!=-1;
+}
+bool set_ttl_hl(int fd, int ttl)
+{
+	bool b1,b2;
+	// try to set both but one may fail if family is wrong
+	b1=set_ttl(fd, ttl);
+	b2=set_hl(fd, ttl);
+	return b1 || b2;
 }
 int get_so_error(int fd)
 {

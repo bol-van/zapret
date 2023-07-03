@@ -29,6 +29,7 @@ struct send_buffer
 {
 	char *data;
 	size_t len,pos;
+	int ttl;
 };
 typedef struct send_buffer send_buffer_t;
 

@@ -529,6 +529,7 @@ tpws is transparent proxy.
  --split-http-req=method|host	; split http request at specified logical position.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
+ --disorder                     ; when splitting simulate sending second fragment first
  --hostcase                     ; change Host: => host:
  --hostspell                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostdot                      ; add "." after Host: name
@@ -596,6 +597,12 @@ if tpws serves many clients it can cause trouble. also DoS attack is possible ag
 
 if remote resolving causes trouble configure clients to use local name resolution and use
 `--no-resolve` option on tpws side.
+
+`--disorder` is an additional flag to any split option.
+It tries to simulate `--disorder2` option of `nfqws` using standard socket API without the need of additional privileges.
+This works fine in Linux and MacOS but unexpectedly in FreeBSD and OpenBSD
+(system sends second fragment then the whole packet instead of the first fragment).
+
 
 ## Ways to get a list of blocked IP
 
