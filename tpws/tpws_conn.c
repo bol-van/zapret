@@ -1200,7 +1200,12 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 
 				accept_salen = sizeof(accept_sa);
 				//Accept new connection
+#if defined (__APPLE__)
+				// macos does not have accept4()
 				tmp_fd = accept(conn->fd, (struct sockaddr*)&accept_sa, &accept_salen);
+#else
+				tmp_fd = accept4(conn->fd, (struct sockaddr*)&accept_sa, &accept_salen, SOCK_NONBLOCK);
+#endif
 				if (tmp_fd < 0)
 				{
 					perror("Failed to accept connection");
@@ -1210,12 +1215,14 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 					close(tmp_fd);
 					VPRINT("Too many local legs : %d", legs_local)
 				}
+#if defined (__APPLE__)
 				// separate fcntl call to comply with macos
 				else if (fcntl(tmp_fd, F_SETFL, O_NONBLOCK) < 0)
 				{
 					perror("socket set O_NONBLOCK (accept)");
 					close(tmp_fd);
 				}
+#endif
 				else if (!(conn=add_tcp_connection(efd, &conn_list, tmp_fd, (struct sockaddr*)&accept_sa, params.port, params.proxy_type)))
 				{
 					// add_tcp_connection closes fd in case of failure
