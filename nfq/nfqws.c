@@ -347,7 +347,11 @@ static int dvt_main()
 		bp4.sin_addr.s_addr = INADDR_ANY;
 	
 		printf("creating divert4 socket\n");
+#if __FreeBSD_version >= 1400066 && defined(PF_DIVERT)
+		fd[0] = socket(PF_DIVERT, SOCK_RAW, 0);
+#else
 		fd[0] = socket(AF_INET, SOCK_RAW, IPPROTO_DIVERT);
+#endif
 		if (fd[0] == -1) {
 				perror("socket (DIVERT4)");
 			goto exiterr;

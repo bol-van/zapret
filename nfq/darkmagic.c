@@ -899,7 +899,12 @@ static int rawsend_socket_divert(sa_family_t family)
 	// we either have to go to the link layer (its hard, possible problems arise, compat testing, ...) or use some HACKING
 	// from my point of view disabling direct ability to send ip frames is not security. its SHIT
 
-	int fd = socket(family, SOCK_RAW, IPPROTO_DIVERT);
+	int fd;
+#if __FreeBSD_version >= 1400066 && defined(PF_DIVERT)
+	fd = socket(PF_DIVERT, SOCK_RAW, 0);
+#else
+	fd = socket(family, SOCK_RAW, IPPROTO_DIVERT);
+#endif
 	if (fd!=-1 && !set_socket_buffers(fd,4096,RAW_SNDBUF))
 	{
 		close(fd);
