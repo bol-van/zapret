@@ -5,10 +5,8 @@ EXEDIR="$(cd "$EXEDIR"; pwd)"
 BINS=binaries
 BINDIR="$EXEDIR/$BINS"
 
-exists()
-{
-	which "$1" >/dev/null 2>/dev/null
-}
+ZAPRET_BASE="$EXEDIR"
+. "$ZAPRET_BASE/common/base.sh"
 
 check_dir()
 {
