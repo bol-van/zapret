@@ -727,6 +727,13 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 			}
 			bKnownProtocol = true;
 		}
+		else if (IsWireguardHandshakeInitiation(data_payload,len_payload))
+		{
+			DLOG("packet contains wireguard handshake initiation\n")
+			fake = params.fake_wg;
+			fake_size = params.fake_wg_size;
+			bKnownProtocol = true;
+		}
 		else
 		{
 			if (!params.desync_any_proto) return res;

@@ -546,6 +546,7 @@ static void exithelp()
 		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
 		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-quic=<filename>\t; file containing fake QUIC Initial\n"
+		" --dpi-desync-fake-wireguard=<filename>\t; file containing fake wireguard handshake initiation\n"
 		" --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload\n"
 		" --dpi-desync-udplen-increment=<int>\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
@@ -645,6 +646,7 @@ int main(int argc, char **argv)
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
 	params.fake_quic_size = 620; // must be 601+ for TSPU hack
 	params.fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
+	params.fake_wg_size = 64;
 	params.fake_unknown_size = 256;
 	params.fake_unknown_udp_size = 64;
 	params.wscale=-1; // default - dont change scale factor (client)
@@ -712,14 +714,15 @@ int main(int argc, char **argv)
 		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=29
 		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=30
 		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=31
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=32
-		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=33
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=34
-		{"hostlist",required_argument,0,0},		// optidx=35
-		{"hostlist-exclude",required_argument,0,0},	// optidx=36
+		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=32
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=33
+		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=34
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=35
+		{"hostlist",required_argument,0,0},		// optidx=36
+		{"hostlist-exclude",required_argument,0,0},	// optidx=37
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=37
-		{"bind-fix6",no_argument,0,0},		// optidx=38
+		{"bind-fix4",no_argument,0,0},		// optidx=38
+		{"bind-fix6",no_argument,0,0},		// optidx=39
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1001,32 +1004,36 @@ int main(int argc, char **argv)
 			params.fake_quic_size = sizeof(params.fake_quic);
 			load_file_or_exit(optarg,params.fake_quic,&params.fake_quic_size);
 			break;
-		case 32: /* dpi-desync-fake-unknown-udp */
+		case 32: /* dpi-desync-fake-wireguard */
+			params.fake_wg_size = sizeof(params.fake_wg);
+			load_file_or_exit(optarg,params.fake_wg,&params.fake_wg_size);
+			break;
+		case 33: /* dpi-desync-fake-unknown-udp */
 			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
-		case 33: /* dpi-desync-udplen-increment */
+		case 34: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&params.udplen_increment)<1 || params.udplen_increment>0x7FFF || params.udplen_increment<-0x8000)
 			{
 				fprintf(stderr, "dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
 				exit_clean(1);
 			}
 			break;
-		case 34: /* desync-cutoff */
+		case 35: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 35: /* hostlist */
+		case 36: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 36: /* hostlist-exclude */
+		case 37: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -1034,10 +1041,10 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifdef __linux__
-		case 37: /* bind-fix4 */
+		case 38: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 38: /* bind-fix6 */
+		case 39: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif
