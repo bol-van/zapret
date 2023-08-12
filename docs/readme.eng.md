@@ -431,6 +431,7 @@ This option can resist DPIs that track outgoing UDP packet sizes.
 Requires that application protocol does not depend on udp payload size.
 
 QUIC initial packets are recognized. Decryption and hostname extraction is supported so `--hostlist` parameter will work.
+Wireguard handshake initiation is also recognized.
 For other protocols desync use `--dpi-desync-any-protocol`.
 
 Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th parameter of `--ctrack-timeouts`.
