@@ -21,7 +21,7 @@ zapret_custom_firewall()
 
         local MODE_OVERRIDE=nfqws
         local f
-        local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1"
+        local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:1"
         local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
 
         zapret_do_firewall_rules_ipt $1
