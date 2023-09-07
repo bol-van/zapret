@@ -75,7 +75,7 @@ bool desync_only_first_stage(enum dpi_desync_mode mode)
 }
 bool desync_valid_second_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_NONE || mode==DESYNC_DISORDER || mode==DESYNC_DISORDER2 || mode==DESYNC_SPLIT || mode==DESYNC_SPLIT2 || mode==DESYNC_IPFRAG2 || mode==DESYNC_UDPLEN;
+	return mode==DESYNC_NONE || mode==DESYNC_DISORDER || mode==DESYNC_DISORDER2 || mode==DESYNC_SPLIT || mode==DESYNC_SPLIT2 || mode==DESYNC_IPFRAG2 || mode==DESYNC_UDPLEN || mode==DESYNC_TAMPER;
 }
 bool desync_valid_second_stage_tcp(enum dpi_desync_mode mode)
 {
@@ -83,7 +83,7 @@ bool desync_valid_second_stage_tcp(enum dpi_desync_mode mode)
 }
 bool desync_valid_second_stage_udp(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_NONE || mode==DESYNC_UDPLEN || mode==DESYNC_IPFRAG2;
+	return mode==DESYNC_NONE || mode==DESYNC_UDPLEN || mode==DESYNC_TAMPER || mode==DESYNC_IPFRAG2;
 }
 enum dpi_desync_mode desync_mode_from_string(const char *s)
 {
@@ -117,6 +117,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_IPFRAG1;
 	else if (!strcmp(s,"udplen"))
 		return DESYNC_UDPLEN;
+	else if (!strcmp(s,"tamper"))
+		return DESYNC_TAMPER;
 	return DESYNC_INVALID;
 }
 
@@ -734,6 +736,13 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 			fake_size = params.fake_wg_size;
 			bKnownProtocol = true;
 		}
+		else if (IsDhtD1(data_payload,len_payload))
+		{
+			DLOG("packet contains DHT d1...e\n")
+			fake = params.fake_dht;
+			fake_size = params.fake_dht_size;
+			bKnownProtocol = true;
+		}
 		else
 		{
 			if (!params.desync_any_proto) return res;
@@ -846,6 +855,37 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return res;
 				return drop;
+			case DESYNC_TAMPER:
+				if (IsDhtD1(data_payload,len_payload))
+				{
+					size_t szbuf,szcopy;
+					memcpy(pkt2,"d2:zz1:x",8);
+					pkt2_len=8;
+					szbuf=sizeof(pkt2)-pkt2_len;
+					szcopy=len_payload-1;
+					if (szcopy>szbuf)
+					{
+						DLOG("packet is too long to tamper");
+						return res;
+					}
+					memcpy(pkt2+pkt2_len,data_payload+1,szcopy);
+					pkt2_len+=szcopy;
+					pkt1_len = sizeof(pkt1);
+					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, NULL, 0 , 0, pkt2, pkt2_len, pkt1, &pkt1_len))
+					{
+						DLOG("could not construct packet with modified length. too large ?\n");
+						return res;
+					}
+					DLOG("resending tampered DHT\n");
+					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+						return res;
+					return drop;
+				}
+				else
+				{
+					DLOG("payload is not tamperable\n");
+					return res;
+				}
 			case DESYNC_IPFRAG2:
 				{
 

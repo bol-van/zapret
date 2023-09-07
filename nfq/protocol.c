@@ -192,7 +192,10 @@ bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len)
 {
     return len==148 && data[0]==1 && data[1]==0 && data[2]==0 && data[3]==0;
 }
-
+bool IsDhtD1(const uint8_t *data, size_t len)
+{
+	return len>=3 && data[0]=='d' && data[1]=='1' && data[len-1]=='e';
+}
 
 /* Returns the QUIC draft version or 0 if not applicable. */
 uint8_t QUICDraftVersion(uint32_t version)

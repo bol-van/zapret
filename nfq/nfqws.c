@@ -522,7 +522,7 @@ static void exithelp()
 		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -547,6 +547,7 @@ static void exithelp()
 		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
 		" --dpi-desync-fake-wireguard=<filename>|0xHEX\t; file containing fake wireguard handshake initiation\n"
+		" --dpi-desync-fake-dht=<filename>|0xHEX\t\t; file containing DHT protocol fake payload (d1...e)\n"
 		" --dpi-desync-fake-unknown-udp=<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
 		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
 		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
@@ -660,6 +661,7 @@ int main(int argc, char **argv)
 	params.fake_quic_size = 620; // must be 601+ for TSPU hack
 	params.fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
 	params.fake_wg_size = 64;
+	params.fake_dht_size = 64;
 	params.fake_unknown_size = 256;
 	params.fake_unknown_udp_size = 64;
 	params.wscale=-1; // default - dont change scale factor (client)
@@ -728,15 +730,16 @@ int main(int argc, char **argv)
 		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=30
 		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=31
 		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=32
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=33
-		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=34
-		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=35
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=36
-		{"hostlist",required_argument,0,0},		// optidx=37
-		{"hostlist-exclude",required_argument,0,0},	// optidx=38
+		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=33
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=34
+		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=35
+		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=36
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=37
+		{"hostlist",required_argument,0,0},		// optidx=38
+		{"hostlist-exclude",required_argument,0,0},	// optidx=39
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=39
-		{"bind-fix6",no_argument,0,0},		// optidx=40
+		{"bind-fix4",no_argument,0,0},		// optidx=40
+		{"bind-fix6",no_argument,0,0},		// optidx=41
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1022,18 +1025,22 @@ int main(int argc, char **argv)
 			params.fake_wg_size = sizeof(params.fake_wg);
 			load_file_or_exit(optarg,params.fake_wg,&params.fake_wg_size);
 			break;
-		case 33: /* dpi-desync-fake-unknown-udp */
+		case 33: /* dpi-desync-fake-dht */
+			params.fake_dht_size = sizeof(params.fake_dht);
+			load_file_or_exit(optarg,params.fake_dht,&params.fake_dht_size);
+			break;
+		case 34: /* dpi-desync-fake-unknown-udp */
 			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
-		case 34: /* dpi-desync-udplen-increment */
+		case 35: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&params.udplen_increment)<1 || params.udplen_increment>0x7FFF || params.udplen_increment<-0x8000)
 			{
 				fprintf(stderr, "dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
 				exit_clean(1);
 			}
 			break;
-		case 35: /* dpi-desync-udplen-pattern */
+		case 36: /* dpi-desync-udplen-pattern */
 			{
 				char buf[sizeof(params.udplen_pattern)];
 				size_t sz=sizeof(buf);
@@ -1041,21 +1048,21 @@ int main(int argc, char **argv)
 				fill_pattern(params.udplen_pattern,sizeof(params.udplen_pattern),buf,sz);
 			}
 			break;
-		case 36: /* desync-cutoff */
+		case 37: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 37: /* hostlist */
+		case 38: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 38: /* hostlist-exclude */
+		case 39: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -1063,10 +1070,10 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifdef __linux__
-		case 39: /* bind-fix4 */
+		case 40: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 40: /* bind-fix6 */
+		case 41: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif

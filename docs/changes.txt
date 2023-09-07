@@ -237,3 +237,9 @@ nfqws : udplen fooling supports packet shrinking (negative increment value)
 v49
 
 QUIC support integrated to the main system and setup
+
+v50
+
+DHT protocol support.
+DPI desync mode 'tamper' for DHT.
+HEX string support in addition to binary files.

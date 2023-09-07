@@ -34,7 +34,8 @@ enum dpi_desync_mode {
 	DESYNC_HOPBYHOP,
 	DESYNC_DESTOPT,
 	DESYNC_IPFRAG1,
-	DESYNC_UDPLEN
+	DESYNC_UDPLEN,
+	DESYNC_TAMPER
 };
 
 extern const char *fake_http_request_default;

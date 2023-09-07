@@ -16,6 +16,7 @@ bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len
 bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host);
 
 bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len);
+bool IsDhtD1(const uint8_t *data, size_t len);
 
 #define QUIC_MAX_CID_LENGTH  20
 typedef struct quic_cid {

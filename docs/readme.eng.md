@@ -154,7 +154,7 @@ nfqws takes the following parameters:
  --hostspell                                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostnospace                                  ; remove space after Host: and add it to User-Agent: to preserve packet size
  --domcase                                      ; mix domain case : Host: TeSt.cOm
- --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
+ --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                         ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                        ; set ipv6 hop limit for desync packet. by default ttl value is used.
@@ -173,6 +173,7 @@ nfqws takes the following parameters:
  --dpi-desync-fake-unknown=<filename>|0xHEX     ; file containing unknown protocol fake payload
  --dpi-desync-fake-quic=<filename>|0xHEX        ; file containing fake QUIC Initial
  --dpi-desync-fake-wireguard=<filename>|0xHEX   ; file containing fake wireguard handshake initiation
+ --dpi-desync-fake-dht=<filename>|0xHEX         ; file containing fake DHT (d1..e)
  --dpi-desync-fake-unknown-udp=<filename>|0xHEX ; file containing unknown udp protocol fake payload
  --dpi-desync-udplen-increment=<int>            ; increase or decrease udp packet length by N bytes (default 2). negative values decrease length.
  --dpi-desync-udplen-pattern=<filename>|0xHEX   ; udp tail fill pattern
@@ -427,14 +428,15 @@ Set conntrack timeouts appropriately.
 
 UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
 Only desync modes `fake`,`hopbyhop`,`destopt`,`ipfrag1` and `ipfrag2` are applicable.
-`fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2` and `udplen`.
+`fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2`.
+`fake` can be used in combo with `udplen` and `tamper`.
 
-`udplen` increases udp payload size by `--dpi-desync-udplen-increment` bytes. Padding is filled with zeroes.
+`udplen` increases udp payload size by `--dpi-desync-udplen-increment` bytes. Padding is filled with zeroes by default but can be overriden with a pattern.
 This option can resist DPIs that track outgoing UDP packet sizes.
 Requires that application protocol does not depend on udp payload size.
 
 QUIC initial packets are recognized. Decryption and hostname extraction is supported so `--hostlist` parameter will work.
-Wireguard handshake initiation is also recognized.
+Wireguard handshake initiation and DHT packets are also recognized.
 For other protocols desync use `--dpi-desync-any-protocol`.
 
 Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th parameter of `--ctrack-timeouts`.

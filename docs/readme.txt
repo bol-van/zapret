@@ -1,4 +1,4 @@
-﻿zapret v.49
+﻿zapret v.50
 
 English
 -------
@@ -207,7 +207,7 @@ nfqws
  --hostnospace					; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
  --hostspell=HoST				; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
  --domcase					; домен после Host: сделать таким : TeSt.cOm
- --dpi-desync=[<mode0>,]<mode>[,<mode2]		; атака по десинхронизации DPI. mode : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
+ --dpi-desync=[<mode0>,]<mode>[,<mode2]		; атака по десинхронизации DPI. mode : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>        	; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
  --dpi-desync-ttl=<int>                 	; установить ttl для десинхронизирующих пакетов
  --dpi-desync-ttl6=<int>               		; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение ttl
@@ -223,6 +223,7 @@ nfqws
  --dpi-desync-fake-tls=<filename>|0xHEX	        ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
  --dpi-desync-fake-unknown=<filename>|0xHEX	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
  --dpi-desync-fake-quic=<filename>|0xHEX        ; файл, содержащий фейковый QUIC Initial
+ --dpi-desync-fake-dht=<filename>|0xHEX 	; файл, содержащий фейковый пейлоад DHT протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
  --dpi-desync-fake-unknown-udp=<filename>|0xHEX ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
  --dpi-desync-udplen-increment=<int>            ; насколько увеличивать длину udp пейлоада в режиме udplen
  --dpi-desync-udplen-pattern=<filename>|0xHEX   ; чем добивать udp пакет в режиме udplen. по умолчанию - нули
@@ -464,14 +465,17 @@ window size итоговый размер окна стал максимальн
 
 ПОДДЕРЖКА UDP
 Атаки на udp более ограничены в возможностях. udp нельзя фрагментировать иначе, чем на уровне ip.
-Для UDP действуют только режимы десинхронизации fake,hopbyhop,destopt,ipfrag1,ipfrag2,udplen.
-Возможно сочетание fake,hopbyhop,destopt с ipfrag2 и udplen.
+Для UDP действуют только режимы десинхронизации fake,hopbyhop,destopt,ipfrag1,ipfrag2,udplen,tamper.
+Возможно сочетание fake,hopbyhop,destopt с ipfrag2, fake,fakeknown с udplen и tamper.
 udplen увеличивает размер udp пакета на указанное в --dpi-desync-udplen-increment количество байтов.
-Паддинг заполняется нулями. Предназначено для обмана DPI, ориентирующегося на размеры пакетов.
+Паддинг заполняется нулями по умолчанию, но можно задать свой паттерн.
+Предназначено для обмана DPI, ориентирующегося на размеры пакетов.
 Может сработать, если пользовательсткий протокол не привязан жестко к размеру udp пейлоада.
+Режим tamper означает модификацию пакетов известных протоколов особенным для протокола образом.
+На текущий момент работает только с DHT.
 Поддерживается определение пакетов QUIC Initial с расшифровкой содержимого и имени хоста, то есть параметр
 --hostlist будет работать.
-Определяется пакет wireguard handshake initiation.
+Определяются пакеты wireguard handshake initiation и DHT (начинается с 'd1', кончается 'e').
 Для десинхронизации других протоколов обязательно указывать --dpi-desync-any-protocol.
 Реализован conntrack для udp. Можно пользоваться --dpi-desync-cutoff. Таймаут conntrack для udp
 можно изменить 4-м параметром в --ctrack-timeouts.
