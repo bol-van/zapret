@@ -179,3 +179,50 @@ void phton64(uint8_t *p, uint64_t v)
 	p[6] = (uint8_t)(v >> 8);
 	p[7] = (uint8_t)(v >> 0);
 }
+
+#define INVALID_HEX_DIGIT ((uint8_t)-1)
+static inline uint8_t parse_hex_digit(char c)
+{
+	return (c>='0' && c<='9') ? c-'0' : (c>='a' && c<='f') ? c-'a'+0xA : (c>='A' && c<='F') ? c-'A'+0xA : INVALID_HEX_DIGIT;
+}
+static inline bool parse_hex_byte(const char *s, uint8_t *pbyte)
+{
+	uint8_t u,l;
+	u = parse_hex_digit(s[0]);
+	l = parse_hex_digit(s[1]);
+	if (u==INVALID_HEX_DIGIT || l==INVALID_HEX_DIGIT)
+	{
+		*pbyte=0;
+		return false;
+	}
+	else
+	{
+		*pbyte=(u<<4) | l;
+		return true;
+	}
+}
+bool parse_hex_str(const char *s, uint8_t *pbuf, size_t *size)
+{
+	uint8_t *pe = pbuf+*size;
+	*size=0;
+	while(pbuf<pe && *s)
+	{
+		if (!parse_hex_byte(s,pbuf))
+			return false;
+		pbuf++; s+=2; (*size)++;
+	}
+	return true;
+}
+
+void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize)
+{
+	size_t size;
+
+	while (bufsize)
+	{
+		size = bufsize>patsize ? patsize : bufsize;
+		memcpy(buf,pattern,size);
+		buf += size;
+		bufsize -= size;
+	}
+}

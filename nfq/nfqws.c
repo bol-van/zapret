@@ -504,54 +504,55 @@ static void exithelp()
 #ifdef __linux__
 		" --qnum=<nfqueue_number>\n"
 #elif defined(BSD)
-		" --port=<port>\t\t\t\t; divert port\n"
+		" --port=<port>\t\t\t\t\t; divert port\n"
 #endif
-		" --daemon\t\t\t\t; daemonize\n"
-		" --pidfile=<filename>\t\t\t; write pid to file\n"
-		" --user=<username>\t\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t\t; drop root privs\n"
+		" --daemon\t\t\t\t\t; daemonize\n"
+		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
+		" --user=<username>\t\t\t\t; drop root privs\n"
+		" --uid=uid[:gid]\t\t\t\t; drop root privs\n"
 #ifdef __linux__
-		" --bind-fix4\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
-		" --bind-fix6\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
+		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
+		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
-		" --wsize=<window_size>[:<scale_factor>]\t; set window size. 0 = do not modify. OBSOLETE !\n"
-		" --wssize=<window_size>[:<scale_factor>]; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
-		" --wssize-cutoff=[n|d|s]N\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --ctrack-timeouts=S:E:F[:U]\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
-		" --hostcase\t\t\t\t; change Host: => host:\n"
-		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-		" --hostnospace\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
-		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>] ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen\n"
+		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
+		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
+		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
+		" --hostcase\t\t\t\t\t; change Host: => host:\n"
+		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
+		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen\n"
 #ifdef __linux__
-		" --dpi-desync-fwmark=<int|0xHEX>\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
+		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
-		" --dpi-desync-sockarg=<int|0xHEX>\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
+		" --dpi-desync-sockarg=<int|0xHEX>\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
 #endif
-		" --dpi-desync-ttl=<int>\t\t\t; set ttl for desync packet\n"
-		" --dpi-desync-ttl6=<int>\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum hopbyhop hopbyhop2\n"
+		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for desync packet\n"
+		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum hopbyhop hopbyhop2\n"
 #ifdef __linux__
-		" --dpi-desync-retrans=0|1\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
+		" --dpi-desync-retrans=0|1\t\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
 #endif
-		" --dpi-desync-repeats=<N>\t\t; send every desync packet N times\n"
-		" --dpi-desync-skip-nosni=0|1\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=<1..%u>\t; data payload split position\n"
-		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default %d\n"
-		" --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default %d\n"
-		" --dpi-desync-any-protocol=0|1\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
-		" --dpi-desync-fake-http=<filename>\t; file containing fake http request\n"
-		" --dpi-desync-fake-tls=<filename>\t; file containing fake TLS ClientHello (for https)\n"
-		" --dpi-desync-fake-unknown=<filename>\t; file containing unknown protocol fake payload\n"
-		" --dpi-desync-fake-quic=<filename>\t; file containing fake QUIC Initial\n"
-		" --dpi-desync-fake-wireguard=<filename>\t; file containing fake wireguard handshake initiation\n"
-		" --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload\n"
-		" --dpi-desync-udplen-increment=<int>\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
-		" --dpi-desync-cutoff=[n|d|s]N\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --hostlist=<filename>\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-exclude=<filename>\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n",
+		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
+		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
+		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
+		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
+		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
+		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
+		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
+		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
+		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
+		" --dpi-desync-fake-wireguard=<filename>|0xHEX\t; file containing fake wireguard handshake initiation\n"
+		" --dpi-desync-fake-unknown-udp=<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
+		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
+		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
+		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
@@ -612,12 +613,24 @@ static bool parse_badseq_increment(const char *opt, uint32_t *value)
 }
 static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 {
-	if (!load_file_nonempty(filename,buf,size))
+	if (filename[0]=='0' && filename[1]=='x')
 	{
-		fprintf(stderr, "could not read %s\n",filename);
-		exit_clean(1);
+		if (!parse_hex_str(filename+2,buf,size) || !*size)
+		{
+			fprintf(stderr, "invalid hex string: %s\n",filename+2);
+			exit_clean(1);
+		}
+		DLOG("read %zu bytes from hex string\n",*size)
 	}
-	DLOG("read %zu bytes from %s\n",*size,filename)
+	else
+	{
+		if (!load_file_nonempty(filename,buf,size))
+		{
+			fprintf(stderr, "could not read %s\n",filename);
+			exit_clean(1);
+		}
+		DLOG("read %zu bytes from %s\n",*size,filename)
+	}
 }
 
 
@@ -717,12 +730,13 @@ int main(int argc, char **argv)
 		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=32
 		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=33
 		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=34
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=35
-		{"hostlist",required_argument,0,0},		// optidx=36
-		{"hostlist-exclude",required_argument,0,0},	// optidx=37
+		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=35
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=36
+		{"hostlist",required_argument,0,0},		// optidx=37
+		{"hostlist-exclude",required_argument,0,0},	// optidx=38
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=38
-		{"bind-fix6",no_argument,0,0},		// optidx=39
+		{"bind-fix4",no_argument,0,0},		// optidx=39
+		{"bind-fix6",no_argument,0,0},		// optidx=40
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1019,21 +1033,29 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 35: /* desync-cutoff */
+		case 35: /* dpi-desync-udplen-pattern */
+			{
+				char buf[sizeof(params.udplen_pattern)];
+				size_t sz=sizeof(buf);
+				load_file_or_exit(optarg,buf,&sz);
+				fill_pattern(params.udplen_pattern,sizeof(params.udplen_pattern),buf,sz);
+			}
+			break;
+		case 36: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 36: /* hostlist */
+		case 37: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 37: /* hostlist-exclude */
+		case 38: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -1041,10 +1063,10 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifdef __linux__
-		case 38: /* bind-fix4 */
+		case 39: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 39: /* bind-fix6 */
+		case 40: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif

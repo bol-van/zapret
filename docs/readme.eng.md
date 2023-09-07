@@ -138,44 +138,47 @@ For BSD systems there is dvtws. Its built from the same source and has almost th
 nfqws takes the following parameters:
 
 ```
- --debug=0|1				; 1=print debug info
+ --debug=0|1
  --qnum=<nfqueue_number>
- --bind-fix4                            ; apply outgoing interface selection fix for generated ipv4 packets
- --bind-fix6                            ; apply outgoing interface selection fix for generated ipv6 packets
- --wsize=<winsize>[:<scale_factor>]	; change window size in SYN,ACK packets. default is not to change scale factor (OBSOLETE !)
- --wssize=<winsize>[:<scale_factor>]	; change window size in outgoing packets. default scale factor is 0. (see CONNTRACK)
- --wssize-cutoff=[n|d|s]N               ; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
- --ctrack-timeouts=S:E:F                ; internal conntrack timeouts for SYN, ESTABLISHED and FIN stages. default 60:300:60
- --hostcase           			; change Host: => host:
- --hostspell=HoSt      			; exact spelling of the "Host" header. must be 4 chars. default is "host"
- --hostnospace         			; remove space after Host: and add it to User-Agent: to preserve packet size
- --domcase				; mix domain case after Host: like this : TeSt.cOm
- --daemon              			; daemonize
- --pidfile=<filename>  			; write pid to file
- --user=<username>      		; drop root privs
- --uid=uid[:gid]			; drop root privs
- --dpi-desync=[<mode0,]<mode>[,<mode2>]	; desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
- --dpi-desync-fwmark=<int|0xHEX>        ; override fwmark for desync packet. default = 0x40000000
- --dpi-desync-ttl=<int>                 ; set ttl for desync packet
- --dpi-desync-ttl6=<int>                ; set ipv6 hop limit for desync packet. by default ttl value is used
- --dpi-desync-fooling=<fooling>		; can take multiple comma separated values : none md5sig badseq badsum hopbyhop hopbyhop2
- --dpi-desync-retrans=0|1               ; (fake,rst,rstack only) 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
- --dpi-desync-repeats=<N>               ; send every desync packet N times
- --dpi-desync-skip-nosni=0|1		; 1(default)=do not apply desync to requests without hostname in the SNI
- --dpi-desync-split-pos=<1..1500>	; (for split* and disorder* only) split TCP packet at specified position
- --dpi-desync-ipfrag-pos-tcp=<8..9216>  ; ip frag position starting from the transport header. multiple of 8, default 8.
- --dpi-desync-ipfrag-pos-udp=<8..9216>  ; ip frag position starting from the transport header. multiple of 8, default 32.
- --dpi-desync-badseq-increment=<int|0xHEX> ; badseq fooling seq signed increment. default -10000
- --dpi-desync-badack-increment=<int|0xHEX> ; badseq fooling ackseq signed increment. default -66000
- --dpi-desync-any-protocol=0|1		; 0(default)=desync only http and tls  1=desync any nonempty data packet
- --dpi-desync-fake-http=<filename>      ; file containing fake http request. replacement for built-in
- --dpi-desync-fake-tls=<filename>       ; file containing fake TLS ClientHello (for https). replacement for built-in
- --dpi-desync-fake-unknown=<filename>   ; file containing unknown protocol fake payload. default is 256 zeroes
- --dpi-desync-fake-quic=<filename>      ; file containing fake QUIC Initial
- --dpi-desync-fake-unknown-udp=<filename> ; file containing unknown udp protocol fake payload
- --dpi-desync-cutoff=[n|d|s]N           ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
- --hostlist=<filename>                  ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
- --hostlist-exclude=<filename>          ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --daemon                                       ; daemonize
+ --pidfile=<filename>                           ; write pid to file
+ --user=<username>                              ; drop root privs
+ --uid=uid[:gid]                                ; drop root privs
+ --bind-fix4                                    ; apply outgoing interface selection fix for generated ipv4 packets
+ --bind-fix6                                    ; apply outgoing interface selection fix for generated ipv6 packets
+ --wsize=<window_size>[:<scale_factor>]         ; set window size. 0 = do not modify. OBSOLETE !
+ --wssize=<window_size>[:<scale_factor>]        ; set window size for server. 0 = do not modify. default scale_factor = 0.
+ --wssize-cutoff=[n|d|s]N                       ; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
+ --ctrack-timeouts=S:E:F[:U]                    ; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default 60:300:60:60
+ --hostcase                                     ; change Host: => host:
+ --hostspell                                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
+ --hostnospace                                  ; remove space after Host: and add it to User-Agent: to preserve packet size
+ --domcase                                      ; mix domain case : Host: TeSt.cOm
+ --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
+ --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
+ --dpi-desync-ttl=<int>                         ; set ttl for desync packet
+ --dpi-desync-ttl6=<int>                        ; set ipv6 hop limit for desync packet. by default ttl value is used.
+ --dpi-desync-fooling=<mode>[,<mode>]           ; can use multiple comma separated values. modes : none md5sig ts badseq badsum hopbyhop hopbyhop2
+ --dpi-desync-retrans=0|1                       ; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
+ --dpi-desync-repeats=<N>                       ; send every desync packet N times
+ --dpi-desync-skip-nosni=0|1                    ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
+ --dpi-desync-split-pos=<1..9216>               ; data payload split position
+ --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
+ --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
+ --dpi-desync-badseq-increment=<int|0xHEX>      ; badseq fooling seq signed increment. default -10000
+ --dpi-desync-badack-increment=<int|0xHEX>      ; badseq fooling ackseq signed increment. default -66000
+ --dpi-desync-any-protocol=0|1                  ; 0(default)=desync only http and tls  1=desync any nonempty data packet
+ --dpi-desync-fake-http=<filename>|0xHEX        ; file containing fake http request
+ --dpi-desync-fake-tls=<filename>|0xHEX         ; file containing fake TLS ClientHello (for https)
+ --dpi-desync-fake-unknown=<filename>|0xHEX     ; file containing unknown protocol fake payload
+ --dpi-desync-fake-quic=<filename>|0xHEX        ; file containing fake QUIC Initial
+ --dpi-desync-fake-wireguard=<filename>|0xHEX   ; file containing fake wireguard handshake initiation
+ --dpi-desync-fake-unknown-udp=<filename>|0xHEX ; file containing unknown udp protocol fake payload
+ --dpi-desync-udplen-increment=<int>            ; increase or decrease udp packet length by N bytes (default 2). negative values decrease length.
+ --dpi-desync-udplen-pattern=<filename>|0xHEX   ; udp tail fill pattern
+ --dpi-desync-cutoff=[n|d|s]N                   ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
+ --hostlist=<filename>                          ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude=<filename>                  ; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
 ```
 
 The manipulation parameters can be combined in any way.

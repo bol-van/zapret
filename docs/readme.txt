@@ -191,43 +191,44 @@ nfqws
 Эта программа - модификатор пакетов и обработчик очереди NFQUEUE.
 Для BSD систем существует адаптированный вариант - dvtws, собираемый из тех же исходников (см. bsd.txt).
 
- --debug=0|1				; 1=выводить отладочные сообщения
- --daemon				; демонизировать прогу
- --pidfile=<file>			; сохранить PID в файл
- --user=<username>			; менять uid процесса
- --uid=uid[:gid]			; менять uid процесса
- --qnum=N				; номер очереди N
- --bind-fix4                            ; пытаться решить проблему неверного выбора исходящего интерфейса для сгенерированных ipv4 пакетов
- --bind-fix6                            ; пытаться решить проблему неверного выбора исходящего интерфейса для сгенерированных ipv6 пакетов
- --wsize=<winsize>[:<scale_factor>]	; менять tcp window size на указанный размер в SYN,ACK. если не задан scale_factor, то он не меняется (устарело !)
- --wssize=<winsize>[:<scale_factor>]	; менять tcp window size на указанный размер в исходящих пакетах. scale_factor по умолчанию 0. (см. conntrack !)
- --wssize-cutoff=[n|d|s]N               ; изменять server window size в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
- --ctrack-timeouts=S:E:F[:U]            ; таймауты внутреннего conntrack в состояниях SYN, ESTABLISHED, FIN, таймаут udp. по умолчанию 60:300:60:60
- --hostcase				; менять регистр заголовка "Host:" по умолчанию на "host:".
- --hostnospace				; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
- --hostspell=HoST			; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
- --domcase				; домен после Host: сделать таким : TeSt.cOm
- --dpi-desync=[<mode0>,]<mode>[,<mode2]	; атака по десинхронизации DPI. mode : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
- --dpi-desync-fwmark=<int|0xHEX>        ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
- --dpi-desync-ttl=<int>                 ; установить ttl для десинхронизирующих пакетов
- --dpi-desync-ttl6=<int>                ; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение ttl
- --dpi-desync-fooling=<fooling>		; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера. none md5sig badseq badsum hopbyhop hopbyhop2
- --dpi-desync-retrans=0|1               ; (только для fake,rst,rstack) 0(default)=отправлять оригинал следом за фейком  1=дропать оригинал, заставляя ОС выполнять ретрансмиссию через 0.2 сек
- --dpi-desync-repeats=<N>               ; посылать каждый генерируемый в nfqws пакет N раз (не влияет на остальные пакеты)
- --dpi-desync-skip-nosni=0|1		; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI
- --dpi-desync-split-pos=<1..1500>	; (только для split*, disorder*) разбивать пакет на указанной позиции
- --dpi-desync-badseq-increment=<int|0xHEX> ; инкремент sequence number для badseq. по умолчанию -10000
- --dpi-desync-badack-increment=<int|0xHEX> ; инкремент ack sequence number для badseq. по умолчанию -66000
- --dpi-desync-any-protocol=0|1		; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
- --dpi-desync-fake-http=<filename>	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному w3.org
- --dpi-desync-fake-tls=<filename>	; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
- --dpi-desync-fake-unknown=<filename>	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
- --dpi-desync-fake-quic=<filename>      ; файл, содержащий фейковый QUIC Initial
- --dpi-desync-fake-unknown-udp=<filename> ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
- --dpi-desync-udplen-increment=<int>    ; насколько увеличивать длину udp пейлоада в режиме udplen
- --dpi-desync-cutoff=[n|d|s]N           ; применять dpi desync только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
- --hostlist=<filename>			; применять дурение только к хостам из листа. может быть множество листов, они обьединяются. пустой обший лист = его отсутствие
- --hostlist-exclude=<filename>		; не применять дурение к хостам из листа. может быть множество листов, они обьединяются
+ --debug=0|1					; 1=выводить отладочные сообщения
+ --daemon					; демонизировать прогу
+ --pidfile=<file>				; сохранить PID в файл
+ --user=<username>				; менять uid процесса
+ --uid=uid[:gid]				; менять uid процесса
+ --qnum=N					; номер очереди N
+ --bind-fix4                            	; пытаться решить проблему неверного выбора исходящего интерфейса для сгенерированных ipv4 пакетов
+ --bind-fix6                            	; пытаться решить проблему неверного выбора исходящего интерфейса для сгенерированных ipv6 пакетов
+ --wsize=<winsize>[:<scale_factor>]		; менять tcp window size на указанный размер в SYN,ACK. если не задан scale_factor, то он не меняется (устарело !)
+ --wssize=<winsize>[:<scale_factor>]		; менять tcp window size на указанный размер в исходящих пакетах. scale_factor по умолчанию 0. (см. conntrack !)
+ --wssize-cutoff=[n|d|s]N               	; изменять server window size в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
+ --ctrack-timeouts=S:E:F[:U]           		; таймауты внутреннего conntrack в состояниях SYN, ESTABLISHED, FIN, таймаут udp. по умолчанию 60:300:60:60
+ --hostcase					; менять регистр заголовка "Host:" по умолчанию на "host:".
+ --hostnospace					; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
+ --hostspell=HoST				; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
+ --domcase					; домен после Host: сделать таким : TeSt.cOm
+ --dpi-desync=[<mode0>,]<mode>[,<mode2]		; атака по десинхронизации DPI. mode : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen
+ --dpi-desync-fwmark=<int|0xHEX>        	; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
+ --dpi-desync-ttl=<int>                 	; установить ttl для десинхронизирующих пакетов
+ --dpi-desync-ttl6=<int>               		; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение ttl
+ --dpi-desync-fooling=<fooling>			; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера. none md5sig badseq badsum hopbyhop hopbyhop2
+ --dpi-desync-retrans=0|1               	; (только для fake,rst,rstack) 0(default)=отправлять оригинал следом за фейком  1=дропать оригинал, заставляя ОС выполнять ретрансмиссию через 0.2 сек
+ --dpi-desync-repeats=<N>       	        ; посылать каждый генерируемый в nfqws пакет N раз (не влияет на остальные пакеты)
+ --dpi-desync-skip-nosni=0|	1		; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI
+ --dpi-desync-split-pos=<1..1500>		; (только для split*, disorder*) разбивать пакет на указанной позиции
+ --dpi-desync-badseq-increment=<int|0xHEX>      ; инкремент sequence number для badseq. по умолчанию -10000
+ --dpi-desync-badack-increment=<int|0xHEX>      ; инкремент ack sequence number для badseq. по умолчанию -66000
+ --dpi-desync-any-protocol=0|1                  ; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
+ --dpi-desync-fake-http=<filename>|0xHEX	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному w3.org
+ --dpi-desync-fake-tls=<filename>|0xHEX	        ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному w3.org
+ --dpi-desync-fake-unknown=<filename>|0xHEX	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
+ --dpi-desync-fake-quic=<filename>|0xHEX        ; файл, содержащий фейковый QUIC Initial
+ --dpi-desync-fake-unknown-udp=<filename>|0xHEX ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
+ --dpi-desync-udplen-increment=<int>            ; насколько увеличивать длину udp пейлоада в режиме udplen
+ --dpi-desync-udplen-pattern=<filename>|0xHEX   ; чем добивать udp пакет в режиме udplen. по умолчанию - нули
+ --dpi-desync-cutoff=[n|d|s]N                   ; применять dpi desync только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
+ --hostlist=<filename>			        ; применять дурение только к хостам из листа. может быть множество листов, они обьединяются. пустой обший лист = его отсутствие
+ --hostlist-exclude=<filename>		        ; не применять дурение к хостам из листа. может быть множество листов, они обьединяются
 
 Параметры манипуляции могут сочетаться в любых комбинациях.
 

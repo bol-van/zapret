@@ -34,3 +34,6 @@ static inline void phton16(uint8_t *p, uint16_t v) {
 static inline uint32_t pntoh32(const uint8_t *p) {
 	return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
 }
+
+bool parse_hex_str(const char *s, uint8_t *pbuf, size_t *size);
+void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize);

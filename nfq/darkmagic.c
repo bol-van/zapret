@@ -299,6 +299,7 @@ bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
 	uint8_t fooling,
+	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
@@ -324,7 +325,10 @@ bool prepare_udp_segment4(
 	fill_udphdr(udp, src->sin_port, dst->sin_port, datalen);
 
 	memcpy(payload,data,len);
-	memset(payload+len,0,padlen);
+	if (padding)
+		fill_pattern(payload+len,padlen,padding,padding_size);
+	else
+		memset(payload+len,0,padlen);
 	udp4_fix_checksum(udp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
 	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
 
@@ -335,6 +339,7 @@ bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
 	uint8_t fooling,
+	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
@@ -408,7 +413,10 @@ bool prepare_udp_segment6(
 	fill_udphdr(udp, src->sin6_port, dst->sin6_port, datalen);
 
 	memcpy(payload,data,len);
-	memset(payload+len,0,padlen);
+	if (padding)
+		fill_pattern(payload+len,padlen,padding,padding_size);
+	else
+		memset(payload+len,0,padlen);
 	udp6_fix_checksum(udp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
 	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
 
@@ -419,14 +427,15 @@ bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
 	uint8_t fooling,
+	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,fooling,padlen,data,len,buf,buflen) :
+		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,fooling,padding,padding_size,padlen,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,fooling,padlen,data,len,buf,buflen) :
+		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,fooling,padding,padding_size,padlen,data,len,buf,buflen) :
 		false;
 }
 
