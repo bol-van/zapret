@@ -859,7 +859,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 				if (IsDhtD1(data_payload,len_payload))
 				{
 					size_t szbuf,szcopy;
-					memcpy(pkt2,"d2:aa1:x",8);
+					memcpy(pkt2,"d2:001:x",8);
 					pkt2_len=8;
 					szbuf=sizeof(pkt2)-pkt2_len;
 					szcopy=len_payload-1;
