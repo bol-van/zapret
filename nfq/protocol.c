@@ -194,7 +194,7 @@ bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len)
 }
 bool IsDhtD1(const uint8_t *data, size_t len)
 {
-	return len>=3 && data[0]=='d' && data[1]=='1' && data[len-1]=='e';
+	return len>=7 && data[0]=='d' && data[1]=='1' && data[len-1]=='e';
 }
 
 /* Returns the QUIC draft version or 0 if not applicable. */
@@ -451,7 +451,7 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len)
 {
 	// Crypto frame can be split into multiple chunks
-	// quiche (chromium) randomly splits it and pads with zero/one bytes to force support the standard
+	// chromium randomly splits it and pads with zero/one bytes to force support the standard
 	// mozilla does not split
 
 	if (*defrag_len<10) return false;
