@@ -921,14 +921,12 @@ static int rawsend_sendto_divert(sa_family_t family, int sock, const void *buf, 
 	struct sockaddr_storage sa;
 	socklen_t slen;
 
-	memset(&sa,0,sizeof(sa));
 #ifdef __FreeBSD__
 	// since FreeBSD 14 it requires hardcoded ipv4 values, although can also send ipv6 frames
-	sa.ss_family = AF_INET;
+	family = AF_INET;
 	slen = sizeof(struct sockaddr_in);
 #else
 	// OpenBSD requires correct family and size
-	sa.ss_family = family;
 	switch(family)
 	{
 		case AF_INET:
@@ -941,6 +939,8 @@ static int rawsend_sendto_divert(sa_family_t family, int sock, const void *buf, 
 			return -1;
 	}
 #endif
+	memset(&sa,0,slen);
+	sa.ss_family = family;
 	return sendto(sock, buf, len, 0, (struct sockaddr*)&sa, slen);
 }
 #endif
