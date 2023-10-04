@@ -456,11 +456,11 @@ address.
 And they really are. Except for link-locals.
 
 If you just reboot the system link-locals will not change. But next day they
-will change.Not necessary to wait so long.
+will change.
 
-Just change the system time to tomorrow and reboot. Link-locals will change.
-(at least they change in vmware guest) Looks like its a kernel bug. Link locals
-should not change. Its useless and can be harmful. Cant use LL as a gateway.
+Not necessary to wait so long. Just change the system time to tomorrow and reboot.
+Link-locals will change (at least they change in vmware guest). Looks like its a kernel bug.
+Link locals should not change. Its useless and can be harmful. Cant use LL as a gateway.
 
 The easiest solution is to disable "secured" addresses.
 
