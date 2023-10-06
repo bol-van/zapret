@@ -1,7 +1,6 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Wno-logical-op-parentheses -O3
 CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
-CFLAGS_MAC = -mmacosx-version-min=10.8
 LIBS = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
 SRC_FILES = *.c crypto/*.c
