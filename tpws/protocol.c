@@ -6,7 +6,6 @@
 #include <ctype.h>
 #include <arpa/inet.h>
 #include <string.h>
-#include <stdio.h>
 
 
 const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
