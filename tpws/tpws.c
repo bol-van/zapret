@@ -174,6 +174,8 @@ static void exithelp()
 		" --methodspace\t\t\t; add extra space after method\n"
 		" --methodeol\t\t\t; add end-of-line before method\n"
 		" --unixeol\t\t\t; replace 0D0A to 0A\n"
+		" --tlsrec=sni\t\t\t; make 2 TLS records. split at SNI. don't split if SNI is not present\n"
+		" --tlsrec-pos=<pos>\t\t; make 2 TLS records. split at specified pos\n"
 	);
 	exit(1);
 }
@@ -288,19 +290,21 @@ void parse_params(int argc, char *argv[])
 		{ "methodeol",no_argument,0,0 },// optidx=28
 		{ "hosttab",no_argument,0,0 },// optidx=29
 		{ "unixeol",no_argument,0,0 },// optidx=30
-		{ "hostlist",required_argument,0,0 },// optidx=31
-		{ "hostlist-exclude",required_argument,0,0 },// optidx=32
-		{ "pidfile",required_argument,0,0 },// optidx=33
-		{ "debug",optional_argument,0,0 },// optidx=34
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=35
-		{ "local-sndbuf",required_argument,0,0 },// optidx=36
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=37
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=38
-		{ "socks",no_argument,0,0 },// optidx=39
-		{ "no-resolve",no_argument,0,0 },// optidx=40
-		{ "skip-nodelay",no_argument,0,0 },// optidx=41
+		{ "tlsrec",required_argument,0,0 },// optidx=31
+		{ "tlsrec-pos",required_argument,0,0 },// optidx=32
+		{ "hostlist",required_argument,0,0 },// optidx=33
+		{ "hostlist-exclude",required_argument,0,0 },// optidx=34
+		{ "pidfile",required_argument,0,0 },// optidx=35
+		{ "debug",optional_argument,0,0 },// optidx=36
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=37
+		{ "local-sndbuf",required_argument,0,0 },// optidx=38
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=39
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=40
+		{ "socks",no_argument,0,0 },// optidx=41
+		{ "no-resolve",no_argument,0,0 },// optidx=42
+		{ "skip-nodelay",no_argument,0,0 },// optidx=43
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=42
+		{ "enable-pf",no_argument,0,0 },// optidx=44
 #endif
 		{ NULL,0,NULL,0 }
 	};
@@ -472,7 +476,7 @@ void parse_params(int argc, char *argv[])
 			break;
 		case 24: /* split-pos */
 			i = atoi(optarg);
-			if (i)
+			if (i>0)
 				params.split_pos = i;
 			else
 			{
@@ -504,7 +508,27 @@ void parse_params(int argc, char *argv[])
 			params.unixeol = true;
 			params.tamper = true;
 			break;
-		case 31: /* hostlist */
+		case 31: /* tlsrec */
+			if (!strcmp(optarg, "sni"))
+				params.tlsrec = tlsrec_sni;
+			else
+			{
+				fprintf(stderr, "Invalid argument for tlsrec\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 32: /* tlsrec-pos */
+			if ((params.tlsrec_pos = atoi(optarg))>0)
+				params.tlsrec = tlsrec_pos;
+			else
+			{
+				fprintf(stderr, "Invalid argument for tlsrec-pos\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 33: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -512,7 +536,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 32: /* hostlist-exclude */
+		case 34: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -520,36 +544,36 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 33: /* pidfile */
+		case 35: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 34:
+		case 36:
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
-		case 35: /* local-rcvbuf */
+		case 37: /* local-rcvbuf */
 			params.local_rcvbuf = atoi(optarg)/2;
 			break;
-		case 36: /* local-sndbuf */
+		case 38: /* local-sndbuf */
 			params.local_sndbuf = atoi(optarg)/2;
 			break;
-		case 37: /* remote-rcvbuf */
+		case 39: /* remote-rcvbuf */
 			params.remote_rcvbuf = atoi(optarg)/2;
 			break;
-		case 38: /* remote-sndbuf */
+		case 40: /* remote-sndbuf */
 			params.remote_sndbuf = atoi(optarg)/2;
 			break;
-		case 39: /* socks */
+		case 41: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 40: /* no-resolve */
+		case 42: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 41: /* skip-nodelay */
+		case 43: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 42: /* enable-pf */
+		case 44: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif

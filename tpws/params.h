@@ -8,6 +8,7 @@
 #include "strpool.h"
 
 enum splithttpreq { split_none = 0, split_method, split_host };
+enum tlsrec { tlsrec_none = 0, tlsrec_sni, tlsrec_pos };
 enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32
@@ -41,6 +42,8 @@ struct params_s
 	int hostpad;
 	char hostspell[4];
 	enum splithttpreq split_http_req;
+	enum tlsrec tlsrec;
+	int tlsrec_pos;
 	bool split_any_protocol;
 	int split_pos;
 	bool disorder;

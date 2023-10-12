@@ -31,6 +31,11 @@ bool set_hl(int fd, int hl);
 bool set_ttl_hl(int fd, int ttl);
 int get_so_error(int fd);
 
+// alignment-safe functions
 static inline uint16_t pntoh16(const uint8_t *p) {
 	return ((uint16_t)p[0] << 8) | (uint16_t)p[1];
+}
+static inline void phton16(uint8_t *p, uint16_t v) {
+	p[0] = (uint8_t)(v>>8);
+	p[1] = (uint8_t)v;
 }

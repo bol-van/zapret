@@ -645,6 +645,9 @@ tpws_check_domain_bypass()
 				tpws_curl_test_update $1 $3 $s $s2 && break
 			done
 		done
+		for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --disorder'; do
+			tpws_curl_test_update $1 $3 $s2 && [ "$FORCE" != 1 ] && break
+		done
 	fi
 	report_strategy $1 $3 tpws
 }

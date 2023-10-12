@@ -4,11 +4,12 @@
 #include "params.h"
 #include "hostlist.h"
 #include "protocol.h"
+#include "helpers.h"
 #include <string.h>
 #include <stdio.h>
 
 // pHost points to "Host: ..."
-bool find_host(char **pHost,char *buf,size_t bs)
+bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
 {
 	if (!*pHost)
 	{
@@ -23,14 +24,15 @@ bool find_host(char **pHost,char *buf,size_t bs)
 }
 
 static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
-void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,size_t *split_pos)
+// segment buffer has at least 5 extra bytes to extend data block
+void modify_tcp_segment(uint8_t *segment,size_t segment_buffer_size,size_t *size,size_t *split_pos)
 {
-	char *p, *pp, *pHost = NULL;
+	uint8_t *p, *pp, *pHost = NULL;
 	size_t method_len = 0, pos;
 	const char **method;
 	bool bIsHttp = false, bBypass = false;
 	char bRemovedHostSpace = 0;
-	char Host[128];
+	char *pc, Host[128];
 	
 	*split_pos=0;
 
@@ -57,7 +59,7 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 			memcpy(Host, p, pp - p);
 			Host[pp - p] = '\0';
 			VPRINT("Requested Host is : %s", Host)
-			for(p = Host; *p; p++) *p=tolower(*p);
+			for(pc = Host; *pc; pc++) *pc=tolower(*pc);
 			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host);
 		}
 		if (!bBypass)
@@ -208,28 +210,62 @@ void modify_tcp_segment(char *segment,size_t segment_buffer_size,size_t *size,si
 		{
 			VPRINT("Not acting on this request")
 		}
+		return;
 	}
-	else if (params.split_pos && params.split_pos < *size)
+	
+	if (IsTLSClientHello(segment,*size))
 	{
-		// split-pos is the only parameter applicable to non-http block (may be https ?)
-		if (IsTLSClientHello((uint8_t*)segment,*size))
-		{
-			char host[256];
+		char host[256];
+		size_t tpos=0,elen;
+		const uint8_t *ext;
 
-			VPRINT("packet contains TLS ClientHello")
-			// we need host only if hostlist is present
-			if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,host,sizeof(host)))
+		VPRINT("packet contains TLS ClientHello")
+		// we need host only if hostlist is present
+		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,host,sizeof(host)))
+		{
+			VPRINT("hostname: %s",host)
+			if (!HostlistCheck(params.hostlist, params.hostlist_exclude, host))
 			{
-				VPRINT("hostname: %s",host)
-				if (!HostlistCheck(params.hostlist, params.hostlist_exclude, host))
-				{
-					VPRINT("Not acting on this request")
-					return;
-				}
+				VPRINT("Not acting on this request")
+				return;
 			}
-			*split_pos = params.split_pos;
 		}
-		else if (params.split_any_protocol)
+		switch(params.tlsrec)
+		{
+			case tlsrec_sni:
+				if (TLSFindExt(segment,*size,0,&ext,&elen))
+					tpos = ext-segment+1; // between typical 1st and 2nd char of hostname
+				break;
+			case tlsrec_pos:
+				tpos = params.tlsrec_pos;
+				break;
+			default:
+				break;
+		}
+		if (tpos)
+		{
+			// construct 2 TLS records from one
+			uint16_t l = pntoh16(segment+3); // length
+			if (l>=2)
+			{
+				// length is checked in IsTLSClientHello and cannot exceed buffer size
+				if (tpos>=l) tpos=1;
+				VPRINT("making 2 TLS records at pos %zu",tpos)
+				memmove(segment+5+tpos+5,segment+5+tpos,l-tpos);
+				segment[5+tpos] = segment[0];
+				segment[5+tpos+1] = segment[1];
+				segment[5+tpos+2] = segment[2];
+				phton16(segment+5+tpos+3,l-tpos);
+				phton16(segment+3,tpos);
+				*size += 5;
+			}
+		}
+		
+		if (params.split_pos < *size)
 			*split_pos = params.split_pos;
+		return;
 	}
+	
+	if (params.split_any_protocol && params.split_pos < *size)
+		*split_pos = params.split_pos;
 }

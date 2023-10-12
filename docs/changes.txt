@@ -243,3 +243,7 @@ v50
 DHT protocol support.
 DPI desync mode 'tamper' for DHT.
 HEX string support in addition to binary files.
+
+v51
+
+tpws --tlsrec attack.

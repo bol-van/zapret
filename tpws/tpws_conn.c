@@ -133,7 +133,7 @@ ssize_t send_with_ttl(int fd, const void *buf, size_t len, int flags, int ttl)
 }
 
 
-static bool send_buffer_create(send_buffer_t *sb, char *data, size_t len, int ttl)
+static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, int ttl)
 {
 	if (sb->data)
 	{
@@ -258,7 +258,7 @@ static bool conn_has_unsent_pair(tproxy_conn_t *conn)
 }
 
 
-static ssize_t send_or_buffer(send_buffer_t *sb, int fd, char *buf, size_t len, int ttl)
+static ssize_t send_or_buffer(send_buffer_t *sb, int fd, const void *buf, size_t len, int ttl)
 {
 	ssize_t wr=0;
 	if (len)
@@ -919,7 +919,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	if (!conn_partner_alive(conn))
 	{
 		// throw it to a black hole
-		char waste[65070];
+		uint8_t waste[65070];
 		ssize_t trd=0;
 
 		while((rd=recv(conn->fd, waste, sizeof(waste), MSG_DONTWAIT))>0 && trd<MAX_WASTE)
@@ -969,7 +969,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 #endif
 		{
 			// incoming data from local leg
-			char buf[RD_BLOCK_SIZE + 4];
+			uint8_t buf[RD_BLOCK_SIZE + 5];
 
 			rd = recv(conn->fd, buf, RD_BLOCK_SIZE, MSG_DONTWAIT);
 			DBGPRINT("recv fd=%d rd=%zd err=%d",conn->fd, rd,errno)
