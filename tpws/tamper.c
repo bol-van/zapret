@@ -251,7 +251,7 @@ void modify_tcp_segment(uint8_t *segment,size_t segment_buffer_size,size_t *size
 				// length is checked in IsTLSClientHello and cannot exceed buffer size
 				if (tpos>=l) tpos=1;
 				VPRINT("making 2 TLS records at pos %zu",tpos)
-				memmove(segment+5+tpos+5,segment+5+tpos,l-tpos);
+				memmove(segment+5+tpos+5,segment+5+tpos,*size-(5+tpos));
 				segment[5+tpos] = segment[0];
 				segment[5+tpos+1] = segment[1];
 				segment[5+tpos+2] = segment[2];
