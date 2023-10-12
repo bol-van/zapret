@@ -122,7 +122,7 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 	data += l; len -= l;
 	l = pntoh16(data);
 	data += 2; len -= 2;
-	if (l < len) return false;
+	if (len < l) return false;
 
 	while (l >= 4)
 	{

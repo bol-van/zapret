@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <stdio.h>
+
 
 const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 bool IsHttp(const uint8_t *data, size_t len)
@@ -86,7 +88,7 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 	data+=l; len-=l;
 	l=pntoh16(data);
 	data+=2; len-=2;
-	if (l<len) return false;
+	if (len<l) return false;
 
 	while(l>=4)
 	{
