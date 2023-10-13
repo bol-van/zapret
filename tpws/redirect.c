@@ -25,7 +25,7 @@
 
 static int redirector_fd=-1;
 
-void redir_close()
+void redir_close(void)
 {
 	if (redirector_fd!=-1)
 	{
@@ -46,7 +46,7 @@ static bool redir_open_private(const char *fname, int flags)
 	DBGPRINT("opened redirector %s",fname);
 	return true;
 }
-bool redir_init()
+bool redir_init(void)
 {
 	return params.pf_enable ? redir_open_private("/dev/pf", O_RDONLY) : true;
 }
@@ -165,8 +165,8 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 
 #else
 
-bool redir_init() {return true;}
-void redir_close() {};
+bool redir_init(void) {return true;}
+void redir_close(void) {};
 
 #endif
 

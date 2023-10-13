@@ -152,7 +152,7 @@ static void set_filter(struct sock_filter *filter, __u16 code, __u8 jt, __u8 jf,
 	filter->k = k;
 }
 // deny all blocked syscalls
-static bool set_seccomp()
+static bool set_seccomp(void)
 {
 #ifdef __X32_SYSCALL_BIT
  #define SECCOMP_PROG_SIZE (6 + BLOCKED_SYSCALL_COUNT)
@@ -190,7 +190,7 @@ static bool set_seccomp()
 	return prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog) >= 0;
 }
 
-bool sec_harden()
+bool sec_harden(void)
 {
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
 	{
@@ -234,7 +234,7 @@ bool setpcap(uint64_t caps)
 
 	return !capset(&ch,cd);
 }
-int getmaxcap()
+int getmaxcap(void)
 {
 	int maxcap = CAP_LAST_CAP;
 	FILE *F = fopen("/proc/sys/kernel/cap_last_cap", "r");
@@ -246,7 +246,7 @@ int getmaxcap()
 	return maxcap;
 
 }
-bool dropcaps()
+bool dropcaps(void)
 {
 	uint64_t caps = (1<<CAP_NET_ADMIN)|(1<<CAP_NET_RAW);
 	int maxcap = getmaxcap();
@@ -272,7 +272,7 @@ bool dropcaps()
 }
 #else // __linux__
 
-bool sec_harden()
+bool sec_harden(void)
 {
 	// noop
 	return true;
@@ -282,7 +282,7 @@ bool sec_harden()
 
 
 
-bool can_drop_root()
+bool can_drop_root(void)
 {
 #ifdef __linux__
 	// has some caps
@@ -325,7 +325,7 @@ bool droproot(uid_t uid, gid_t gid)
 #endif
 }
 
-void print_id()
+void print_id(void)
 {
  int i,N;
  gid_t g[128];
@@ -341,7 +341,7 @@ void print_id()
 	printf("%u\n",getgid());
 }
 
-void daemonize()
+void daemonize(void)
 {
 	int pid;
 

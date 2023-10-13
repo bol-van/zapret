@@ -142,7 +142,7 @@ static void mask_from_bitcount6_make(uint32_t zct, struct in6_addr *a)
 	}
 }
 static struct in6_addr ip6_mask[129];
-static void mask_from_bitcount6_prepare()
+static void mask_from_bitcount6_prepare(void)
 {
 	for (int zct=0;zct<=128;zct++) mask_from_bitcount6_make(zct, ip6_mask+zct);
 }
@@ -205,7 +205,7 @@ static struct params_s
 } params;
 
 
-static void exithelp()
+static void exithelp(void)
 {
 	printf(
 		" -4\t\t\t\t; ipv4 list (default)\n"

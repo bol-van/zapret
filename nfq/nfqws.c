@@ -53,7 +53,7 @@ static void onhup(int sig)
 	bHup = true;
 }
 // should be called in normal execution
-static void dohup()
+static void dohup(void)
 {
 	if (bHup)
 	{
@@ -223,7 +223,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	DLOG("packet: id=%d pass unmodified\n", id);
 	return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, 0, NULL);
 }
-static int nfq_main()
+static int nfq_main(void)
 {
 	struct nfq_handle *h = NULL;
 	struct nfq_q_handle *qh = NULL;
@@ -328,7 +328,7 @@ exiterr:
 
 #elif defined(BSD)
 
-static int dvt_main()
+static int dvt_main(void)
 {
 	uint8_t buf[16384] __attribute__((aligned));
 	struct sockaddr_storage sa_from;
@@ -497,7 +497,7 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 }
 
 
-static void exithelp()
+static void exithelp(void)
 {
 	printf(
 		" --debug=0|1\n"
@@ -567,7 +567,7 @@ static void exithelp()
 	exit(1);
 }
 
-static void cleanup_params()
+static void cleanup_params(void)
 {
 	ConntrackPoolDestroy(&params.conntrack);
 
@@ -584,7 +584,7 @@ static void cleanup_params()
 		params.hostlist = NULL;
 	}
 }
-static void exithelp_clean()
+static void exithelp_clean(void)
 {
 	cleanup_params();
 	exithelp();

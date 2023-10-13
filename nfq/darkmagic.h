@@ -125,7 +125,7 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const 
 // should pre-do it if dropping privileges. otherwise its not necessary
 bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 // cleans up socket autocreated by rawsend
-void rawsend_cleanup();
+void rawsend_cleanup(void);
 
 const char *proto_name(uint8_t proto);
 uint16_t family_from_proto(uint8_t l3proto);

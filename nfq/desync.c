@@ -55,7 +55,7 @@ const uint8_t fake_tls_clienthello_default[517] = {
 
 static uint8_t zeropkt[DPI_DESYNC_MAX_FAKE_LEN];
 
-void desync_init()
+void desync_init(void)
 {
 	memset(zeropkt, 0, sizeof(zeropkt));
 }

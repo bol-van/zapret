@@ -884,7 +884,7 @@ static void rawsend_clean_sock(int *sock)
 		*sock=-1;
 	}
 }
-void rawsend_cleanup()
+void rawsend_cleanup(void)
 {
 	rawsend_clean_sock(&rawsend_sock4);
 	rawsend_clean_sock(&rawsend_sock6);

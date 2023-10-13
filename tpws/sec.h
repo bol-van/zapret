@@ -11,8 +11,8 @@
 
 bool checkpcap(uint64_t caps);
 bool setpcap(uint64_t caps);
-int getmaxcap();
-bool dropcaps();
+int getmaxcap(void);
+bool dropcaps(void);
 
 #define syscall_nr (offsetof(struct seccomp_data, nr))
 #define arch_nr (offsetof(struct seccomp_data, arch))
@@ -52,9 +52,9 @@ bool dropcaps();
 
 #endif
 
-bool sec_harden();
+bool sec_harden(void);
 bool can_drop_root();
 bool droproot(uid_t uid, gid_t gid);
-void print_id();
-void daemonize();
+void print_id(void);
+void daemonize(void);
 bool writepid(const char *filename);

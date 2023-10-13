@@ -272,7 +272,7 @@ static void *t_resolver(void *arg)
 	return NULL;
 }
 
-static int run_threads()
+static int run_threads(void)
 {
 	int i, thread;
 	pthread_t *t;
@@ -317,7 +317,7 @@ static int run_threads()
 	return thread ? 0 : 12;
 }
 
-static void exithelp()
+static void exithelp(void)
 {
 	printf(
 		" --threads=<threads_number>\n"

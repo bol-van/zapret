@@ -37,7 +37,7 @@ static void count_legs(struct tailhead *conn_list)
 	
 }
 */
-static void print_legs()
+static void print_legs(void)
 {
 	VPRINT("Legs : local:%d remote:%d", legs_local, legs_remote)
 }

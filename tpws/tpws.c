@@ -48,7 +48,7 @@ static void onhup(int sig)
 	bHup = true;
 }
 // should be called in normal execution
-void dohup()
+void dohup(void)
 {
 	if (bHup)
 	{
@@ -64,7 +64,7 @@ void dohup()
 
 
 
-static int8_t block_sigpipe()
+static int8_t block_sigpipe(void)
 {
 	sigset_t sigset;
 	memset(&sigset, 0, sizeof(sigset));
@@ -103,7 +103,7 @@ static bool is_interface_online(const char *ifname)
 	close(sock);
 	return !!(ifr.ifr_flags & IFF_UP);
 }
-static int get_default_ttl()
+static int get_default_ttl(void)
 {
 	int sock,ttl=0;
 	socklen_t optlen=sizeof(ttl);
@@ -117,7 +117,7 @@ static int get_default_ttl()
 }
 
 
-static void exithelp()
+static void exithelp(void)
 {
 	printf(
 		" --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %%interface_name\n"
@@ -179,7 +179,7 @@ static void exithelp()
 	);
 	exit(1);
 }
-static void cleanup_params()
+static void cleanup_params(void)
 {
 	strlist_destroy(&params.hostlist_files);
 	strlist_destroy(&params.hostlist_exclude_files);
@@ -194,7 +194,7 @@ static void cleanup_params()
 		params.hostlist = NULL;
 	}
 }
-static void exithelp_clean()
+static void exithelp_clean(void)
 {
 	cleanup_params();
 	exithelp();
@@ -204,7 +204,7 @@ static void exit_clean(int code)
 	cleanup_params();
 	exit(code);
 }
-static void nextbind_clean()
+static void nextbind_clean(void)
 {
 	params.binds_last++;
 	if (params.binds_last>=MAX_BINDS)
@@ -213,7 +213,7 @@ static void nextbind_clean()
 		exit_clean(1);
 	}
 }
-static void checkbind_clean()
+static void checkbind_clean(void)
 {
 	if (params.binds_last<0)
 	{
@@ -223,7 +223,7 @@ static void checkbind_clean()
 }
 
 
-void save_default_ttl()
+void save_default_ttl(void)
 {
 	if (!params.ttl_default)
 	{
@@ -705,7 +705,7 @@ static bool write_system_maxfiles(rlim_t maxfile)
 #endif
 }
 
-static bool set_ulimit()
+static bool set_ulimit(void)
 {
 	rlim_t fdmax,fdmin_system,cur_lim=0;
 	int n;
