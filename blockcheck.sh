@@ -244,13 +244,15 @@ curl_translate_code()
 }
 curl_supports_tls13()
 {
+	local r
 	curl --tlsv1.3 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
 	# this is online test because there's no other way to trigger library incompatibility case
 	curl --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://w3.org 2>/dev/null
-	[ $? != 4 ]
+	r=$?
+	[ $r != 4 -a $r != 35 ]
 }
 
 curl_supports_tlsmax()
