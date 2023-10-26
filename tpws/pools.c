@@ -76,6 +76,7 @@ hostfail_pool * HostFailPoolAdd(hostfail_pool **pp,const char *s,int fail_time)
 	size_t slen = strlen(s);
 	ADD_STR_POOL(hostfail_pool, pp, s, slen)
 	elem->expire = time(NULL) + fail_time;
+	elem->counter = 0;
 	return elem;
 }
 hostfail_pool *HostFailPoolFind(hostfail_pool *p,const char *s)

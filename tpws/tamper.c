@@ -303,16 +303,25 @@ static void auto_hostlist_failed(const char *hostname)
 	{
 		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist", hostname);
 		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
-		if (!StrPoolAddStr(&params.hostlist, hostname))
+		
+		VPRINT("auto hostlist : rechecking %s to avoid duplicates", hostname);
+		bool bExcluded=false;
+		if (!HostlistCheck(params.hostlist, params.hostlist_exclude, hostname, &bExcluded) && !bExcluded)
 		{
-			fprintf(stderr, "StrPoolAddStr out of memory\n");
-			return;
+			VPRINT("auto hostlist : adding %s", hostname);
+			if (!StrPoolAddStr(&params.hostlist, hostname))
+			{
+				fprintf(stderr, "StrPoolAddStr out of memory\n");
+				return;
+			}
+			if (!append_to_list_file(params.hostlist_auto_filename, hostname))
+			{
+				perror("write to auto hostlist:");
+				return;
+			}
 		}
-		if (!append_to_list_file(params.hostlist_auto_filename, hostname))
-		{
-			perror("write to auto hostlist:");
-			return;
-		}
+		else
+			VPRINT("auto hostlist: NOT adding %s", hostname);
 	}
 }
 
