@@ -225,8 +225,8 @@ select_mode_quic()
 }
 select_mode_filter()
 {
-	local filter="none ipset hostlist"
-	[ "$MODE" = "tpws-socks" ] && filter="none hostlist"
+	local filter="none ipset hostlist autohostlist"
+	[ "$MODE" = "tpws-socks" ] && filter="none hostlist autohostlist"
 	echo
 	echo select filtering :
 	ask_list MODE_FILTER "$filter" none && write_config_var MODE_FILTER
@@ -487,7 +487,7 @@ backup_restore_settings()
 {
 	# $1 - 1 - backup, 0 - restore
 	local mode=$1
-	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/openwrt/custom" "init.d/macos/custom" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt"
+	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/openwrt/custom" "init.d/macos/custom" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt" "ipset/zapret-hosts-auto.txt"
 }
 
 check_location()

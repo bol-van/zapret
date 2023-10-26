@@ -63,10 +63,8 @@ nft_del_all_chains_from_table()
 
 nft_create_chains()
 {
-	# NOTE : postrouting hook has priority 101 to hook packets already processed by nat
-	# NOTE : this is the only way to implement ipfrag for forwarded packets if nat is present
-	# NOTE : to avoid retracking and sport changing use notrack for nfqws generated packets
-	# NOTE : this also prevents defragmentation of ipv6 fragmented frames in kernels 4.16+
+	# NOTE : postrouting hook has priority 99 to hook packets with original source but NATed destination
+	# NOTE : prerouting hook has priority -99 for the same reason
 cat << EOF | nft -f -
 	add chain inet $ZAPRET_NFT_TABLE dnat_output { type nat hook output priority -101; }
 	flush chain inet $ZAPRET_NFT_TABLE dnat_output
@@ -84,6 +82,7 @@ cat << EOF | nft -f -
 	add rule inet  $ZAPRET_NFT_TABLE localnet_protect ip daddr 127.0.0.0/8 drop comment "route_localnet remote access protection"
 	add rule inet  $ZAPRET_NFT_TABLE input iif != lo jump localnet_protect
 	add chain inet $ZAPRET_NFT_TABLE postrouting { type filter hook postrouting priority 99; }
+	add chain inet $ZAPRET_NFT_TABLE prerouting { type filter hook prerouting priority -99; }
 	flush chain inet $ZAPRET_NFT_TABLE postrouting
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif { type ifname; }
@@ -109,6 +108,7 @@ cat << EOF | nft -f - 2>/dev/null
 	delete chain inet $ZAPRET_NFT_TABLE forward
 	delete chain inet $ZAPRET_NFT_TABLE input
 	delete chain inet $ZAPRET_NFT_TABLE postrouting
+	delete chain inet $ZAPRET_NFT_TABLE prerouting
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload
 	delete chain inet $ZAPRET_NFT_TABLE localnet_protect
 EOF
@@ -202,7 +202,7 @@ nft_reverse_nfqws_rule()
 }
 nft_clean_nfqws_rule()
 {
-	echo "$@" | sed -e "s/mark and $DESYNC_MARK == 0//g"
+	echo "$@" | sed -e "s/mark and $DESYNC_MARK == 0//g" -e "s/oifname @wanif6//g" -e "s/oifname @wanif//g"
 }
 nft_add_nfqws_flow_exempt_rule()
 {
@@ -464,6 +464,64 @@ nft_fw_nfqws_post()
 	nft_fw_nfqws_post6 "$2" $3
 }
 
+_nft_fw_nfqws_pre4()
+{
+	# $1 - filter ipv4
+	# $2 - queue number
+	# $3 - not-empty if wan interface filtering required
+
+	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || {
+		local filter="$1" port="$2" rule
+		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 4
+		rule="${3:+iifname @wanif }$filter ip saddr != @nozapret"
+		nft_add_rule prerouting $rule queue num $port bypass
+	}
+}
+_nft_fw_nfqws_pre6()
+{
+	# $1 - filter ipv6
+	# $2 - queue number
+	# $3 - not-empty if wan interface filtering required
+
+	[ "$DISABLE_IPV6" = "1" -o -z "$1" ] || {
+		local filter="$1" port="$2" rule
+		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 6
+		rule="${3:+iifname @wanif6 }$filter ip6 saddr != @nozapret6"
+		nft_add_rule prerouting $rule queue num $port bypass
+	}
+}
+nft_fw_nfqws_pre()
+{
+	# $1 - filter ipv4
+	# $2 - filter ipv6
+	# $3 - queue number
+
+	nft_fw_nfqws_pre4 "$1" $3
+	nft_fw_nfqws_pre6 "$2" $3
+}
+
+nft_fw_nfqws_both4()
+{
+	# $1 - filter ipv4
+	# $2 - queue number
+	nft_fw_nfqws_post4 "$@"
+	nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $1)" $2
+}
+nft_fw_nfqws_both6()
+{
+	# $1 - filter ipv6
+	# $2 - queue number
+	nft_fw_nfqws_post6 "$@"
+	nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $1)" $2
+}
+nft_fw_nfqws_both()
+{
+	# $1 - filter ipv4
+	# $2 - filter ipv6
+	# $3 - queue number
+	nft_fw_nfqws_both4 "$1" "$3"
+	nft_fw_nfqws_both6 "$2" "$3"
+}
 
 zapret_reload_ifsets()
 {
@@ -485,9 +543,18 @@ zapret_apply_firewall_rules_nft()
 {
 	local mode="${MODE_OVERRIDE:-$MODE}"
 
-	local first_packet_only="ct original packets 1-4"
+	local first_packet_only
 	local desync="mark and $DESYNC_MARK == 0"
-	local f4 f6 qn qns qn6 qns6
+	local f4 f6 ff qn qns qn6 qns6
+	
+	# autohostlist mode requires incoming traffic sample
+	# always use conntrack packet limiter or nfqws will deal with gigabytes
+	if [ "$MODE_FILTER" = "autohostlist" ]; then
+		first_packet_only=$((4+${AUTOHOSTLIST_RETRANS_THRESHOLD:-3}))
+	else
+		first_packet_only=4
+	fi
+	first_packet_only="ct original packets 1-$first_packet_only"
 
 	case "$mode" in
 		tpws)
@@ -508,17 +575,23 @@ zapret_apply_firewall_rules_nft()
 				f4="$f4 $first_packet_only"
 				nft_filter_apply_ipset_target4 f4
 				nft_fw_nfqws_post4 "$f4 $desync" $qn
+				[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $f4)" $qn
 			else
 				if [ -n "$qn" ]; then
 					f4="tcp dport 80"
+					ff="$f4"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
+					ff="$ff $first_packet_only"
 					nft_filter_apply_ipset_target4 f4
+					nft_filter_apply_ipset_target4 ff
 					nft_fw_nfqws_post4 "$f4 $desync" $qn
+					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $ff)" $qn
 				fi
 				if [ -n "$qns" ]; then
 					f4="tcp dport 443 $first_packet_only"
 					nft_filter_apply_ipset_target4 f4
 					nft_fw_nfqws_post4 "$f4 $desync" $qns
+					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $f4)" $qns
 				fi
 			fi
 			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn6" ] && [ "$qn6" = "$qns6" ]; then
@@ -526,17 +599,23 @@ zapret_apply_firewall_rules_nft()
 				f6="$f6 $first_packet_only"
 				nft_filter_apply_ipset_target6 f6
 				nft_fw_nfqws_post6 "$f6 $desync" $qn6
+				[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $f6)" $qn
 			else
 				if [ -n "$qn6" ]; then
 					f6="tcp dport 80"
+					ff="$f6"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
+					ff="$ff $first_packet_only"
 					nft_filter_apply_ipset_target6 f6
+					nft_filter_apply_ipset_target6 ff
 					nft_fw_nfqws_post6 "$f6 $desync" $qn6
+					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $ff)" $qn6
 				fi
 				if [ -n "$qns6" ]; then
 					f6="tcp dport 443 $first_packet_only"
 					nft_filter_apply_ipset_target6 f6
 					nft_fw_nfqws_post6 "$f6 $desync" $qns6
+					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $f6)" $qns6
 				fi
 			fi
 

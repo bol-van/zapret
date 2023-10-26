@@ -24,6 +24,7 @@
 #include "socks.h"
 #include "helpers.h"
 
+
 // keep separate legs counter. counting every time thousands of legs can consume cpu
 static int legs_local, legs_remote;
 /*
@@ -376,6 +377,7 @@ static void free_conn(tproxy_conn_t *conn)
 	}
 	conn_free_buffers(conn);
 	if (conn->partner) conn->partner->partner=NULL;
+	if (conn->track.hostname) free(conn->track.hostname);
 	free(conn);
 }
 static tproxy_conn_t *new_conn(int fd, bool remote)
@@ -890,6 +892,25 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 	return false;
 }
 
+static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_size, size_t *segment_size, size_t *split_pos)
+{
+	*split_pos=0;
+	if (params.tamper)
+	{
+		if (conn->remote)
+		{
+			if (conn_partner_alive(conn) && !conn->partner->track.bTamperInCutoff)
+			{
+				tamper_in(&conn->partner->track,segment,segment_buffer_size,segment_size);
+			}
+		}
+		else
+		{
+			tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos);
+		}
+	}
+}
+
 #define RD_BLOCK_SIZE 65536
 #define MAX_WASTE (1024*1024)
 static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32_t evt)
@@ -942,7 +963,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	if (numbytes>0)
 	{
 #ifdef SPLICE_PRESENT
-		if (!params.tamper || conn->remote)
+		if (!params.tamper || conn->remote && conn->track.bTamperInCutoff)
 		{
 			// incoming data from remote leg we splice without touching
 			// pipe is in the local leg, so its in conn->partner->splice_pipe
@@ -978,13 +999,11 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			{
 				conn->trd+=rd;
 
-				size_t split_pos=0;
+				size_t split_pos;
 
 				bs = rd;
-#ifndef SPLICE_PRESENT
-				if (!conn->remote && params.tamper)
-#endif
-				modify_tcp_segment(buf,sizeof(buf),&bs,&split_pos);
+				
+				tamper(conn, buf, sizeof(buf), &bs, &split_pos);
 
 				if (split_pos)
 				{
@@ -1070,8 +1089,13 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 					conn->partner->wr_buf[buffer_number].len = rd;
 					
 					conn->partner->bFlowOut = true;
+					
+					size_t split_pos;
+					tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes, &conn->partner->wr_buf[buffer_number].len, &split_pos);
+					
 					if (epoll_update_flow(conn->partner))
 						return true;
+						
 				}
 				send_buffer_free(conn->partner->wr_buf+buffer_number);
 			}
@@ -1254,6 +1278,8 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) %s so_error=%d (%s)",conn->fd,conn->partner ? conn->partner->fd : 0,conn->remote,se,errn,strerror(errn));
 						proxy_remote_conn_ack(conn,errn);
 						read_all_and_buffer(conn,3);
+						if (errn==ECONNRESET && conn->remote && conn_partner_alive(conn)) rst_in(&conn->partner->track);
+
 						conn_close_with_partner_check(&conn_list,&close_list,conn);
 						continue;
 					}
@@ -1270,6 +1296,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 					{
 						DBGPRINT("EPOLLRDHUP")
 						read_all_and_buffer(conn,2);
+						if (!conn->remote) hup_out(&conn->track);
 
 						if (conn_has_unsent(conn))
 						{

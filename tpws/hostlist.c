@@ -4,6 +4,7 @@
 #include "params.h"
 
 
+// inplace tolower() and add to pool
 static bool addpool(strpool **hostlist, char **s, const char *end)
 {
 	char *p;
@@ -21,7 +22,6 @@ static bool addpool(strpool **hostlist, char **s, const char *end)
 	*s = p;
 	return true;
 }
-
 
 bool AppendHostList(strpool **hostlist, char *filename)
 {
@@ -106,6 +106,12 @@ bool LoadHostLists(strpool **hostlist, struct str_list_head *file_list)
 	return true;
 }
 
+bool NonEmptyHostlist(strpool **hostlist)
+{
+	// add impossible hostname if the list is empty
+	return *hostlist ? true : StrPoolAddStrLen(hostlist, "@&()", 4);
+}
+
 
 bool SearchHostList(strpool *hostlist, const char *host)
 {
@@ -126,12 +132,17 @@ bool SearchHostList(strpool *hostlist, const char *host)
 }
 
 // return : true = apply fooling, false = do not apply
-bool HostlistCheck(strpool *hostlist, strpool *hostlist_exclude, const char *host)
+bool HostlistCheck(strpool *hostlist, strpool *hostlist_exclude, const char *host, bool *excluded)
 {
+	if (excluded) *excluded = false;
 	if (hostlist_exclude)
 	{
 		if (params.debug) printf("Checking exclude hostlist\n");
-		if (SearchHostList(hostlist_exclude, host)) return false;
+		if (SearchHostList(hostlist_exclude, host))
+		{
+			if (excluded) *excluded = true;
+			return false;
+		}
 	}
 	if (hostlist)
 	{

@@ -8,6 +8,8 @@
 
 char *strncasestr(const char *s,const char *find, size_t slen);
 
+bool append_to_list_file(const char *filename, const char *s);
+
 void ntop46(const struct sockaddr *sa, char *str, size_t len);
 void ntop46_port(const struct sockaddr *sa, char *str, size_t len);
 void print_sockaddr(const struct sockaddr *sa);

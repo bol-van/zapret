@@ -30,12 +30,7 @@ CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/openwrt/custom"
 IPSET_EXCLUDE="-m set ! --match-set nozapret"
 IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
 
-NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
-NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
-NFQWS_OPT_DESYNC_HTTP6="${NFQWS_OPT_DESYNC_HTTP6:-$NFQWS_OPT_DESYNC_HTTP}"
-NFQWS_OPT_DESYNC_HTTPS6="${NFQWS_OPT_DESYNC_HTTPS6:-$NFQWS_OPT_DESYNC_HTTPS}"
-NFQWS_OPT_DESYNC_QUIC6="${NFQWS_OPT_DESYNC_QUIC6:-$NFQWS_OPT_DESYNC_QUIC}"
-
+apply_unspecified_desync_modes
 
 
 # can be multiple ipv6 outgoing interfaces
@@ -60,6 +55,15 @@ network_find_wan6_all()
 	__network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 10 2>/dev/null && return
 	network_find_wan6 $1
 }
+network_find_wanX_devices()
+{
+	# $1 - ip version: 4 or 6
+	# $2 - variable to put result to
+	local ifaces
+	network_find_wan${1}_all ifaces
+	call_for_multiple_items network_get_device $2 "$ifaces"
+}
+
 
 dnat6_target()
 {
@@ -87,25 +91,35 @@ set_route_localnet()
 }
 
 
-fw_nfqws_post_x()
+fw_nfqws_prepost_x()
 {
 	# $1 - 1 - add, 0 - del
 	# $2 - filter
 	# $3 - queue number
-	# $4 - ip version : 4 or 6
+	# $4 - 4/6
+	# $5 - post/pre
 
+	local ifaces DWAN
 	network_find_wan${4}_all ifaces
 	call_for_multiple_items network_get_device DWAN "$ifaces"
 
-	[ -n "$DWAN" ] && _fw_nfqws_post${4} $1 "$2" $3 "$(unique $DWAN)"
+	[ -n "$DWAN" ] && _fw_nfqws_${5}${4} $1 "$2" $3 "$(unique $DWAN)"
 }
 fw_nfqws_post4()
 {
-	fw_nfqws_post_x  $1 "$2" $3 4
+	fw_nfqws_prepost_x  $1 "$2" $3 4 post
 }
 fw_nfqws_post6()
 {
-	fw_nfqws_post_x  $1 "$2" $3 6
+	fw_nfqws_prepost_x  $1 "$2" $3 6 post
+}
+fw_nfqws_pre4()
+{
+	fw_nfqws_prepost_x  $1 "$2" $3 4 pre
+}
+fw_nfqws_pre6()
+{
+	fw_nfqws_prepost_x  $1 "$2" $3 6 pre
 }
 fw_tpws_x()
 {
@@ -146,10 +160,6 @@ list_nfqws_rules()
 		grep -E "NFQUEUE --queue-num $QNUM --queue-bypass|NFQUEUE --queue-num $(($QNUM+1)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+2)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+3)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+10)) --queue-bypass|NFQUEUE --queue-num $(($QNUM+11)) --queue-bypass" | \
 		sed -re 's/^-A POSTROUTING (.*) -j NFQUEUE.*$/\1/' -e "s/-m mark ! --mark $DESYNC_MARK\/$DESYNC_MARK//"
 }
-reverse_nfqws_rule()
-{
-	sed -e 's/-o /-i /g' -e 's/--dport /--sport /g' -e 's/--dports /--sports /g' -e 's/ dst$/ src/' -e 's/ dst / src /g'
-}
 apply_flow_offloading_enable_rule()
 {
 	# $1 = '' for ipv4, '6' for ipv6
@@ -171,14 +181,16 @@ apply_flow_offloading_exempt_rule()
 }
 flow_offloading_unexempt_v()
 {
-	ipt$1_del FORWARD -j forwarding_rule_zapret
+	# $1 = '' for ipv4, '6' for ipv6
+	local DWAN
+	network_find_wanX_devices ${1:-4} DWAN
+	for i in $DWAN; do ipt$1_del FORWARD -o $i -j forwarding_rule_zapret ; done
 	ip$1tables -F forwarding_rule_zapret 2>/dev/null
 	ip$1tables -X forwarding_rule_zapret 2>/dev/null
 }
 flow_offloading_exempt_v()
 {
 	# $1 = '' for ipv4, '6' for ipv6
-
 	is_ipt_flow_offload_avail $1 || return 0
 
 	flow_offloading_unexempt_v $1
@@ -186,21 +198,19 @@ flow_offloading_exempt_v()
 	[ "$FLOWOFFLOAD" = 'software' -o "$FLOWOFFLOAD" = 'hardware' ] && {
 		ip$1tables -N forwarding_rule_zapret
 
-		list_nfqws_rules $1 |
-		while read rule; do
-			apply_flow_offloading_exempt_rule "$1" $rule
-		done
-
-		list_nfqws_rules $1 | grep -v "connbytes" | reverse_nfqws_rule |
+		# remove outgoing interface
+		list_nfqws_rules $1 | sed -re 's/-o +[^ ]+//g' |
 		while read rule; do
 			apply_flow_offloading_exempt_rule "$1" $rule
 		done
 	
 		apply_flow_offloading_enable_rule $1
 
-		ipt$1 FORWARD -j forwarding_rule_zapret
+		# only outgoing to WAN packets trigger flow offloading
+		local DWAN
+		network_find_wanX_devices ${1:-4} DWAN
+		for i in $DWAN; do ipt$1 FORWARD -o $i -j forwarding_rule_zapret; done
 	}
-
 	return 0
 }
 flow_offloading_exempt()
@@ -251,4 +261,12 @@ nft_fw_nfqws_post4()
 nft_fw_nfqws_post6()
 {
 	_nft_fw_nfqws_post6 "$1" $2 always_apply_wan_filter
+}
+nft_fw_nfqws_pre4()
+{
+	_nft_fw_nfqws_pre4 "$1" $2 always_apply_wan_filter
+}
+nft_fw_nfqws_pre6()
+{
+	_nft_fw_nfqws_pre6 "$1" $2 always_apply_wan_filter
 }

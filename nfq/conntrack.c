@@ -25,11 +25,16 @@ static void connswap(const t_conn *c, t_conn *c2)
 	c2->dport = c->sport;
 }
 
+static void ConntrackFreeElem(t_conntrack_pool *elem)
+{
+	if (elem->track.hostname) free(elem->track.hostname);
+	free(elem);
+}
 
 static void ConntrackPoolDestroyPool(t_conntrack_pool **pp)
 {
 	t_conntrack_pool *elem, *tmp;
-	HASH_ITER(hh, *pp, elem, tmp) { HASH_DEL(*pp, elem); free(elem); }
+	HASH_ITER(hh, *pp, elem, tmp) { HASH_DEL(*pp, elem); ConntrackFreeElem(elem); }
 }
 void ConntrackPoolDestroy(t_conntrack *p)
 {
@@ -226,7 +231,7 @@ static bool ConntrackPoolDropPool(t_conntrack_pool **pp, const struct ip *ip, co
 		t=ConntrackPoolSearch(*pp,&connswp);
 	}
 	if (!t) return false;
-	HASH_DEL(*pp, t); free(t);
+	HASH_DEL(*pp, t); ConntrackFreeElem(t);
 	return true;
 }
 bool ConntrackPoolDrop(t_conntrack *p, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr)
@@ -251,7 +256,7 @@ void ConntrackPoolPurge(t_conntrack *p)
 				t->conn.l4proto==IPPROTO_UDP &&
 					tidle>=p->timeout_udp)
 			{
-				HASH_DEL(p->pool, t); free(t); 
+				HASH_DEL(p->pool, t); ConntrackFreeElem(t); 
 			}
 		}
 		p->t_last_purge = tnow;
@@ -263,6 +268,18 @@ static void taddr2str(uint8_t l3proto, const t_addr *a, char *buf, size_t bufsiz
 	if (!inet_ntop(family_from_proto(l3proto), a, buf, bufsize) && bufsize) *buf=0;
 }
 
+static const char *ConntrackProtoName(t_l7proto proto)
+{
+	switch(proto)
+	{
+		case HTTP: return "HTTP";
+		case TLS: return "TLS";
+		case QUIC: return "QUIC";
+		case WIREGUARD: return "WIREGUARD";
+		case DHT: return "DHT";
+		default: return "UNKNOWN";
+	}
+}
 void ConntrackPoolDump(const t_conntrack *p)
 {
 	t_conntrack_pool *t, *tmp;
@@ -271,29 +288,24 @@ void ConntrackPoolDump(const t_conntrack *p)
 	HASH_ITER(hh, p->pool, t, tmp) {
 		taddr2str(t->conn.l3proto, &t->conn.src, sa1, sizeof(sa1));
 		taddr2str(t->conn.l3proto, &t->conn.dst, sa2, sizeof(sa2));
+		printf("%s [%s]:%u => [%s]:%u : %s : t0=%llu last=t0+%llu now=last+%llu packets_orig=d%llu/n%llu packets_reply=d%llu/n%llu ",
+			proto_name(t->conn.l4proto),
+			sa1, t->conn.sport, sa2, t->conn.dport,
+			t->conn.l4proto==IPPROTO_TCP ? connstate_s[t->track.state] : "-",
+			(unsigned long long)t->track.t_start, (unsigned long long)(t->track.t_last - t->track.t_start), (unsigned long long)(tnow - t->track.t_last),
+			(unsigned long long)t->track.pdcounter_orig, (unsigned long long)t->track.pcounter_orig,
+			(unsigned long long)t->track.pdcounter_reply, (unsigned long long)t->track.pcounter_reply);
 		if (t->conn.l4proto==IPPROTO_TCP)
-			printf("%s [%s]:%u => [%s]:%u : %s : t0=%llu last=t0+%llu now=last+%llu packets_orig=d%llu/n%llu packets_reply=d%llu/n%llu seq0=%u rseq=%u pos_orig=%u ack0=%u rack=%u pos_reply=%u wsize_orig=%u:%d wsize_reply=%u:%d",
-				proto_name(t->conn.l4proto),
-				sa1, t->conn.sport, sa2, t->conn.dport,
-				t->conn.l4proto==IPPROTO_TCP ? connstate_s[t->track.state] : "-",
-				(unsigned long long)t->track.t_start, (unsigned long long)(t->track.t_last - t->track.t_start), (unsigned long long)(tnow - t->track.t_last),
-				(unsigned long long)t->track.pdcounter_orig, (unsigned long long)t->track.pcounter_orig,
-				(unsigned long long)t->track.pdcounter_reply, (unsigned long long)t->track.pcounter_reply,
+			printf("seq0=%u rseq=%u pos_orig=%u ack0=%u rack=%u pos_reply=%u wsize_orig=%u:%d wsize_reply=%u:%d",
 				t->track.seq0, t->track.seq_last - t->track.seq0, t->track.pos_orig - t->track.seq0,
 				t->track.ack0, t->track.ack_last - t->track.ack0, t->track.pos_reply - t->track.ack0,
 				t->track.winsize_orig, t->track.scale_orig==SCALE_NONE ? -1 : t->track.scale_orig,
 				t->track.winsize_reply, t->track.scale_reply==SCALE_NONE ? -1 : t->track.scale_reply);
 		else
-			printf("%s [%s]:%u => [%s]:%u : %s : t0=%llu last=t0+%llu now=last+%llu packets_orig=d%llu/n%llu packets_reply=d%llu/n%llu rseq=%u pos_orig=%u rack=%u pos_reply=%u",
-				proto_name(t->conn.l4proto),
-				sa1, t->conn.sport, sa2, t->conn.dport,
-				t->conn.l4proto==IPPROTO_TCP ? connstate_s[t->track.state] : "-",
-				(unsigned long long)t->track.t_start, (unsigned long long)(t->track.t_last - t->track.t_start), (unsigned long long)(tnow - t->track.t_last),
-				(unsigned long long)t->track.pdcounter_orig, (unsigned long long)t->track.pcounter_orig,
-				(unsigned long long)t->track.pdcounter_reply, (unsigned long long)t->track.pcounter_reply,
+			printf("rseq=%u pos_orig=%u rack=%u pos_reply=%u",
 				t->track.seq_last, t->track.pos_orig,
 				t->track.ack_last, t->track.pos_reply);
-		printf("  cutoff=%u wss_cutoff=%u d_cutoff=%u\n",
-			t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff);
+		printf(" req_retrans=%u cutoff=%u wss_cutoff=%u d_cutoff=%u hostname=%s l7proto=%s\n",
+			t->track.req_retrans_counter, t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff, t->track.hostname, ConntrackProtoName(t->track.l7proto));
 	};
 }

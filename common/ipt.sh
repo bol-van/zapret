@@ -89,6 +89,14 @@ filter_apply_ipset_target()
 	filter_apply_ipset_target6 $2
 }
 
+reverse_nfqws_rule_stream()
+{
+	sed -e 's/-o /-i /g' -e 's/--dport /--sport /g' -e 's/--dports /--sports /g' -e 's/ dst$/ src/' -e 's/ dst / src /g' -e 's/--connbytes-dir=original/--connbytes-dir=reply/g' -e "s/-m mark ! --mark $DESYNC_MARK\/$DESYNC_MARK//g"
+}
+reverse_nfqws_rule()
+{
+	echo "$@" | reverse_nfqws_rule_stream
+}
 
 prepare_tpws_fw4()
 {
@@ -250,14 +258,81 @@ fw_nfqws_post()
 	fw_nfqws_post6 $1 "$3" $4
 }
 
+_fw_nfqws_pre4()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - queue number
+	# $4 - wan interface names space separated
+	[ "$DISABLE_IPV4" = "1" -o -z "$2" ] || {
+		local i
+
+		ipt_print_op $1 "$2" "nfqws input+forward (qnum $3)"
+
+		rule="$2 $IPSET_EXCLUDE src -j NFQUEUE --queue-num $3 --queue-bypass"
+		if [ -n "$4" ] ; then
+			for i in $4; do
+				# iptables PREROUTING chain is before NAT. not possible to have DNATed ip's there
+				ipt_add_del $1 INPUT -t mangle -i $i $rule
+				ipt_add_del $1 FORWARD -t mangle -i $i $rule
+			done
+		else
+			ipt_add_del $1 INPUT -t mangle $rule
+			ipt_add_del $1 FORWARD -t mangle $rule
+		fi
+	}
+}
+_fw_nfqws_pre6()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv6
+	# $3 - queue number
+	# $4 - wan interface names space separated
+	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || {
+		local i
+
+		ipt_print_op $1 "$2" "nfqws input+forward (qnum $3)" 6
+
+		rule="$2 $IPSET_EXCLUDE6 src -j NFQUEUE --queue-num $3 --queue-bypass"
+		if [ -n "$4" ] ; then
+			for i in $4; do
+				# iptables PREROUTING chain is before NAT. not possible to have DNATed ip's there
+				ipt6_add_del $1 INPUT -t mangle -i $i $rule
+				ipt6_add_del $1 FORWARD -t mangle -i $i $rule
+			done
+		else
+			ipt6_add_del $1 INPUT -t mangle $rule
+			ipt6_add_del $1 FORWARD -t mangle $rule
+		fi
+	}
+}
+fw_nfqws_pre()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - iptable filter for ipv4
+	# $3 - iptable filter for ipv6
+	# $4 - queue number
+	fw_nfqws_pre4 $1 "$2" $4
+	fw_nfqws_pre6 $1 "$3" $4
+}
+
 
 zapret_do_firewall_rules_ipt()
 {
 	local mode="${MODE_OVERRIDE:-$MODE}"
 
-	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:4"
+	local first_packet_only="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:"
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	local f4 f6 qn qns qn6 qns6
+	local n f4 f6 ff qn qns qn6 qns6
+
+	# autohostlist mode requires incoming traffic sample
+	# always use conntrack packet limiter or nfqws will deal with gigabytes
+	if [ "$MODE_FILTER" = "autohostlist" ]; then
+		n=$((4+${AUTOHOSTLIST_RETRANS_THRESHOLD:-3}))
+	else
+		n=4
+	fi
+	first_packet_only="${first_packet_only}$n"
 
 	case "$mode" in
 		tpws)
@@ -279,17 +354,23 @@ zapret_do_firewall_rules_ipt()
 				f4="$f4 $first_packet_only"
 				filter_apply_ipset_target4 f4
 				fw_nfqws_post4 $1 "$f4 $desync" $qn
+				[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre4 $1 "$(reverse_nfqws_rule $f4)" $qn
 			else
 				if [ -n "$qn" ]; then
 					f4="-p tcp --dport 80"
+					ff="$f4"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
+					ff="$ff $first_packet_only"
 					filter_apply_ipset_target4 f4
+					filter_apply_ipset_target4 ff
 					fw_nfqws_post4 $1 "$f4 $desync" $qn
+					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre4 $1 "$(reverse_nfqws_rule $ff)" $qn
 				fi
 				if [ -n "$qns" ]; then
 					f4="-p tcp --dport 443 $first_packet_only"
 					filter_apply_ipset_target4 f4
 					fw_nfqws_post4 $1 "$f4 $desync" $qns
+					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre4 $1 "$(reverse_nfqws_rule $f4)" $qns
 				fi
 			fi
 			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn6" ] && [ "$qn6" = "$qns6" ]; then
@@ -297,17 +378,23 @@ zapret_do_firewall_rules_ipt()
 				f6="$f6 $first_packet_only"
 				filter_apply_ipset_target6 f6
 				fw_nfqws_post6 $1 "$f6 $desync" $qn6
+				[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre6 $1 "$(reverse_nfqws_rule $f6)" $qn
 			else
 				if [ -n "$qn6" ]; then
 					f6="-p tcp --dport 80"
+					ff="$f6"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
+					ff="$ff $first_packet_only"
 					filter_apply_ipset_target6 f6
+					filter_apply_ipset_target6 ff
 					fw_nfqws_post6 $1 "$f6 $desync" $qn6
+					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre6 $1 "$(reverse_nfqws_rule $ff)" $qn6
 				fi
 				if [ -n "$qns6" ]; then
 					f6="-p tcp --dport 443 $first_packet_only"
 					filter_apply_ipset_target6 f6
 					fw_nfqws_post6 $1 "$f6 $desync" $qns6
+					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre6 $1 "$(reverse_nfqws_rule $f6)" $qns6
 				fi
 			fi
 

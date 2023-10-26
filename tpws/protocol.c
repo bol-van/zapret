@@ -21,29 +21,95 @@ bool IsHttp(const uint8_t *data, size_t len)
 	}
 	return false;
 }
-bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+bool IsHttpReply(const uint8_t *data, size_t len)
 {
-	const uint8_t *p, *s, *e=data+len;
+	// HTTP/1.x 200\r\n
+	return len>14 && !memcmp(data,"HTTP/1.",7) && (data[7]=='0' || data[7]=='1') && data[8]==' ' &&
+		data[9]>='0' && data[9]<='9' &&
+		data[10]>='0' && data[10]<='9' &&
+		data[11]>='0' && data[11]<='9';
+}
+int HttpReplyCode(const uint8_t *data, size_t len)
+{
+	return (data[9]-'0')*100 + (data[10]-'0')*10 + (data[11]-'0');
+}
+bool HttpExtractHeader(const uint8_t *data, size_t len, const char *header, char *buf, size_t len_buf)
+{
+	const uint8_t *p, *s, *e = data + len;
 
-	p = (uint8_t*)strncasestr((char*)data, "\nHost:", len);
+	p = (uint8_t*)strncasestr((char*)data, header, len);
 	if (!p) return false;
-	p+=6;
-	while(p<e && (*p==' ' || *p=='\t')) p++;
-	s=p;
-	while(s<e && (*s!='\r' && *s!='\n' && *s!=' ' && *s!='\t')) s++;
-	if (s>p)
+	p += strlen(header);
+	while (p < e && (*p == ' ' || *p == '\t')) p++;
+	s = p;
+	while (s < e && (*s != '\r' && *s != '\n' && *s != ' ' && *s != '\t')) s++;
+	if (s > p)
 	{
-		size_t slen = s-p;
-		if (host && len_host)
+		size_t slen = s - p;
+		if (buf && len_buf)
 		{
-			if (slen>=len_host) slen=len_host-1;
-			for(size_t i=0;i<slen;i++) host[i]=tolower(p[i]);
-			host[slen]=0;
+			if (slen >= len_buf) slen = len_buf - 1;
+			for (size_t i = 0; i < slen; i++) buf[i] = tolower(p[i]);
+			buf[slen] = 0;
 		}
 		return true;
 	}
 	return false;
 }
+bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+{
+	return HttpExtractHeader(data, len, "\nHost:", host, len_host);
+}
+const char *HttpFind2ndLevelDomain(const char *host)
+{
+	const char *p=NULL;
+	if (*host)
+	{
+		for (p = host + strlen(host)-1; p>host && *p!='.'; p--);
+		if (*p=='.') for (p--; p>host && *p!='.'; p--);
+		if (*p=='.') p++;
+	}
+	return p;
+}
+// DPI redirects are global redirects to another domain
+bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *host)
+{
+	char loc[256],*redirect_host, *p;
+	int code;
+	
+	if (!host || !*host) return false;
+	
+	code = HttpReplyCode(data,len);
+	
+	if (code!=302 && code!=307 || !HttpExtractHeader(data,len,"\nLocation:",loc,sizeof(loc))) return false;
+
+	// something like : https://censor.net/badpage.php?reason=denied&source=RKN
+		
+	if (!strncmp(loc,"http://",7))
+		redirect_host=loc+7;
+	else if (!strncmp(loc,"https://",8))
+		redirect_host=loc+8;
+	else
+		return false;
+		
+	// somethinkg like : censor.net/badpage.php?reason=denied&source=RKN
+	
+	for(p=redirect_host; *p && *p!='/' ; p++);
+	*p=0;
+	if (!*redirect_host) return false;
+
+	// somethinkg like : censor.net
+	
+	// extract 2nd level domains
+
+	const char *dhost = HttpFind2ndLevelDomain(host);
+	const char *drhost = HttpFind2ndLevelDomain(redirect_host);
+	
+	return strcasecmp(dhost, drhost)!=0;
+}
+
+
+
 bool IsTLSClientHello(const uint8_t *data, size_t len)
 {
 	return len>=6 && data[0]==0x16 && data[1]==0x03 && data[2]>=0x01 && data[2]<=0x03 && data[5]==0x01 && (pntoh16(data+3)+5)<=len;

@@ -11,9 +11,9 @@
 
 
 const char *fake_http_request_default = "GET / HTTP/1.1\r\nHost: www.w3.org\r\n"
-                                        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:70.0) Gecko/20100101 Firefox/70.0\r\n"
-                                        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-                                        "Accept-Encoding: gzip, deflate\r\n\r\n";
+                                        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0\r\n"
+                                        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
+                                        "Accept-Encoding: gzip, deflate, br\r\n\r\n";
 const uint8_t fake_tls_clienthello_default[517] = {
     0x16, 0x03, 0x01, 0x02, 0x00, 0x01, 0x00, 0x01, 0xfc, 0x03, 0x03, 0x9a, 0x8f, 0xa7, 0x6a, 0x5d,
     0x57, 0xf3, 0x62, 0x19, 0xbe, 0x46, 0x82, 0x45, 0xe2, 0x59, 0x5c, 0xb4, 0x48, 0x31, 0x12, 0x15,
@@ -158,7 +158,10 @@ static void maybe_cutoff(t_ctrack *ctrack, uint8_t proto)
 		if (proto==IPPROTO_TCP)
 			// we do not need conntrack entry anymore if all cutoff conditions are either not defined or reached
 			// do not drop udp entry because it will be recreated when next packet arrives
-			ctrack->b_cutoff |= (!params.wssize || ctrack->b_wssize_cutoff) && (!params.desync_cutoff || ctrack->b_desync_cutoff);
+			ctrack->b_cutoff |= \
+			    (!params.wssize || ctrack->b_wssize_cutoff) &&
+			    (!params.desync_cutoff || ctrack->b_desync_cutoff) &&
+			    (!*params.hostlist_auto_filename || ctrack->req_retrans_counter==RETRANS_COUNTER_STOP);
 	}
 }
 static void wssize_cutoff(t_ctrack *ctrack)
@@ -169,7 +172,73 @@ static void wssize_cutoff(t_ctrack *ctrack)
 		maybe_cutoff(ctrack, IPPROTO_TCP);
 	}
 }
-#define CONNTRACK_REQUIRED (params.wssize || params.desync_cutoff)
+
+static void ctrack_stop_req_counter(t_ctrack *ctrack)
+{
+	ctrack->req_retrans_counter = RETRANS_COUNTER_STOP;
+	maybe_cutoff(ctrack, IPPROTO_TCP);
+}
+
+// return true if retrans trigger fires
+static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold)
+{
+	if (*params.hostlist_auto_filename && ctrack && ctrack->req_retrans_counter!=RETRANS_COUNTER_STOP)
+	{
+		ctrack->req_retrans_counter++;
+		DLOG("req retrans counter : %u/%u\n",ctrack->req_retrans_counter, threshold);
+		if (ctrack->req_retrans_counter >= threshold)
+		{
+			DLOG("req retrans threshold reached\n");
+			ctrack_stop_req_counter(ctrack);
+			return true;
+		}
+		if (l4proto==IPPROTO_TCP)
+		{
+		    if (!ctrack->req_seq) ctrack->req_seq = ctrack->seq_last;
+		    if (ctrack->seq_last != ctrack->req_seq)
+		    {
+			    DLOG("another request, not retransmission. stop tracking.\n");
+			    ctrack_stop_req_counter(ctrack);
+			    return false;
+		    }
+		}
+	}
+	return false;
+}
+static void auto_hostlist_failed(const char *hostname)
+{
+	hostfail_pool *fail_counter;
+	
+	fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+	if (!fail_counter)
+	{
+		fail_counter = HostFailPoolAdd(&params.hostlist_auto_fail_counters, hostname, params.hostlist_auto_fail_time);
+		if (!fail_counter)
+		{
+			fprintf(stderr, "HostFailPoolAdd: out of memory\n");
+			return;
+		}
+	}
+	fail_counter->counter++;
+	DLOG("auto hostlist : %s : fail counter %d/%d\n", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
+	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
+	{
+		DLOG("auto hostlist : fail threshold reached. adding %s to auto hostlist\n", hostname);
+		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
+		if (!StrPoolAddStr(&params.hostlist, hostname))
+		{
+			fprintf(stderr, "StrPoolAddStr out of memory\n");
+			return;
+		}
+		if (!append_to_list_file(params.hostlist_auto_filename, hostname))
+		{
+			perror("write to auto hostlist:");
+			return;
+		}
+	}
+}
+
+#define CONNTRACK_REQUIRED (params.wssize || params.desync_cutoff || *params.hostlist_auto_filename)
 // result : true - drop original packet, false = dont drop
 packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {
@@ -190,6 +259,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, NULL, len_payload, &ctrack, &bReverse))
 			maybe_cutoff(ctrack, IPPROTO_TCP);
+		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 	}
 
 	//ConntrackPoolDump(&params.conntrack);
@@ -199,11 +269,48 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
 		res=modify;
 	}
-
-	if (bReverse) return res; // nothing to do. do not waste cpu
+	
+	if (bReverse)
+	{
+		// process reply packets for auto hostlist mode
+		// by looking at RSTs or HTTP replies we decide whether original request looks to be blocked by DPI
+		if (*params.hostlist_auto_filename && ctrack && ctrack->hostname && ctrack->req_retrans_counter != RETRANS_COUNTER_STOP)
+		{
+			bool bFail=false, bStop=false;
+			if (tcphdr->th_flags & TH_RST)
+			{
+				DLOG("incoming RST detected for hostname %s\n", ctrack->hostname);
+				bFail = bStop = true;
+			}
+			else if (len_payload && ctrack->l7proto==HTTP)
+			{
+				if (IsHttpReply(data_payload,len_payload))
+				{
+					DLOG("incoming HTTP reply detected for hostname %s\n", ctrack->hostname);
+					bFail = HttpReplyLooksLikeDPIRedirect(data_payload, len_payload, ctrack->hostname);
+					if (bFail)
+						DLOG("redirect to another domain detected. possibly DPI redirect.\n")
+					else
+						DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n")
+				}
+				else
+				{
+					// received not http reply. do not monitor this connection anymore
+					DLOG("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
+				}
+				bStop = true;
+			}
+			if (bFail)
+				auto_hostlist_failed(ctrack->hostname);
+			if (bStop)
+				ctrack_stop_req_counter(ctrack);
+		}
+	
+		return res; // nothing to do. do not waste cpu
+	}
 
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
-
+	
 	if (params.wssize)
 	{
 		if (ctrack)
@@ -269,7 +376,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		}
 	}
 
-	if (!params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase) return res; // nothing to do. do not waste cpu
+	if (!params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase && !*params.hostlist_auto_filename) return res; // nothing to do. do not waste cpu
 
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)
 	{
@@ -280,12 +387,15 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		bool bIsHttp;
 		bool bKnownProtocol = false;
 		uint8_t *p, *phost;
-
 		if ((bIsHttp = IsHttp(data_payload,len_payload)))
 		{
 			DLOG("packet contains HTTP request\n")
-			if (params.wssize) DLOG("forced wssize-cutoff\n");
-			wssize_cutoff(ctrack);
+			if (ctrack && !ctrack->l7proto) ctrack->l7proto = HTTP;
+			if (params.wssize)
+			{
+				DLOG("forced wssize-cutoff\n");
+				wssize_cutoff(ctrack);
+			}
 			fake = params.fake_http;
 			fake_size = params.fake_http_size;
 			if (params.hostlist || params.debug) bHaveHost=HttpExtractHost(data_payload,len_payload,host,sizeof(host));
@@ -299,8 +409,12 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		else if (IsTLSClientHello(data_payload,len_payload))
 		{
 			DLOG("packet contains TLS ClientHello\n")
-			if (params.wssize) DLOG("forced wssize-cutoff\n");
-			wssize_cutoff(ctrack);
+			if (ctrack && !ctrack->l7proto) ctrack->l7proto = TLS;
+			if (params.wssize)
+			{
+				DLOG("forced wssize-cutoff\n");
+				wssize_cutoff(ctrack);
+			}
 			fake = params.fake_tls;
 			fake_size = params.fake_tls_size;
 			if (params.hostlist || params.desync_skip_nosni || params.debug)
@@ -316,6 +430,10 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		}
 		else
 		{
+			if (ctrack && *params.hostlist_auto_filename)
+				// received unknown payload. it means we are out of the request retransmission phase. stop counter
+				ctrack_stop_req_counter(ctrack);
+			
 			if (!params.desync_any_proto) return res;
 			DLOG("applying tampering to unknown protocol\n")
 			fake = params.fake_unknown;
@@ -325,9 +443,17 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		if (bHaveHost)
 		{
 			DLOG("hostname: %s\n",host)
-			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host))
+			bool bExcluded;
+			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host, &bExcluded))
 			{
 				DLOG("not applying tampering to this request\n")
+				if (!bExcluded)
+				{
+					if (*params.hostlist_auto_filename && ctrack && !ctrack->hostname)
+						ctrack->hostname=strdup(host);
+					if (auto_hostlist_retrans(ctrack, IPPROTO_TCP, params.hostlist_auto_retrans_threshold))
+						auto_hostlist_failed(host);
+				}
 				return res;
 			}
 		}
@@ -650,12 +776,13 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, NULL, udphdr, len_payload, &ctrack, &bReverse))
 			maybe_cutoff(ctrack, IPPROTO_UDP);
+		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 	}
 
 	//ConntrackPoolDump(&params.conntrack);
 
 	if (bReverse) return res; // nothing to do. do not waste cpu
-
+	
 	if (params.desync_cutoff)
 	{
 		if (ctrack)
@@ -674,7 +801,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		}
 	}
 
-	if (params.desync_mode==DESYNC_NONE) return res;
+	if (params.desync_mode==DESYNC_NONE && !*params.hostlist_auto_filename) return res; // do not waste cpu
 
 	if (len_payload)
 	{
@@ -688,6 +815,8 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		if (IsQUICInitial(data_payload,len_payload))
 		{
 			DLOG("packet contains QUIC initial\n")
+			
+			if (ctrack && !ctrack->l7proto) ctrack->l7proto = QUIC;
 			fake = params.fake_quic;
 			fake_size = params.fake_quic_size;
 
@@ -732,6 +861,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		else if (IsWireguardHandshakeInitiation(data_payload,len_payload))
 		{
 			DLOG("packet contains wireguard handshake initiation\n")
+			if (ctrack && !ctrack->l7proto) ctrack->l7proto = WIREGUARD;
 			fake = params.fake_wg;
 			fake_size = params.fake_wg_size;
 			bKnownProtocol = true;
@@ -739,12 +869,17 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		else if (IsDhtD1(data_payload,len_payload))
 		{
 			DLOG("packet contains DHT d1...e\n")
+			if (ctrack && !ctrack->l7proto) ctrack->l7proto = DHT;
 			fake = params.fake_dht;
 			fake_size = params.fake_dht_size;
 			bKnownProtocol = true;
 		}
 		else
 		{
+			if (ctrack && *params.hostlist_auto_filename)
+				// received unknown payload. it means we are out of the request retransmission phase. stop counter
+				ctrack_stop_req_counter(ctrack);
+			
 			if (!params.desync_any_proto) return res;
 			DLOG("applying tampering to unknown protocol\n")
 			fake = params.fake_unknown_udp;
@@ -754,9 +889,17 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		if (bHaveHost)
 		{
 			DLOG("hostname: %s\n",host)
-			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host))
+			bool bExcluded;
+			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host, &bExcluded))
 			{
 				DLOG("not applying tampering to this request\n")
+				if (!bExcluded)
+				{
+					if (*params.hostlist_auto_filename && ctrack && !ctrack->hostname)
+						ctrack->hostname=strdup(host);
+					if (auto_hostlist_retrans(ctrack, IPPROTO_UDP, params.hostlist_auto_retrans_threshold))
+						auto_hostlist_failed(host);
+				}
 				return res;
 			}
 		}

@@ -67,10 +67,7 @@ IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
 NFQWS_OPT_BASE="$USEROPT --dpi-desync-fwmark=$DESYNC_MARK"
-NFQWS_OPT_DESYNC_HTTP="${NFQWS_OPT_DESYNC_HTTP:-$NFQWS_OPT_DESYNC}"
-NFQWS_OPT_DESYNC_HTTPS="${NFQWS_OPT_DESYNC_HTTPS:-$NFQWS_OPT_DESYNC}"
-NFQWS_OPT_DESYNC_HTTP6="${NFQWS_OPT_DESYNC_HTTP6:-$NFQWS_OPT_DESYNC_HTTP}"
-NFQWS_OPT_DESYNC_HTTPS6="${NFQWS_OPT_DESYNC_HTTPS6:-$NFQWS_OPT_DESYNC_HTTPS}"
+apply_unspecified_desync_modes
 
 [ -n "$TPPORT" ] || TPPORT=988
 [ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
@@ -113,6 +110,14 @@ fw_nfqws_post6()
 {
 	_fw_nfqws_post6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
 }
+fw_nfqws_pre4()
+{
+	_fw_nfqws_pre4  $1 "$2" $3 "$IFACE_WAN"
+}
+fw_nfqws_pre6()
+{
+	_fw_nfqws_pre6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
+}
 fw_tpws4()
 {
 	_fw_tpws4 $1 "$2" $3 "$IFACE_LAN" "$IFACE_WAN"
@@ -136,6 +141,14 @@ nft_fw_nfqws_post4()
 nft_fw_nfqws_post6()
 {
 	_nft_fw_nfqws_post6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
+}
+nft_fw_nfqws_pre4()
+{
+	_nft_fw_nfqws_pre4 "$1" $2 "$IFACE_WAN"
+}
+nft_fw_nfqws_pre6()
+{
+	_nft_fw_nfqws_pre6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
 }
 nft_fill_ifsets_overload()
 {

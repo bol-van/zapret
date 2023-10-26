@@ -19,7 +19,13 @@ For dpi desync attack :
 nft delete table inet ztest
 nft create table inet ztest
 nft add chain inet ztest post "{type filter hook postrouting priority mangle;}"
-nft add rule inet ztest post tcp dport "{80,443}" queue num 200 bypass
+nft add rule inet ztest post tcp dport "{80,443}" ct original packets 1-12 queue num 200 bypass
+nft add rule inet ztest post udp dport 443 ct original packets 1-4 queue num 200 bypass
+
+# auto hostlist with avoiding wrong ACK numbers in RST,ACK packets sent by russian DPI
+sysctl net.netfilter.nf_conntrack_tcp_be_liberal=1 
+nft add chain inet ztest pre "{type filter hook prerouting priority filter;}"
+nft add rule inet ztest pre tcp sport "{80,443}" ct reply packets 1-4 queue num 200 bypass
 
 
 show rules   : nft list table inet ztest

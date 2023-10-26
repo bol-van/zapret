@@ -82,6 +82,14 @@ bool save_file(const char *filename, const void *buffer, size_t buffer_size)
 	fclose(F);
 	return true;
 }
+bool append_to_list_file(const char *filename, const char *s)
+{
+	FILE *F = fopen(filename,"at");
+	if (!F) return false;
+	bool bOK = fprintf(F,"%s\n",s)>0;
+	fclose(F);
+	return bOK;
+}
 
 
 void ntop46(const struct sockaddr *sa, char *str, size_t len)

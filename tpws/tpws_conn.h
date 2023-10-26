@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 #include <time.h>
+#include "tamper.h"
 
 #define BACKLOG 10
 #define MAX_EPOLL_EVENTS 64
@@ -27,7 +28,7 @@ typedef uint8_t conn_state_t;
 // when pos==len its time to free buffer
 struct send_buffer
 {
-	char *data;
+	uint8_t *data;
 	size_t len,pos;
 	int ttl;
 };
@@ -84,6 +85,8 @@ struct tproxy_conn
 	// buffer cannot be sent if there is unsent data in a lower buffer
 	struct send_buffer wr_buf[4];
 
+	t_ctrack track;
+	
 	//Create the struct which contains ptrs to next/prev element
 	TAILQ_ENTRY(tproxy_conn) conn_ptrs;
 };

@@ -25,15 +25,17 @@ bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
 
 static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 // segment buffer has at least 5 extra bytes to extend data block
-void modify_tcp_segment(uint8_t *segment,size_t segment_buffer_size,size_t *size,size_t *split_pos)
+void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos)
 {
 	uint8_t *p, *pp, *pHost = NULL;
 	size_t method_len = 0, pos;
 	const char **method;
-	bool bIsHttp = false, bBypass = false;
+	bool bIsHttp = false, bBypass = false, bHaveHost = false, bHostExcluded = false;
 	char bRemovedHostSpace = 0;
-	char *pc, Host[128];
+	char *pc, Host[256];
 	
+	DBGPRINT("tamper_out")
+
 	*split_pos=0;
 
 	for (method = http_methods; *method; method++)
@@ -49,6 +51,7 @@ void modify_tcp_segment(uint8_t *segment,size_t segment_buffer_size,size_t *size
 	if (bIsHttp)
 	{
 		VPRINT("Data block looks like http request start : %s", *method)
+		if (!ctrack->l7proto) ctrack->l7proto=HTTP;
 		// cpu saving : we search host only if and when required. we do not research host every time we need its position
 		if ((params.hostlist || params.hostlist_exclude) && find_host(&pHost,segment,*size))
 		{
@@ -58,9 +61,10 @@ void modify_tcp_segment(uint8_t *segment,size_t segment_buffer_size,size_t *size
 			while (pp < (segment + *size) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
 			memcpy(Host, p, pp - p);
 			Host[pp - p] = '\0';
+			bHaveHost = true;
 			VPRINT("Requested Host is : %s", Host)
 			for(pc = Host; *pc; pc++) *pc=tolower(*pc);
-			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host);
+			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host, &bHostExcluded);
 		}
 		if (!bBypass)
 		{
@@ -210,62 +214,161 @@ void modify_tcp_segment(uint8_t *segment,size_t segment_buffer_size,size_t *size
 		{
 			VPRINT("Not acting on this request")
 		}
-		return;
 	}
-	
-	if (IsTLSClientHello(segment,*size))
+	else if (IsTLSClientHello(segment,*size))
 	{
-		char host[256];
 		size_t tpos=0,elen;
 		const uint8_t *ext;
+		
+		if (!ctrack->l7proto) ctrack->l7proto=TLS;
 
 		VPRINT("packet contains TLS ClientHello")
 		// we need host only if hostlist is present
-		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,host,sizeof(host)))
+		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host)))
 		{
-			VPRINT("hostname: %s",host)
-			if (!HostlistCheck(params.hostlist, params.hostlist_exclude, host))
+			VPRINT("hostname: %s",Host)
+			bHaveHost = true;
+			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host, &bHostExcluded);
+		}
+		if (bBypass)
+		{
+			VPRINT("Not acting on this request")
+		}
+		else
+		{
+			switch(params.tlsrec)
 			{
-				VPRINT("Not acting on this request")
-				return;
+				case tlsrec_sni:
+					if (TLSFindExt(segment,*size,0,&ext,&elen))
+						tpos = ext-segment+1; // between typical 1st and 2nd char of hostname
+					break;
+				case tlsrec_pos:
+					tpos = params.tlsrec_pos;
+					break;
+				default:
+					break;
 			}
-		}
-		switch(params.tlsrec)
-		{
-			case tlsrec_sni:
-				if (TLSFindExt(segment,*size,0,&ext,&elen))
-					tpos = ext-segment+1; // between typical 1st and 2nd char of hostname
-				break;
-			case tlsrec_pos:
-				tpos = params.tlsrec_pos;
-				break;
-			default:
-				break;
-		}
-		if (tpos)
-		{
-			// construct 2 TLS records from one
-			uint16_t l = pntoh16(segment+3); // length
-			if (l>=2)
+			if (tpos)
 			{
-				// length is checked in IsTLSClientHello and cannot exceed buffer size
-				if (tpos>=l) tpos=1;
-				VPRINT("making 2 TLS records at pos %zu",tpos)
-				memmove(segment+5+tpos+5,segment+5+tpos,*size-(5+tpos));
-				segment[5+tpos] = segment[0];
-				segment[5+tpos+1] = segment[1];
-				segment[5+tpos+2] = segment[2];
-				phton16(segment+5+tpos+3,l-tpos);
-				phton16(segment+3,tpos);
-				*size += 5;
+				// construct 2 TLS records from one
+				uint16_t l = pntoh16(segment+3); // length
+				if (l>=2)
+				{
+					// length is checked in IsTLSClientHello and cannot exceed buffer size
+					if (tpos>=l) tpos=1;
+					VPRINT("making 2 TLS records at pos %zu",tpos)
+					memmove(segment+5+tpos+5,segment+5+tpos,*size-(5+tpos));
+					segment[5+tpos] = segment[0];
+					segment[5+tpos+1] = segment[1];
+					segment[5+tpos+2] = segment[2];
+					phton16(segment+5+tpos+3,l-tpos);
+					phton16(segment+3,tpos);
+					*size += 5;
+				}
 			}
-		}
 		
-		if (params.split_pos < *size)
-			*split_pos = params.split_pos;
-		return;
+			if (params.split_pos < *size)
+				*split_pos = params.split_pos;
+		}
 	}
-	
-	if (params.split_any_protocol && params.split_pos < *size)
+	else if (params.split_any_protocol && params.split_pos < *size)
 		*split_pos = params.split_pos;
+		
+	if (bHaveHost && bBypass && !bHostExcluded && !ctrack->hostname && *params.hostlist_auto_filename)
+	{
+		DBGPRINT("tamper_out put hostname : %s", Host)
+		ctrack->hostname=strdup(Host);
+	}
+
+}
+
+
+static void auto_hostlist_failed(const char *hostname)
+{
+	hostfail_pool *fail_counter;
+
+	fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+	if (!fail_counter)
+	{
+		fail_counter = HostFailPoolAdd(&params.hostlist_auto_fail_counters, hostname, params.hostlist_auto_fail_time);
+		if (!fail_counter)
+		{
+			fprintf(stderr, "HostFailPoolAdd: out of memory\n");
+			return;
+		}
+	}
+	fail_counter->counter++;
+	VPRINT("auto hostlist : %s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
+	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
+	{
+		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist", hostname);
+		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
+		if (!StrPoolAddStr(&params.hostlist, hostname))
+		{
+			fprintf(stderr, "StrPoolAddStr out of memory\n");
+			return;
+		}
+		if (!append_to_list_file(params.hostlist_auto_filename, hostname))
+		{
+			perror("write to auto hostlist:");
+			return;
+		}
+	}
+}
+
+void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size)
+{
+	bool bFail=false;
+
+	DBGPRINT("tamper_in hostname=%s", ctrack->hostname)
+
+	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+
+	if (ctrack->l7proto==HTTP && ctrack->hostname)
+	{
+		if (IsHttpReply(segment,*size))
+		{
+			VPRINT("incoming HTTP reply detected for hostname %s", ctrack->hostname);
+			bFail = HttpReplyLooksLikeDPIRedirect(segment, *size, ctrack->hostname);
+			if (bFail)
+				VPRINT("redirect to another domain detected. possibly DPI redirect.")
+			else
+				VPRINT("local or in-domain redirect detected. it's not a DPI redirect.")
+		}
+		else
+		{
+			// received not http reply. do not monitor this connection anymore
+			VPRINT("incoming unknown HTTP data detected for hostname %s", ctrack->hostname);
+		}
+		if (bFail)
+			auto_hostlist_failed(ctrack->hostname);
+		
+	}
+	ctrack->bTamperInCutoff = true;
+}
+
+void rst_in(t_ctrack *ctrack)
+{
+	DBGPRINT("rst_in hostname=%s", ctrack->hostname)
+
+	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+
+	if (!ctrack->bTamperInCutoff && ctrack->hostname)
+	{
+		VPRINT("incoming RST detected for hostname %s", ctrack->hostname);
+		auto_hostlist_failed(ctrack->hostname);
+	}
+}
+void hup_out(t_ctrack *ctrack)
+{
+	DBGPRINT("hup_out hostname=%s", ctrack->hostname)
+
+	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+
+	if (!ctrack->bTamperInCutoff && ctrack->hostname)
+	{
+		// local leg dropped connection after first request. probably due to timeout.
+		VPRINT("local leg closed connection after first request (timeout ?). hostname: %s", ctrack->hostname);
+		auto_hostlist_failed(ctrack->hostname);
+	}
 }

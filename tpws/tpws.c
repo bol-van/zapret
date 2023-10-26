@@ -36,6 +36,8 @@
 #include "sec.h"
 #include "redirect.h"
 #include "helpers.h"
+#include "gzip.h"
+#include "pools.h"
 
 struct params_s params;
 
@@ -62,6 +64,12 @@ void dohup(void)
 	}
 }
 
+static void onusr2(int sig)
+{
+	printf("\nHOSTFAIL POOL DUMP\n");
+	HostFailPoolDump(params.hostlist_auto_fail_counters);
+	printf("\n");
+}
 
 
 static int8_t block_sigpipe(void)
@@ -120,62 +128,66 @@ static int get_default_ttl(void)
 static void exithelp(void)
 {
 	printf(
-		" --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %%interface_name\n"
-		" --bind-iface4=<interface_name>\t; bind to the first ipv4 addr of interface\n"
-		" --bind-iface6=<interface_name>\t; bind to the first ipv6 addr of interface\n"
-		" --bind-linklocal=no|unwanted|prefer|force\n"
-		"\t\t\t\t; prohibit, accept, prefer or force ipv6 link local bind\n"
-		" --bind-wait-ifup=<sec>\t\t; wait for interface to appear and up\n"
-		" --bind-wait-ip=<sec>\t\t; after ifup wait for ip address to appear up to N seconds\n"
-		" --bind-wait-ip-linklocal=<sec>\t; (prefer) accept only LL first N seconds then any  (unwanted) accept only globals first N seconds then LL\n"
-		" --bind-wait-only\t\t; wait for bind conditions satisfaction then exit. return code 0 if success.\n"
+		" --bind-addr=<v4_addr>|<v6_addr>\t; for v6 link locals append %%interface_name\n"
+		" --bind-iface4=<interface_name>\t\t; bind to the first ipv4 addr of interface\n"
+		" --bind-iface6=<interface_name>\t\t; bind to the first ipv6 addr of interface\n"
+		" --bind-linklocal=no|unwanted|prefer|force ; prohibit, accept, prefer or force ipv6 link local bind\n"
+		" --bind-wait-ifup=<sec>\t\t\t; wait for interface to appear and up\n"
+		" --bind-wait-ip=<sec>\t\t\t; after ifup wait for ip address to appear up to N seconds\n"
+		" --bind-wait-ip-linklocal=<sec>\t\t; (prefer) accept only LL first N seconds then any  (unwanted) accept only globals first N seconds then LL\n"
+		" --bind-wait-only\t\t\t; wait for bind conditions satisfaction then exit. return code 0 if success.\n"
 		" * multiple binds are supported. each bind-addr, bind-iface* start new bind\n"
-		" --port=<port>\t\t\t; only one port number for all binds is supported\n"
-		" --socks\t\t\t; implement socks4/5 proxy instead of transparent proxy\n"
-		" --no-resolve\t\t\t; disable socks5 remote dns ability (resolves are not async, they block all activity)\n"
+		" --port=<port>\t\t\t\t; only one port number for all binds is supported\n"
+		" --socks\t\t\t\t; implement socks4/5 proxy instead of transparent proxy\n"
+		" --no-resolve\t\t\t\t; disable socks5 remote dns ability (resolves are not async, they block all activity)\n"
 		" --local-rcvbuf=<bytes>\n"
 		" --local-sndbuf=<bytes>\n"
 		" --remote-rcvbuf=<bytes>\n"
 		" --remote-sndbuf=<bytes>\n"
-		" --skip-nodelay\t\t\t; do not set TCP_NODELAY option for outgoing connections (incompatible with split options)\n"
+		" --skip-nodelay\t\t\t\t; do not set TCP_NODELAY option for outgoing connections (incompatible with split options)\n"
 		" --maxconn=<max_connections>\n"
 #ifdef SPLICE_PRESENT
-		" --maxfiles=<max_open_files>\t; should be at least (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode\n"
+		" --maxfiles=<max_open_files>\t\t; should be at least (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode\n"
 #else
-		" --maxfiles=<max_open_files>\t; should be at least (connections*2+16)\n"
+		" --maxfiles=<max_open_files>\t\t; should be at least (connections*2+16)\n"
 #endif
-		" --max-orphan-time=<sec>\t; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds\n"
-		" --daemon\t\t\t; daemonize\n"
-		" --pidfile=<filename>\t\t; write pid to file\n"
-		" --user=<username>\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t; drop root privs\n"
+		" --max-orphan-time=<sec>\t\t; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds\n"
+		" --daemon\t\t\t\t; daemonize\n"
+		" --pidfile=<filename>\t\t\t; write pid to file\n"
+		" --user=<username>\t\t\t; drop root privs\n"
+		" --uid=uid[:gid]\t\t\t; drop root privs\n"
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		" --enable-pf\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
+		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
-		" --debug=0|1|2\t\t\t; 0(default)=silent 1=verbose 2=debug\n"
-		"\nTAMPERING:\n"
-		" --hostlist=<filename>\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-exclude=<filename>\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --split-http-req=method|host\t; split at specified logical part of plain http request\n"
-		" --split-pos=<numeric_offset>\t; split at specified pos. split-http-req takes precedence for http.\n"
-		" --split-any-protocol\t\t; split not only http and https\n"
+		" --debug=0|1|2\t\t\t\t; 0(default)=silent 1=verbose 2=debug\n"
+		"\nFILTER:\n"
+		" --hostlist=<filename>\t\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude=<filename>\t\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-auto=<filename>\t\t; detect DPI blocks and build hostlist automatically\n"
+		" --hostlist-auto-fail-threshold=<int>\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t; all failed attemps must be within these seconds (default : %d)\n"
+		"\nTAMPER:\n"
+		" --split-http-req=method|host\t\t; split at specified logical part of plain http request\n"
+		" --split-pos=<numeric_offset>\t\t; split at specified pos. split-http-req takes precedence for http.\n"
+		" --split-any-protocol\t\t\t; split not only http and https\n"
 #if defined(BSD) && !defined(__APPLE__)
-		" --disorder\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
+		" --disorder\t\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
 #else
-		" --disorder\t\t\t; when splitting simulate sending second fragment first\n"
+		" --disorder\t\t\t\t; when splitting simulate sending second fragment first\n"
 #endif
-		" --hostcase\t\t\t; change Host: => host:\n"
-		" --hostspell\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-		" --hostdot\t\t\t; add \".\" after Host: name\n"
-		" --hosttab\t\t\t; add tab after Host: name\n"
-		" --hostnospace\t\t\t; remove space after Host:\n"
-		" --hostpad=<bytes>\t\t; add dummy padding headers before Host:\n"
-		" --domcase\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --methodspace\t\t\t; add extra space after method\n"
-		" --methodeol\t\t\t; add end-of-line before method\n"
-		" --unixeol\t\t\t; replace 0D0A to 0A\n"
-		" --tlsrec=sni\t\t\t; make 2 TLS records. split at SNI. don't split if SNI is not present\n"
-		" --tlsrec-pos=<pos>\t\t; make 2 TLS records. split at specified pos\n"
+		" --hostcase\t\t\t\t; change Host: => host:\n"
+		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+		" --hostdot\t\t\t\t; add \".\" after Host: name\n"
+		" --hosttab\t\t\t\t; add tab after Host: name\n"
+		" --hostnospace\t\t\t\t; remove space after Host:\n"
+		" --hostpad=<bytes>\t\t\t; add dummy padding headers before Host:\n"
+		" --domcase\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
+		" --methodspace\t\t\t\t; add extra space after method\n"
+		" --methodeol\t\t\t\t; add end-of-line before method\n"
+		" --unixeol\t\t\t\t; replace 0D0A to 0A\n"
+		" --tlsrec=sni\t\t\t\t; make 2 TLS records. split at SNI. don't split if SNI is not present\n"
+		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n",
+		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
 	);
 	exit(1);
 }
@@ -183,16 +195,9 @@ static void cleanup_params(void)
 {
 	strlist_destroy(&params.hostlist_files);
 	strlist_destroy(&params.hostlist_exclude_files);
-	if (params.hostlist_exclude)
-	{
-		StrPoolDestroy(&params.hostlist_exclude);
-		params.hostlist_exclude = NULL;
-	}
-	if (params.hostlist)
-	{
-		StrPoolDestroy(&params.hostlist);
-		params.hostlist = NULL;
-	}
+	StrPoolDestroy(&params.hostlist_exclude);
+	StrPoolDestroy(&params.hostlist);
+	HostFailPoolDestroy(&params.hostlist_auto_fail_counters);
 }
 static void exithelp_clean(void)
 {
@@ -246,6 +251,8 @@ void parse_params(int argc, char *argv[])
 	params.maxconn = DEFAULT_MAX_CONN;
 	params.max_orphan_time = DEFAULT_MAX_ORPHAN_TIME;
 	params.binds_last = -1;
+	params.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
+	params.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
 	LIST_INIT(&params.hostlist_files);
 	LIST_INIT(&params.hostlist_exclude_files);
 
@@ -294,18 +301,22 @@ void parse_params(int argc, char *argv[])
 		{ "tlsrec-pos",required_argument,0,0 },// optidx=32
 		{ "hostlist",required_argument,0,0 },// optidx=33
 		{ "hostlist-exclude",required_argument,0,0 },// optidx=34
-		{ "pidfile",required_argument,0,0 },// optidx=35
-		{ "debug",optional_argument,0,0 },// optidx=36
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=37
-		{ "local-sndbuf",required_argument,0,0 },// optidx=38
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=39
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=40
-		{ "socks",no_argument,0,0 },// optidx=41
-		{ "no-resolve",no_argument,0,0 },// optidx=42
-		{ "skip-nodelay",no_argument,0,0 },// optidx=43
+		{ "hostlist-auto",required_argument,0,0}, // optidx=35
+		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=36
+		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=37
+		{ "pidfile",required_argument,0,0 },// optidx=38
+		{ "debug",optional_argument,0,0 },// optidx=39
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=40
+		{ "local-sndbuf",required_argument,0,0 },// optidx=41
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=42
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=43
+		{ "socks",no_argument,0,0 },// optidx=44
+		{ "no-resolve",no_argument,0,0 },// optidx=45
+		{ "skip-nodelay",no_argument,0,0 },// optidx=46
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=44
+		{ "enable-pf",no_argument,0,0 },// optidx=47
 #endif
+		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
 	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -544,36 +555,84 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 35: /* pidfile */
+		case 35: /* hostlist-auto */
+			if (*params.hostlist_auto_filename)
+			{
+				fprintf(stderr, "only one auto hostlist is supported\n");
+				exit_clean(1);
+			}
+			{
+				FILE *F = fopen(optarg,"a+t");
+				if (!F)
+				{
+					fprintf(stderr, "cannot create %s\n", optarg);
+					exit_clean(1);
+				}
+				bool bGzip = is_gzip(F);
+				fclose(F);
+				if (bGzip)
+				{
+					fprintf(stderr, "gzipped auto hostlists are not supported\n");
+					exit_clean(1);
+				}
+				if (params.droproot && chown(optarg, params.uid, -1))
+					fprintf(stderr, "could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
+			}
+			if (!strlist_add(&params.hostlist_files, optarg))
+			{
+				fprintf(stderr, "strlist_add failed\n");
+				exit_clean(1);
+			}
+			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
+			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
+			params.tamper = true; // need to detect blocks and update autohostlist. cannot just slice.
+			break;
+		case 36: /* hostlist-auto-fail-threshold */
+			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
+			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
+			{
+				fprintf(stderr, "auto hostlist fail threshold must be within 1..20\n");
+				exit_clean(1);
+			}
+			break;
+		case 37: /* hostlist-auto-fail-time */
+			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
+			if (params.hostlist_auto_fail_time<1)
+			{
+				fprintf(stderr, "auto hostlist fail time is not valid\n");
+				exit_clean(1);
+			}
+			break;
+		case 38: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 36:
+		case 39:
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
-		case 37: /* local-rcvbuf */
+		case 40: /* local-rcvbuf */
 			params.local_rcvbuf = atoi(optarg)/2;
 			break;
-		case 38: /* local-sndbuf */
+		case 41: /* local-sndbuf */
 			params.local_sndbuf = atoi(optarg)/2;
 			break;
-		case 39: /* remote-rcvbuf */
+		case 42: /* remote-rcvbuf */
 			params.remote_rcvbuf = atoi(optarg)/2;
 			break;
-		case 40: /* remote-sndbuf */
+		case 43: /* remote-sndbuf */
 			params.remote_sndbuf = atoi(optarg)/2;
 			break;
-		case 41: /* socks */
+		case 44: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 42: /* no-resolve */
+		case 45: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 43: /* skip-nodelay */
+		case 46: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 44: /* enable-pf */
+		case 47: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif
@@ -599,6 +658,7 @@ void parse_params(int argc, char *argv[])
 		fprintf(stderr, "Include hostlist load failed\n");
 		exit_clean(1);
 	}
+	if (*params.hostlist_auto_filename) NonEmptyHostlist(&params.hostlist);
 	if (!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
 	{
 		fprintf(stderr, "Exclude hostlist load failed\n");
@@ -1020,6 +1080,7 @@ int main(int argc, char *argv[])
 	if (!params.tamper) printf("TCP proxy mode (no tampering)\n");
 
 	signal(SIGHUP, onhup); 
+	signal(SIGUSR2, onusr2);
 
 	retval = event_loop(listen_fd,params.binds_last+1);
 	exit_v = retval < 0 ? EXIT_FAILURE : EXIT_SUCCESS;

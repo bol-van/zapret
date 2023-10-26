@@ -8,6 +8,8 @@
 #include "params.h"
 #include "protocol.h"
 #include "hostlist.h"
+#include "gzip.h"
+#include "pools.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +26,7 @@
 #include <time.h>
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 
 #ifdef __linux__
@@ -71,6 +74,12 @@ static void onusr1(int sig)
 {
 	printf("\nCONNTRACK DUMP\n");
 	ConntrackPoolDump(&params.conntrack);
+	printf("\n");
+}
+static void onusr2(int sig)
+{
+	printf("\nHOSTFAIL POOL DUMP\n");
+	HostFailPoolDump(params.hostlist_auto_fail_counters);
 	printf("\n");
 }
 
@@ -284,6 +293,7 @@ static int nfq_main(void)
 
 	signal(SIGHUP, onhup);
 	signal(SIGUSR1, onusr1);
+	signal(SIGUSR2, onusr2);
 
 	desync_init();
 
@@ -553,7 +563,11 @@ static void exithelp(void)
 		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n",
+		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
+		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
@@ -562,7 +576,8 @@ static void exithelp(void)
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
 		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
-		UDPLEN_INCREMENT_DEFAULT
+		UDPLEN_INCREMENT_DEFAULT,
+		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT
 	);
 	exit(1);
 }
@@ -573,16 +588,9 @@ static void cleanup_params(void)
 
 	strlist_destroy(&params.hostlist_files);
 	strlist_destroy(&params.hostlist_exclude_files);
-	if (params.hostlist_exclude)
-	{
-		StrPoolDestroy(&params.hostlist_exclude);
-		params.hostlist_exclude = NULL;
-	}
-	if (params.hostlist)
-	{
-		StrPoolDestroy(&params.hostlist);
-		params.hostlist = NULL;
-	}
+	StrPoolDestroy(&params.hostlist_exclude);
+	StrPoolDestroy(&params.hostlist);
+	HostFailPoolDestroy(&params.hostlist_auto_fail_counters);
 }
 static void exithelp_clean(void)
 {
@@ -641,7 +649,7 @@ int main(int argc, char **argv)
 	int option_index = 0;
 	bool daemon = false;
 	char pidfile[256];
-
+	
 	srandom(time(NULL));
 
 	memset(&params, 0, sizeof(params));
@@ -674,10 +682,13 @@ int main(int argc, char **argv)
 	params.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
 	params.wssize_cutoff_mode = params.desync_cutoff_mode = 'n'; // packet number by default
 	params.udplen_increment = UDPLEN_INCREMENT_DEFAULT;
+	params.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
+	params.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+	params.hostlist_auto_retrans_threshold = HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT;
 
 	LIST_INIT(&params.hostlist_files);
 	LIST_INIT(&params.hostlist_exclude_files);
-
+	
 	if (can_drop_root()) // are we root ?
 	{
 		params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
@@ -737,9 +748,14 @@ int main(int argc, char **argv)
 		{"dpi-desync-cutoff",required_argument,0,0},// optidx=37
 		{"hostlist",required_argument,0,0},		// optidx=38
 		{"hostlist-exclude",required_argument,0,0},	// optidx=39
+		{"hostlist-auto",required_argument,0,0},	// optidx=40
+		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=41
+		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=42
+		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=43
+	
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=40
-		{"bind-fix6",no_argument,0,0},		// optidx=41
+		{"bind-fix4",no_argument,0,0},		// optidx=44
+		{"bind-fix6",no_argument,0,0},		// optidx=45
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1069,11 +1085,66 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case 40: /* hostlist-auto */
+			if (*params.hostlist_auto_filename)
+			{
+				fprintf(stderr, "only one auto hostlist is supported\n");
+				exit_clean(1);
+			}
+			{
+				FILE *F = fopen(optarg,"a+t");
+				if (!F)
+				{
+					fprintf(stderr, "cannot create %s\n", optarg);
+					exit_clean(1);
+				}
+				bool bGzip = is_gzip(F);
+				fclose(F);
+				if (bGzip)
+				{
+					fprintf(stderr, "gzipped auto hostlists are not supported\n");
+					exit_clean(1);
+				}
+				if (params.droproot && chown(optarg, params.uid, -1))
+					fprintf(stderr, "could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
+			}
+			if (!strlist_add(&params.hostlist_files, optarg))
+			{
+				fprintf(stderr, "strlist_add failed\n");
+				exit_clean(1);
+			}
+			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
+			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
+			break;
+		case 41: /* hostlist-auto-fail-threshold */
+			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
+			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
+			{
+				fprintf(stderr, "auto hostlist fail threshold must be within 1..20\n");
+				exit_clean(1);
+			}
+			break;
+		case 42: /* hostlist-auto-fail-time */
+			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
+			if (params.hostlist_auto_fail_time<1)
+			{
+				fprintf(stderr, "auto hostlist fail time is not valid\n");
+				exit_clean(1);
+			}
+			break;
+		case 43: /* hostlist-auto-retrans-threshold */
+			params.hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
+			if (params.hostlist_auto_retrans_threshold<2 || params.hostlist_auto_retrans_threshold>10)
+			{
+				fprintf(stderr, "auto hostlist fail threshold must be within 2..10\n");
+				exit_clean(1);
+			}
+			break;
 #ifdef __linux__
-		case 40: /* bind-fix4 */
+		case 44: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 41: /* bind-fix6 */
+		case 45: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif
@@ -1094,6 +1165,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Include hostlist load failed\n");
 		exit_clean(1);
 	}
+	if (*params.hostlist_auto_filename) NonEmptyHostlist(&params.hostlist);
 	if (!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
 	{
 		fprintf(stderr, "Exclude hostlist load failed\n");

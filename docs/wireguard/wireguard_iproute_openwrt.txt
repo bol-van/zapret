@@ -268,7 +268,7 @@ OUTPUT относится к исходящим с роутера пакетам
 
 create_ipset no-update
 
-network_find_wan_all wan_iface
+network_find_wan4_all wan_iface
 for ext_iface in $wan_iface; do
 	network_get_device DEVICE $ext_iface
 	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800
@@ -414,7 +414,7 @@ connmark относится к соединению, fwmark - к пакету. �
 
 create_ipset no-update
 
-network_find_wan_all wan_iface
+network_find_wan4_all wan_iface
 for ext_iface in $wan_iface; do
 	network_get_device DEVICE $ext_iface
 	ipt OUTPUT -t mangle -o $DEVICE -p tcp --dport 443 -m set --match-set zapret dst -m set ! --match-set nozapret dst -j MARK --set-mark 0x800/0x800

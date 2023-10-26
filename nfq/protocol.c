@@ -20,69 +20,95 @@ bool IsHttp(const uint8_t *data, size_t len)
 	}
 	return false;
 }
-bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+bool IsHttpReply(const uint8_t *data, size_t len)
+{
+	// HTTP/1.x 200\r\n
+	return len>14 && !memcmp(data,"HTTP/1.",7) && (data[7]=='0' || data[7]=='1') && data[8]==' ' &&
+		data[9]>='0' && data[9]<='9' &&
+		data[10]>='0' && data[10]<='9' &&
+		data[11]>='0' && data[11]<='9';
+}
+int HttpReplyCode(const uint8_t *data, size_t len)
+{
+	return (data[9]-'0')*100 + (data[10]-'0')*10 + (data[11]-'0');
+}
+bool HttpExtractHeader(const uint8_t *data, size_t len, const char *header, char *buf, size_t len_buf)
 {
 	const uint8_t *p, *s, *e = data + len;
 
-	p = (uint8_t*)strncasestr((char*)data, "\nHost:", len);
+	p = (uint8_t*)strncasestr((char*)data, header, len);
 	if (!p) return false;
-	p += 6;
+	p += strlen(header);
 	while (p < e && (*p == ' ' || *p == '\t')) p++;
 	s = p;
 	while (s < e && (*s != '\r' && *s != '\n' && *s != ' ' && *s != '\t')) s++;
 	if (s > p)
 	{
 		size_t slen = s - p;
-		if (host && len_host)
+		if (buf && len_buf)
 		{
-			if (slen >= len_host) slen = len_host - 1;
-			for (size_t i = 0; i < slen; i++) host[i] = tolower(p[i]);
-			host[slen] = 0;
+			if (slen >= len_buf) slen = len_buf - 1;
+			for (size_t i = 0; i < slen; i++) buf[i] = tolower(p[i]);
+			buf[slen] = 0;
 		}
 		return true;
 	}
 	return false;
 }
-
-static uint8_t tvb_get_varint(const uint8_t *tvb, uint64_t *value)
+bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
 {
-	switch (*tvb >> 6)
+	return HttpExtractHeader(data, len, "\nHost:", host, len_host);
+}
+const char *HttpFind2ndLevelDomain(const char *host)
+{
+	const char *p=NULL;
+	if (*host)
 	{
-	case 0: /* 0b00 => 1 byte length (6 bits Usable) */
-		if (value) *value = *tvb & 0x3F;
-		return 1;
-	case 1: /* 0b01 => 2 bytes length (14 bits Usable) */
-		if (value) *value = pntoh16(tvb) & 0x3FFF;
-		return 2;
-	case 2: /* 0b10 => 4 bytes length (30 bits Usable) */
-		if (value) *value = pntoh32(tvb) & 0x3FFFFFFF;
-		return 4;
-	case 3: /* 0b11 => 8 bytes length (62 bits Usable) */
-		if (value) *value = pntoh64(tvb) & 0x3FFFFFFFFFFFFFFF;
-		return 8;
+		for (p = host + strlen(host)-1; p>host && *p!='.'; p--);
+		if (*p=='.') for (p--; p>host && *p!='.'; p--);
+		if (*p=='.') p++;
 	}
-	return 0;
+	return p;
 }
-static uint8_t tvb_get_size(uint8_t tvb)
+// DPI redirects are global redirects to another domain
+bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *host)
 {
-	return 1 << (tvb >> 6);
+	char loc[256],*redirect_host, *p;
+	int code;
+	
+	if (!host || !*host) return false;
+	
+	code = HttpReplyCode(data,len);
+	
+	if (code!=302 && code!=307 || !HttpExtractHeader(data,len,"\nLocation:",loc,sizeof(loc))) return false;
+
+	// something like : https://censor.net/badpage.php?reason=denied&source=RKN
+		
+	if (!strncmp(loc,"http://",7))
+		redirect_host=loc+7;
+	else if (!strncmp(loc,"https://",8))
+		redirect_host=loc+8;
+	else
+		return false;
+		
+	// somethinkg like : censor.net/badpage.php?reason=denied&source=RKN
+	
+	for(p=redirect_host; *p && *p!='/' ; p++);
+	*p=0;
+	if (!*redirect_host) return false;
+
+	// somethinkg like : censor.net
+	
+	// extract 2nd level domains
+
+	const char *dhost = HttpFind2ndLevelDomain(host);
+	const char *drhost = HttpFind2ndLevelDomain(redirect_host);
+	
+	return strcasecmp(dhost, drhost)!=0;
 }
 
-bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, size_t *hello_len)
-{
-	size_t offset = 1;
-	uint64_t coff, clen;
-	if (len < 3 || *data != 6) return false;
-	if ((offset+tvb_get_size(data[offset])) >= len) return false;
-	offset += tvb_get_varint(data + offset, &coff);
-	// offset must be 0 if it's a full segment, not just a chunk
-	if (coff || (offset+tvb_get_size(data[offset])) >= len) return false;
-	offset += tvb_get_varint(data + offset, &clen);
-	if (data[offset] != 0x01 || (offset + clen) > len) return false;
-	if (hello_offset) *hello_offset = offset;
-	if (hello_len) *hello_len = (size_t)clen;
-	return true;
-}
+
+
 bool IsTLSClientHello(const uint8_t *data, size_t len)
 {
 	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (pntoh16(data + 3) + 5) <= len;
@@ -188,13 +214,45 @@ bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *hos
 }
 
 
-bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len)
+
+static uint8_t tvb_get_varint(const uint8_t *tvb, uint64_t *value)
 {
-    return len==148 && data[0]==1 && data[1]==0 && data[2]==0 && data[3]==0;
+	switch (*tvb >> 6)
+	{
+	case 0: /* 0b00 => 1 byte length (6 bits Usable) */
+		if (value) *value = *tvb & 0x3F;
+		return 1;
+	case 1: /* 0b01 => 2 bytes length (14 bits Usable) */
+		if (value) *value = pntoh16(tvb) & 0x3FFF;
+		return 2;
+	case 2: /* 0b10 => 4 bytes length (30 bits Usable) */
+		if (value) *value = pntoh32(tvb) & 0x3FFFFFFF;
+		return 4;
+	case 3: /* 0b11 => 8 bytes length (62 bits Usable) */
+		if (value) *value = pntoh64(tvb) & 0x3FFFFFFFFFFFFFFF;
+		return 8;
+	}
+	return 0;
 }
-bool IsDhtD1(const uint8_t *data, size_t len)
+static uint8_t tvb_get_size(uint8_t tvb)
 {
-	return len>=7 && data[0]=='d' && data[1]=='1' && data[len-1]=='e';
+	return 1 << (tvb >> 6);
+}
+
+bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, size_t *hello_len)
+{
+	size_t offset = 1;
+	uint64_t coff, clen;
+	if (len < 3 || *data != 6) return false;
+	if ((offset+tvb_get_size(data[offset])) >= len) return false;
+	offset += tvb_get_varint(data + offset, &coff);
+	// offset must be 0 if it's a full segment, not just a chunk
+	if (coff || (offset+tvb_get_size(data[offset])) >= len) return false;
+	offset += tvb_get_varint(data + offset, &clen);
+	if (data[offset] != 0x01 || (offset + clen) > len) return false;
+	if (hello_offset) *hello_offset = offset;
+	if (hello_len) *hello_len = (size_t)clen;
+	return true;
 }
 
 /* Returns the QUIC draft version or 0 if not applicable. */
@@ -258,7 +316,6 @@ static bool is_quic_v2(uint32_t version)
     return version == 0x709A50C4;
 }
 
-
 static bool quic_hkdf_expand_label(const uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
 {
 	uint8_t hkdflabel[64];
@@ -274,7 +331,6 @@ static bool quic_hkdf_expand_label(const uint8_t *secret, uint8_t secret_len, co
 	hkdflabel[3 + label_size] = 0;
 	return !hkdfExpand(SHA256, secret, secret_len, hkdflabel, hkdflabel_size, out, out_len);
 }
-
 
 static bool quic_derive_initial_secret(const quic_cid_t *cid, uint8_t *client_initial_secret, uint32_t version)
 {
@@ -505,7 +561,6 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 	return found;
 }
 
-
 bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host, size_t len_host, bool *bDecryptOK, bool *bIsCryptoHello)
 {
 	if (bIsCryptoHello) *bIsCryptoHello=false;
@@ -564,4 +619,15 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 
 	// client hello cannot be too small. likely ACK
 	return sz>=96;
+}
+
+
+
+bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len)
+{
+    return len==148 && data[0]==1 && data[1]==0 && data[2]==0 && data[3]==0;
+}
+bool IsDhtD1(const uint8_t *data, size_t len)
+{
+	return len>=7 && data[0]=='d' && data[1]=='1' && data[len-1]=='e';
 }

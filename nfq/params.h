@@ -1,7 +1,7 @@
 #pragma once
 
 #include "params.h"
-#include "strpool.h"
+#include "pools.h"
 #include "conntrack.h"
 #include "desync.h"
 
@@ -25,6 +25,11 @@
 #define IPFRAG_TCP_DEFAULT 32
 
 #define UDPLEN_INCREMENT_DEFAULT 	2
+
+#define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	2
+#define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
+#define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
+
 
 struct params_s
 {
@@ -59,6 +64,9 @@ struct params_s
 
 	strpool *hostlist, *hostlist_exclude;
 	struct str_list_head hostlist_files, hostlist_exclude_files;
+	char hostlist_auto_filename[PATH_MAX];
+	int hostlist_auto_fail_threshold, hostlist_auto_fail_time, hostlist_auto_retrans_threshold;
+	hostfail_pool *hostlist_auto_fail_counters;
 
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;
 	t_conntrack conntrack;

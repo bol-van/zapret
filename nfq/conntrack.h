@@ -20,6 +20,7 @@
 #define HASH_FUNCTION HASH_BER
 #include "uthash.h"
 
+#define RETRANS_COUNTER_STOP ((uint8_t)-1)
 
 typedef union {
 	struct in_addr ip;
@@ -37,6 +38,7 @@ typedef struct
 // ESTABLISHED - any except SYN or SYN/ACK received
 // FIN - FIN or RST received
 typedef enum {SYN=0, ESTABLISHED, FIN} t_connstate;
+typedef enum {UNKNOWN=0, HTTP, TLS, QUIC, WIREGUARD, DHT} t_l7proto;
 typedef struct
 {
 	// common state
@@ -51,9 +53,15 @@ typedef struct
 	uint32_t seq0, ack0;			// starting seq and ack
 	uint16_t winsize_orig, winsize_reply;	// last seen window size
 	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
+	
+	uint8_t req_retrans_counter;		// number of request retransmissions
+	uint32_t req_seq;			// sequence number of the request (to track retransmissions)
 
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff;
+
+	t_l7proto l7proto;
+	char *hostname;
 } t_ctrack;
 
 typedef struct

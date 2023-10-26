@@ -5,7 +5,10 @@
 #include <stdint.h>
 #include <sys/param.h>
 #include <sys/queue.h>
-#include "strpool.h"
+#include "pools.h"
+
+#define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	2
+#define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
 enum splithttpreq { split_none = 0, split_method, split_host };
 enum tlsrec { tlsrec_none = 0, tlsrec_sni, tlsrec_pos };
@@ -53,6 +56,9 @@ struct params_s
 
 	strpool *hostlist, *hostlist_exclude;
 	struct str_list_head hostlist_files, hostlist_exclude_files;
+	char hostlist_auto_filename[PATH_MAX];
+	int hostlist_auto_fail_threshold, hostlist_auto_fail_time;
+	hostfail_pool *hostlist_auto_fail_counters;
 
 	int debug;
 
