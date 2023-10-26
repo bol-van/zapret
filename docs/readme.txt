@@ -958,7 +958,7 @@ nfqws и tpws могут сечь варианты 1-3, 4 они не распо
 Скрипты zapret ведут autohostlist в ipset/zapret-hosts-auto.txt.
 install_easy.sh при апгрейде zapret сохраняет этот файл.
 Режим autohostlist включает в себя режим hostlist.
-Можно вести ipset/zapret-hosts-user.txt, ipset/zapret-hosts-user.txt.
+Можно вести ipset/zapret-hosts-user.txt, ipset/zapret-hosts-user-exclude.txt.
 
 
 Проверка провайдера
