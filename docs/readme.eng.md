@@ -180,6 +180,10 @@ nfqws takes the following parameters:
  --dpi-desync-cutoff=[n|d|s]N                   ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --hostlist=<filename>                          ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>                  ; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-auto=<filename>                     ; detect DPI blocks and build hostlist automatically
+ --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 2)
+ --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
+ --hostlist-auto-retrans-threshold=<int>        ; how many request retransmissions cause attempt to fail (default : 3)
 ```
 
 The manipulation parameters can be combined in any way.
@@ -532,6 +536,9 @@ tpws is transparent proxy.
 
  --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-auto=<filename>            ; detect DPI blocks and build hostlist automatically
+ --hostlist-auto-fail-threshold=<int>  ; how many failed attempts cause hostname to be added to auto hostlist (default : 2)
+ --hostlist-auto-fail-time=<int>       ; all failed attemps must be within these seconds (default : 60)
  --split-http-req=method|host	; split http request at specified logical position.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
@@ -716,6 +723,46 @@ tpws and nfqws reread lists on HUP signal.
 When filtering by domain name, daemons should run without filtering by ipset.
 When using large regulator lists estimate the amount of RAM on the router !
 
+## **autohostlist** mode
+
+This mode analyzes both client requests and server replies.
+If a host is not in any list and a situation similar to block occurs host is automatically added to the special list both in memory and file.
+Use exclude hostlist to prevent autohostlist triggering.
+If it did happen - delete the undesired record from the file and restart tpws/nfqws or send them SIGHUP to force lists reload.
+
+In case of nfqws it's required to redirect both incoming and outgoing traffic to the queue.
+It's strongly recommended to use connbytes filter or nfqws will process gigabytes of incoming traffic.
+For the same reason it's not recommended to use autohostlist mode in BSDs. BSDs do not support connbytes or similar mechanism.
+
+nfqws и tpws detect the folowing situations :
+1) [nfqws] Multiple retransmissions of the first request inside a TCP session having host.
+2) [nfqws,tpws] RST in response to the first request.
+3) [nfqws,tpws] HTTP redirect in response to the first http request with 2nd level domain diferent from the original.
+4) [tpws] Client closes connection after first request without having server reply (no reponse from server, timeout).
+
+To minimize false positives there's fail counter. If in specific time occurs more than specified number of fails
+the host is added to the list. Then DPI bypass strategy start to apply immediately.
+
+For the user autohostlist mode looks like this.
+When for the first time user visits a blocked website it sees block page, connection reset
+or browser hangs until timeout, then display a error.
+User presses multiple times F5 causing browser to retry attempts.
+After some retries a website opens and next time works as expected.
+
+With autohostlist mode it's possible to use bypass strategies that break lots of sites.
+If a site does not behave like blocked no fooling applies.
+Otherwise it's nothing to lose.
+
+However false positives still can occur in case target website is behaving abnormally
+(may be due to DDoS attack or server malfunction). If it happens bypass strategy
+may start to break the website. This situation can only be controlled manually.
+Remove undesired domain from the autohostlist file, restart nfqws/tpws or send them SIGHUP.
+Use exclude hostlist to prevent further auto additions.
+
+If zapret scripts are used then autohostlist is `ipset/zapret-hosts-auto.txt`
+and exlude list is `ipset/zapret-hosts-user-exclude.txt`. autohostlist mode
+includes hostlist mode. You can use `ipset/zapret-hosts-user.txt`.
+
 
 ## Choosing parameters
 
@@ -763,6 +810,7 @@ Host filtering mode :
 none - apply fooling to all hosts
 ipset - limit fooling to hosts from ipset zapret/zapret6
 hostlist - limit fooling to hosts from hostlist
+autohostlist - hostlist mode + blocks auto detection
 ```
 
 `MODE_FILTER=none`
@@ -855,6 +903,14 @@ ip2net options. separate for ipv4 and ipv6.
 ```
 IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
 IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
+```
+
+autohostlist mode tuning.
+
+```
+AUTOHOSTLIST_RETRANS_THRESHOLD=3
+AUTOHOSTLIST_FAIL_THRESHOLD=2
+AUTOHOSTLIST_FAIL_TIME=60
 ```
 
 Enable gzip compression for large lists. Used by ipset/*.sh scripts.

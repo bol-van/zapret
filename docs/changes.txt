@@ -247,3 +247,7 @@ HEX string support in addition to binary files.
 v51
 
 tpws --tlsrec attack.
+
+v52
+
+autohostlist mode
