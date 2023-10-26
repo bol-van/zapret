@@ -19,6 +19,10 @@ IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
 # options for ip2net. "-4" or "-6" auto added by ipset create script
 IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
 IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
+# options for auto hostlist
+AUTOHOSTLIST_RETRANS_THRESHOLD=3
+AUTOHOSTLIST_FAIL_THRESHOLD=2
+AUTOHOSTLIST_FAIL_TIME=60
 
 # number of parallel threads for domain list resolves
 MDIG_THREADS=30
@@ -38,7 +42,7 @@ GZIP_LISTS=1
 # tpws-socks : tpws socks mode
 # filter : no daemon, just create ipset or download hostlist
 # custom : custom mode. should modify custom init script and add your own code
-MODE=tpws
+MODE=nfqws
 # apply fooling to http
 MODE_HTTP=1
 # for nfqws only. support http keep alives. enable only if DPI checks for http request in any outgoing packet
@@ -47,8 +51,8 @@ MODE_HTTP_KEEPALIVE=0
 MODE_HTTPS=1
 # apply fooling to quic
 MODE_QUIC=0
-# none,ipset,hostlist
-MODE_FILTER=none
+# none,ipset,hostlist,autohostlist
+MODE_FILTER=autohostlist
 
 # CHOOSE NFQWS DAEMON OPTIONS for DPI desync mode. run "nfq/nfqws --help" for option list
 DESYNC_MARK=0x40000000
