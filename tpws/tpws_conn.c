@@ -963,7 +963,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	if (numbytes>0)
 	{
 #ifdef SPLICE_PRESENT
-		if (!params.tamper || conn->remote && conn->track.bTamperInCutoff)
+		if (!params.tamper || conn->remote && conn_partner_alive(conn) && conn->partner->track.bTamperInCutoff)
 		{
 			// incoming data from remote leg we splice without touching
 			// pipe is in the local leg, so its in conn->partner->splice_pipe
