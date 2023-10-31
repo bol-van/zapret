@@ -208,6 +208,9 @@ fsleep_setup()
 		local errtext=$(read -t 0.001 2>&1)
 		if [ -z "$errtext" ]; then
 			FSLEEP=3
+		# newer openwrt has ucode with system function that supports timeout in ms
+		elif ucode -e "system(['sleep','infinity'], 1)"; then
+			FSLEEP=4
 		else
 			FSLEEP=0
 		fi
@@ -225,6 +228,9 @@ minsleep()
 		;;
 	3)
 		read -t 0.1
+		;;
+	4)
+		ucode -e "system(['sleep','infinity'], 100)"
 		;;
     	*)
 		sleep 1
