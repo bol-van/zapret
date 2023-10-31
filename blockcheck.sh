@@ -58,40 +58,6 @@ exitp()
 	exit $1
 }
 
-fsleep_setup()
-{
-    [ -n "$FSLEEP" ] || {
-	if sleep 0.1 2>/dev/null; then
-		FSLEEP=1
-	elif busybox usleep 1 2>/dev/null; then
-		FSLEEP=2
-	else
-		local errtext=$(read -t 0.001 2>&1)
-		if [ -z "$errtext" ]; then
-			FSLEEP=3
-		else
-			FSLEEP=0
-		fi
-	fi
-    }
-}
-minsleep()
-{
-    case "$FSLEEP" in
-	1)
-		sleep 0.1
-		;;
-	2)
-		busybox usleep 100000
-		;;
-	3)
-		read -t 0.1
-		;;
-    	*)
-		sleep 1
-    esac
-}
-
 IPT()
 {
 	$IPTABLES -C "$@" >/dev/null 2>/dev/null || $IPTABLES -I "$@"

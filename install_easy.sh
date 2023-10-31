@@ -27,24 +27,6 @@ GET_LIST="$IPSET_DIR/get_config.sh"
 MD5=md5sum
 exists $MD5 || MD5=md5
 
-fsleep_setup()
-{
-    [ -n "$FSLEEP" ] || {
-	if sleep 0.1 2>/dev/null; then
-		FSLEEP=1
-	elif busybox usleep 1 2>/dev/null; then
-		FSLEEP=2
-	else
-		local errtext=$(read -t 0.001 2>&1)
-		if [ -z "$errtext" ]; then
-			FSLEEP=3
-		else
-			FSLEEP=0
-		fi
-	fi
-    }
-}
-
 sedi()
 {
 	# MacOS doesnt support -i without parameter. busybox doesnt support -i with parameter.
@@ -852,7 +834,7 @@ check_prerequisites_openwrt()
 	[ "$FSLEEP" = 0 ] && is_linked_to_busybox sleep && {
 		echo
 		echo no methods of sub-second sleep were found.
-		echo if you want to speed up blockcheck install coreutils-sleep
+		echo if you want to speed up blockcheck install coreutils-sleep. it requires about 40 Kb space
 		if ask_yes_no N "do you want to install COREUTILS sleep"; then
 			[ "$UPD" = "0" ] && {
 				opkg update
