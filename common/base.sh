@@ -200,7 +200,7 @@ fix_sbin_path()
 fsleep_setup()
 {
     [ -n "$FSLEEP" ] || {
-	if sleep 0.1 2>/dev/null; then
+	if sleep 0.001 2>/dev/null; then
 		FSLEEP=1
 	elif busybox usleep 1 2>/dev/null; then
 		FSLEEP=2
