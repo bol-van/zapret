@@ -33,7 +33,7 @@ HDRTEMP=/tmp/zapret-hdr.txt
 NFT_TABLE=blockcheck
 
 [ -n "$DNSCHECK_DNS" ] || DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
-[ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org www.torproject.org startmail.com"
+[ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org www.torproject.org bbc.com"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -56,6 +56,40 @@ exitp()
 	echo press enter to continue
 	read A
 	exit $1
+}
+
+fsleep_setup()
+{
+    [ -n "$FSLEEP" ] || {
+	if sleep 0.1 2>/dev/null; then
+		FSLEEP=1
+	elif busybox usleep 1 2>/dev/null; then
+		FSLEEP=2
+	else
+		local errtext=$(read -t 0.001 2>&1)
+		if [ -z "$errtext" ]; then
+			FSLEEP=3
+		else
+			FSLEEP=0
+		fi
+	fi
+    }
+}
+minsleep()
+{
+    case "$FSLEEP" in
+	1)
+		sleep 0.1
+		;;
+	2)
+		busybox usleep 100000
+		;;
+	3)
+		read -t 0.1
+		;;
+    	*)
+		sleep 1
+    esac
 }
 
 IPT()
@@ -421,7 +455,7 @@ tpws_start()
 	"$TPWS" --uid $TPWS_UID:$TPWS_GID --bind-addr=$LOCALHOST --port=$TPPORT "$@" >/dev/null &
 	PID=$!
 	# give some time to initialize
-	sleep 1
+	minsleep
 }
 ws_kill()
 {
@@ -1014,6 +1048,7 @@ sigpipe()
 	exit 1
 }
 
+fsleep_setup
 fix_sbin_path
 check_system
 require_root
