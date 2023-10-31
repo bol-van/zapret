@@ -230,7 +230,7 @@ minsleep()
 		read -t 0.1
 		;;
 	4)
-		ucode -e "system(['sleep','infinity'], 100)"
+		ucode -e "system(['sleep','1'], 100)"
 		;;
     	*)
 		sleep 1
