@@ -27,6 +27,24 @@ GET_LIST="$IPSET_DIR/get_config.sh"
 MD5=md5sum
 exists $MD5 || MD5=md5
 
+fsleep_setup()
+{
+    [ -n "$FSLEEP" ] || {
+	if sleep 0.1 2>/dev/null; then
+		FSLEEP=1
+	elif busybox usleep 1 2>/dev/null; then
+		FSLEEP=2
+	else
+		local errtext=$(read -t 0.001 2>&1)
+		if [ -z "$errtext" ]; then
+			FSLEEP=3
+		else
+			FSLEEP=0
+		fi
+	fi
+    }
+}
+
 sedi()
 {
 	# MacOS doesnt support -i without parameter. busybox doesnt support -i with parameter.
@@ -831,6 +849,19 @@ check_prerequisites_openwrt()
 			opkg install --force-overwrite coreutils-sort
 		fi
 	}
+	[ "$FSLEEP" = 0 ] && is_linked_to_busybox sleep && {
+		echo
+		echo no methods of sub-second sleep were found.
+		echo if you want to speed up blockcheck install coreutils-sleep
+		if ask_yes_no N "do you want to install COREUTILS sleep"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite coreutils-sleep
+			fsleep_setup
+		fi
+	}
 }
 
 deoffload_openwrt_firewall()
@@ -977,6 +1008,7 @@ install_macos()
 # build binaries, do not use precompiled
 [ "$1" = "make" ] && FORCE_BUILD=1
 
+fsleep_setup
 fix_sbin_path
 check_system
 
