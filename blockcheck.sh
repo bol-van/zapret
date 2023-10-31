@@ -449,6 +449,8 @@ pktws_start()
 			;;
 	esac
 	PID=$!
+	# give some time to initialize
+	minsleep
 }
 tpws_start()
 {
