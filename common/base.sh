@@ -209,7 +209,7 @@ fsleep_setup()
 		if [ -z "$errtext" ]; then
 			FSLEEP=3
 		# newer openwrt has ucode with system function that supports timeout in ms
-		elif ucode -e "system(['sleep','infinity'], 1)"; then
+		elif ucode -e "system(['sleep','1'], 1)"; then
 			FSLEEP=4
 		else
 			FSLEEP=0
