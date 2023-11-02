@@ -209,10 +209,13 @@ fsleep_setup()
 		if [ -z "$errtext" ]; then
 			FSLEEP=3
 		# newer openwrt has ucode with system function that supports timeout in ms
-		elif ucode -e "system(['sleep','1'], 1)"; then
+		elif ucode -e "system(['sleep','1'], 1)" 2>/dev/null; then
 			FSLEEP=4
+		# older openwrt may have lua and nixio lua module
+		elif lua -e 'local nixio  = require "nixio"; nixio.nanosleep(0,1);' 2>/dev/null ; then
+			FSLEEP=5
 		else
-			FSLEEP=0
+			FSLEEP=5
 		fi
 	fi
     }
@@ -231,6 +234,9 @@ minsleep()
 		;;
 	4)
 		ucode -e "system(['sleep','1'], 100)"
+		;;
+	5)
+		lua -e 'local nixio  = require "nixio"; nixio.nanosleep(0,100000000);'
 		;;
     	*)
 		sleep 1
