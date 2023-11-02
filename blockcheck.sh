@@ -23,7 +23,7 @@ ZAPRET_BASE="$EXEDIR"
 [ -n "$IPFW_RULE_NUM" ] || IPFW_RULE_NUM=1
 [ -n "$IPFW_DIVERT_PORT" ] || IPFW_DIVERT_PORT=59780
 [ -n "$DOMAINS" ] || DOMAINS=rutracker.org
-[ -n "$CURL_MAX_TIME" ] || CURL_MAX_TIME=5
+[ -n "$CURL_MAX_TIME" ] || CURL_MAX_TIME=3
 [ -n "$MIN_TTL" ] || MIN_TTL=1
 [ -n "$MAX_TTL" ] || MAX_TTL=12
 [ -n "$USER_AGENT" ] || USER_AGENT="Mozilla"
@@ -298,6 +298,11 @@ curl_test_http()
 		}
 	}
 	rm -f "$HDRTEMP"
+	[ "$code" = 400 ] && {
+		# this can often happen if the server receives fake packets it should not receive
+		echo http code $code. likely the server receives fakes.
+		return 254
+	}
 	return 0
 }
 curl_test_https_tls12()
