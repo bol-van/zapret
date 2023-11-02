@@ -215,7 +215,7 @@ fsleep_setup()
 		elif lua -e 'local nixio  = require "nixio"; nixio.nanosleep(0,1);' 2>/dev/null ; then
 			FSLEEP=5
 		else
-			FSLEEP=5
+			FSLEEP=0
 		fi
 	fi
     }
