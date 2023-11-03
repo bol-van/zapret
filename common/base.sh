@@ -197,6 +197,12 @@ fix_sbin_path()
 	export PATH
 }
 
+# it can calculate floating point expr
+calc()
+{
+	awk "BEGIN { print $*}";
+}
+
 fsleep_setup()
 {
     [ -n "$FSLEEP" ] || {
@@ -220,25 +226,30 @@ fsleep_setup()
 	fi
     }
 }
-minsleep()
+msleep()
 {
+    # $1 - milliseconds
     case "$FSLEEP" in
 	1)
-		sleep 0.1
+		sleep $(calc $1/1000)
 		;;
 	2)
-		busybox usleep 100000
+		busybox usleep $(calc $1*1000)
 		;;
 	3)
-		read -t 0.1
+		read -t $(calc $1/1000)
 		;;
 	4)
-		ucode -e "system(['sleep','1'], 100)"
+		ucode -e "system(['sleep','2147483647'], $1)"
 		;;
 	5)
-		lua -e 'require "nixio".nanosleep(0,100000000)'
+		lua -e "require 'nixio'.nanosleep($(($1/1000)),$(calc $1%1000*1000000))"
 		;;
     	*)
 		sleep 1
     esac
+}
+minsleep()
+{
+	msleep 100
 }
