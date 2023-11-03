@@ -212,7 +212,7 @@ fsleep_setup()
 		elif ucode -e "system(['sleep','1'], 1)" 2>/dev/null; then
 			FSLEEP=4
 		# older openwrt may have lua and nixio lua module
-		elif lua -e 'local nixio  = require "nixio"; nixio.nanosleep(0,1);' 2>/dev/null ; then
+		elif lua -e 'require "nixio".nanosleep(0,1)' 2>/dev/null ; then
 			FSLEEP=5
 		else
 			FSLEEP=0
@@ -236,7 +236,7 @@ minsleep()
 		ucode -e "system(['sleep','1'], 100)"
 		;;
 	5)
-		lua -e 'local nixio  = require "nixio"; nixio.nanosleep(0,100000000);'
+		lua -e 'require "nixio".nanosleep(0,100000000)'
 		;;
     	*)
 		sleep 1
