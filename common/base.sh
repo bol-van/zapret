@@ -246,7 +246,7 @@ msleep()
 		lua -e "require 'nixio'.nanosleep($(($1/1000)),$(calc $1%1000*1000000))"
 		;;
     	*)
-		sleep 1
+		sleep $((($1+999)/1000))
     esac
 }
 minsleep()
