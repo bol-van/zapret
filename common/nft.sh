@@ -37,6 +37,11 @@ nft_set_exists()
 	# $1 - set name
 	nft -t list set inet $ZAPRET_NFT_TABLE $1 2>/dev/null >/dev/null
 }
+nft_flush_chain()
+{
+	# $1 - chain name
+	nft flush chain inet $ZAPRET_NFT_TABLE $1
+}
 
 nft_del_all_chains_from_table()
 {
@@ -65,6 +70,7 @@ nft_create_chains()
 {
 	# NOTE : postrouting hook has priority 99 to hook packets with original source but NATed destination
 	# NOTE : prerouting hook has priority -99 for the same reason
+	# NOTE : postnat is intended for hooks after NAT. many undersired things can happen. use with care. to activate set env POSTNAT=1
 cat << EOF | nft -f -
 	add chain inet $ZAPRET_NFT_TABLE dnat_output { type nat hook output priority -101; }
 	flush chain inet $ZAPRET_NFT_TABLE dnat_output
@@ -82,13 +88,24 @@ cat << EOF | nft -f -
 	add rule inet  $ZAPRET_NFT_TABLE localnet_protect ip daddr 127.0.0.0/8 drop comment "route_localnet remote access protection"
 	add rule inet  $ZAPRET_NFT_TABLE input iif != lo jump localnet_protect
 	add chain inet $ZAPRET_NFT_TABLE postrouting { type filter hook postrouting priority 99; }
-	add chain inet $ZAPRET_NFT_TABLE prerouting { type filter hook prerouting priority -99; }
 	flush chain inet $ZAPRET_NFT_TABLE postrouting
+	add chain inet $ZAPRET_NFT_TABLE postnat { type filter hook postrouting priority 101; }
+	flush chain inet $ZAPRET_NFT_TABLE postnat
+	add chain inet $ZAPRET_NFT_TABLE prerouting { type filter hook prerouting priority -99; }
+	flush chain inet $ZAPRET_NFT_TABLE prerouting
+	add chain inet $ZAPRET_NFT_TABLE predefrag { type filter hook output priority -401; }
+	flush chain inet $ZAPRET_NFT_TABLE predefrag 
+	add rule inet $ZAPRET_NFT_TABLE predefrag mark and $DESYNC_MARK !=0 ip frag-off != 0 notrack comment "do not track nfqws generated ipfrag packets to avoid nat tampering and defragmentation"
+	add rule inet $ZAPRET_NFT_TABLE predefrag mark and $DESYNC_MARK !=0 exthdr frag exists notrack comment "do not track nfqws generated ipfrag packets to avoid nat tampering and defragmentation"
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif6 { type ifname; }
 	add map inet $ZAPRET_NFT_TABLE link_local { type ifname : ipv6_addr; }
 EOF
+	[ -n "$POSTNAT_ALL" ] && {
+		nft_flush_chain predefrag
+		nft_add_rule predefrag mark and $DESYNC_MARK !=0  notrack comment \"do not track nfqws generated packets to avoid nat tampering and defragmentation\"
+	}
 # unfortunately this approach breaks udp desync of the connection initiating packet (new, first one)
 # however without notrack ipfrag will not work
 # postrouting priority : 99 - before srcnat, 101 - after srcnat
@@ -108,7 +125,9 @@ cat << EOF | nft -f - 2>/dev/null
 	delete chain inet $ZAPRET_NFT_TABLE forward
 	delete chain inet $ZAPRET_NFT_TABLE input
 	delete chain inet $ZAPRET_NFT_TABLE postrouting
+	delete chain inet $ZAPRET_NFT_TABLE postnat
 	delete chain inet $ZAPRET_NFT_TABLE prerouting
+	delete chain inet $ZAPRET_NFT_TABLE predefrag
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload
 	delete chain inet $ZAPRET_NFT_TABLE localnet_protect
 EOF
@@ -425,7 +444,14 @@ nft_fw_tpws()
 	nft_fw_tpws4 "$1" $3
 	nft_fw_tpws6 "$2" $3
 }
-
+get_postchain()
+{
+	if [ "$POSTNAT" = 1 -o "$POSTNAT_ALL" = 1 ] ; then
+		echo -n postnat
+	else
+		echo -n postrouting
+	fi
+}
 _nft_fw_nfqws_post4()
 {
 	# $1 - filter ipv4
@@ -436,7 +462,7 @@ _nft_fw_nfqws_post4()
 		local filter="$1" port="$2" rule
 		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 4
 		rule="${3:+oifname @wanif }$filter ip daddr != @nozapret"
-		nft_add_rule postrouting $rule queue num $port bypass
+		nft_add_rule $(get_postchain) $rule queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
 	}
 }
@@ -450,7 +476,7 @@ _nft_fw_nfqws_post6()
 		local filter="$1" port="$2" rule
 		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 6
 		rule="${3:+oifname @wanif6 }$filter ip6 daddr != @nozapret6"
-		nft_add_rule postrouting $rule queue num $port bypass
+		nft_add_rule $(get_postchain) $rule queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
 	}
 }
