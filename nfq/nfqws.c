@@ -567,7 +567,8 @@ static void exithelp(void)
 		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
 		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
 		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
-		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n",
+		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
+		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
@@ -752,10 +753,11 @@ int main(int argc, char **argv)
 		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=41
 		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=42
 		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=43
+		{"hostlist-auto-debug",required_argument,0,0},	// optidx=44
 	
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=44
-		{"bind-fix6",no_argument,0,0},		// optidx=45
+		{"bind-fix4",no_argument,0,0},		// optidx=45
+		{"bind-fix6",no_argument,0,0},		// optidx=46
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1140,11 +1142,26 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case 44: /* hostlist-auto-debug */
+			{
+				FILE *F = fopen(optarg,"a+t");
+				if (!F)
+				{
+					fprintf(stderr, "cannot create %s\n", optarg);
+					exit_clean(1);
+				}
+				fclose(F);
+				if (params.droproot && chown(optarg, params.uid, -1))
+					fprintf(stderr, "could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
+				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
+				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
+			}
+			break;
 #ifdef __linux__
-		case 44: /* bind-fix4 */
+		case 45: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 45: /* bind-fix6 */
+		case 46: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif

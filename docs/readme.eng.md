@@ -184,6 +184,7 @@ nfqws takes the following parameters:
  --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 2)
  --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
  --hostlist-auto-retrans-threshold=<int>        ; how many request retransmissions cause attempt to fail (default : 3)
+ --hostlist-auto-debug=<logfile>        	; debug auto hostlist positives
 ```
 
 The manipulation parameters can be combined in any way.
@@ -539,6 +540,8 @@ tpws is transparent proxy.
  --hostlist-auto=<filename>            ; detect DPI blocks and build hostlist automatically
  --hostlist-auto-fail-threshold=<int>  ; how many failed attempts cause hostname to be added to auto hostlist (default : 2)
  --hostlist-auto-fail-time=<int>       ; all failed attemps must be within these seconds (default : 60)
+ --hostlist-auto-debug=<logfile>       	; debug auto hostlist positives
+
  --split-http-req=method|host	; split http request at specified logical position.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
@@ -911,6 +914,7 @@ autohostlist mode tuning.
 AUTOHOSTLIST_RETRANS_THRESHOLD=3
 AUTOHOSTLIST_FAIL_THRESHOLD=2
 AUTOHOSTLIST_FAIL_TIME=60
+AUTOHOSTLIST_DEBUG=0
 ```
 
 Enable gzip compression for large lists. Used by ipset/*.sh scripts.

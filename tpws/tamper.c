@@ -299,6 +299,7 @@ static void auto_hostlist_failed(const char *hostname)
 	}
 	fail_counter->counter++;
 	VPRINT("auto hostlist : %s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
 	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
 	{
 		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist", hostname);
@@ -309,6 +310,7 @@ static void auto_hostlist_failed(const char *hostname)
 		if (!HostlistCheck(params.hostlist, params.hostlist_exclude, hostname, &bExcluded) && !bExcluded)
 		{
 			VPRINT("auto hostlist : adding %s", hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
 			if (!StrPoolAddStr(&params.hostlist, hostname))
 			{
 				fprintf(stderr, "StrPoolAddStr out of memory\n");
@@ -321,7 +323,10 @@ static void auto_hostlist_failed(const char *hostname)
 			}
 		}
 		else
+		{
 			VPRINT("auto hostlist: NOT adding %s", hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
+		}
 	}
 }
 
@@ -340,7 +345,10 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 			VPRINT("incoming HTTP reply detected for hostname %s", ctrack->hostname);
 			bFail = HttpReplyLooksLikeDPIRedirect(segment, *size, ctrack->hostname);
 			if (bFail)
+			{
 				VPRINT("redirect to another domain detected. possibly DPI redirect.")
+				HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+			}
 			else
 				VPRINT("local or in-domain redirect detected. it's not a DPI redirect.")
 		}
@@ -365,6 +373,7 @@ void rst_in(t_ctrack *ctrack)
 	if (!ctrack->bTamperInCutoff && ctrack->hostname)
 	{
 		VPRINT("incoming RST detected for hostname %s", ctrack->hostname);
+		HOSTLIST_DEBUGLOG_APPEND("%s : incoming RST", ctrack->hostname);
 		auto_hostlist_failed(ctrack->hostname);
 	}
 }
@@ -378,6 +387,7 @@ void hup_out(t_ctrack *ctrack)
 	{
 		// local leg dropped connection after first request. probably due to timeout.
 		VPRINT("local leg closed connection after first request (timeout ?). hostname: %s", ctrack->hostname);
+		HOSTLIST_DEBUGLOG_APPEND("%s : client closed connection without server reply", ctrack->hostname);
 		auto_hostlist_failed(ctrack->hostname);
 	}
 }

@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <stdio.h>
 
 char *strncasestr(const char *s,const char *find, size_t slen);
 
@@ -41,3 +42,5 @@ static inline void phton16(uint8_t *p, uint16_t v) {
 	p[0] = (uint8_t)(v>>8);
 	p[1] = (uint8_t)v;
 }
+
+int fprint_localtime(FILE *F);

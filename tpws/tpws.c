@@ -166,6 +166,7 @@ static void exithelp(void)
 		" --hostlist-auto=<filename>\t\t; detect DPI blocks and build hostlist automatically\n"
 		" --hostlist-auto-fail-threshold=<int>\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
 		" --hostlist-auto-fail-time=<int>\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-debug=<logfile>\t; debug auto hostlist positives\n"
 		"\nTAMPER:\n"
 		" --split-http-req=method|host\t\t; split at specified logical part of plain http request\n"
 		" --split-pos=<numeric_offset>\t\t; split at specified pos. split-http-req takes precedence for http.\n"
@@ -304,17 +305,18 @@ void parse_params(int argc, char *argv[])
 		{ "hostlist-auto",required_argument,0,0}, // optidx=35
 		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=36
 		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=37
-		{ "pidfile",required_argument,0,0 },// optidx=38
-		{ "debug",optional_argument,0,0 },// optidx=39
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=40
-		{ "local-sndbuf",required_argument,0,0 },// optidx=41
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=42
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=43
-		{ "socks",no_argument,0,0 },// optidx=44
-		{ "no-resolve",no_argument,0,0 },// optidx=45
-		{ "skip-nodelay",no_argument,0,0 },// optidx=46
+		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=38
+		{ "pidfile",required_argument,0,0 },// optidx=39
+		{ "debug",optional_argument,0,0 },// optidx=40
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=41
+		{ "local-sndbuf",required_argument,0,0 },// optidx=42
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=43
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=44
+		{ "socks",no_argument,0,0 },// optidx=45
+		{ "no-resolve",no_argument,0,0 },// optidx=46
+		{ "skip-nodelay",no_argument,0,0 },// optidx=47
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=47
+		{ "enable-pf",no_argument,0,0 },// optidx=48
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -603,36 +605,51 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 38: /* pidfile */
+		case 38: /* hostlist-auto-debug */
+			{
+				FILE *F = fopen(optarg,"a+t");
+				if (!F)
+				{
+					fprintf(stderr, "cannot create %s\n", optarg);
+					exit_clean(1);
+				}
+				fclose(F);
+				if (params.droproot && chown(optarg, params.uid, -1))
+					fprintf(stderr, "could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
+				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
+				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
+			}
+			break;
+		case 39: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 39:
+		case 40:
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
-		case 40: /* local-rcvbuf */
+		case 41: /* local-rcvbuf */
 			params.local_rcvbuf = atoi(optarg)/2;
 			break;
-		case 41: /* local-sndbuf */
+		case 42: /* local-sndbuf */
 			params.local_sndbuf = atoi(optarg)/2;
 			break;
-		case 42: /* remote-rcvbuf */
+		case 43: /* remote-rcvbuf */
 			params.remote_rcvbuf = atoi(optarg)/2;
 			break;
-		case 43: /* remote-sndbuf */
+		case 44: /* remote-sndbuf */
 			params.remote_sndbuf = atoi(optarg)/2;
 			break;
-		case 44: /* socks */
+		case 45: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 45: /* no-resolve */
+		case 46: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 46: /* skip-nodelay */
+		case 47: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 47: /* enable-pf */
+		case 48: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif

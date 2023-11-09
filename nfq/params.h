@@ -64,7 +64,7 @@ struct params_s
 
 	strpool *hostlist, *hostlist_exclude;
 	struct str_list_head hostlist_files, hostlist_exclude_files;
-	char hostlist_auto_filename[PATH_MAX];
+	char hostlist_auto_filename[PATH_MAX], hostlist_auto_debuglog[PATH_MAX];
 	int hostlist_auto_fail_threshold, hostlist_auto_fail_time, hostlist_auto_retrans_threshold;
 	hostfail_pool *hostlist_auto_fail_counters;
 
@@ -75,3 +75,15 @@ struct params_s
 extern struct params_s params;
 
 #define DLOG(format, ...) {if (params.debug) printf(format, ##__VA_ARGS__);}
+
+#define LOG_APPEND(filename, format, ...) \
+{ \
+	FILE *F = fopen(filename,"at"); \
+	if (F) \
+	{ \
+		fprint_localtime(F); \
+		fprintf(F, " : " format "\n", ##__VA_ARGS__); \
+		fclose(F); \
+	} \
+}
+#define HOSTLIST_DEBUGLOG_APPEND(format, ...) if (*params.hostlist_auto_debuglog) LOG_APPEND(params.hostlist_auto_debuglog, format, ##__VA_ARGS__)

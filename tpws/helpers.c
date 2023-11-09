@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+#include <time.h>
 
 char *strncasestr(const char *s,const char *find, size_t slen)
 {
@@ -210,4 +211,14 @@ int get_so_error(int fd)
 	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
 		errn=errno;
 	return errn;
+}
+
+int fprint_localtime(FILE *F)
+{
+	struct tm t;
+	time_t now;
+
+	time(&now);
+	localtime_r(&now,&t);
+	return fprintf(F, "%02d.%02d.%04d %02d:%02d:%02d", t.tm_mday, t.tm_mon + 1, t.tm_year + 1900, t.tm_hour, t.tm_min, t.tm_sec);
 }

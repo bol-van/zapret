@@ -188,6 +188,12 @@ void phton64(uint8_t *p, uint64_t v)
 	p[7] = (uint8_t)(v >> 0);
 }
 
+bool ipv6_addr_is_zero(const struct in6_addr *a)
+{
+    return !memcmp(a,"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",16);
+}
+
+
 #define INVALID_HEX_DIGIT ((uint8_t)-1)
 static inline uint8_t parse_hex_digit(char c)
 {
@@ -233,4 +239,14 @@ void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize
 		buf += size;
 		bufsize -= size;
 	}
+}
+
+int fprint_localtime(FILE *F)
+{
+	struct tm t;
+	time_t now;
+
+	time(&now);
+	localtime_r(&now,&t);
+	return fprintf(F, "%02d.%02d.%04d %02d:%02d:%02d", t.tm_mday, t.tm_mon + 1, t.tm_year + 1900, t.tm_hour, t.tm_min, t.tm_sec);
 }

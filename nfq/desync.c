@@ -175,8 +175,11 @@ static void wssize_cutoff(t_ctrack *ctrack)
 
 static void ctrack_stop_req_counter(t_ctrack *ctrack)
 {
-	ctrack->req_retrans_counter = RETRANS_COUNTER_STOP;
-	maybe_cutoff(ctrack, IPPROTO_TCP);
+	if (ctrack && *params.hostlist_auto_filename)
+	{
+		ctrack->req_retrans_counter = RETRANS_COUNTER_STOP;
+		maybe_cutoff(ctrack, IPPROTO_TCP);
+	}
 }
 
 // return true if retrans trigger fires
@@ -221,6 +224,7 @@ static void auto_hostlist_failed(const char *hostname)
 	}
 	fail_counter->counter++;
 	DLOG("auto hostlist : %s : fail counter %d/%d\n", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
 	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
 	{
 		DLOG("auto hostlist : fail threshold reached. adding %s to auto hostlist\n", hostname);
@@ -231,6 +235,7 @@ static void auto_hostlist_failed(const char *hostname)
 		if (!HostlistCheck(params.hostlist, params.hostlist_exclude, hostname, &bExcluded) && !bExcluded)
 		{
 			DLOG("auto hostlist : adding %s\n", hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
 			if (!StrPoolAddStr(&params.hostlist, hostname))
 			{
 				fprintf(stderr, "StrPoolAddStr out of memory\n");
@@ -243,7 +248,10 @@ static void auto_hostlist_failed(const char *hostname)
 			}
 		}
 		else
+		{
 			DLOG("auto hostlist : NOT adding %s\n", hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
+		}
 	}
 }
 
@@ -289,6 +297,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 			if (tcphdr->th_flags & TH_RST)
 			{
 				DLOG("incoming RST detected for hostname %s\n", ctrack->hostname);
+				HOSTLIST_DEBUGLOG_APPEND("%s : incoming RST", ctrack->hostname);
 				bFail = bStop = true;
 			}
 			else if (len_payload && ctrack->l7proto==HTTP)
@@ -298,7 +307,10 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 					DLOG("incoming HTTP reply detected for hostname %s\n", ctrack->hostname);
 					bFail = HttpReplyLooksLikeDPIRedirect(data_payload, len_payload, ctrack->hostname);
 					if (bFail)
+					{
 						DLOG("redirect to another domain detected. possibly DPI redirect.\n")
+						HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+					}
 					else
 						DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n")
 				}
@@ -439,9 +451,8 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		}
 		else
 		{
-			if (ctrack && *params.hostlist_auto_filename)
-				// received unknown payload. it means we are out of the request retransmission phase. stop counter
-				ctrack_stop_req_counter(ctrack);
+			// received unknown payload. it means we are out of the request retransmission phase. stop counter
+			ctrack_stop_req_counter(ctrack);
 			
 			if (!params.desync_any_proto) return res;
 			DLOG("applying tampering to unknown protocol\n")
@@ -456,12 +467,14 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host, &bExcluded))
 			{
 				DLOG("not applying tampering to this request\n")
-				if (!bExcluded)
+				if (!bExcluded && *params.hostlist_auto_filename && ctrack)
 				{
-					if (*params.hostlist_auto_filename && ctrack && !ctrack->hostname)
-						ctrack->hostname=strdup(host);
+					if (!ctrack->hostname) ctrack->hostname=strdup(host);
 					if (auto_hostlist_retrans(ctrack, IPPROTO_TCP, params.hostlist_auto_retrans_threshold))
+					{
+						HOSTLIST_DEBUGLOG_APPEND("%s : tcp retrans threshold reached", ctrack->hostname);
 						auto_hostlist_failed(host);
+					}
 				}
 				return res;
 			}
@@ -867,32 +880,34 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 			}
 			bKnownProtocol = true;
 		}
-		else if (IsWireguardHandshakeInitiation(data_payload,len_payload))
-		{
-			DLOG("packet contains wireguard handshake initiation\n")
-			if (ctrack && !ctrack->l7proto) ctrack->l7proto = WIREGUARD;
-			fake = params.fake_wg;
-			fake_size = params.fake_wg_size;
-			bKnownProtocol = true;
-		}
-		else if (IsDhtD1(data_payload,len_payload))
-		{
-			DLOG("packet contains DHT d1...e\n")
-			if (ctrack && !ctrack->l7proto) ctrack->l7proto = DHT;
-			fake = params.fake_dht;
-			fake_size = params.fake_dht_size;
-			bKnownProtocol = true;
-		}
 		else
 		{
-			if (ctrack && *params.hostlist_auto_filename)
-				// received unknown payload. it means we are out of the request retransmission phase. stop counter
-				ctrack_stop_req_counter(ctrack);
-			
-			if (!params.desync_any_proto) return res;
-			DLOG("applying tampering to unknown protocol\n")
-			fake = params.fake_unknown_udp;
-			fake_size = params.fake_unknown_udp_size;
+			// received payload without host. it means we are out of the request retransmission phase. stop counter
+			ctrack_stop_req_counter(ctrack);
+
+			if (IsWireguardHandshakeInitiation(data_payload,len_payload))
+			{
+				DLOG("packet contains wireguard handshake initiation\n")
+				if (ctrack && !ctrack->l7proto) ctrack->l7proto = WIREGUARD;
+				fake = params.fake_wg;
+				fake_size = params.fake_wg_size;
+				bKnownProtocol = true;
+			}
+			else if (IsDhtD1(data_payload,len_payload))
+			{
+				DLOG("packet contains DHT d1...e\n")
+				if (ctrack && !ctrack->l7proto) ctrack->l7proto = DHT;
+				fake = params.fake_dht;
+				fake_size = params.fake_dht_size;
+				bKnownProtocol = true;
+			}
+			else
+			{
+				if (!params.desync_any_proto) return res;
+				DLOG("applying tampering to unknown protocol\n")
+				fake = params.fake_unknown_udp;
+				fake_size = params.fake_unknown_udp_size;
+			}
 		}
 
 		if (bHaveHost)
@@ -902,12 +917,14 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host, &bExcluded))
 			{
 				DLOG("not applying tampering to this request\n")
-				if (!bExcluded)
+				if (!bExcluded && *params.hostlist_auto_filename && ctrack)
 				{
-					if (*params.hostlist_auto_filename && ctrack && !ctrack->hostname)
-						ctrack->hostname=strdup(host);
+					if (!ctrack->hostname) ctrack->hostname=strdup(host);
 					if (auto_hostlist_retrans(ctrack, IPPROTO_UDP, params.hostlist_auto_retrans_threshold))
+					{
+						HOSTLIST_DEBUGLOG_APPEND("%s : udp retrans threshold reached", ctrack->hostname);
 						auto_hostlist_failed(host);
+					}
 				}
 				return res;
 			}

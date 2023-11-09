@@ -25,6 +25,8 @@ bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);
 uint64_t pntoh64(const void *p);
 void phton64(uint8_t *p, uint64_t v);
 
+bool ipv6_addr_is_zero(const struct in6_addr *a);
+
 static inline uint16_t pntoh16(const uint8_t *p) {
 	return ((uint16_t)p[0] << 8) | (uint16_t)p[1];
 }
@@ -38,3 +40,5 @@ static inline uint32_t pntoh32(const uint8_t *p) {
 
 bool parse_hex_str(const char *s, uint8_t *pbuf, size_t *size);
 void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize);
+
+int fprint_localtime(FILE *F);

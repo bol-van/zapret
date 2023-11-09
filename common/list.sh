@@ -15,6 +15,7 @@ find_hostlists()
 	[ -f "$HOSTLIST_EXCLUDE" ] || HOSTLIST_EXCLUDE=
 
 	HOSTLIST_AUTO="$HOSTLIST_BASE/zapret-hosts-auto.txt"
+	HOSTLIST_AUTO_DEBUGLOG="$HOSTLIST_BASE/zapret-hosts-auto-debug.log"
 }
 
 filter_apply_autohostlist_target()
@@ -23,9 +24,10 @@ filter_apply_autohostlist_target()
 	
 	local parm1="${AUTOHOSTLIST_FAIL_THRESHOLD:+--hostlist-auto-fail-threshold=$AUTOHOSTLIST_FAIL_THRESHOLD}"
 	local parm2="${AUTOHOSTLIST_FAIL_TIME:+--hostlist-auto-fail-time=$AUTOHOSTLIST_FAIL_TIME}"
-	local parm3
+	local parm3 parm4
 	[ "$MODE" = "tpws" -o "$MODE" = "tpws-socks" ] || parm3="${AUTOHOSTLIST_RETRANS_THRESHOLD:+--hostlist-auto-retrans-threshold=$AUTOHOSTLIST_RETRANS_THRESHOLD}"
-	eval $1="\"\$$1 --hostlist-auto=$HOSTLIST_AUTO $parm1 $parm2 $parm3\""
+	[ "$AUTOHOSTLIST_DEBUGLOG" = 1 ] && parm4="--hostlist-auto-debug=$HOSTLIST_AUTO_DEBUGLOG"
+	eval $1="\"\$$1 --hostlist-auto=$HOSTLIST_AUTO $parm1 $parm2 $parm3 $parm4\""
 }
 
 filter_apply_hostlist_target()

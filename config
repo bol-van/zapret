@@ -23,6 +23,8 @@ IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
 AUTOHOSTLIST_RETRANS_THRESHOLD=3
 AUTOHOSTLIST_FAIL_THRESHOLD=2
 AUTOHOSTLIST_FAIL_TIME=60
+# 1 = debug autohostlist positives to ipset/zapret-hosts-auto-debug.log
+AUTOHOSTLIST_DEBUGLOG=0
 
 # number of parallel threads for domain list resolves
 MDIG_THREADS=30
