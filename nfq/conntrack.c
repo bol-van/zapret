@@ -25,9 +25,23 @@ static void connswap(const t_conn *c, t_conn *c2)
 	c2->dport = c->sport;
 }
 
+void ConntrackClearHostname(t_ctrack *track)
+{
+	if (track->hostname)
+	{
+		free(track->hostname);
+		track->hostname = NULL;
+	}
+}
+static void ConntrackClearTrack(t_ctrack *track)
+{
+	ConntrackClearHostname(track);
+	ReasmClear(&track->reasm_orig);
+}
+
 static void ConntrackFreeElem(t_conntrack_pool *elem)
 {
-	if (elem->track.hostname) free(elem->track.hostname);
+	ConntrackClearTrack(&elem->track);
 	free(elem);
 }
 
@@ -308,4 +322,37 @@ void ConntrackPoolDump(const t_conntrack *p)
 		printf(" req_retrans=%u cutoff=%u wss_cutoff=%u d_cutoff=%u hostname=%s l7proto=%s\n",
 			t->track.req_retrans_counter, t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff, t->track.hostname, ConntrackProtoName(t->track.l7proto));
 	};
+}
+
+
+void ReasmClear(t_reassemble *reasm)
+{
+	if (reasm->packet)
+	{
+		free(reasm->packet);
+		reasm->packet = NULL;
+	}
+	reasm->size = reasm->size_present = 0;
+}
+bool ReasmInit(t_reassemble *reasm, size_t size_requested, uint32_t seq_start)
+{
+	reasm->packet = malloc(size_requested);
+	if (!reasm->packet) return false;
+	reasm->size = size_requested;
+	reasm->size_present = 0;
+	reasm->seq = seq_start;
+	return true;
+}
+bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len)
+{
+	if (reasm->seq!=seq) return false; // fail session if out of sequence
+	
+	size_t szcopy;
+	szcopy = reasm->size - reasm->size_present;
+	if (len<szcopy) szcopy = len;
+	memcpy(reasm->packet + reasm->size_present, payload, szcopy);
+	reasm->size_present += szcopy;
+	reasm->seq += (uint32_t)szcopy;
+
+	return true;
 }

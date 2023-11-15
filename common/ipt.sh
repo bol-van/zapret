@@ -328,9 +328,9 @@ zapret_do_firewall_rules_ipt()
 	# autohostlist mode requires incoming traffic sample
 	# always use conntrack packet limiter or nfqws will deal with gigabytes
 	if [ "$MODE_FILTER" = "autohostlist" ]; then
-		n=$((4+${AUTOHOSTLIST_RETRANS_THRESHOLD:-3}))
+		n=$((6+${AUTOHOSTLIST_RETRANS_THRESHOLD:-3}))
 	else
-		n=4
+		n=6
 	fi
 	first_packet_only="${first_packet_only}$n"
 

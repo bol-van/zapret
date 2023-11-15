@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <time.h>
 
 void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
 {
@@ -149,12 +150,12 @@ void dbgprint_socket_buffers(int fd)
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
 {
 	DLOG("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n", fd, rcvbuf, sndbuf)
-		if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) < 0)
-		{
-			perror("setsockopt (SO_RCVBUF)");
-			close(fd);
-			return false;
-		}
+	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) < 0)
+	{
+		perror("setsockopt (SO_RCVBUF)");
+		close(fd);
+		return false;
+	}
 	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) < 0)
 	{
 		perror("setsockopt (SO_SNDBUF)");
@@ -186,6 +187,11 @@ void phton64(uint8_t *p, uint64_t v)
 	p[5] = (uint8_t)(v >> 16);
 	p[6] = (uint8_t)(v >> 8);
 	p[7] = (uint8_t)(v >> 0);
+}
+
+bool seq_within(uint32_t s, uint32_t s1, uint32_t s2)
+{
+	return s2>=s1 && s>=s1 && s<=s2 || s2<s1 && (s<=s2 || s>=s1);
 }
 
 bool ipv6_addr_is_zero(const struct in6_addr *a)

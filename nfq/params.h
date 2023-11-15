@@ -1,6 +1,5 @@
 #pragma once
 
-#include "params.h"
 #include "pools.h"
 #include "conntrack.h"
 #include "desync.h"
@@ -11,6 +10,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+
+#define TLS_PARTIALS_ENABLE	true
 
 #define Q_RCVBUF	(128*1024)	// in bytes
 #define Q_SNDBUF	(64*1024)	// in bytes

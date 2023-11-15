@@ -108,12 +108,25 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 }
 
 
-
-bool IsTLSClientHello(const uint8_t *data, size_t len)
+uint16_t TLSRecordDataLen(const uint8_t *data)
 {
-	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (pntoh16(data + 3) + 5) <= len;
+	return pntoh16(data + 3);
 }
-bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
+size_t TLSRecordLen(const uint8_t *data)
+{
+	return TLSRecordDataLen(data) + 5;
+}
+bool IsTLSRecordFull(const uint8_t *data, size_t len)
+{
+	return TLSRecordLen(data)<=len;
+}
+bool IsTLSClientHello(const uint8_t *data, size_t len, bool bPartialIsOK)
+{
+	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
+}
+
+// bPartialIsOK=true - accept partial packets not containing the whole TLS message
+bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK)
 {
 	// +0
 	// u8	HandshakeType: ClientHello
@@ -133,8 +146,11 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 	l = 1 + 3 + 2 + 32;
 	// SessionIDLength
 	if (len < (l + 1)) return false;
-	ll = data[1] << 16 | data[2] << 8 | data[3]; // HandshakeProtocol length
-	if (len < (ll + 4)) return false;
+	if (!bPartialIsOK)
+	{
+	    ll = data[1] << 16 | data[2] << 8 | data[3]; // HandshakeProtocol length
+	    if (len < (ll + 4)) return false;
+	}
 	l += data[l] + 1;
 	// CipherSuitesLength
 	if (len < (l + 2)) return false;
@@ -148,7 +164,15 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 	data += l; len -= l;
 	l = pntoh16(data);
 	data += 2; len -= 2;
-	if (len < l) return false;
+	
+	if (bPartialIsOK)
+	{
+		if (len < l) l = len;
+	}
+	else
+	{
+		if (len < l) return false;
+	}
 
 	while (l >= 4)
 	{
@@ -170,14 +194,14 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 
 	return false;
 }
-bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
+bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK)
 {
 	// +0
 	// u8	ContentType: Handshake
 	// u16	Version: TLS1.0
 	// u16	Length
-	if (!IsTLSClientHello(data, len)) return false;
-	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext);
+	if (!IsTLSClientHello(data, len, bPartialIsOK)) return false;
+	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext, bPartialIsOK);
 }
 static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, size_t len_host)
 {
@@ -196,20 +220,20 @@ static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, s
 	}
 	return true;
 }
-bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK)
 {
 	const uint8_t *ext;
 	size_t elen;
 
-	if (!TLSFindExt(data, len, 0, &ext, &elen)) return false;
+	if (!TLSFindExt(data, len, 0, &ext, &elen, bPartialIsOK)) return false;
 	return TLSExtractHostFromExt(ext, elen, host, len_host);
 }
-bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host)
+bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK)
 {
 	const uint8_t *ext;
 	size_t elen;
 
-	if (!TLSFindExtInHandshake(data, len, 0, &ext, &elen)) return false;
+	if (!TLSFindExtInHandshake(data, len, 0, &ext, &elen, bPartialIsOK)) return false;
 	return TLSExtractHostFromExt(ext, elen, host, len_host);
 }
 
@@ -580,7 +604,7 @@ bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host
 	if (!IsQUICCryptoHello(defrag, defrag_len, &hello_offset, &hello_len)) return false;
 	if (bIsCryptoHello) *bIsCryptoHello=true;
 
-	return TLSHelloExtractHostFromHandshake(defrag + hello_offset, hello_len, host, len_host);
+	return TLSHelloExtractHostFromHandshake(defrag + hello_offset, hello_len, host, len_host, true);
 }
 
 bool IsQUICInitial(const uint8_t *data, size_t len)

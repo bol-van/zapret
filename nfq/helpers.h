@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "params.h"
 
@@ -18,6 +19,8 @@ bool append_to_list_file(const char *filename, const char *s);
 void print_sockaddr(const struct sockaddr *sa);
 void ntop46(const struct sockaddr *sa, char *str, size_t len);
 void ntop46_port(const struct sockaddr *sa, char *str, size_t len);
+
+bool seq_within(uint32_t s, uint32_t s1, uint32_t s2);
 
 void dbgprint_socket_buffers(int fd);
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);

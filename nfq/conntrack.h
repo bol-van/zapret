@@ -34,6 +34,14 @@ typedef struct
 	uint8_t l4proto; // IPPROTO_TCP, IPPROTO_UDP
 } t_conn;
 
+// this structure helps to reassemble continuous packets streams. it does not support out-of-orders
+typedef struct {
+	uint8_t *packet;		// allocated for size during reassemble request. requestor must know the message size.
+	uint32_t seq;			// current seq number. if a packet comes with an unexpected seq - it fails reassemble session.
+	size_t size;			// expected message size. success means that we have received exactly 'size' bytes and have them in 'packet'
+	size_t size_present;		// how many bytes already stored in 'packet'
+} t_reassemble;
+
 // SYN - SYN or SYN/ACK received
 // ESTABLISHED - any except SYN or SYN/ACK received
 // FIN - FIN or RST received
@@ -55,10 +63,13 @@ typedef struct
 	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
 	
 	uint8_t req_retrans_counter;		// number of request retransmissions
-	uint32_t req_seq;			// sequence number of the request (to track retransmissions)
+	bool req_seq_start_present, req_seq_present;
+	uint32_t req_seq_start,req_seq_end;	// sequence interval of the request (to track retransmissions)
 
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff;
+
+	t_reassemble reasm_orig;
 
 	t_l7proto l7proto;
 	char *hostname;
@@ -85,3 +96,11 @@ bool ConntrackPoolDrop(t_conntrack *p, const struct ip *ip, const struct ip6_hdr
 void CaonntrackExtractConn(t_conn *c, bool bReverse, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr);
 void ConntrackPoolDump(const t_conntrack *p);
 void ConntrackPoolPurge(t_conntrack *p);
+void ConntrackClearHostname(t_ctrack *track);
+
+bool ReasmInit(t_reassemble *reasm, size_t size_requested, uint32_t seq_start);
+void ReasmClear(t_reassemble *reasm);
+// false means reassemble session has failed and we should ReasmClear() it
+bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len);
+inline static bool ReasmIsEmpty(t_reassemble *reasm) {return !reasm->size;}
+inline static bool ReasmIsFull(t_reassemble *reasm) {return !ReasmIsEmpty(reasm) && (reasm->size==reasm->size_present);}
