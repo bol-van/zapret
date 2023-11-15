@@ -990,6 +990,7 @@ install_macos()
 # build binaries, do not use precompiled
 [ "$1" = "make" ] && FORCE_BUILD=1
 
+umask 0022
 fsleep_setup
 fix_sbin_path
 check_system
