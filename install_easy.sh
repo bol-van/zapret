@@ -467,6 +467,52 @@ copy_openwrt()
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
 
+fix_perms()
+{
+	[ -d "$1" ] || return
+	find "$1" -type d -exec chmod 755 {} \;
+	find "$1" -type f -exec chmod 644 {} \;
+	chown -R root:root "$1"
+	find "$1/binaries" '(' -name tpws -o -name dvtws -o -name nfqws -o -name ip2net -o -name mdig ')' -exec chmod 755 {} \;
+	for f in \
+install_bin.sh \
+blockcheck.sh \
+install_easy.sh \
+files/huawei/E8372/zapret-ip \
+files/huawei/E8372/unzapret-ip \
+files/huawei/E8372/run-zapret-hostlist \
+files/huawei/E8372/unzapret \
+files/huawei/E8372/zapret \
+files/huawei/E8372/run-zapret-ip \
+ipset/get_exclude.sh \
+ipset/clear_lists.sh \
+ipset/get_antifilter_ipresolve.sh \
+ipset/get_reestr_resolvable_domains.sh \
+ipset/get_config.sh \
+ipset/get_reestr_preresolved.sh \
+ipset/get_user.sh \
+ipset/get_antifilter_allyouneed.sh \
+ipset/get_reestr_resolve.sh \
+ipset/create_ipset.sh \
+ipset/get_reestr_hostlist.sh \
+ipset/get_ipban.sh \
+ipset/get_antifilter_ipsum.sh \
+ipset/get_antifilter_ipsmart.sh \
+ipset/get_antizapret_domains.sh \
+ipset/get_reestr_preresolved_smart.sh \
+ipset/get_antifilter_ip.sh \
+init.d/pfsense/zapret.sh \
+init.d/macos/zapret \
+init.d/runit/zapret/run \
+init.d/runit/zapret/finish \
+init.d/openrc/zapret \
+init.d/sysv/zapret \
+init.d/openwrt/zapret \
+uninstall_easy.sh \
+	; do chmod 755 "$1/$f" 2>/dev/null ; done
+}
+
+
 _backup_settings()
 {
 	local i=0
@@ -520,6 +566,7 @@ check_location()
 			local B=$(dirname "$ZAPRET_TARGET")
 			[ -d "$B" ] || mkdir -p "$B"
 			$1 "$EXEDIR" "$ZAPRET_TARGET"
+			fix_perms "$ZAPRET_TARGET"
 			[ "$keep" = "Y" ] && backup_restore_settings 0
 			echo relaunching itself from $ZAPRET_TARGET
 			exec $ZAPRET_TARGET/$(basename $0)
