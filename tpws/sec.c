@@ -86,10 +86,6 @@ SYS_symlinkat,
 SYS_link,
 #endif
 SYS_linkat,
-#ifdef SYS_pkey_mprotect
-SYS_pkey_mprotect,
-#endif
-SYS_mprotect,
 SYS_truncate,
 #ifdef SYS_truncate64
 SYS_truncate64,
