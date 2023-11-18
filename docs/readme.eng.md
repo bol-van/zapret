@@ -1036,8 +1036,8 @@ They are mainly about possibly low flash free space.
 Simple install will not work if it has no space to install itself and required packages from the repo.
 
 Another challenge would be to bring zapret to the router. You can download zip from github and use it.
-Do not repack zip contents in Windows, because this way you break chmod and links.
 Install openssh-sftp-server and unzip to openwrt and use sftp to transfer the file.
+It's also not too hard to use 'nc' (netcat) for file transfer.
 
 The best way to start is to put zapret dir to `/tmp` and run `/tmp/zapret/install_easy.sh` from there.
 After installation remove `/tmp/zapret` to free RAM.

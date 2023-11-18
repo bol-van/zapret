@@ -105,7 +105,7 @@ check_bins()
 
 call_install_bin()
 {
-	"$EXEDIR/install_bin.sh" $1
+	sh "$EXEDIR/install_bin.sh" $1
 }
 get_bin_arch()
 {
