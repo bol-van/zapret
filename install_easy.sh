@@ -76,6 +76,7 @@ check_bins()
 {
 	echo \* checking executables
 
+	fix_perms_bin_test "$EXEDIR"
 	local arch=$(get_bin_arch)
 	local make_target
 	[ "$FORCE_BUILD" = "1" ] && {
@@ -467,6 +468,11 @@ copy_openwrt()
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
 
+fix_perms_bin_test()
+{
+	[ -d "$1" ] || return
+	find "$1/binaries" -name ip2net -exec chmod +x {} \;
+}
 fix_perms()
 {
 	[ -d "$1" ] || return

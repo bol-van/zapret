@@ -5,8 +5,8 @@ require_root()
 	[ $(id -u) -ne "0" ] && {
 		echo root is required
 		exe="$EXEDIR/$(basename "$0")"
-		exists sudo && exec sudo "$exe"
-		exists su && exec su root -c "$exe"
+		exists sudo && exec sudo sh "$exe"
+		exists su && exec su root -c "sh \"$exe\""
 		echo su or sudo not found
 		exitp 2
 	}
