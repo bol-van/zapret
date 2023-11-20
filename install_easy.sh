@@ -471,7 +471,7 @@ copy_openwrt()
 fix_perms_bin_test()
 {
 	[ -d "$1" ] || return
-	find "$1/binaries" -name ip2net -exec chmod +x {} \;
+	find "$1/binaries" -name ip2net ! -perm -111 -exec chmod +x {} \;
 }
 fix_perms()
 {
