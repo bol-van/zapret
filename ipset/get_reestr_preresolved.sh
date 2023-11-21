@@ -8,19 +8,15 @@ IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
 
 TMPLIST="$TMPDIR/list_nethub.txt"
 
-# free domain was discontinued
-HOST=list.nethub.fi
-IP=69.197.166.36
-RESOLVE="--resolve $HOST:80:$IP"
-URL4="http://list.nethub.fi/reestr_resolved4.txt"
-URL6="http://list.nethub.fi/reestr_resolved6.txt"
-
+BASEURL="https://raw.githubusercontent.com/bol-van/rulist/main"
+URL4="$BASEURL/reestr_resolved4.txt"
+URL6="$BASEURL/reestr_resolved6.txt"
 
 dl()
 {
   # $1 - url
   # $2 - file
-  curl -H "Accept-Encoding: gzip" $RESOLVE -k --fail --max-time 180 --connect-timeout 10 --retry 4 --max-filesize 33554432 "$1" | gunzip - >"$TMPLIST" ||
+  curl -H "Accept-Encoding: gzip" -k --fail --max-time 180 --connect-timeout 10 --retry 4 --max-filesize 33554432 "$1" | gunzip - >"$TMPLIST" ||
   {
    echo list download failed : $1
    exit 2
