@@ -52,9 +52,10 @@ dl_checked "$ZURL_REESTR" "$ZREESTR" 204800 251658240 600 || {
 reestr_list | sort -u | zz "$ZHOSTLIST"
 
 reestr_extract_ip <"$ZREESTR" >"$IPB"
+
 rm -f "$ZREESTR"
-[ "$DISABLE_IPV4" != "1" ] && $AWK '/^([0-9]{1,3}\.){3}[0-9]{1,3}$/' "$IPB" | ip2net4 | zz "$ZIPLIST_IPBAN"
-[ "$DISABLE_IPV6" != "1" ] && $AWK '/^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$/' "$IPB" | ip2net6 | zz "$ZIPLIST_IPBAN6"
+[ "$DISABLE_IPV4" != "1" ] && $AWK '/^([0-9]{1,3}\.){3}[0-9]{1,3}($|(\/[0-9]{1,2}$))/' "$IPB" | ip2net4 | zz "$ZIPLIST_IPBAN"
+[ "$DISABLE_IPV6" != "1" ] && $AWK '/^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}($|(\/[0-9]{2,3}$))/' "$IPB" | ip2net6 | zz "$ZIPLIST_IPBAN6"
 rm -f "$IPB"
 
 hup_zapret_daemons
