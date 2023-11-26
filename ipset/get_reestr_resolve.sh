@@ -7,28 +7,56 @@ IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
 
 ZREESTR="$TMPDIR/zapret.txt"
 ZDIG="$TMPDIR/zapret-dig.txt"
+IPB="$TMPDIR/ipb.txt"
 ZIPLISTTMP="$TMPDIR/zapret-ip.txt"
 #ZURL=https://reestr.rublacklist.net/api/current
 ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
+
+dl_checked()
+{
+  # $1 - url
+  # $2 - file
+  # $3 - minsize
+  # $4 - maxsize
+  # $5 - maxtime
+  curl -H "Accept-Encoding: gzip" -k --fail --max-time $5 --connect-timeout 10 --retry 4 --max-filesize $4 "$1" | gunzip - >"$2" ||
+  {
+   echo list download failed : $1
+   return 2
+  }
+  dlsize=$(LANG=C wc -c "$2" | xargs | cut -f 1 -d ' ')
+  if test $dlsize -lt $3; then
+   echo list is too small : $dlsize bytes. can be bad.
+   return 2
+  fi
+  return 0
+}
+
+reestr_list()
+{
+ LANG=C cut -s -f2 -d';' "$ZREESTR" | LANG=C nice -n 5 sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p'
+}
+reestr_extract_ip()
+{
+ LANG=C nice -n 5 $AWK -F ';' '($1 ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}/) && (($2 == "" && $3 == "") || ($1 == $2)) {gsub(/ \| /, RS); print $1}' "$ZREESTR" | LANG=C $AWK '{split($1, a, /\|/); for (i in a) {print a[i]}}'
+}
 
 getuser && {
  # both disabled
  [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && exit 0
 
- curl -H "Accept-Encoding: gzip" -k --fail --max-time 600 --connect-timeout 5 --retry 3 --max-filesize 251658240 "$ZURL_REESTR" | gunzip - >"$ZREESTR" ||
- {
-  echo reestr list download failed   
-  exit 2
- }
-
- dlsize=$(LANG=C wc -c "$ZREESTR" | xargs | cut -f 1 -d ' ')
- if test $dlsize -lt 204800; then
-  echo list file is too small. can be bad.
-  exit 2
- fi
+ dl_checked "$ZURL_REESTR" "$ZREESTR" 204800 251658240 600 || exit 2
+ 
+ echo preparing ipban list ..
+ 
+ reestr_extract_ip <"$ZREESTR" >"$IPB"
+ $AWK '/^([0-9]{1,3}\.){3}[0-9]{1,3}$/' "$IPB" | ip2net4 | zz "$ZIPLIST_IPBAN"
+ $AWK '/^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$/' "$IPB" | ip2net6 | zz "$ZIPLIST_IPBAN6"
+ rm -f "$IPB"
 
  echo preparing dig list ..
- LANG=C cut -f2 -d ';' "$ZREESTR"  | LANG=C sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p' >"$ZDIG"
+ reestr_list | sort -u >"$ZDIG"
+
  rm -f "$ZREESTR"
 
  echo digging started. this can take long ...
