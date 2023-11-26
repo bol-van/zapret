@@ -50,8 +50,8 @@ getuser && {
  echo preparing ipban list ..
  
  reestr_extract_ip <"$ZREESTR" >"$IPB"
- $AWK '/^([0-9]{1,3}\.){3}[0-9]{1,3}$/' "$IPB" | ip2net4 | zz "$ZIPLIST_IPBAN"
- $AWK '/^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$/' "$IPB" | ip2net6 | zz "$ZIPLIST_IPBAN6"
+ [ "$DISABLE_IPV4" != "1" ] && $AWK '/^([0-9]{1,3}\.){3}[0-9]{1,3}$/' "$IPB" | ip2net4 | zz "$ZIPLIST_IPBAN"
+ [ "$DISABLE_IPV6" != "1" ] && $AWK '/^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$/' "$IPB" | ip2net6 | zz "$ZIPLIST_IPBAN6"
  rm -f "$IPB"
 
  echo preparing dig list ..
