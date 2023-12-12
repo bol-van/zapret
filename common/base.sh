@@ -253,3 +253,21 @@ minsleep()
 {
 	msleep 100
 }
+
+replace_char()
+{
+	local a=$1
+	local b=$2
+	shift; shift
+	echo "$@" | tr $a $b
+}
+
+std_ports()
+{
+        HTTP_PORTS=${HTTP_PORTS:-80}
+	HTTPS_PORTS=${HTTPS_PORTS:-443}
+	QUIC_PORTS=${QUIC_PORTS:-443}
+        HTTP_PORTS_IPT=$(replace_char - : $HTTP_PORTS)
+        HTTPS_PORTS_IPT=$(replace_char - : $HTTPS_PORTS)
+        QUIC_PORTS_IPT=$(replace_char - : $QUIC_PORTS)
+}

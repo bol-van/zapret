@@ -2,6 +2,7 @@
 
 # required for : nft -f -
 create_dev_stdin
+std_ports
 
 nft_create_table()
 {
@@ -279,11 +280,11 @@ nft_filter_apply_port_target()
 	# $1 - var name of nftables filter
 	local f
 	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		f="tcp dport {80,443}"
+		f="tcp dport {$HTTP_PORTS,$HTTPS_PORTS}"
 	elif [ "$MODE_HTTPS" = "1" ]; then
-		f="tcp dport 443"
+		f="tcp dport {$HTTPS_PORTS}"
 	elif [ "$MODE_HTTP" = "1" ]; then
-		f="tcp dport 80"
+		f="tcp dport {$HTTP_PORTS}"
 	else
 		echo WARNING !!! HTTP and HTTPS are both disabled
 	fi
@@ -293,7 +294,7 @@ nft_filter_apply_port_target_quic()
 {
 	# $1 - var name of nftables filter
 	local f
-	f="udp dport 443"
+	f="udp dport {$QUIC_PORTS}"
 	eval $1="\"\$$1 $f\""
 }
 nft_filter_apply_ipset_target4()
@@ -604,7 +605,7 @@ zapret_apply_firewall_rules_nft()
 				[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $f4)" $qn
 			else
 				if [ -n "$qn" ]; then
-					f4="tcp dport 80"
+					f4="tcp dport {$HTTP_PORTS}"
 					ff="$f4"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
 					ff="$ff $first_packet_only"
@@ -614,7 +615,7 @@ zapret_apply_firewall_rules_nft()
 					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $ff)" $qn
 				fi
 				if [ -n "$qns" ]; then
-					f4="tcp dport 443 $first_packet_only"
+					f4="tcp dport {$HTTPS_PORTS} $first_packet_only"
 					nft_filter_apply_ipset_target4 f4
 					nft_fw_nfqws_post4 "$f4 $desync" $qns
 					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre4 "$(nft_reverse_nfqws_rule $f4)" $qns
@@ -628,7 +629,7 @@ zapret_apply_firewall_rules_nft()
 				[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $f6)" $qn
 			else
 				if [ -n "$qn6" ]; then
-					f6="tcp dport 80"
+					f6="tcp dport {$HTTP_PORTS}"
 					ff="$f6"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
 					ff="$ff $first_packet_only"
@@ -638,7 +639,7 @@ zapret_apply_firewall_rules_nft()
 					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $ff)" $qn6
 				fi
 				if [ -n "$qns6" ]; then
-					f6="tcp dport 443 $first_packet_only"
+					f6="tcp dport {$HTTPS_PORTS} $first_packet_only"
 					nft_filter_apply_ipset_target6 f6
 					nft_fw_nfqws_post6 "$f6 $desync" $qns6
 					[ "$MODE_FILTER" = "autohostlist" ] && nft_fw_nfqws_pre6 "$(nft_reverse_nfqws_rule $f6)" $qns6

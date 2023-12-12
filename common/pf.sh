@@ -4,6 +4,8 @@ PF_ANCHOR_ZAPRET="$PF_ANCHOR_DIR/zapret"
 PF_ANCHOR_ZAPRET_V4="$PF_ANCHOR_DIR/zapret-v4"
 PF_ANCHOR_ZAPRET_V6="$PF_ANCHOR_DIR/zapret-v6"
 
+std_ports
+
 pf_anchor_root_reload()
 {
 	echo reloading PF root anchor
@@ -107,11 +109,11 @@ pf_anchor_zapret_tables()
 pf_anchor_port_target()
 {
 	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		echo "{80,443}"
+		echo "{$HTTP_PORTS_IPT,$HTTPS_PORTS_IPT}"
 	elif [ "$MODE_HTTPS" = "1" ]; then
-		echo "443"
+		echo "{$HTTPS_PORTS_IPT}"
 	elif [ "$MODE_HTTP" = "1" ]; then
-		echo "80"
+		echo "{$HTTP_PORTS_IPT}"
 	fi
 }
 

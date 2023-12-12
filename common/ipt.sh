@@ -1,3 +1,5 @@
+std_ports
+
 ipt()
 {
 	iptables -C "$@" >/dev/null 2>/dev/null || iptables -I "$@"
@@ -50,11 +52,11 @@ filter_apply_port_target()
 	# $1 - var name of iptables filter
 	local f
 	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		f="-p tcp -m multiport --dports 80,443"
+		f="-p tcp -m multiport --dports $HTTP_PORTS_IPT,$HTTPS_PORTS_IPT"
 	elif [ "$MODE_HTTPS" = "1" ]; then
-		f="-p tcp --dport 443"
+		f="-p tcp -m multiport --dports $HTTPS_PORTS_IPT"
 	elif [ "$MODE_HTTP" = "1" ]; then
-		f="-p tcp --dport 80"
+		f="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
 	else
 		echo WARNING !!! HTTP and HTTPS are both disabled
 	fi
@@ -64,7 +66,7 @@ filter_apply_port_target_quic()
 {
 	# $1 - var name of nftables filter
 	local f
-	f="-p udp --dport 443"
+	f="-p udp -m multiport --dports $QUIC_PORTS_IPT"
 	eval $1="\"\$$1 $f\""
 }
 filter_apply_ipset_target4()
@@ -357,7 +359,7 @@ zapret_do_firewall_rules_ipt()
 				[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre4 $1 "$(reverse_nfqws_rule $f4)" $qn
 			else
 				if [ -n "$qn" ]; then
-					f4="-p tcp --dport 80"
+					f4="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
 					ff="$f4"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
 					ff="$ff $first_packet_only"
@@ -367,7 +369,7 @@ zapret_do_firewall_rules_ipt()
 					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre4 $1 "$(reverse_nfqws_rule $ff)" $qn
 				fi
 				if [ -n "$qns" ]; then
-					f4="-p tcp --dport 443 $first_packet_only"
+					f4="-p tcp -m multiport --dports $HTTPS_PORTS_IPT $first_packet_only"
 					filter_apply_ipset_target4 f4
 					fw_nfqws_post4 $1 "$f4 $desync" $qns
 					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre4 $1 "$(reverse_nfqws_rule $f4)" $qns
@@ -381,7 +383,7 @@ zapret_do_firewall_rules_ipt()
 				[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre6 $1 "$(reverse_nfqws_rule $f6)" $qn
 			else
 				if [ -n "$qn6" ]; then
-					f6="-p tcp --dport 80"
+					f6="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
 					ff="$f6"
 					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
 					ff="$ff $first_packet_only"
@@ -391,7 +393,7 @@ zapret_do_firewall_rules_ipt()
 					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre6 $1 "$(reverse_nfqws_rule $ff)" $qn6
 				fi
 				if [ -n "$qns6" ]; then
-					f6="-p tcp --dport 443 $first_packet_only"
+					f6="-p tcp -m multiport --dports $HTTPS_PORTS_IPT $first_packet_only"
 					filter_apply_ipset_target6 f6
 					fw_nfqws_post6 $1 "$f6 $desync" $qns6
 					[ "$MODE_FILTER" = "autohostlist" ] && fw_nfqws_pre6 $1 "$(reverse_nfqws_rule $f6)" $qns6

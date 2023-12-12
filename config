@@ -37,6 +37,11 @@ GZIP_LISTS=1
 # set to "-" to disable reload
 #LISTS_RELOAD="pfctl -f /etc/pf.conf"
 
+# override ports
+#HTTP_PORTS=80-81,85
+#HTTPS_PORTS=443,500-501
+#QUIC_PORTS=443,444
+
 # CHOOSE OPERATION MODE
 # MODE : nfqws,tpws,tpws-socks,filter,custom
 # nfqws : nfqws for dpi desync
@@ -96,7 +101,7 @@ INIT_APPLY_FW=1
 # do not work with ipv4
 #DISABLE_IPV4=1
 # do not work with ipv6
-DISABLE_IPV6=1
+#DISABLE_IPV6=1
 
 # select which init script will be used to get ip or host list
 # possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
