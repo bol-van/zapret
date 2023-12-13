@@ -28,14 +28,14 @@ zapret_custom_firewall()
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
 
 	[ "$MODE_HTTP" = "1" ] && {
-		f4="-p tcp --dport 80"
+		f4="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
 		f6=$f4
 		filter_apply_ipset_target f4 f6
 		fw_tpws $1 "$f4" "$f6" $TPPORT
 	}
 	
 	[ "$MODE_HTTPS" = "1" ] && {
-		f4="-p tcp --dport 443 $first_packet_only"
+		f4="-p tcp -m multiport --dports $HTTPS_PORTS_IPT $first_packet_only"
 		f6=$f4
 		filter_apply_ipset_target f4 f6
 		fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
@@ -50,14 +50,14 @@ zapret_custom_firewall_nft()
 	local desync="mark and $DESYNC_MARK == 0"
 
 	[ "$MODE_HTTP" = "1" ] && {
-		f4="tcp dport 80"
+		f4="tcp dport {$HTTP_PORTS}"
 		f6=$f4
 		nft_filter_apply_ipset_target f4 f6
 		nft_fw_tpws "$f4" "$f6" $TPPORT
 	}
 	
 	[ "$MODE_HTTPS" = "1" ] && {
-		f4="tcp dport 443 $first_packet_only"
+		f4="tcp dport {$HTTPS_PORTS} $first_packet_only"
 		f6=$f4
 		nft_filter_apply_ipset_target f4 f6
 		nft_fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM

@@ -28,7 +28,7 @@ zapret_custom_firewall()
 
 	zapret_do_firewall_rules_ipt $1
 
-	f="-p udp --dport 443"
+	f="-p udp -m multiport --dports $QUIC_PORTS_IPT"
 	fw_nfqws_post $1 "$f $desync $first_packets_only" "$f $desync $first_packets_only" $QNUM2
 
 }
@@ -43,6 +43,6 @@ zapret_custom_firewall_nft()
 
 	zapret_apply_firewall_rules_nft
 
-	f="udp dport 443"
+	f="udp dport {$QUIC_PORTS}"
 	nft_fw_nfqws_post "$f $desync $first_packets_only" "$f $desync $first_packets_only" $QNUM2
 }
