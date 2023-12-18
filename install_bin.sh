@@ -16,13 +16,15 @@ check_dir()
 	if [ -f "$exe" ]; then
 		if [ -x "$exe" ]; then
 			# ash and dash try to execute invalid executables as a script. they interpret binary garbage with possible negative consequences
-			# bash do not do this
+			# bash and zsh do not do this
 			if exists bash; then
 				out=$(echo 0.0.0.0 | bash -c "$exe" 2>/dev/null)
+			elif exists zsh; then
+				out=$(echo 0.0.0.0 | zsh -c "$exe" 2>/dev/null)
 			else
-				# find do not use its own shell exec
+				# find does not use its own shell exec
 				# it uses execvp(). in musl libc it does not call shell, in glibc it DOES call /bin/sh
-				# that's why prefer bash if present
+				# that's why prefer bash or zsh if present. otherwise it's our last chance
 				out=$(echo 0.0.0.0 | find "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
 			fi
 			[ -n "$out" ]
