@@ -15,6 +15,11 @@ int HttpReplyCode(const uint8_t *data, size_t len);
 // must be pre-checked by IsHttpReply
 bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *host);
 
-bool IsTLSClientHello(const uint8_t *data, size_t len);
-bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext);
-bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host);
+uint16_t TLSRecordDataLen(const uint8_t *data);
+size_t TLSRecordLen(const uint8_t *data);
+bool IsTLSRecordFull(const uint8_t *data, size_t len);
+bool IsTLSClientHello(const uint8_t *data, size_t len, bool bPartialIsOK);
+bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK);
+bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK);
+bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK);
+bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK);

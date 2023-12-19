@@ -110,17 +110,27 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 
 
 
-bool IsTLSClientHello(const uint8_t *data, size_t len)
+uint16_t TLSRecordDataLen(const uint8_t *data)
 {
-	return len>=6 && data[0]==0x16 && data[1]==0x03 && data[2]>=0x01 && data[2]<=0x03 && data[5]==0x01 && (pntoh16(data+3)+5)<=len;
+	return pntoh16(data + 3);
 }
-bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext)
+size_t TLSRecordLen(const uint8_t *data)
+{
+	return TLSRecordDataLen(data) + 5;
+}
+bool IsTLSRecordFull(const uint8_t *data, size_t len)
+{
+	return TLSRecordLen(data)<=len;
+}
+bool IsTLSClientHello(const uint8_t *data, size_t len, bool bPartialIsOK)
+{
+	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
+}
+
+// bPartialIsOK=true - accept partial packets not containing the whole TLS message
+bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK)
 {
 	// +0
-	// u8	ContentType: Handshake
-	// u16	Version: TLS1.0
-	// u16	Length
-	// +5 
 	// u8	HandshakeType: ClientHello
 	// u24	Length
 	// u16	Version
@@ -133,35 +143,46 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 	//	<CompressionMethods>
 	// u16	ExtensionsLength
 
-	size_t l,ll;
+	size_t l, ll;
 
-	l = 1+2+2+1+3+2+32;
+	l = 1 + 3 + 2 + 32;
 	// SessionIDLength
-	if (len<(l+1)) return false;
-	ll = data[6]<<16 | data[7]<<8 | data[8]; // HandshakeProtocol length
-	if (len<(ll+9)) return false;
-	l += data[l]+1;
-	// CipherSuitesLength
-	if (len<(l+2)) return false;
-	l += pntoh16(data+l)+2;
-	// CompressionMethodsLength
-	if (len<(l+1)) return false;
-	l += data[l]+1;
-	// ExtensionsLength
-	if (len<(l+2)) return false;
-
-	data+=l; len-=l;
-	l=pntoh16(data);
-	data+=2; len-=2;
-	if (len<l) return false;
-
-	while(l>=4)
+	if (len < (l + 1)) return false;
+	if (!bPartialIsOK)
 	{
-		uint16_t etype=pntoh16(data);
-		size_t elen=pntoh16(data+2);
-		data+=4; l-=4;
-		if (l<elen) break;
-		if (etype==type)
+	    ll = data[1] << 16 | data[2] << 8 | data[3]; // HandshakeProtocol length
+	    if (len < (ll + 4)) return false;
+	}
+	l += data[l] + 1;
+	// CipherSuitesLength
+	if (len < (l + 2)) return false;
+	l += pntoh16(data + l) + 2;
+	// CompressionMethodsLength
+	if (len < (l + 1)) return false;
+	l += data[l] + 1;
+	// ExtensionsLength
+	if (len < (l + 2)) return false;
+
+	data += l; len -= l;
+	l = pntoh16(data);
+	data += 2; len -= 2;
+	
+	if (bPartialIsOK)
+	{
+		if (len < l) l = len;
+	}
+	else
+	{
+		if (len < l) return false;
+	}
+
+	while (l >= 4)
+	{
+		uint16_t etype = pntoh16(data);
+		size_t elen = pntoh16(data + 2);
+		data += 4; l -= 4;
+		if (l < elen) break;
+		if (etype == type)
 		{
 			if (ext && len_ext)
 			{
@@ -170,29 +191,53 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 			}
 			return true;
 		}
-		data+=elen; l-=elen;
+		data += elen; l -= elen;
 	}
 
 	return false;
 }
-bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host)
+bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK)
+{
+	// +0
+	// u8	ContentType: Handshake
+	// u16	Version: TLS1.0
+	// u16	Length
+	size_t reclen;
+	if (!IsTLSClientHello(data, len, bPartialIsOK)) return false;
+	reclen=TLSRecordLen(data);
+	if (reclen<len) len=reclen; // correct len if it has more data than the first tls record has
+	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext, bPartialIsOK);
+}
+static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, size_t len_host)
+{
+	// u16	data+0 - name list length
+	// u8	data+2 - server name type. 0=host_name
+	// u16	data+3 - server name length
+	if (elen < 5 || ext[2] != 0) return false;
+	size_t slen = pntoh16(ext + 3);
+	ext += 5; elen -= 5;
+	if (slen < elen) return false;
+	if (ext && len_host)
+	{
+		if (slen >= len_host) slen = len_host - 1;
+		for (size_t i = 0; i < slen; i++) host[i] = tolower(ext[i]);
+		host[slen] = 0;
+	}
+	return true;
+}
+bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK)
 {
 	const uint8_t *ext;
 	size_t elen;
 
-	if (!TLSFindExt(data,len,0,&ext,&elen)) return false;
-	// u16	data+0 - name list length
-	// u8	data+2 - server name type. 0=host_name
-	// u16	data+3 - server name length
-	if (elen<5 || ext[2]!=0) return false;
-	size_t slen = pntoh16(ext+3);
-	ext+=5; elen-=5;
-	if (slen<elen) return false;
-	if (ext && len_host)
-	{
-		if (slen>=len_host) slen=len_host-1;
-		for(size_t i=0;i<slen;i++) host[i]=tolower(ext[i]);
-		host[slen]=0;
-	}
-	return true;
+	if (!TLSFindExt(data, len, 0, &ext, &elen, bPartialIsOK)) return false;
+	return TLSExtractHostFromExt(ext, elen, host, len_host);
+}
+bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK)
+{
+	const uint8_t *ext;
+	size_t elen;
+
+	if (!TLSFindExtInHandshake(data, len, 0, &ext, &elen, bPartialIsOK)) return false;
+	return TLSExtractHostFromExt(ext, elen, host, len_host);
 }

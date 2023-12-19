@@ -200,7 +200,10 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 	// u8	ContentType: Handshake
 	// u16	Version: TLS1.0
 	// u16	Length
+	size_t reclen;
 	if (!IsTLSClientHello(data, len, bPartialIsOK)) return false;
+	reclen=TLSRecordLen(data);
+	if (reclen<len) len=reclen; // correct len if it has more data than the first tls record has
 	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext, bPartialIsOK);
 }
 static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, size_t len_host)

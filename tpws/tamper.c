@@ -215,7 +215,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			VPRINT("Not acting on this request")
 		}
 	}
-	else if (IsTLSClientHello(segment,*size))
+	else if (IsTLSClientHello(segment,*size,false))
 	{
 		size_t tpos=0,elen;
 		const uint8_t *ext;
@@ -224,7 +224,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 
 		VPRINT("packet contains TLS ClientHello")
 		// we need host only if hostlist is present
-		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host)))
+		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false))
 		{
 			VPRINT("hostname: %s",Host)
 			bHaveHost = true;
@@ -239,7 +239,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			switch(params.tlsrec)
 			{
 				case tlsrec_sni:
-					if (TLSFindExt(segment,*size,0,&ext,&elen))
+					if (TLSFindExt(segment,*size,0,&ext,&elen,false))
 						tpos = ext-segment+1; // between typical 1st and 2nd char of hostname
 					break;
 				case tlsrec_pos:
