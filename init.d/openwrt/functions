@@ -43,8 +43,12 @@ apply_unspecified_desync_modes
 
 network_find_wan4_all()
 {
-	__network_ifstatus "$1" "" "[@.route[@.target='0.0.0.0' && !@.table]].interface" "" 10 2>/dev/null && return
-	network_find_wan $1
+	if [ -n "$OPENWRT_WAN4" ]; then
+		eval $1="\$OPENWRT_WAN4"
+	else
+		__network_ifstatus "$1" "" "[@.route[@.target='0.0.0.0' && !@.table]].interface" "" 10 2>/dev/null && return
+		network_find_wan $1
+	fi
 }
 network_find_wan_all()
 {
@@ -52,8 +56,12 @@ network_find_wan_all()
 }
 network_find_wan6_all()
 {
-	__network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 10 2>/dev/null && return
-	network_find_wan6 $1
+	if [ -n "$OPENWRT_WAN6" ]; then
+		eval $1="\$OPENWRT_WAN6"
+	else
+		__network_ifstatus "$1" "" "[@.route[@.target='::' && !@.table]].interface" "" 10 2>/dev/null && return
+		network_find_wan6 $1
+	fi
 }
 network_find_wanX_devices()
 {

@@ -934,6 +934,13 @@ To override this behaviour set the following variable :
 
 `OPENWRT_LAN="lan lan2 lan3"`
 
+In openwrt wan interfaces are those having default route. Separately for ipv4 and ipv6.
+This can be redefined :
+```
+OPENWRT_WAN4="wan4 vpn"
+OPENWRT_WAN6="wan6 vpn6"
+```
+
 The `INIT_APPLY_FW=1` parameter enables the init script to independently apply iptables rules.
 With other values or if the parameter is commented out, the rules will not be applied.
 This is useful if you have a firewall management system, in the settings of which you should tie the rules.
