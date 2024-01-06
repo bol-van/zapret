@@ -81,7 +81,7 @@ FLOWOFFLOAD=donttouch
 #OPENWRT_LAN="lan lan2 lan3"
 # openwrt: specify networks to be treated as WAN. default wans are interfaces with default route
 #OPENWRT_WAN4="wan vpn"
-#OPENWRT_WAN6="wan4 vpn6"
+#OPENWRT_WAN6="wan6 vpn6"
 
 # for routers based on desktop linux and macos. has no effect in openwrt.
 # CHOOSE LAN and optinally WAN/WAN6 NETWORK INTERFACES
