@@ -404,6 +404,7 @@ fix_perms()
 install_bin.sh \
 blockcheck.sh \
 install_easy.sh \
+install_prereq.sh \
 files/huawei/E8372/zapret-ip \
 files/huawei/E8372/unzapret-ip \
 files/huawei/E8372/run-zapret-hostlist \
