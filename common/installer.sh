@@ -462,3 +462,195 @@ remove_macos_firewall()
 	pf_anchor_root_del
 	pf_anchor_root_reload
 }
+
+sedi()
+{
+	# MacOS doesnt support -i without parameter. busybox doesnt support -i with parameter.
+	# its not possible to put "sed -i ''" to a variable and then use it
+	if [ "$SYSTEM" = "macos" ]; then
+		sed -i '' "$@"
+	else
+		sed -i "$@"
+	fi
+}
+
+write_config_var()
+{
+	# $1 - mode var
+	local M
+	eval M="\$$1"
+
+	if grep -q "^$1=\|^#$1=" "$ZAPRET_CONFIG"; then
+		# replace / => \/
+		#M=${M//\//\\\/}
+		M=$(echo $M | sed 's/\//\\\//g')
+		if [ -n "$M" ]; then
+			if contains "$M" " "; then
+				sedi -Ee "s/^#?$1=.*$/$1=\"$M\"/" "$ZAPRET_CONFIG"
+			else
+				sedi -Ee "s/^#?$1=.*$/$1=$M/" "$ZAPRET_CONFIG"
+			fi
+		else
+			# write with comment at the beginning
+			sedi -Ee "s/^#?$1=.*$/#$1=/" "$ZAPRET_CONFIG"
+		fi
+	else
+		# var does not exist in config. add it
+		if [ -n "$M" ]; then
+			echo "$1=$M" >>"$ZAPRET_CONFIG"
+		else
+			echo "#$1=$M" >>"$ZAPRET_CONFIG"
+		fi
+	fi
+}
+
+check_prerequisites_linux()
+{
+	echo \* checking prerequisites
+
+	local s cmd PKGS UTILS req="curl curl"
+	case "$FWTYPE" in
+		iptables)
+			req="$req iptables iptables ip6tables iptables ipset ipset"
+			;;
+		nftables)
+			req="$req nft nftables"
+			;;
+	esac
+
+	PKGS=$(for s in $req; do echo $s; done |
+		while read cmd; do
+			read pkg
+			exists $cmd || echo $pkg
+		done | sort -u | xargs)
+	UTILS=$(for s in $req; do echo $s; done |
+		while read cmd; do
+			read pkg
+			echo $cmd
+		done | sort -u | xargs)
+
+	if [ -z "$PKGS" ] ; then
+		echo required utilities exist : $UTILS
+	else
+		echo \* installing prerequisites
+
+		echo packages required : $PKGS
+
+		APTGET=$(whichq apt-get)
+		YUM=$(whichq yum)
+		PACMAN=$(whichq pacman)
+		ZYPPER=$(whichq zypper)
+		EOPKG=$(whichq eopkg)
+		APK=$(whichq apk)
+		if [ -x "$APTGET" ] ; then
+			"$APTGET" update
+			"$APTGET" install -y --no-install-recommends $PKGS dnsutils || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$YUM" ] ; then
+			"$YUM" -y install $PKGS || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$PACMAN" ] ; then
+			"$PACMAN" -Syy
+			"$PACMAN" --noconfirm -S $PKGS || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$ZYPPER" ] ; then
+			"$ZYPPER" --non-interactive install $PKGS || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$EOPKG" ] ; then
+			"$EOPKG" -y install $PKGS || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		elif [ -x "$APK" ] ; then
+			"$APK" update
+			# for alpine
+			[ "$FWTYPE" = iptables ] && [ -n "$($APK list ip6tables)" ] && PKGS="$PKGS ip6tables"
+			"$APK" add $PKGS || {
+				echo could not install prerequisites
+				exitp 6
+			}
+		else
+			echo supported package manager not found
+			echo you must manually install : $UTILS
+			exitp 5
+		fi
+	fi
+}
+
+check_prerequisites_openwrt()
+{
+	echo \* checking prerequisites
+
+	local PKGS="curl" UPD=0
+
+	case "$FWTYPE" in
+		iptables)
+			PKGS="$PKGS ipset iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
+			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS ip6tables ip6tables-mod-nat ip6tables-extra"
+			;;
+		nftables)
+			PKGS="$PKGS nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
+			;;
+	esac
+
+	if check_packages_openwrt $PKGS ; then
+		echo everything is present
+	else
+		echo \* installing prerequisites
+
+		opkg update
+		UPD=1
+		opkg install $PKGS || {
+			echo could not install prerequisites
+			exitp 6
+		}
+	fi
+	
+	is_linked_to_busybox gzip && {
+		echo
+		echo your system uses default busybox gzip. its several times slower than GNU gzip.
+		echo ip/host list scripts will run much faster with GNU gzip
+		echo installer can install GNU gzip but it requires about 100 Kb space
+		if ask_yes_no N "do you want to install GNU gzip"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite gzip
+		fi
+	}
+	is_linked_to_busybox sort && {
+		echo
+		echo your system uses default busybox sort. its much slower and consumes much more RAM than GNU sort
+		echo ip/host list scripts will run much faster with GNU sort
+		echo installer can install GNU sort but it requires about 100 Kb space
+		if ask_yes_no N "do you want to install GNU sort"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite coreutils-sort
+		fi
+	}
+	[ "$FSLEEP" = 0 ] && is_linked_to_busybox sleep && {
+		echo
+		echo no methods of sub-second sleep were found.
+		echo if you want to speed up blockcheck install coreutils-sleep. it requires about 40 Kb space
+		if ask_yes_no N "do you want to install COREUTILS sleep"; then
+			[ "$UPD" = "0" ] && {
+				opkg update
+				UPD=1
+			}
+			opkg install --force-overwrite coreutils-sleep
+			fsleep_setup
+		fi
+	}
+}

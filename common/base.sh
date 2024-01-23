@@ -262,6 +262,20 @@ replace_char()
 	echo "$@" | tr $a $b
 }
 
+random()
+{
+	# $1 - min, $2 - max
+	local r rs
+	if [ -c /dev/urandom ]; then
+		read rs </dev/urandom
+	else
+		rs="$RANDOM$RANDOM$(date)"
+	fi
+	# shells use signed int64
+	r=1$(echo $rs | $MD5 | sed 's/[^0-9]//g' | head -c 17)
+	echo $(( ($r % ($2-$1+1)) + $1 ))
+}
+
 std_ports()
 {
         HTTP_PORTS=${HTTP_PORTS:-80}
