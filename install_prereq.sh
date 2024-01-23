@@ -22,7 +22,7 @@ ZAPRET_BASE="$EXEDIR"
 umask 0022
 fsleep_setup
 fix_sbin_path
-check_system
+check_system accept_unknown_rc
 [ $UNAME = "Linux" ] || {
 	echo no prerequisites required for $SYSTEM
 }

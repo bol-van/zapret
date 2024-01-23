@@ -72,6 +72,8 @@ openrc_test()
 }
 check_system()
 {
+	# $1 - nonempty = do not fail on unknown rc system
+
 	echo \* checking system
 
 	SYSTEM=""
@@ -111,7 +113,7 @@ check_system()
 			echo system is not either systemd, openrc or openwrt based
 			echo easy installer can set up config settings but can\'t configure auto start
 			echo you have to do it manually. check readme.txt for manual setup info.
-			if ask_yes_no N "do you want to continue"; then
+			if [ -n "$1" ] || ask_yes_no N "do you want to continue"; then
 			    SYSTEM=linux
 			else
 			    exitp 5
