@@ -813,8 +813,8 @@ install_macos()
 [ "$1" = "make" ] && FORCE_BUILD=1
 
 umask 0022
-fsleep_setup
 fix_sbin_path
+fsleep_setup
 check_system
 
 [ "$SYSTEM" = "macos" ] && . "$EXEDIR/init.d/macos/functions"

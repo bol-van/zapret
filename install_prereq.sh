@@ -16,8 +16,8 @@ ZAPRET_BASE="$EXEDIR"
 . "$ZAPRET_BASE/common/ipt.sh"
 
 umask 0022
-fsleep_setup
 fix_sbin_path
+fsleep_setup
 check_system accept_unknown_rc
 [ $UNAME = "Linux" ] || {
 	echo no prerequisites required for $SYSTEM
