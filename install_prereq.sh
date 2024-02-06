@@ -20,7 +20,8 @@ fix_sbin_path
 fsleep_setup
 check_system accept_unknown_rc
 [ $UNAME = "Linux" ] || {
-	echo no prerequisites required for $SYSTEM
+	echo no prerequisites required for $UNAME
+	exitp 0
 }
 require_root
 
