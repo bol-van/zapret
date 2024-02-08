@@ -552,6 +552,14 @@ report_strategy()
 		return 1
 	fi
 }
+test_has_split()
+{
+	contains "$1" split || contains "$1" disorder
+}
+warn_md5sig()
+{
+	echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
+}
 pktws_check_domain_bypass()
 {
 	# $1 - test function
@@ -583,10 +591,15 @@ pktws_check_domain_bypass()
 			fi
 		done
 	}
-	[ "$ok" = 1 ] || tests="$tests split fake,split2 fake,split"
+	[ "$ok" = 1 -a "$FORCE" != 1 ] || tests="$tests split fake,split2 fake,split"
 
 	pktws_curl_test_update $1 $3 --dpi-desync=disorder2
-	[ "$?" != 0 -o "$FORCE" = 1 ] && tests="$tests disorder fake,disorder2 fake,disorder"
+	ret=$?
+	[ "$ret" != 0 -o "$FORCE" = 1 ] && {
+	    pktws_curl_test_update $1 $3 --dpi-desync=disorder2 --dpi-desync-split-pos=1
+	    ret=$?
+	}
+	[ "$ret" != 0 -o "$FORCE" = 1 ] && tests="$tests disorder fake,disorder2 fake,disorder"
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
 	for e in '' '--wssize 1:6'; do
@@ -600,12 +613,13 @@ pktws_check_domain_bypass()
 			s="--dpi-desync=$desync"
 			for ttl in $ttls; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=$ttl $e && break
+				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=$ttl $e && break
 			done
 			f="badsum badseq md5sig"
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
-				pktws_curl_test_update $1 $3 $s --dpi-desync-fooling=$fooling $e && [ "$fooling" = "md5sig" ] &&
-					echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
+				pktws_curl_test_update $1 $3 $s --dpi-desync-fooling=$fooling $e && [ "$fooling" = "md5sig" ] && warn_md5sig
+				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-fooling=$fooling $e && [ "$fooling" = "md5sig" ] && warn_md5sig
 			done
 		done
 		[ "$IPV" = 6 ] && {
@@ -613,6 +627,7 @@ pktws_check_domain_bypass()
 			[ -n "$IP6_DEFRAG_DISABLE" ] && f="$f ipfrag1 ipfrag1,split2 ipfrag1,disorder2"
 			for desync in $f; do
 				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
+				test_has_split $desync && pktws_curl_test_update $1 $3 --dpi-desync-split-pos=1 --dpi-desync=$desync $e
 			done
 		}
 		# do not do wssize test for http. it's useless
@@ -695,7 +710,7 @@ check_domain()
 	if [ "$SUBSYS" = "pfSense" ] ; then
 		echo "tpws tests are not possible on pfSense"
 		report_append "ipv${IPV} $4 $1 : automated tpws tests are not possible on pfSense. check docs/bsd.txt"
-	else
+	elif [ "$SKIP_TPWS" != 1 ]; then
 		echo preparing tpws redirection
 		tpws_ipt_prepare $2
 
