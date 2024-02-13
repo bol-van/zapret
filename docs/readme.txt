@@ -1382,13 +1382,19 @@ chcon u:object_r:system_file:s0 /data/local/tmp/zapret/tpws
 Это лучше всего делать с компа через adb shell.
 Если компа нет, то это единственный вариант, хотя и неудобный.
 Подойдет что-то легковесное, например, alpine или даже openwrt.
+Если это не эмулятор android, то универсальная архитектура - arm (любой вариант).
+Если вы точно знаете, что ОС у вас 64-разрядная, то лучше вместо arm - aarch64.
 
 mount --bind /dev /data/linux/dev
 mount --bind /proc /data/linux/proc
 mount --bind /sys /data/linux/sys
 chroot /data/linux
 
-Под этим linux нужно средствами пакетного менеджера установить iptables-legacy. Обязательно НЕ iptables-nft,
+Первым делом вам нужно будет один раз настроить DNS. Сам он не заведется.
+
+echo nameserver 1.1.1.1 >/etc/resolv.conf
+
+Далее нужно средствами пакетного менеджера установить iptables-legacy. Обязательно НЕ iptables-nft,
 который как правило присутствует по умолчанию. В ядре android нет nftables.
 ls -la $(which iptables)
 Линк должен указывать на legacy вариант.
