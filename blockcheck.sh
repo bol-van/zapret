@@ -452,6 +452,9 @@ curl_test()
 			continue
 		}
 		code=$?
+		if [ $code != 0 ]; then
+			break
+		fi
 	done
 	if [ $code = 254 ]; then
 		echo "UNAVAILABLE"
