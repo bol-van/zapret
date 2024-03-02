@@ -637,9 +637,11 @@ pktws_check_domain_bypass()
 				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=$ttl $e && break
 				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=$ttl $e && break
 			done
-			pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=1 --dpi-desync-autottl $e || {
-				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=1 --dpi-desync-autottl $e
-			}
+			for delta in 1 2 3; do
+				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e || {
+					test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e
+				}
+			done
 			f="badsum badseq md5sig datanoack"
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
