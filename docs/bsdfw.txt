@@ -26,7 +26,7 @@ ipfw add 100 fwd ::1,988 tcp from any to any 80,443 proto ip6 recv em1
 
 
 ipfw delete 100
-ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit vmx0
+ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 ipfw add 100 divert 989 udp from any to any 443 out not diverted not sockarg xmit em0
 # this is required for autottl but very bad, all incoming traffic will be diverted, no way to limit like in linux (connbytes)
 ipfw add 100 divert 989 tcp from any 80,443 to any in not diverted not sockarg recv em0
