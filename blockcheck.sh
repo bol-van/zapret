@@ -588,7 +588,7 @@ pktws_check_domain_bypass()
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local strategy tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2"
+	local strategy tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
