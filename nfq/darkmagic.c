@@ -1195,9 +1195,7 @@ uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 
 	path = orig - ttl;
 
-	if (path <=attl->delta) return 0;
-
-	fake = path - attl->delta;
+	fake = path > attl->delta ? path - attl->delta : attl->min;
 	if (fake<attl->min) fake=attl->min;
 	else if (fake>attl->max) fake=attl->max;
 
