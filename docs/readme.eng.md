@@ -259,13 +259,6 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   Can fail if inbound and outbound paths are not symmetric.
 
 
-special knowledge what you are doing. Blockcheck can find a strategy with 'datanoack'
-  but it will not work with forwarded traffic unless POSTNAT mode is enabled.
-  POSTNAT mode brings some limits. No desync of the first UDP packet is possible (QUIC, for example).
-  That's why it's disabled by default. To enable write POSTNAT_ALL=1 to config.
-  Works only with nftables and from the system with an external IP address.
-
-
 `--dpi-desync-fooling` takes multiple comma separated values.
 
 For fake,rst,rstack modes original packet can be sent after the fake one or just dropped.
