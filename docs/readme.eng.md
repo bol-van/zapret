@@ -99,7 +99,7 @@ Its necessary to use this filter when also using `connbytes 1:6`. Without it pac
 
 Some attacks require redirection of incoming packets :
 
-iptables -t mangle -I PREROUTING -i <external_interface> -p tcp --sport 80 -m connbytes --connbytes-dir=reply --connbytes-mode=packets --connbytes 1:6 -m set --match-set zapret src -j NFQUEUE --queue-num 200 --queue-bypass
+`iptables -t mangle -I PREROUTING -i <external_interface> -p tcp --sport 80 -m connbytes --connbytes-dir=reply --connbytes-mode=packets --connbytes 1:6 -m set --match-set zapret src -j NFQUEUE --queue-num 200 --queue-bypass`
 
 Incoming packets are filtered by incoming interface, source port and IP. This is opposite to the direct rule.
 
