@@ -176,6 +176,7 @@ static void exithelp(void)
 #else
 		" --disorder\t\t\t\t; when splitting simulate sending second fragment first\n"
 #endif
+		" --oob\t\t\t\t\t; when splitting send out of band zero byte\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostdot\t\t\t\t; add \".\" after Host: name\n"
@@ -294,29 +295,30 @@ void parse_params(int argc, char *argv[])
 		{ "split-pos",required_argument,0,0 },// optidx=24
 		{ "split-any-protocol",optional_argument,0,0},// optidx=25
 		{ "disorder",no_argument,0,0 },// optidx=26
-		{ "methodspace",no_argument,0,0 },// optidx=27
-		{ "methodeol",no_argument,0,0 },// optidx=28
-		{ "hosttab",no_argument,0,0 },// optidx=29
-		{ "unixeol",no_argument,0,0 },// optidx=30
-		{ "tlsrec",required_argument,0,0 },// optidx=31
-		{ "tlsrec-pos",required_argument,0,0 },// optidx=32
-		{ "hostlist",required_argument,0,0 },// optidx=33
-		{ "hostlist-exclude",required_argument,0,0 },// optidx=34
-		{ "hostlist-auto",required_argument,0,0}, // optidx=35
-		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=36
-		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=37
-		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=38
-		{ "pidfile",required_argument,0,0 },// optidx=39
-		{ "debug",optional_argument,0,0 },// optidx=40
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=41
-		{ "local-sndbuf",required_argument,0,0 },// optidx=42
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=43
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=44
-		{ "socks",no_argument,0,0 },// optidx=45
-		{ "no-resolve",no_argument,0,0 },// optidx=46
-		{ "skip-nodelay",no_argument,0,0 },// optidx=47
+		{ "oob",no_argument,0,0 },// optidx=27
+		{ "methodspace",no_argument,0,0 },// optidx=28
+		{ "methodeol",no_argument,0,0 },// optidx=29
+		{ "hosttab",no_argument,0,0 },// optidx=30
+		{ "unixeol",no_argument,0,0 },// optidx=31
+		{ "tlsrec",required_argument,0,0 },// optidx=32
+		{ "tlsrec-pos",required_argument,0,0 },// optidx=33
+		{ "hostlist",required_argument,0,0 },// optidx=34
+		{ "hostlist-exclude",required_argument,0,0 },// optidx=35
+		{ "hostlist-auto",required_argument,0,0}, // optidx=36
+		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=37
+		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=38
+		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=39
+		{ "pidfile",required_argument,0,0 },// optidx=40
+		{ "debug",optional_argument,0,0 },// optidx=41
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=42
+		{ "local-sndbuf",required_argument,0,0 },// optidx=43
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=44
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=45
+		{ "socks",no_argument,0,0 },// optidx=46
+		{ "no-resolve",no_argument,0,0 },// optidx=47
+		{ "skip-nodelay",no_argument,0,0 },// optidx=48
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=48
+		{ "enable-pf",no_argument,0,0 },// optidx=49
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -505,23 +507,26 @@ void parse_params(int argc, char *argv[])
 			params.disorder = true;
 			save_default_ttl();
 			break;
-		case 27: /* methodspace */
+		case 27: /* oob */
+			params.oob = true;
+			break;
+		case 28: /* methodspace */
 			params.methodspace = true;
 			params.tamper = true;
 			break;
-		case 28: /* methodeol */
+		case 29: /* methodeol */
 			params.methodeol = true;
 			params.tamper = true;
 			break;
-		case 29: /* hosttab */
+		case 30: /* hosttab */
 			params.hosttab = true;
 			params.tamper = true;
 			break;
-		case 30: /* unixeol */
+		case 31: /* unixeol */
 			params.unixeol = true;
 			params.tamper = true;
 			break;
-		case 31: /* tlsrec */
+		case 32: /* tlsrec */
 			if (!strcmp(optarg, "sni"))
 				params.tlsrec = tlsrec_sni;
 			else
@@ -531,7 +536,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 32: /* tlsrec-pos */
+		case 33: /* tlsrec-pos */
 			if ((params.tlsrec_pos = atoi(optarg))>0)
 				params.tlsrec = tlsrec_pos;
 			else
@@ -541,7 +546,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 33: /* hostlist */
+		case 34: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -549,7 +554,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 34: /* hostlist-exclude */
+		case 35: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
@@ -557,7 +562,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 35: /* hostlist-auto */
+		case 36: /* hostlist-auto */
 			if (*params.hostlist_auto_filename)
 			{
 				fprintf(stderr, "only one auto hostlist is supported\n");
@@ -589,7 +594,7 @@ void parse_params(int argc, char *argv[])
 			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
 			params.tamper = true; // need to detect blocks and update autohostlist. cannot just slice.
 			break;
-		case 36: /* hostlist-auto-fail-threshold */
+		case 37: /* hostlist-auto-fail-threshold */
 			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
 			{
@@ -597,7 +602,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 37: /* hostlist-auto-fail-time */
+		case 38: /* hostlist-auto-fail-time */
 			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_time<1)
 			{
@@ -605,7 +610,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 38: /* hostlist-auto-debug */
+		case 39: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -620,36 +625,36 @@ void parse_params(int argc, char *argv[])
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
 			break;
-		case 39: /* pidfile */
+		case 40: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 40:
+		case 41:
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
-		case 41: /* local-rcvbuf */
+		case 42: /* local-rcvbuf */
 			params.local_rcvbuf = atoi(optarg)/2;
 			break;
-		case 42: /* local-sndbuf */
+		case 43: /* local-sndbuf */
 			params.local_sndbuf = atoi(optarg)/2;
 			break;
-		case 43: /* remote-rcvbuf */
+		case 44: /* remote-rcvbuf */
 			params.remote_rcvbuf = atoi(optarg)/2;
 			break;
-		case 44: /* remote-sndbuf */
+		case 45: /* remote-sndbuf */
 			params.remote_sndbuf = atoi(optarg)/2;
 			break;
-		case 45: /* socks */
+		case 46: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 46: /* no-resolve */
+		case 47: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 47: /* skip-nodelay */
+		case 48: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 48: /* enable-pf */
+		case 49: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif

@@ -255,3 +255,10 @@ autohostlist mode
 v53
 
 nfqws: tcp session reassemble for TLS ClientHello
+
+v54
+
+tpws: out of band send when splitting (--oob)
+nfqws: autottl
+nfqws: datanoack fooling
+nftables: use POSTNAT path for tcp redirections to allow NAT-breaking strategies. use additional mark bit DESYNC_MARK_POSTNAT.

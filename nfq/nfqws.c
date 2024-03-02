@@ -540,7 +540,9 @@ static void exithelp(void)
 #endif
 		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for desync packet\n"
 		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum hopbyhop hopbyhop2\n"
+		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
+		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
 #ifdef __linux__
 		" --dpi-desync-retrans=0|1\t\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
 #endif
@@ -573,6 +575,7 @@ static void exithelp(void)
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
+		AUTOTTL_DEFAULT_DELTA,AUTOTTL_DEFAULT_MIN,AUTOTTL_DEFAULT_MAX,
 		DPI_DESYNC_MAX_FAKE_LEN,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
@@ -643,6 +646,31 @@ static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 	}
 }
 
+bool parse_autottl(const char *s, autottl *t)
+{
+	unsigned int delta,min,max;
+	AUTOTTL_SET_DEFAULT(*t);
+	if (s)
+	{
+		max = t->max;
+		switch (sscanf(s,"%u:%u-%u",&delta,&min,&max))
+		{
+			case 3:
+				if (delta && !max || max>255) return false;
+				t->max=(uint8_t)max;
+			case 2:
+				if (delta && !min || min>255 || min>max) return false;
+				t->min=(uint8_t)min;
+			case 1:
+				if (delta>255) return false;
+				t->delta=(uint8_t)delta;
+				break;
+			default:
+				return false;
+		}
+	}
+	return true;
+}
 
 int main(int argc, char **argv)
 {
@@ -727,37 +755,39 @@ int main(int argc, char **argv)
 #endif
 		{"dpi-desync-ttl",required_argument,0,0},	// optidx=16
 		{"dpi-desync-ttl6",required_argument,0,0},	// optidx=17
-		{"dpi-desync-fooling",required_argument,0,0},	// optidx=18
-		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=19
-		{"dpi-desync-repeats",required_argument,0,0},	// optidx=20
-		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=21
-		{"dpi-desync-split-pos",required_argument,0,0},// optidx=22
-		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=23
-		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=24
-		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=25
-		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=26
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=27
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=28
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=29
-		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=30
-		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=31
-		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=32
-		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=33
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=34
-		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=35
-		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=36
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=37
-		{"hostlist",required_argument,0,0},		// optidx=38
-		{"hostlist-exclude",required_argument,0,0},	// optidx=39
-		{"hostlist-auto",required_argument,0,0},	// optidx=40
-		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=41
-		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=42
-		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=43
-		{"hostlist-auto-debug",required_argument,0,0},	// optidx=44
+		{"dpi-desync-autottl",optional_argument,0,0},	// optidx=18
+		{"dpi-desync-autottl6",optional_argument,0,0},	// optidx=19
+		{"dpi-desync-fooling",required_argument,0,0},	// optidx=20
+		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=21
+		{"dpi-desync-repeats",required_argument,0,0},	// optidx=22
+		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=23
+		{"dpi-desync-split-pos",required_argument,0,0},// optidx=24
+		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=25
+		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=26
+		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=27
+		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=28
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=29
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=30
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=31
+		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=32
+		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=33
+		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=34
+		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=35
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=36
+		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=37
+		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=38
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=39
+		{"hostlist",required_argument,0,0},		// optidx=40
+		{"hostlist-exclude",required_argument,0,0},	// optidx=41
+		{"hostlist-auto",required_argument,0,0},	// optidx=42
+		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=43
+		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=44
+		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=45
+		{"hostlist-auto-debug",required_argument,0,0},	// optidx=46
 	
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=45
-		{"bind-fix6",no_argument,0,0},		// optidx=46
+		{"bind-fix4",no_argument,0,0},		// optidx=47
+		{"bind-fix6",no_argument,0,0},		// optidx=48
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -924,7 +954,21 @@ int main(int argc, char **argv)
 		case 17: /* dpi-desync-ttl6 */
 			params.desync_ttl6 = (uint8_t)atoi(optarg);
 			break;
-		case 18: /* dpi-desync-fooling */
+		case 18: /* dpi-desync-autottl */
+			if (!parse_autottl(optarg, &params.desync_autottl))
+			{
+				fprintf(stderr, "dpi-desync-autottl value error\n");
+				exit_clean(1);
+			}
+			break;
+		case 19: /* dpi-desync-autottl6 */
+			if (!parse_autottl(optarg, &params.desync_autottl6))
+			{
+				fprintf(stderr, "dpi-desync-autottl6 value error\n");
+				exit_clean(1);
+			}
+			break;
+		case 20: /* dpi-desync-fooling */
 			{
 				char *e,*p = optarg;
 				while (p)
@@ -944,20 +988,22 @@ int main(int argc, char **argv)
 					}
 					else if (!strcmp(p,"badseq"))
 						params.desync_fooling_mode |= FOOL_BADSEQ;
+					else if (!strcmp(p,"datanoack"))
+						params.desync_fooling_mode |= FOOL_DATANOACK;
 					else if (!strcmp(p,"hopbyhop"))
 						params.desync_fooling_mode |= FOOL_HOPBYHOP;
 					else if (!strcmp(p,"hopbyhop2"))
 						params.desync_fooling_mode |= FOOL_HOPBYHOP2;
 					else if (strcmp(p,"none"))
 					{
-						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum,hopbyhop,hopbyhop2\n");
+						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum,datanoack,hopbyhop,hopbyhop2\n");
 						exit_clean(1);
 					}
 					p = e;
 				}
 			}
 			break;
-		case 19: /* dpi-desync-retrans */
+		case 21: /* dpi-desync-retrans */
 #ifdef __linux__
 			params.desync_retrans = !optarg || atoi(optarg);
 #else
@@ -965,24 +1011,24 @@ int main(int argc, char **argv)
 			exit_clean(1);
 #endif
 			break;
-		case 20: /* dpi-desync-repeats */
+		case 22: /* dpi-desync-repeats */
 			if (sscanf(optarg,"%u",&params.desync_repeats)<1 || !params.desync_repeats || params.desync_repeats>20)
 			{
 				fprintf(stderr, "dpi-desync-repeats must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
-		case 21: /* dpi-desync-skip-nosni */
+		case 23: /* dpi-desync-skip-nosni */
 			params.desync_skip_nosni = !optarg || atoi(optarg);
 			break;
-		case 22: /* dpi-desync-split-pos */
+		case 24: /* dpi-desync-split-pos */
 			if (sscanf(optarg,"%u",&params.desync_split_pos)<1 || params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-split-pos must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
 				exit_clean(1);
 			}
 			break;
-		case 23: /* dpi-desync-ipfrag-pos-tcp */
+		case 25: /* dpi-desync-ipfrag-pos-tcp */
 			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_tcp)<1 || params.desync_ipfrag_pos_tcp<1 || params.desync_ipfrag_pos_tcp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-ipfrag-pos-tcp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
@@ -994,7 +1040,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 24: /* dpi-desync-ipfrag-pos-udp */
+		case 26: /* dpi-desync-ipfrag-pos-udp */
 			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_udp)<1 || params.desync_ipfrag_pos_udp<1 || params.desync_ipfrag_pos_udp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-ipfrag-pos-udp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
@@ -1006,59 +1052,59 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 25: /* dpi-desync-badseq-increments */
+		case 27: /* dpi-desync-badseq-increments */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_increment))
 			{
 				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 26: /* dpi-desync-badack-increment */
+		case 28: /* dpi-desync-badack-increment */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_ack_increment))
 			{
 				fprintf(stderr, "dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 27: /* dpi-desync-any-protocol */
+		case 29: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 28: /* dpi-desync-fake-http */
+		case 30: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
 			load_file_or_exit(optarg,params.fake_http,&params.fake_http_size);
 			break;
-		case 29: /* dpi-desync-fake-tls */
+		case 31: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
 			load_file_or_exit(optarg,params.fake_tls,&params.fake_tls_size);
 			break;
-		case 30: /* dpi-desync-fake-unknown */
+		case 32: /* dpi-desync-fake-unknown */
 			params.fake_unknown_size = sizeof(params.fake_unknown);
 			load_file_or_exit(optarg,params.fake_unknown,&params.fake_unknown_size);
 			break;
-		case 31: /* dpi-desync-fake-quic */
+		case 33: /* dpi-desync-fake-quic */
 			params.fake_quic_size = sizeof(params.fake_quic);
 			load_file_or_exit(optarg,params.fake_quic,&params.fake_quic_size);
 			break;
-		case 32: /* dpi-desync-fake-wireguard */
+		case 34: /* dpi-desync-fake-wireguard */
 			params.fake_wg_size = sizeof(params.fake_wg);
 			load_file_or_exit(optarg,params.fake_wg,&params.fake_wg_size);
 			break;
-		case 33: /* dpi-desync-fake-dht */
+		case 35: /* dpi-desync-fake-dht */
 			params.fake_dht_size = sizeof(params.fake_dht);
 			load_file_or_exit(optarg,params.fake_dht,&params.fake_dht_size);
 			break;
-		case 34: /* dpi-desync-fake-unknown-udp */
+		case 36: /* dpi-desync-fake-unknown-udp */
 			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
-		case 35: /* dpi-desync-udplen-increment */
+		case 37: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&params.udplen_increment)<1 || params.udplen_increment>0x7FFF || params.udplen_increment<-0x8000)
 			{
 				fprintf(stderr, "dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
 				exit_clean(1);
 			}
 			break;
-		case 36: /* dpi-desync-udplen-pattern */
+		case 38: /* dpi-desync-udplen-pattern */
 			{
 				char buf[sizeof(params.udplen_pattern)];
 				size_t sz=sizeof(buf);
@@ -1066,28 +1112,28 @@ int main(int argc, char **argv)
 				fill_pattern(params.udplen_pattern,sizeof(params.udplen_pattern),buf,sz);
 			}
 			break;
-		case 37: /* desync-cutoff */
+		case 39: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 38: /* hostlist */
+		case 40: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 39: /* hostlist-exclude */
+		case 41: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 40: /* hostlist-auto */
+		case 42: /* hostlist-auto */
 			if (*params.hostlist_auto_filename)
 			{
 				fprintf(stderr, "only one auto hostlist is supported\n");
@@ -1118,7 +1164,7 @@ int main(int argc, char **argv)
 			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
 			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
 			break;
-		case 41: /* hostlist-auto-fail-threshold */
+		case 43: /* hostlist-auto-fail-threshold */
 			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
 			{
@@ -1126,7 +1172,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 42: /* hostlist-auto-fail-time */
+		case 44: /* hostlist-auto-fail-time */
 			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_time<1)
 			{
@@ -1134,7 +1180,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 43: /* hostlist-auto-retrans-threshold */
+		case 45: /* hostlist-auto-retrans-threshold */
 			params.hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_retrans_threshold<2 || params.hostlist_auto_retrans_threshold>10)
 			{
@@ -1142,7 +1188,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 44: /* hostlist-auto-debug */
+		case 46: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1158,10 +1204,10 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifdef __linux__
-		case 45: /* bind-fix4 */
+		case 47: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 46: /* bind-fix6 */
+		case 48: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif
@@ -1169,6 +1215,12 @@ int main(int argc, char **argv)
 	}
 	// not specified - use desync_ttl value instead
 	if (params.desync_ttl6 == 0xFF) params.desync_ttl6=params.desync_ttl;
+	if (!AUTOTTL_ENABLED(params.desync_autottl6)) params.desync_autottl6 = params.desync_autottl;
+	if (AUTOTTL_ENABLED(params.desync_autottl))
+		DLOG("autottl ipv4 %u:%u-%u\n",params.desync_autottl.delta,params.desync_autottl.min,params.desync_autottl.max)
+	if (AUTOTTL_ENABLED(params.desync_autottl6))
+		DLOG("autottl ipv6 %u:%u-%u\n",params.desync_autottl6.delta,params.desync_autottl6.min,params.desync_autottl6.max)
+
 #ifdef BSD
 	if (!params.port)
 	{

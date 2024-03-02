@@ -333,6 +333,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 	uint32_t *timestamps;
 
 	if (!!ip == !!ip6hdr) return res; // one and only one must be present
+	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 
 	ConntrackPoolPurge(&params.conntrack);
 	if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, NULL, len_payload, &ctrack, &bReverse))
@@ -349,6 +350,19 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 	
 	if (bReverse)
 	{
+		if (ctrack && !ctrack->autottl && ctrack->pcounter_reply==1)
+		{
+			autottl *attl = ip ? &params.desync_autottl : &params.desync_autottl6;
+			if (AUTOTTL_ENABLED(*attl))
+			{
+				ctrack->autottl = autottl_guess(ttl_orig, attl);
+				if (ctrack->autottl)
+					DLOG("autottl: guessed %u\n",ctrack->autottl)
+				else
+					DLOG("autottl: could not guess\n")
+			}
+		}
+
 		// process reply packets for auto hostlist mode
 		// by looking at RSTs or HTTP replies we decide whether original request looks like DPI blocked
 		// we only process first-sequence replies. do not react to subsequent redirects or RSTs
@@ -415,9 +429,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 
 	if (params.desync_mode0!=DESYNC_NONE || params.desync_mode!=DESYNC_NONE) // save some cpu
 	{
-		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
-		else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+		ttl_fake = (ctrack && ctrack->autottl) ? ctrack->autottl : (ip6hdr ? (params.desync_ttl6 ? params.desync_ttl6 : ttl_orig) : (params.desync_ttl ? params.desync_ttl : ttl_orig));
 		flags_orig = *((uint8_t*)tcphdr+13);
 		scale_factor = tcp_find_scale_factor(tcphdr);
 		timestamps = tcp_find_timestamps(tcphdr);
@@ -628,7 +640,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		}
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;
-		uint8_t fooling_orig = FOOL_NONE;
+		uint32_t fooling_orig = FOOL_NONE;
 		bool b;
 
 		pkt1_len = sizeof(pkt1);
@@ -1026,7 +1038,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		}
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;
-		uint8_t fooling_orig = FOOL_NONE;
+		uint32_t fooling_orig = FOOL_NONE;
 
 		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 		if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;

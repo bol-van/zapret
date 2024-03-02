@@ -30,7 +30,7 @@ struct send_buffer
 {
 	uint8_t *data;
 	size_t len,pos;
-	int ttl;
+	int ttl, flags;
 };
 typedef struct send_buffer send_buffer_t;
 

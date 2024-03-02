@@ -27,10 +27,9 @@
 
 #define UDPLEN_INCREMENT_DEFAULT 	2
 
-#define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	2
+#define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
-
 
 struct params_s
 {
@@ -53,7 +52,8 @@ struct params_s
 	char desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;
-	uint8_t desync_fooling_mode;
+	autottl desync_autottl, desync_autottl6;
+	uint32_t desync_fooling_mode;
 	uint32_t desync_fwmark; // unused in BSD
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
 	uint8_t fake_http[1432],fake_tls[1432],fake_quic[1472],fake_wg[1472],fake_dht[1472],fake_unknown[1432],fake_unknown_udp[1472], udplen_pattern[1472];

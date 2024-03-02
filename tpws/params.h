@@ -49,7 +49,7 @@ struct params_s
 	int tlsrec_pos;
 	bool split_any_protocol;
 	int split_pos;
-	bool disorder;
+	bool disorder, oob;
 	int ttl_default;
 
 	char pidfile[256];

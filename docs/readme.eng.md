@@ -97,6 +97,15 @@ Then we can reduce CPU load, refusing to process unnecessary packets.
 Mark filter does not allow nfqws-generated packets to enter the queue again.
 Its necessary to use this filter when also using `connbytes 1:6`. Without it packet ordering can be changed breaking the whole idea.
 
+Some attacks require redirection of incoming packets :
+
+iptables -t mangle -I PREROUTING -i <external_interface> -p tcp --sport 80 -m connbytes --connbytes-dir=reply --connbytes-mode=packets --connbytes 1:6 -m set --match-set zapret src -j NFQUEUE --queue-num 200 --queue-bypass
+
+Incoming packets are filtered by incoming interface, source port and IP. This is opposite to the direct rule.
+
+Some techniques that break NAT are possible only with nftables.
+
+
 ## ip6tables
 
 ip6tables work almost exactly the same way as ipv4, but there are a number of important nuances.
@@ -120,7 +129,10 @@ nf sets do not support overlapping intervals and that's why nft process applies 
 There're equivalents to iptables for all other functions. Interface and protocol anonymous sets allow not to write multiple similar rules.
 Flow offloading is built-in into new linux kernels and nft versions.
 
-nft version `1.0.2` or higher is recommended.
+nft version `1.0.2` or higher is recommended. But the higher is version the better.
+
+Some techniques can be fully used only with nftables. It's not possible to queue packets after NAT in iptables.
+This limits techniques that break NAT.
 
 
 ## When it will not work
@@ -158,7 +170,9 @@ nfqws takes the following parameters:
  --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                         ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                        ; set ipv6 hop limit for desync packet. by default ttl value is used.
- --dpi-desync-fooling=<mode>[,<mode>]           ; can use multiple comma separated values. modes : none md5sig ts badseq badsum hopbyhop hopbyhop2
+ --dpi-desync-autottl=[<delta>[:<min>[-<max>]]] ; auto ttl mode for both ipv4 and ipv6. default: 1:3-20
+ --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only
+ --dpi-desync-fooling=<mode>[,<mode>]           ; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2
  --dpi-desync-retrans=0|1                       ; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
  --dpi-desync-repeats=<N>                       ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1                    ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
@@ -181,7 +195,7 @@ nfqws takes the following parameters:
  --hostlist=<filename>                          ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>                  ; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-auto=<filename>                     ; detect DPI blocks and build hostlist automatically
- --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 2)
+ --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
  --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
  --hostlist-auto-retrans-threshold=<int>        ; how many request retransmissions cause attempt to fail (default : 3)
  --hostlist-auto-debug=<logfile>        	; debug auto hostlist positives
@@ -234,6 +248,23 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   Some ISPs/operators drop ipv6 packets with hop-by-hop options. Fakes will not be processed by the server either because
   ISP drops them or because there are two same headers.
   DPIs may still anaylize packets with one or two hop-by-hop headers.
+* `datanoack` sends tcp fakes without ACK flag. Servers do not accept this but DPI may accept.
+  This mode breaks NAT and does not work with iptables if masquerade is used, even from the router itself.
+  Works with nftables properly. Requires external IP address.
+* `autottl` tries to automatically guess TTL value that allows DPI to receive fakes and does not allow them to reach the server.
+  This tech relies on well known TTL values used by OS : 64,128,255. nfqws takes first incoming packet (YES, you need to redirect it too),
+  guesses path length and decreases by `delta` value (default 1). If resulting value is outside the range (min,max - default 3,20)
+  then its normalized to min or max. If the path shorter than the value then autottl fails and falls back to the fixed value.
+  This can help if multiple DPIs exists on backbone channels, not just near the ISP.
+  Can fail if inbound and outbound paths are not symmetric.
+
+
+special knowledge what you are doing. Blockcheck can find a strategy with 'datanoack'
+  but it will not work with forwarded traffic unless POSTNAT mode is enabled.
+  POSTNAT mode brings some limits. No desync of the first UDP packet is possible (QUIC, for example).
+  That's why it's disabled by default. To enable write POSTNAT_ALL=1 to config.
+  Works only with nftables and from the system with an external IP address.
+
 
 `--dpi-desync-fooling` takes multiple comma separated values.
 
@@ -538,7 +569,7 @@ tpws is transparent proxy.
  --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-auto=<filename>            ; detect DPI blocks and build hostlist automatically
- --hostlist-auto-fail-threshold=<int>  ; how many failed attempts cause hostname to be added to auto hostlist (default : 2)
+ --hostlist-auto-fail-threshold=<int>  ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
  --hostlist-auto-fail-time=<int>       ; all failed attemps must be within these seconds (default : 60)
  --hostlist-auto-debug=<logfile>       	; debug auto hostlist positives
 
@@ -546,6 +577,7 @@ tpws is transparent proxy.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
  --disorder                     ; when splitting simulate sending second fragment first
+ --oob				; when splitting send out of band zero byte
  --hostcase                     ; change Host: => host:
  --hostspell                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostdot                      ; add "." after Host: name
@@ -826,6 +858,7 @@ nfqws options for DPI desync attack:
 
 ```
 DESYNC_MARK=0x40000000
+DESYNC_MARK_POSTNAT=0x20000000
 NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
 ```
 

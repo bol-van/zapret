@@ -66,6 +66,8 @@ typedef struct
 	bool req_seq_start_present, req_seq_present;
 	uint32_t req_seq_start,req_seq_end;	// sequence interval of the request (to track retransmissions)
 
+	uint8_t autottl;
+
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff;
 

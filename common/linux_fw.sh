@@ -38,3 +38,16 @@ zapret_unapply_firewall()
 {
 	zapret_do_firewall 0 "$@"
 }
+
+first_packets_for_mode()
+{
+	# autohostlist and autottl modes requires incoming traffic sample
+	# always use conntrack packet limiter or nfqws will deal with gigabytes
+	local n
+	if [ "$MODE_FILTER" = "autohostlist" ]; then
+		n=$((6+${AUTOHOSTLIST_RETRANS_THRESHOLD:-3}))
+	else
+		n=6
+	fi
+	echo $n
+}

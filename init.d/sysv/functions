@@ -64,6 +64,9 @@ fi
 PIDDIR=/var/run
 IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
+[ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
+[ -n "$DESYNC_MARK_POSTNAT" ] || DESYNC_MARK_POSTNAT=0x20000000
+
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
 NFQWS_OPT_BASE="$USEROPT --dpi-desync-fwmark=$DESYNC_MARK"
@@ -80,8 +83,6 @@ TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 # first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
 TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
-
-[ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
 
 # max wait time for the link local ipv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5

@@ -134,7 +134,7 @@ ssize_t send_with_ttl(int fd, const void *buf, size_t len, int flags, int ttl)
 }
 
 
-static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, int ttl)
+static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, int flags, int ttl)
 {
 	if (sb->data)
 	{
@@ -151,6 +151,7 @@ static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, 
 	sb->len = len;
 	sb->pos = 0;
 	sb->ttl = ttl;
+	sb->flags = flags;
 	return true;
 }
 static void send_buffer_free(send_buffer_t *sb)
@@ -185,7 +186,7 @@ static ssize_t send_buffer_send(send_buffer_t *sb, int fd)
 {
 	ssize_t wr;
 
-	wr = send_with_ttl(fd, sb->data + sb->pos, sb->len - sb->pos, 0, sb->ttl);
+	wr = send_with_ttl(fd, sb->data + sb->pos, sb->len - sb->pos, sb->flags, sb->ttl);
 	DBGPRINT("send_buffer_send len=%zu pos=%zu wr=%zd err=%d",sb->len,sb->pos,wr,errno)
 	if (wr>0)
 	{
@@ -259,16 +260,16 @@ static bool conn_has_unsent_pair(tproxy_conn_t *conn)
 }
 
 
-static ssize_t send_or_buffer(send_buffer_t *sb, int fd, const void *buf, size_t len, int ttl)
+static ssize_t send_or_buffer(send_buffer_t *sb, int fd, const void *buf, size_t len, int flags, int ttl)
 {
 	ssize_t wr=0;
 	if (len)
 	{
-		wr = send_with_ttl(fd, buf, len, 0, ttl);
+		wr = send_with_ttl(fd, buf, len, flags, ttl);
 		if (wr<0 && errno==EAGAIN) wr=0;
 		if (wr>=0 && wr<len)
 		{
-			if (!send_buffer_create(sb, buf+wr, len-wr, ttl))
+			if (!send_buffer_create(sb, buf+wr, len-wr, flags, ttl))
 				wr=-1;
 		}
 	}
@@ -1007,20 +1008,28 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 
 				if (split_pos)
 				{
+					uint8_t oob;
+
 					VPRINT("Splitting at pos %zu", split_pos)
-					wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, params.disorder ? 1 : 0);
+					if (params.oob)
+					{
+						oob = buf[split_pos];
+						buf[split_pos] = 0;
+					}
+					wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos+1, params.oob ? MSG_OOB : 0, params.disorder ? 1 : 0);
+					if (params.oob) buf[split_pos] = oob;
 					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 					if (wr >= 0)
 					{
 						conn->partner->twr += wr;
-						wr = send_or_buffer(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0);
+						wr = send_or_buffer(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0, 0);
 						DBGPRINT("send_or_buffer(2) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 						if (wr>0) conn->partner->twr += wr;
 					}
 				}
 				else
 				{
-					wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, bs, 0);
+					wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, bs, 0, 0);
 					DBGPRINT("send_or_buffer(3) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 					if (wr>0) conn->partner->twr += wr;
 				}
@@ -1080,7 +1089,7 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 		DBGPRINT("read_all_and_buffer(%d) numbytes=%d",buffer_number,numbytes)
 		if (numbytes>0)
 		{
-			if (send_buffer_create(conn->partner->wr_buf+buffer_number, NULL, numbytes, 0))
+			if (send_buffer_create(conn->partner->wr_buf+buffer_number, NULL, numbytes, 0, 0))
 			{
 				ssize_t rd = recv(conn->fd, conn->partner->wr_buf[buffer_number].data, numbytes, MSG_DONTWAIT);
 				if (rd>0)

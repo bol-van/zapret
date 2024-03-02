@@ -59,13 +59,14 @@ uint8_t tcp_find_scale_factor(const struct tcphdr *tcp)
 
 // n prefix (nsport, nwsize) means network byte order
 static void fill_tcphdr(
-	struct tcphdr *tcp, uint8_t fooling, uint8_t tcp_flags,
+	struct tcphdr *tcp, uint32_t fooling, uint8_t tcp_flags,
 	uint32_t nseq, uint32_t nack_seq,
 	uint16_t nsport, uint16_t ndport,
 	uint16_t nwsize, uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint32_t badseq_increment,
-	uint32_t badseq_ack_increment)
+	uint32_t badseq_ack_increment,
+	uint16_t data_len)
 {
 	char *tcpopt = (char*)(tcp+1);
 	uint8_t t=0;
@@ -84,6 +85,8 @@ static void fill_tcphdr(
 		tcp->th_ack = nack_seq;
 	}
 	tcp->th_off       = 5;
+	if ((fooling & FOOL_DATANOACK) && !(tcp_flags & (TH_SYN|TH_RST)) && data_len)
+		tcp_flags &= ~TH_ACK;
 	*((uint8_t*)tcp+13)= tcp_flags;
 	tcp->th_win     = nwsize;
 	if (fooling & FOOL_MD5SIG)
@@ -115,7 +118,7 @@ static void fill_tcphdr(
 	tcp->th_off += t>>2;
 	tcp->th_sum = 0;
 }
-static uint16_t tcpopt_len(uint8_t fooling, const uint32_t *timestamps, uint8_t scale_factor)
+static uint16_t tcpopt_len(uint32_t fooling, const uint32_t *timestamps, uint8_t scale_factor)
 {
 	uint16_t t=0;
 	if (fooling & FOOL_MD5SIG) t=18;
@@ -163,7 +166,7 @@ bool prepare_tcp_segment4(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -179,7 +182,7 @@ bool prepare_tcp_segment4(
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
 	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_TCP, ttl);
-	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
+	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
 	tcp4_fix_checksum(tcp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
@@ -197,7 +200,7 @@ bool prepare_tcp_segment6(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -262,7 +265,7 @@ bool prepare_tcp_segment6(
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
 	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
-	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment);
+	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
 	tcp6_fix_checksum(tcp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
@@ -280,7 +283,7 @@ bool prepare_tcp_segment(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -298,7 +301,7 @@ bool prepare_tcp_segment(
 bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
@@ -338,7 +341,7 @@ bool prepare_udp_segment4(
 bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
@@ -426,7 +429,7 @@ bool prepare_udp_segment6(
 bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
@@ -674,11 +677,11 @@ static void str_ip(char *s, size_t s_len, const struct ip *ip)
 	char ss[35],s_proto[16];
 	str_srcdst_ip(ss,sizeof(ss),&ip->ip_src,&ip->ip_dst);
 	str_proto_name(s_proto,sizeof(s_proto),ip->ip_p);
-	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
+	snprintf(s,s_len,"%s proto=%s ttl=%u",ss,s_proto,ip->ip_ttl);
 }
 void print_ip(const struct ip *ip)
 {
-	char s[64];
+	char s[66];
 	str_ip(s,sizeof(s),ip);
 	printf("%s",s);
 }
@@ -695,7 +698,7 @@ static void str_ip6hdr(char *s, size_t s_len, const struct ip6_hdr *ip6hdr, uint
 	char ss[83],s_proto[16];
 	str_srcdst_ip6(ss,sizeof(ss),&ip6hdr->ip6_src,&ip6hdr->ip6_dst);
 	str_proto_name(s_proto,sizeof(s_proto),proto);
-	snprintf(s,s_len,"%s proto=%s",ss,s_proto);
+	snprintf(s,s_len,"%s proto=%s ttl=%u",ss,s_proto,ip6hdr->ip6_hlim);
 }
 void print_ip6hdr(const struct ip6_hdr *ip6hdr, uint8_t proto)
 {
@@ -1169,4 +1172,36 @@ nofix:
 		return false;
 	}
 	return true;
+}
+
+// return guessed fake ttl value. 0 means unsuccessfull, should not perform autottl fooling
+// ttl = TTL of incoming packet
+uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
+{
+	uint8_t orig, path, fake;
+
+	// 18.65.168.125 ( cloudfront ) 	255
+	// 157.254.246.178 			128
+	// 1.1.1.1				 64
+	// guess original ttl. consider path lengths less than 32 hops
+	if (ttl>223)
+		orig=255;
+	else if (ttl<128 && ttl>96)
+		orig=128;
+	else if (ttl<64 && ttl>32)
+		orig=64;
+	else
+		return 0;
+
+	path = orig - ttl;
+
+	if (path <=attl->delta) return 0;
+
+	fake = path - attl->delta;
+	if (fake<attl->min) fake=attl->min;
+	else if (fake>attl->max) fake=attl->max;
+
+	if (fake>=path) return 0;
+
+	return fake;
 }

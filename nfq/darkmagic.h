@@ -24,6 +24,7 @@ uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 #define FOOL_HOPBYHOP2	0x20
 #define FOOL_DESTOPT	0x40
 #define FOOL_IPFRAG1	0x80
+#define FOOL_DATANOACK	0x100
 
 #define SCALE_NONE ((uint8_t)-1)
 
@@ -36,7 +37,7 @@ bool prepare_tcp_segment4(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -49,7 +50,7 @@ bool prepare_tcp_segment6(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -62,7 +63,7 @@ bool prepare_tcp_segment(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -72,7 +73,7 @@ bool prepare_tcp_segment(
 bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
@@ -80,7 +81,7 @@ bool prepare_udp_segment4(
 bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
@@ -88,7 +89,7 @@ bool prepare_udp_segment6(
 bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
-	uint8_t fooling,
+	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
 	const void *data, uint16_t len,
@@ -149,3 +150,15 @@ bool tcp_ack_segment(const struct tcphdr *tcphdr);
 // scale_factor=SCALE_NONE - do not change
 void tcp_rewrite_wscale(struct tcphdr *tcp, uint8_t scale_factor);
 void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_factor);
+
+typedef struct
+{
+	uint8_t delta, min, max;
+} autottl;
+#define AUTOTTL_DEFAULT_DELTA 1
+#define AUTOTTL_DEFAULT_MIN 3
+#define AUTOTTL_DEFAULT_MAX 20
+#define AUTOTTL_ENABLED(a) (!!(a).delta)
+#define AUTOTTL_SET_DEFAULT(a) {(a).delta=AUTOTTL_DEFAULT_DELTA; (a).min=AUTOTTL_DEFAULT_MIN; (a).max=AUTOTTL_DEFAULT_MAX;}
+
+uint8_t autottl_guess(uint8_t ttl, const autottl *attl);
