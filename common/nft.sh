@@ -645,6 +645,7 @@ zapret_apply_firewall_rules_nft()
 			;;
 		nfqws)
 			local POSTNAT_SAVE=$POSTNAT
+
 			POSTNAT=1
 			# quite complex but we need to minimize nfqws processes to save RAM
 			get_nfqws_qnums qn qns qn6 qns6
@@ -690,8 +691,8 @@ zapret_apply_firewall_rules_nft()
 					nft_fw_reverse_nfqws_rule6 "$f6" $qns6
 				fi
 			fi
-			POSTNAT=$POSTNAT_SAVE
 
+			POSTNAT=0
 			get_nfqws_qnums_quic qn qn6
 			if [ -n "$qn" ]; then
 				f4=
@@ -707,6 +708,8 @@ zapret_apply_firewall_rules_nft()
 				nft_filter_apply_ipset_target6 f6
 				nft_fw_nfqws_post6 "$f6 $desync" $qn6
 			fi
+
+			POSTNAT=$POSTNAT_SAVE
 			;;
 		custom)
 	    		existf zapret_custom_firewall_nft && zapret_custom_firewall_nft
