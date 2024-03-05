@@ -579,7 +579,7 @@ warn_fool()
 {
 	case "$1" in
 		md5sig) echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.' ;;
-		datanoack) echo 'WARNING ! although datanoack fooling worked it breaks NAT and can only work with external IP. Additionally it may require nftables to work correctly.' ;;
+		datanoack) echo 'WARNING ! although datanoack fooling worked it may break NAT and may only work with external IP. Additionally it may require nftables to work correctly.' ;;
 	esac
 }
 pktws_check_domain_bypass()
@@ -637,7 +637,7 @@ pktws_check_domain_bypass()
 				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=$ttl $e && break
 				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=$ttl $e && break
 			done
-			for delta in 1 2 3; do
+			for delta in 1 2 3 4 5; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e || {
 					test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e
 				}
