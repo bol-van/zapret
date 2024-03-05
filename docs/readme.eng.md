@@ -249,8 +249,8 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   ISP drops them or because there are two same headers.
   DPIs may still anaylize packets with one or two hop-by-hop headers.
 * `datanoack` sends tcp fakes without ACK flag. Servers do not accept this but DPI may accept.
-  This mode breaks NAT and does not work with iptables if masquerade is used, even from the router itself.
-  Works with nftables properly. Requires external IP address.
+  This mode may break NAT and may not work with iptables if masquerade is used, even from the router itself.
+  Works with nftables properly. Likely requires external IP address (some ISPs pass these packets through their NAT).
 * `autottl` tries to automatically guess TTL value that allows DPI to receive fakes and does not allow them to reach the server.
   This tech relies on well known TTL values used by OS : 64,128,255. nfqws takes first incoming packet (YES, you need to redirect it too),
   guesses path length and decreases by `delta` value (default 1). If resulting value is outside the range (min,max - default 3,20)
@@ -570,7 +570,7 @@ tpws is transparent proxy.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
  --disorder                     ; when splitting simulate sending second fragment first
- --oob				; when splitting send out of band zero byte
+ --oob[=<char>|0xHEX]		; when splitting send out of band byte. default is HEX 0x00.
  --hostcase                     ; change Host: => host:
  --hostspell                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostdot                      ; add "." after Host: name
@@ -583,6 +583,8 @@ tpws is transparent proxy.
  --unixeol                      ; replace 0D0A to 0A
  --tlsrec=sni                   ; make 2 TLS records. split at SNI. don't split if SNI is not present.
  --tlsrec-pos=<pos>             ; make 2 TLS records. split at specified pos
+ --tamper-start=<pos>           ; start tampering only from specified outbound stream position. default is 0.
+ --tamper-cutoff=<pos>          ; do not tamper anymore after specified outbound stream position. default is unlimited.
  --daemon                       ; daemonize
  --pidfile=<filename>           ; write pid to file
  --user=<username>              ; drop root privs
