@@ -176,7 +176,7 @@ static void exithelp(void)
 #else
 		" --disorder\t\t\t\t; when splitting simulate sending second fragment first\n"
 #endif
-		" --oob\t\t\t\t\t; when splitting send out of band zero byte\n"
+		" --oob[=<char>|0xHEX]\t\t\t; when splitting send out of band byte. default is HEX 0x00.\n"
 		" --hostcase\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostdot\t\t\t\t; add \".\" after Host: name\n"
@@ -188,7 +188,9 @@ static void exithelp(void)
 		" --methodeol\t\t\t\t; add end-of-line before method\n"
 		" --unixeol\t\t\t\t; replace 0D0A to 0A\n"
 		" --tlsrec=sni\t\t\t\t; make 2 TLS records. split at SNI. don't split if SNI is not present\n"
-		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n",
+		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n"
+		" --tamper-start=<pos>\t\t\t; start tampering only from specified outbound stream position. default is 0.\n"
+		" --tamper-cutoff=<pos>\t\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
 	);
 	exit(1);
@@ -295,7 +297,7 @@ void parse_params(int argc, char *argv[])
 		{ "split-pos",required_argument,0,0 },// optidx=24
 		{ "split-any-protocol",optional_argument,0,0},// optidx=25
 		{ "disorder",no_argument,0,0 },// optidx=26
-		{ "oob",no_argument,0,0 },// optidx=27
+		{ "oob",optional_argument,0,0 },// optidx=27
 		{ "methodspace",no_argument,0,0 },// optidx=28
 		{ "methodeol",no_argument,0,0 },// optidx=29
 		{ "hosttab",no_argument,0,0 },// optidx=30
@@ -317,8 +319,10 @@ void parse_params(int argc, char *argv[])
 		{ "socks",no_argument,0,0 },// optidx=46
 		{ "no-resolve",no_argument,0,0 },// optidx=47
 		{ "skip-nodelay",no_argument,0,0 },// optidx=48
+		{ "tamper-start",required_argument,0,0 },// optidx=49
+		{ "tamper-cutoff",required_argument,0,0 },// optidx=50
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=49
+		{ "enable-pf",no_argument,0,0 },// optidx=51
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -508,6 +512,18 @@ void parse_params(int argc, char *argv[])
 			save_default_ttl();
 			break;
 		case 27: /* oob */
+			if (optarg)
+			{
+				size_t l = strlen(optarg);
+				unsigned int bt;
+				if (l==1) params.oob_byte = (uint8_t)*optarg;
+				else if (l!=4 || sscanf(optarg,"0x%02X",&bt)!=1)
+				{
+					fprintf(stderr, "Invalid argument for oob\n");
+					exit_clean(1);
+				}
+				else params.oob_byte = (uint8_t)bt;
+			}
 			params.oob = true;
 			break;
 		case 28: /* methodspace */
@@ -653,8 +669,14 @@ void parse_params(int argc, char *argv[])
 		case 48: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
+		case 49: /* tamper-start */
+			params.tamper_start = atoi(optarg);
+			break;
+		case 50: /* tamper-cutoff */
+			params.tamper_cutoff = atoi(optarg);
+			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 49: /* enable-pf */
+		case 51: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #endif
@@ -798,7 +820,7 @@ static bool set_ulimit(void)
 		// additional 1/2 for unpaired remote legs sending buffers
 		// 16 for listen_fd, epoll, hostlist, ...
 #ifdef SPLICE_PRESENT
-		fdmax = (params.tamper ? 4 : 6) * params.maxconn;
+		fdmax = (params.tamper && !params.tamper_start && !params.tamper_cutoff ? 4 : 6) * params.maxconn;
 #else
 		fdmax = 2 * params.maxconn;
 #endif

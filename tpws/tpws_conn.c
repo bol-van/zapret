@@ -400,7 +400,7 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 #ifdef SPLICE_PRESENT
 	// if dont tamper - both legs are spliced, create 2 pipes
 	// otherwise create pipe only in local leg
-	if((!params.tamper || !remote) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
+	if ((!remote || !params.tamper || params.tamper_start || params.tamper_cutoff ) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
 	{
 		fprintf(stderr, "Could not create the splice pipe\n");
 		free_conn(conn);
@@ -905,10 +905,13 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 				tamper_in(&conn->partner->track,segment,segment_buffer_size,segment_size);
 			}
 		}
-		else
+		else if (conn->trd >= params.tamper_start && (!params.tamper_cutoff || conn->trd < params.tamper_cutoff))
 		{
+			DBGPRINT("tamper_out stream pos %zu. tamper range %u-%u", conn->trd, params.tamper_start, params.tamper_cutoff)
 			tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos);
 		}
+		else
+			DBGPRINT("stream pos %zu is out of tamper range %u-%u", conn->trd, params.tamper_start, params.tamper_cutoff)
 	}
 }
 
@@ -963,8 +966,13 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	DBGPRINT("numbytes=%d",numbytes)
 	if (numbytes>0)
 	{
+		if (conn->remote)
+			VPRINT("remote leg stream pos R/W : %zu/%zu",conn->trd,conn->twr)
+		else
+			VPRINT("local leg stream pos : %zu/%zu",conn->trd,conn->twr)
 #ifdef SPLICE_PRESENT
-		if (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff)
+		if (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff ||
+			!conn->remote && (conn->trd < params.tamper_start || params.tamper_cutoff && conn->trd >= params.tamper_cutoff))
 		{
 			// incoming data from remote leg we splice without touching
 			// pipe is in the local leg, so its in conn->partner->splice_pipe
@@ -998,26 +1006,28 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			if (rd<0 && errno==EAGAIN) rd=0;
 			if (rd>0)
 			{
-				conn->trd+=rd;
-
 				size_t split_pos;
 
 				bs = rd;
-				
+
+				// tamper needs to know stream position of the block start
 				tamper(conn, buf, sizeof(buf), &bs, &split_pos);
+				// increase after tamper
+				conn->trd+=rd;
 
 				if (split_pos)
 				{
-					uint8_t oob;
-
 					VPRINT("Splitting at pos %zu", split_pos)
 					if (params.oob)
 					{
-						oob = buf[split_pos];
-						buf[split_pos] = 0;
+						uint8_t oob_save;
+						oob_save = buf[split_pos];
+						buf[split_pos] = params.oob_byte;
+						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos+1, MSG_OOB, params.disorder ? 1 : 0);
+						buf[split_pos] = oob_save;
 					}
-					wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos+1, params.oob ? MSG_OOB : 0, params.disorder ? 1 : 0);
-					if (params.oob) buf[split_pos] = oob;
+					else
+						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, 0, params.disorder ? 1 : 0);
 					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 					if (wr >= 0)
 					{

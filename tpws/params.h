@@ -50,6 +50,7 @@ struct params_s
 	bool split_any_protocol;
 	int split_pos;
 	bool disorder, oob;
+	uint8_t oob_byte;
 	int ttl_default;
 
 	char pidfile[256];
@@ -59,6 +60,8 @@ struct params_s
 	char hostlist_auto_filename[PATH_MAX], hostlist_auto_debuglog[PATH_MAX];
 	int hostlist_auto_fail_threshold, hostlist_auto_fail_time;
 	hostfail_pool *hostlist_auto_fail_counters;
+
+	unsigned int tamper_start,tamper_cutoff;
 
 	int debug;
 
