@@ -139,7 +139,7 @@ bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 // cleans up socket autocreated by rawsend
 void rawsend_cleanup(void);
 
-int rawsend_socket_divert(sa_family_t family);
+int socket_divert(sa_family_t family);
 
 const char *proto_name(uint8_t proto);
 uint16_t family_from_proto(uint8_t l3proto);

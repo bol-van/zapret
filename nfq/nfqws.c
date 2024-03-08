@@ -353,7 +353,7 @@ static int dvt_main(void)
 		bp4.sin_addr.s_addr = INADDR_ANY;
 	
 		printf("creating divert4 socket\n");
-		fd[0] = rawsend_socket_divert(AF_INET);
+		fd[0] = socket_divert(AF_INET);
 		if (fd[0] == -1) {
 				perror("socket (DIVERT4)");
 			goto exiterr;
@@ -378,7 +378,7 @@ static int dvt_main(void)
 		bp6.sin6_port = htons(params.port);
 	
 		printf("creating divert6 socket\n");
-		fd[1] = rawsend_socket_divert(AF_INET6);
+		fd[1] = socket_divert(AF_INET6);
 		if (fd[1] == -1) {
 			perror("socket (DIVERT6)");
 			goto exiterr;
