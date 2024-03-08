@@ -11,6 +11,17 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#ifndef IPPROTO_DIVERT
+#define IPPROTO_DIVERT 258
+#endif
+
+#ifndef AF_DIVERT
+#define	AF_DIVERT	44	/* divert(4) */
+#endif
+#ifndef PF_DIVERT
+#define PF_DIVERT AF_DIVERT
+#endif
+
 // returns netorder value
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
@@ -127,6 +138,8 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const 
 bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 // cleans up socket autocreated by rawsend
 void rawsend_cleanup(void);
+
+int rawsend_socket_divert(sa_family_t family);
 
 const char *proto_name(uint8_t proto);
 uint16_t family_from_proto(uint8_t l3proto);

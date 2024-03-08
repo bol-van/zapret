@@ -903,7 +903,7 @@ static int *rawsend_family_sock(sa_family_t family)
 }
 
 #ifdef BSD
-static int rawsend_socket_divert(sa_family_t family)
+int rawsend_socket_divert(sa_family_t family)
 {
 	// HACK HACK HACK HACK HACK HACK HACK HACK
 	// FreeBSD doesnt allow IP_HDRINCL for IPV6
@@ -911,7 +911,14 @@ static int rawsend_socket_divert(sa_family_t family)
 	// we either have to go to the link layer (its hard, possible problems arise, compat testing, ...) or use some HACKING
 	// from my point of view disabling direct ability to send ip frames is not security. its SHIT
 
-	int fd = socket(family, SOCK_RAW, IPPROTO_DIVERT);
+	int fd,err;
+	
+	// freebsd14+ way
+	fd = socket(PF_DIVERT, SOCK_RAW, 0);
+	err=errno;
+	if (fd==-1 && (err==EPROTONOSUPPORT || err==EAFNOSUPPORT || err==EPFNOSUPPORT))
+		// legacy way
+		fd = socket(family, SOCK_RAW, IPPROTO_DIVERT);
 	if (fd!=-1 && !set_socket_buffers(fd,4096,RAW_SNDBUF))
 	{
 		close(fd);
