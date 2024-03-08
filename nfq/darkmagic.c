@@ -911,13 +911,15 @@ int rawsend_socket_divert(sa_family_t family)
 	// we either have to go to the link layer (its hard, possible problems arise, compat testing, ...) or use some HACKING
 	// from my point of view disabling direct ability to send ip frames is not security. its SHIT
 
-	int fd,err;
+	int fd;
 	
+#ifdef __FreeBSD__
 	// freebsd14+ way
+	// don't want to use ifdefs with os version to make binaries compatible with all versions
 	fd = socket(PF_DIVERT, SOCK_RAW, 0);
-	err=errno;
-	if (fd==-1 && (err==EPROTONOSUPPORT || err==EAFNOSUPPORT || err==EPFNOSUPPORT))
-		// legacy way
+	if (fd==-1 && (errno==EPROTONOSUPPORT || errno==EAFNOSUPPORT || errno==EPFNOSUPPORT))
+#endif
+		// freebsd13- or openbsd way
 		fd = socket(family, SOCK_RAW, IPPROTO_DIVERT);
 	if (fd!=-1 && !set_socket_buffers(fd,4096,RAW_SNDBUF))
 	{
