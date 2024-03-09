@@ -583,8 +583,8 @@ tpws is transparent proxy.
  --unixeol                      ; replace 0D0A to 0A
  --tlsrec=sni                   ; make 2 TLS records. split at SNI. don't split if SNI is not present.
  --tlsrec-pos=<pos>             ; make 2 TLS records. split at specified pos
- --tamper-start=<pos>           ; start tampering only from specified outbound stream position. default is 0.
- --tamper-cutoff=<pos>          ; do not tamper anymore after specified outbound stream position. default is unlimited.
+ --tamper-start=[n]<pos>        ; start tampering only from specified outbound stream position. byte pos or block number ('n'). default is 0.
+ --tamper-cutoff=[n]<pos>       ; do not tamper anymore after specified outbound stream position. byte pos or block number ('n'). default is unlimited.
  --daemon                       ; daemonize
  --pidfile=<filename>           ; write pid to file
  --user=<username>              ; drop root privs
