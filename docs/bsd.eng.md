@@ -334,6 +334,7 @@ requires root.
 
 `/etc/pf.conf`:
 ```
+pass in  quick on em0 proto tcp from port {80,443} flags SA/SA divert-packet port 989 no state
 pass in  quick on em0 proto tcp from port {80,443} no state
 pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989
 ```
