@@ -354,7 +354,6 @@ table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
 table <zapret-user> file "/opt/zapret/ipset/zapret-ip-user.txt"
 table <nozapret> file "/opt/zapret/ipset/zapret-ip-exclude.txt"
 pass out quick on em0 inet  proto tcp to   <nozapret> port {80,443}
-pass in  quick on em0 inet  proto tcp from <nozapret> port {80,443}
 pass in  quick on em0 inet  proto tcp from <zapret>  port {80,443} flags SA/SA divert-packet port 989 no state
 pass in  quick on em0 inet  proto tcp from <zapret>  port {80,443} no state
 pass out quick on em0 inet  proto tcp to   <zapret>  port {80,443} divert-packet port 989 no state
@@ -365,7 +364,6 @@ table <zapret6> file "/opt/zapret/ipset/zapret-ip6.txt"
 table <zapret6-user> file "/opt/zapret/ipset/zapret-ip-user6.txt"
 table <nozapret6> file "/opt/zapret/ipset/zapret-ip-exclude6.txt"
 pass out quick on em0 inet6 proto tcp to   <nozapret6> port {80,443}
-pass in  quick on em0 inet6 proto tcp from <nozapret6> port {80,443}
 pass in  quick on em0 inet6 proto tcp from <zapret6> port {80,443} flags SA/SA divert-packet port 989 no state
 pass in  quick on em0 inet6 proto tcp from <zapret6> port {80,443} no state
 pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet port 989 no state
