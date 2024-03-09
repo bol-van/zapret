@@ -893,6 +893,12 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 	return false;
 }
 
+static bool in_tamper_out_range(tproxy_conn_t *conn)
+{
+	return (params.tamper_start_n ? (conn->tnrd+1) : conn->trd) >= params.tamper_start &&
+		(!params.tamper_cutoff || (params.tamper_cutoff_n ? (conn->tnrd+1) : conn->trd) < params.tamper_cutoff);
+}
+
 static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_size, size_t *segment_size, size_t *split_pos)
 {
 	*split_pos=0;
@@ -905,13 +911,16 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 				tamper_in(&conn->partner->track,segment,segment_buffer_size,segment_size);
 			}
 		}
-		else if (conn->trd >= params.tamper_start && (!params.tamper_cutoff || conn->trd < params.tamper_cutoff))
-		{
-			DBGPRINT("tamper_out stream pos %zu. tamper range %u-%u", conn->trd, params.tamper_start, params.tamper_cutoff)
-			tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos);
-		}
 		else
-			DBGPRINT("stream pos %zu is out of tamper range %u-%u", conn->trd, params.tamper_start, params.tamper_cutoff)
+		{
+			bool in_range = in_tamper_out_range(conn);
+			DBGPRINT("tamper_out stream pos %" PRIu64 "(n%" PRIu64 "). tamper range %s%u-%s%u (%s)",
+				conn->trd, conn->tnrd+1,
+				params.tamper_start_n ? "n" : "" , params.tamper_start,
+				params.tamper_cutoff_n ? "n" : "" , params.tamper_cutoff,
+				in_range ? "IN RANGE" : "OUT OF RANGE")
+			if (in_range) tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos);
+		}
 	}
 }
 
@@ -945,14 +954,14 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	{
 		// throw it to a black hole
 		uint8_t waste[65070];
-		ssize_t trd=0;
+		uint64_t trd=0;
 
 		while((rd=recv(conn->fd, waste, sizeof(waste), MSG_DONTWAIT))>0 && trd<MAX_WASTE)
 		{
 			trd+=rd;
 			conn->trd+=rd;
 		}
-		DBGPRINT("wasted recv=%zd all_rd=%zd err=%d",rd,trd,errno)
+		DBGPRINT("wasted recv=%zd all_rd=%" PRIu64 " err=%d",rd,trd,errno)
 		return true;
 	}
 
@@ -966,13 +975,9 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	DBGPRINT("numbytes=%d",numbytes)
 	if (numbytes>0)
 	{
-		if (conn->remote)
-			VPRINT("remote leg stream pos R/W : %zu/%zu",conn->trd,conn->twr)
-		else
-			VPRINT("local leg stream pos : %zu/%zu",conn->trd,conn->twr)
+		VPRINT("%s leg stream pos : %" PRIu64 "(n%" PRIu64 ")/%" PRIu64, conn->remote ? "remote" : "local", conn->trd,conn->tnrd+1,conn->twr)
 #ifdef SPLICE_PRESENT
-		if (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff ||
-			!conn->remote && (conn->trd < params.tamper_start || params.tamper_cutoff && conn->trd >= params.tamper_cutoff))
+		if (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff || !conn->remote && !in_tamper_out_range(conn))
 		{
 			// incoming data from remote leg we splice without touching
 			// pipe is in the local leg, so its in conn->partner->splice_pipe
@@ -983,6 +988,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			if (rd<0 && errno==EAGAIN) rd=0;
 			if (rd>0)
 			{
+				conn->tnrd++;
 				conn->trd += rd;
 				conn->partner->wr_unsent += rd;
 				wr = splice(conn->partner->splice_pipe[0], NULL, conn->partner->fd, NULL, conn->partner->wr_unsent, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
@@ -1013,6 +1019,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				// tamper needs to know stream position of the block start
 				tamper(conn, buf, sizeof(buf), &bs, &split_pos);
 				// increase after tamper
+				conn->tnrd++;
 				conn->trd+=rd;
 
 				if (split_pos)
@@ -1070,7 +1077,7 @@ static bool remove_closed_connections(int efd, struct tailhead *close_list)
 
 		shutdown(conn->fd,SHUT_RDWR);
 		epoll_del(conn);
-		VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) closed, connection removed. total_read=%zu total_write=%zu event_count=%u",
+		VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) closed, connection removed. total_read=%" PRIu64 " total_write=%" PRIu64 " event_count=%u",
 			conn->fd, conn->partner ? conn->partner->fd : 0, conn->remote, conn->trd, conn->twr, conn->event_count)
 		if (conn->remote) legs_remote--; else legs_local--;
 		free_conn(conn);

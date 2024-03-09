@@ -189,8 +189,8 @@ static void exithelp(void)
 		" --unixeol\t\t\t\t; replace 0D0A to 0A\n"
 		" --tlsrec=sni\t\t\t\t; make 2 TLS records. split at SNI. don't split if SNI is not present\n"
 		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n"
-		" --tamper-start=<pos>\t\t\t; start tampering only from specified outbound stream position. default is 0.\n"
-		" --tamper-cutoff=<pos>\t\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
+		" --tamper-start=[n]<pos>\t\t; start tampering only from specified outbound stream position. default is 0. 'n' means data block number.\n"
+		" --tamper-cutoff=[n]<pos>\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
 	);
 	exit(1);
@@ -670,10 +670,30 @@ void parse_params(int argc, char *argv[])
 			params.skip_nodelay = true;
 			break;
 		case 49: /* tamper-start */
-			params.tamper_start = atoi(optarg);
+			{
+				const char *p=optarg;
+				if (*p=='n')
+				{
+					params.tamper_start_n=true;
+					p++;
+				}
+				else
+					params.tamper_start_n=false;
+				params.tamper_start = atoi(p);
+			}
 			break;
 		case 50: /* tamper-cutoff */
-			params.tamper_cutoff = atoi(optarg);
+			{
+				const char *p=optarg;
+				if (*p=='n')
+				{
+					params.tamper_cutoff_n=true;
+					p++;
+				}
+				else
+					params.tamper_cutoff_n=false;
+				params.tamper_cutoff = atoi(p);
+			}
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
 		case 51: /* enable-pf */

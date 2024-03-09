@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <inttypes.h>
 #include <sys/queue.h>
 #include <time.h>
 #include "tamper.h"
@@ -67,7 +68,7 @@ struct tproxy_conn
 	bool bFlowIn,bFlowOut, bFlowInPrev,bFlowOutPrev, bPrevRdhup;
 
 	// total read,write
-	size_t trd,twr;
+	uint64_t trd,twr, tnrd;
 	// number of epoll_wait events
 	unsigned int event_count;
 

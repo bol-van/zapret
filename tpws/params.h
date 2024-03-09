@@ -61,6 +61,7 @@ struct params_s
 	int hostlist_auto_fail_threshold, hostlist_auto_fail_time;
 	hostfail_pool *hostlist_auto_fail_counters;
 
+	bool tamper_start_n,tamper_cutoff_n;
 	unsigned int tamper_start,tamper_cutoff;
 
 	int debug;
