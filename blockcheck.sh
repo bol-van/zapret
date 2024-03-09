@@ -364,8 +364,8 @@ pktws_ipt_prepare()
 			;;
 		ipfw)
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any $1 proto ip${IPV} out not diverted not sockarg
-			# this redirects all incoming traffic to the port, do not use it in real life !
-			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} in not diverted not sockarg
+			# for autottl mode
+			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in
 			;;
 	esac
 }

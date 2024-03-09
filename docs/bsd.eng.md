@@ -155,6 +155,8 @@ For all traffic:
 ```
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
+# required for autottl mode only
+ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in recv em0
 /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
 ```
 
@@ -163,6 +165,8 @@ Process only table zapret with the exception of table nozapret:
 ipfw delete 100
 ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
 ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted not sockarg xmit em0
+# required for autottl mode only
+ipfw add 100 divert 989 tcp from table\(zapret\) 80,443 to any tcpflags syn,ack in recv em0
 /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
 ```
 
@@ -349,17 +353,19 @@ table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
 table <zapret-user> file "/opt/zapret/ipset/zapret-ip-user.txt"
 table <nozapret> file "/opt/zapret/ipset/zapret-ip-exclude.txt"
 pass out quick on em0 inet  proto tcp to   <nozapret> port {80,443}
-pass in  quick on em0 inet  proto tcp from <zapret>  port {80,443} no state
-pass out quick on em0 inet  proto tcp to   <zapret>  port {80,443} divert-packet port 989 no state
-pass in  quick on em0 inet  proto tcp from <zapret-user>  port {80,443} no state
-pass out quick on em0 inet  proto tcp to   <zapret-user>  port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet  proto tcp from <zapret> port {80,443} flags SA/SA divert-packet port 989 no state
+pass in  quick on em0 inet  proto tcp from <zapret> port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret> port {80,443} divert-packet port 989 no state
+pass in  quick on em0 inet  proto tcp from <zapret-user> port {80,443} no state
+pass out quick on em0 inet  proto tcp to   <zapret-user> port {80,443} divert-packet port 989 no state
 table <zapret6> file "/opt/zapret/ipset/zapret-ip6.txt"
 table <zapret6-user> file "/opt/zapret/ipset/zapret-ip-user6.txt"
 table <nozapret6> file "/opt/zapret/ipset/zapret-ip-exclude6.txt"
 pass out quick on em0 inet6 proto tcp to   <nozapret6> port {80,443}
-pass in  quick on em0 inet6 proto tcp from <zapret6>  port {80,443} no state
+pass in  quick on em0 inet6 proto tcp from <zapret6> port {80,443} flags SA/SA divert-packet port 989 no state
+pass in  quick on em0 inet6 proto tcp from <zapret6> port {80,443} no state
 pass out quick on em0 inet6 proto tcp to   <zapret6> port {80,443} divert-packet port 989 no state
-pass in  quick on em0 inet6 proto tcp from <zapret6-user>  port {80,443} no state
+pass in  quick on em0 inet6 proto tcp from <zapret6-user> port {80,443} no state
 pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-packet port 989 no state
 ```
 
