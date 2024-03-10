@@ -975,7 +975,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	DBGPRINT("numbytes=%d",numbytes)
 	if (numbytes>0)
 	{
-		VPRINT("%s leg stream pos : %" PRIu64 "(n%" PRIu64 ")/%" PRIu64, conn->remote ? "remote" : "local", conn->trd,conn->tnrd+1,conn->twr)
+		DBGPRINT("%s leg fd=%d stream pos : %" PRIu64 "(n%" PRIu64 ")/%" PRIu64, conn->remote ? "remote" : "local", conn->fd, conn->trd,conn->tnrd+1,conn->twr)
 #ifdef SPLICE_PRESENT
 		if (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff || !conn->remote && !in_tamper_out_range(conn))
 		{
