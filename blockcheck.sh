@@ -128,12 +128,12 @@ mpf_tpws_anchor()
 	# $1 - port
 	case "$IPV" in
 		4)
-			echo "rdr pass on $LO_IFACE inet proto tcp from \!127.0.0.0/8 to any port $1 -> $LOCALHOST port $TPPORT"
-			echo "pass out route-to ($LO_IFACE $LOCALHOST) inet proto tcp from any to any port $1 user { >root }"
+			echo "rdr pass on $LO_IFACE inet proto tcp from \!127.0.0.0/8 to any port $1 -> $LINKLOCAL port $TPPORT"
+			echo "pass out route-to ($LO_IFACE $LINKLOCAL) inet proto tcp from any to any port $1 user { >root }"
 		;;
 		6)
-			echo "rdr pass on $LO_IFACE inet6 proto tcp from \!::1 to any port $1 -> $LOCALHOST port $TPPORT"
-			echo "pass out route-to ($LO_IFACE $LOCALHOST) inet6 proto tcp from any to any port $1 user { >root }"
+			echo "rdr pass on $LO_IFACE inet6 proto tcp from \!::1 to any port $1 -> $LINKLOCAL port $TPPORT"
+			echo "pass out route-to ($LO_IFACE $LINKLOCAL) inet6 proto tcp from any to any port $1 user { >root }"
 		;;
 	esac
 }
@@ -373,7 +373,7 @@ curl_translate_code()
 curl_supports_tls13()
 {
 	local r
-	curl --tlsv1.3 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
+	curl --tlsv1.3 -Is -o /dev/null http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
@@ -388,7 +388,7 @@ curl_supports_tlsmax()
 	# supported only in OpenSSL and LibreSSL
 	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS || return 1
 	# supported since curl 7.54
-	curl --tls-max 1.2 -Is -o /dev/null http://$LOCALHOST_IPT:65535 2>/dev/null
+	curl --tls-max 1.2 -Is -o /dev/null http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? != 2 ]
 }
@@ -584,7 +584,7 @@ pktws_start()
 }
 tpws_start()
 {
-	"$TPWS" --uid $TPWS_UID:$TPWS_GID --bind-addr=$LOCALHOST%$LO_IFACE --port=$TPPORT "$@" >/dev/null &
+	"$TPWS" --uid $TPWS_UID:$TPWS_GID --bind-addr=$LINKLOCAL%$LO_IFACE --port=$TPPORT "$@" >/dev/null &
 	PID=$!
 	# give some time to initialize
 	minsleep
@@ -924,13 +924,17 @@ configure_ip_version()
 {
 	if [ "$IPV" = 6 ]; then
 		LOCALHOST=::1
-		[ "$UNAME" = Darwin ] && LOCALHOST=fe80::1
 		LOCALHOST_IPT=[${LOCALHOST}]
+		LINKLOCAL=$LOCALHOST
+		[ "$UNAME" = Darwin ] && LINKLOCAL=fe80::1
+		LINKLOCAL_IPT=[${LINKLOCAL}]
 		IPVV=6
 	else
 		IPTABLES=iptables
 		LOCALHOST=127.0.0.1
 		LOCALHOST_IPT=$LOCALHOST
+		LINKLOCAL=$LOCALHOST
+		LINKLOCAL_IPT=$LINKLOCAL
 		IPVV=
 	fi
 	IPTABLES=ip${IPVV}tables
