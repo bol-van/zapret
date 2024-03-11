@@ -38,6 +38,8 @@ DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
 
+unset PF_STATUS
+PF_RULES_SAVE=/tmp/pf-zapret-save.conf
 
 killwait()
 {
@@ -56,6 +58,65 @@ exitp()
 	echo press enter to continue
 	read A
 	exit $1
+}
+
+pf_is_avail()
+{
+	[ -c /dev/pf ]
+}
+pf_status()
+{
+	pfctl -qsi  | sed -nre "s/^Status: ([^ ]+).*$/\1/p"
+}
+pf_is_enabled()
+{
+	[ "$(pf_status)" = Enabled ]
+}
+pf_save()
+{
+	PF_STATUS=0
+	pf_is_enabled && PF_STATUS=1
+	pfctl -sr >"$PF_RULES_SAVE"
+}
+pf_restore()
+{
+	[ -n "$PF_STATUS" ] || return
+	if [ -f "$PF_RULES_SAVE" ]; then
+		pfctl -qf "$PF_RULES_SAVE"
+	else
+		echo | pfctl -qf -
+	fi
+	if [ "$PF_STATUS" = 1 ]; then
+		pfctl -qe
+	else
+		pfctl -qd
+	fi
+}
+pf_clean()
+{
+	rm -f "$PF_RULES_SAVE"
+}
+opf_dvtws_anchor()
+{
+	echo "set reassemble no"
+	echo "pass in  quick proto tcp from port {80,443} flags SA/SA divert-packet port $IPFW_DIVERT_PORT no state"
+	echo "pass in  quick proto tcp from port {80,443} no state"
+	echo "pass out quick proto tcp to   port {80,443} divert-packet port $IPFW_DIVERT_PORT no state"
+	echo "pass"
+}
+opf_prepare_dvtws()
+{
+	opf_dvtws_anchor | pfctl -qf -
+	pfctl -qe
+}
+
+cleanup()
+{
+	case "$UNAME" in
+		OpenBSD)
+		    pf_clean
+		    ;;
+	esac
 }
 
 IPT()
@@ -127,6 +188,11 @@ check_system()
 			FWTYPE=ipfw
 			[ -f /etc/platform ] && read SUBSYS </etc/platform
 			;;
+		OpenBSD)
+			PKTWS="$DVTWS"
+			PKTWSD=dvtws
+			FWTYPE=opf
+			;;
 		*)
 			echo $UNAME not supported
 			exitp 5
@@ -188,6 +254,19 @@ check_prerequisites()
 				echo ipfw is disabled. use : ipfw enable firewall
 				exitp 6
 			}
+			;;
+		OpenBSD)
+			progs="$progs pfctl"
+			pf_is_avail || {
+				echo pf is not available
+				exitp 6
+			}
+			# I dont know how to redirect traffic originating from the host itself
+			# even with route-to trick DIOCNATLOOK fails, thus making tpws unusable
+			# this trick works fine on MacOS but doesn't work on FreeBSD and OpenBSD
+			# socks version is also not a solution because I can't control ip version of the resolved domain
+			SKIP_TPWS=1
+			pf_save
 			;;
 	esac
 
@@ -367,6 +446,9 @@ pktws_ipt_prepare()
 			# for autottl mode
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in
 			;;
+		opf)
+			opf_prepare_dvtws
+			;;
 	esac
 }
 pktws_ipt_unprepare()
@@ -392,6 +474,9 @@ pktws_ipt_unprepare()
 			;;
 		ipfw)
 			IPFW_DEL
+			;;
+		opf)
+			pf_restore
 			;;
 	esac
 }
@@ -434,7 +519,7 @@ pktws_start()
 		Linux)
 			"$NFQWS" --uid $TPWS_UID:$TPWS_GID --dpi-desync-fwmark=$DESYNC_MARK --qnum=$QNUM "$@" >/dev/null &
 			;;
-		FreeBSD)
+		FreeBSD|OpenBSD)
 			"$DVTWS" --port=$IPFW_DIVERT_PORT "$@" >/dev/null &
 			;;
 	esac
@@ -642,7 +727,9 @@ pktws_check_domain_bypass()
 					test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e
 				}
 			done
-			f="badsum badseq md5sig datanoack"
+			f=
+			[ "$UNAME" = "OpenBSD" ] || f="badsum"
+			f="$f badseq md5sig datanoack"
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-fooling=$fooling $e && warn_fool $fooling
@@ -661,15 +748,18 @@ pktws_check_domain_bypass()
 		[ "$sec" = 1 ] || break
 	done
 
-	[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
-		for frag in 24 32 40 64 80 104; do
-			tests="ipfrag2"
-			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
-			for desync in $tests; do
-				pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
+	# OpenBSD has checksum issues with fragmented packets
+	if [ "$UNAME" != "OpenBSD" ]; then
+		[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
+			for frag in 24 32 40 64 80 104; do
+				tests="ipfrag2"
+				[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
+				for desync in $tests; do
+					pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
+				done
 			done
-		done
-	}
+		}
+	fi
 
 	report_strategy $1 $3 $PKTWSD
 }
@@ -928,7 +1018,14 @@ ask_params()
 
 pingtest()
 {
-	ping -c 1 -W 1 $1 >/dev/null
+	case "$UNAME" in
+		OpenBSD)
+			ping -c 1 -w 1 $1 >/dev/null
+			;;
+		*)
+			ping -c 1 -W 1 $1 >/dev/null
+			;;
+	esac
 }
 dnstest()
 {
@@ -1048,6 +1145,7 @@ unprepare_all()
 		pktws_ipt_unprepare 443
 	}
 	ws_kill
+	cleanup
 }
 sigint()
 {
@@ -1055,6 +1153,11 @@ sigint()
 	echo terminating...
 	unprepare_all
 	exitp 1
+}
+sigint_cleanup()
+{
+	cleanup
+	exit 1
 }
 sigpipe()
 {
@@ -1068,9 +1171,11 @@ fix_sbin_path
 check_system
 require_root
 check_prerequisites
+trap sigint_cleanup INT
 check_dns
 check_virt
 ask_params
+trap - INT
 
 PID=
 NREPORT=
@@ -1086,6 +1191,8 @@ for dom in $DOMAINS; do
 done
 trap - PIPE
 trap - INT
+
+cleanup
 
 echo
 echo \* SUMMARY
