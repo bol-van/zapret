@@ -345,11 +345,8 @@ GZIP_LISTS=0
  crontab -e
  дописать строчку : 0 12 */2 * * /opt/zapret/ipset/get_config.sh
 
-Если будете пользоваться скриптом ipset/get_combined.sh, установите GNU grep : pkg_add ggrep.
-Родной древний как мамонт, безумно медленный с опцией -f.
 
-
-MacOS
+ MacOS
 -----
 
 Иначально ядро этой ОС "darwin" основывалось на BSD, потому в ней много похожего на другие версии BSD.
