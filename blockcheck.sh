@@ -41,6 +41,8 @@ DNSCHECK_DIGS=/tmp/digs.txt
 unset PF_STATUS
 PF_RULES_SAVE=/tmp/pf-zapret-save.conf
 
+CURL=curl
+
 killwait()
 {
 	# $1 - signal (-9, -2, ...)
@@ -76,16 +78,24 @@ pf_save()
 {
 	PF_STATUS=0
 	pf_is_enabled && PF_STATUS=1
-	pfctl -sr >"$PF_RULES_SAVE"
+	[ "$UNAME" = "OpenBSD" ] && pfctl -sr >"$PF_RULES_SAVE"
 }
 pf_restore()
 {
 	[ -n "$PF_STATUS" ] || return
-	if [ -f "$PF_RULES_SAVE" ]; then
-		pfctl -qf "$PF_RULES_SAVE"
-	else
-		echo | pfctl -qf -
-	fi
+	case "$UNAME" in
+		OpenBSD)
+			if [ -f "$PF_RULES_SAVE" ]; then
+				pfctl -qf "$PF_RULES_SAVE"
+			else
+				echo | pfctl -qf -
+			fi
+			;;
+		Darwin)
+			# it's not possible to save all rules in the right order. hard to reorder. if not ordered pf will refuse to load conf.
+			pfctl -qf /etc/pf.conf
+			;;
+	esac
 	if [ "$PF_STATUS" = 1 ]; then
 		pfctl -qe
 	else
@@ -98,15 +108,39 @@ pf_clean()
 }
 opf_dvtws_anchor()
 {
+	# $1 - port
+	local family=inet
+	[ "$IPV" = 6 ] && family=inet6
 	echo "set reassemble no"
-	echo "pass in  quick proto tcp from port {80,443} flags SA/SA divert-packet port $IPFW_DIVERT_PORT no state"
-	echo "pass in  quick proto tcp from port {80,443} no state"
-	echo "pass out quick proto tcp to   port {80,443} divert-packet port $IPFW_DIVERT_PORT no state"
+	echo "pass in  quick $family proto tcp from port $1 flags SA/SA divert-packet port $IPFW_DIVERT_PORT no state"
+	echo "pass in  quick $family proto tcp from port $1 no state"
+	echo "pass out quick $family proto tcp to   port $1 divert-packet port $IPFW_DIVERT_PORT no state"
 	echo "pass"
 }
 opf_prepare_dvtws()
 {
-	opf_dvtws_anchor | pfctl -qf -
+	# $1 - port
+	opf_dvtws_anchor $1 | pfctl -qf -
+	pfctl -qe
+}
+mpf_tpws_anchor()
+{
+	# $1 - port
+	case "$IPV" in
+		4)
+			echo "rdr pass on $LO_IFACE inet proto tcp from \!127.0.0.0/8 to any port $1 -> $LOCALHOST port $TPPORT"
+			echo "pass out route-to ($LO_IFACE $LOCALHOST) inet proto tcp from any to any port $1 user { >root }"
+		;;
+		6)
+			echo "rdr pass on $LO_IFACE inet6 proto tcp from \!::1 to any port $1 -> $LOCALHOST port $TPPORT"
+			echo "pass out route-to ($LO_IFACE $LOCALHOST) inet6 proto tcp from any to any port $1 user { >root }"
+		;;
+	esac
+}
+mpf_prepare_tpws()
+{
+	# $1 - port
+	mpf_tpws_anchor $1 | pfctl -qf -
 	pfctl -qe
 }
 
@@ -176,6 +210,7 @@ check_system()
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
+			LO_IFACE=lo
 			linux_fwtype
 			[ "$FWTYPE" = iptables -o "$FWTYPE" = nftables ] || {
 				echo firewall type $FWTYPE not supported in $UNAME
@@ -186,12 +221,24 @@ check_system()
 			PKTWS="$DVTWS"
 			PKTWSD=dvtws
 			FWTYPE=ipfw
+			LO_IFACE=lo0
 			[ -f /etc/platform ] && read SUBSYS </etc/platform
 			;;
 		OpenBSD)
 			PKTWS="$DVTWS"
 			PKTWSD=dvtws
 			FWTYPE=opf
+			LO_IFACE=lo0
+			;;
+		Darwin)
+			PKTWS="$DVTWS"
+			PKTWSD=dvtws
+			FWTYPE=mpf
+			# will not redirect traffic for root
+			CURL="sudo -u nobody curl"
+			# /dev/pf requires root. hardcoded in kernel
+			TPWS_UID=0
+			LO_IFACE=lo0
 			;;
 		*)
 			echo $UNAME not supported
@@ -220,7 +267,7 @@ check_prerequisites()
 {
 	echo \* checking prerequisites
 	
-	[ -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
+	[ "$UNAME" = Darwin -o -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
 		echo $PKTWS or $TPWS or $MDIG is not available. run \"$ZAPRET_BASE/install_bin.sh\" or make -C \"$ZAPRET_BASE\"
 		exitp 6
 	}
@@ -255,7 +302,7 @@ check_prerequisites()
 				exitp 6
 			}
 			;;
-		OpenBSD)
+		OpenBSD|Darwin)
 			progs="$progs pfctl"
 			pf_is_avail || {
 				echo pf is not available
@@ -265,7 +312,9 @@ check_prerequisites()
 			# even with route-to trick DIOCNATLOOK fails, thus making tpws unusable
 			# this trick works fine on MacOS but doesn't work on FreeBSD and OpenBSD
 			# socks version is also not a solution because I can't control ip version of the resolved domain
-			SKIP_TPWS=1
+			[ "$UNAME" = "OpenBSD" ] && SKIP_TPWS=1
+			# no divert sockets in MacOS
+			[ "$UNAME" = "Darwin" ] && SKIP_PKTWS=1
 			pf_save
 			;;
 	esac
@@ -361,7 +410,7 @@ curl_test_http()
 	# $1 - ip version : 4/6
 	# $2 - domain name
 	local code loc
-	curl -${1}SsD "$HDRTEMP" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
+	$CURL -${1}SsD "$HDRTEMP" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
 		code=$?
 		rm -f "$HDRTEMP"
 		return $code
@@ -390,7 +439,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
+	$CURL -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
@@ -398,7 +447,7 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
+	$CURL -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
 }
 
 pktws_ipt_prepare()
@@ -447,7 +496,7 @@ pktws_ipt_prepare()
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in
 			;;
 		opf)
-			opf_prepare_dvtws
+			opf_prepare_dvtws $1
 			;;
 	esac
 }
@@ -496,6 +545,9 @@ tpws_ipt_prepare()
 		ipfw)
 			IPFW_ADD fwd $LOCALHOST,$TPPORT tcp from me to any $1 proto ip${IPV} not uid $TPWS_UID
 			;;
+		mpf)
+			mpf_prepare_tpws $1
+			;;
 	esac
 }
 tpws_ipt_unprepare()
@@ -510,6 +562,9 @@ tpws_ipt_unprepare()
 			;;
 		ipfw)
 			IPFW_DEL
+			;;
+		mpf)
+			pf_restore
 			;;
 	esac
 }
@@ -529,7 +584,7 @@ pktws_start()
 }
 tpws_start()
 {
-	"$TPWS" --uid $TPWS_UID:$TPWS_GID --bind-addr=$LOCALHOST --port=$TPPORT "$@" >/dev/null &
+	"$TPWS" --uid $TPWS_UID:$TPWS_GID --bind-addr=$LOCALHOST%$LO_IFACE --port=$TPPORT "$@" >/dev/null &
 	PID=$!
 	# give some time to initialize
 	minsleep
@@ -839,13 +894,15 @@ check_domain()
 
 	echo
 
-	echo preparing $PKTWSD redirection
-	pktws_ipt_prepare $2
+	[ "$SKIP_PKTWS" = 1 ] || {
+	        echo preparing $PKTWSD redirection
+		pktws_ipt_prepare $2
 
-	pktws_check_domain_bypass $1 $3 $4
+		pktws_check_domain_bypass $1 $3 $4
 
-	echo clearing $PKTWSD redirection
-	pktws_ipt_unprepare $2
+		echo clearing $PKTWSD redirection
+		pktws_ipt_unprepare $2
+	}
 }
 check_domain_http()
 {
@@ -867,6 +924,7 @@ configure_ip_version()
 {
 	if [ "$IPV" = 6 ]; then
 		LOCALHOST=::1
+		[ "$UNAME" = Darwin ] && LOCALHOST=fe80::1
 		LOCALHOST_IPT=[${LOCALHOST}]
 		IPVV=6
 	else
