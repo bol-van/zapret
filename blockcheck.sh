@@ -351,7 +351,7 @@ curl_translate_code()
 curl_supports_tls13()
 {
 	local r
-	curl --tlsv1.3 -Is -o /dev/null http://127.0.0.1:65535 2>/dev/null
+	curl --tlsv1.3 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
@@ -366,14 +366,14 @@ curl_supports_tlsmax()
 	# supported only in OpenSSL and LibreSSL
 	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS || return 1
 	# supported since curl 7.54
-	curl --tls-max 1.2 -Is -o /dev/null http://127.0.0.1:65535 2>/dev/null
+	curl --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? != 2 ]
 }
 
 curl_supports_connect_to()
 {
-	curl --connect-to 127.0.0.1:: -o /dev/null http://127.0.0.1:65535 2>/dev/null
+	curl --connect-to 127.0.0.1:: -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	[ "$?" != 2 ]
 }
 
