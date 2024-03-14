@@ -598,9 +598,13 @@ nft_produce_reverse_nfqws_rule()
 	if contains "$rule" "$nft_connbytes "; then
 		# autohostlist - need several incoming packets
 		# autottl - need only one incoming packet
-		[ "$MODE_FILTER" = autohostlist ] || rule=$(echo "$rule" | sed -re 's/$nft_connbytes [0-9]+-[0-9]+/$nft_connbytes 1-1/')
+		[ "$MODE_FILTER" = autohostlist ] || rule=$(echo "$rule" | sed -re "s/$nft_connbytes [0-9]+-[0-9]+/$nft_connbytes 1/")
 	else
-		rule="$nft_connbytes 1-$(first_packets_for_mode) $rule"
+		# old nft does not swallow 1-1
+		local range=1
+		[ "$MODE_FILTER" = autohostlist ] && range=$(first_packets_for_mode)
+		[ "$range" = 1 ] || range="1-$range"
+		rule="$nft_connbytes $range $rule"
 	fi
 	nft_reverse_nfqws_rule $rule
 }

@@ -328,7 +328,9 @@ produce_reverse_nfqws_rule()
 		# autottl - need only one incoming packet
 		[ "$MODE_FILTER" = autohostlist ] || rule=$(echo "$rule" | sed -re "s/$ipt_connbytes [0-9]+:[0-9]+/$ipt_connbytes 1:1/")
 	else
-		rule="$ipt_connbytes 1:$(first_packets_for_mode) $rule"
+		local n=1
+		[ "$MODE_FILTER" = autohostlist ] && n=$(first_packets_for_mode)
+		rule="$ipt_connbytes 1:$n $rule"
 	fi
 	echo "$rule" | reverse_nfqws_rule_stream
 }
