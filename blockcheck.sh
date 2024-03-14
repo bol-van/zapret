@@ -284,6 +284,19 @@ check_prerequisites()
 				echo ipfw is disabled. use : ipfw enable firewall
 				exitp 6
 			}
+			pf_is_avail && {
+				pf_save
+				[ "$SUBSYS" = "pfSense" ] && {
+					# pfsense's ipfw may not work without these workarounds
+					sysctl net.inet.ip.pfil.outbound=ipfw,pf 2>/dev/null
+					sysctl net.inet.ip.pfil.inbound=ipfw,pf 2>/dev/null
+					sysctl net.inet6.ip6.pfil.outbound=ipfw,pf 2>/dev/null
+					sysctl net.inet6.ip6.pfil.inbound=ipfw,pf 2>/dev/null
+					pfctl -qd
+					pfctl -qe
+					pf_restore
+				}
+			}
 			;;
 		OpenBSD|Darwin)
 			progs="$progs pfctl"
@@ -497,6 +510,9 @@ pktws_ipt_prepare()
 			nft "add rule inet $NFT_TABLE predefrag meta nfproto ipv${IPV} mark and $DESYNC_MARK !=0 notrack"
 			;;
 		ipfw)
+			# disable PF to avoid interferences
+			pf_is_avail && pfctl -qd
+
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any $1 proto ip${IPV} out not diverted not sockarg
 			# for autottl mode
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in
@@ -529,6 +545,7 @@ pktws_ipt_unprepare()
 			;;
 		ipfw)
 			IPFW_DEL
+			pf_is_avail && pf_restore
 			;;
 		opf)
 			pf_restore
