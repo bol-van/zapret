@@ -156,7 +156,7 @@ For all traffic:
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 # required for autottl mode only
-ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in recv em0
+ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in not diverted not sockarg recv em0
 /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
 ```
 
@@ -166,7 +166,7 @@ ipfw delete 100
 ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
 ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted not sockarg xmit em0
 # required for autottl mode only
-ipfw add 100 divert 989 tcp from table\(zapret\) 80,443 to any tcpflags syn,ack in recv em0
+ipfw add 100 divert 989 tcp from table\(zapret\) 80,443 to any tcpflags syn,ack in not diverted not sockarg recv em0
 /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
 ```
 

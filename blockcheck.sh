@@ -515,7 +515,7 @@ pktws_ipt_prepare()
 
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from me to any $1 proto ip${IPV} out not diverted not sockarg
 			# for autottl mode
-			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in
+			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in not diverted not sockarg
 			;;
 		opf)
 			opf_prepare_dvtws $1
