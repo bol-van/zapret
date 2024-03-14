@@ -108,19 +108,21 @@ pf_clean()
 }
 opf_dvtws_anchor()
 {
-	# $1 - port
+	# $1 - tcp/udp
+	# $2 - port
 	local family=inet
 	[ "$IPV" = 6 ] && family=inet6
 	echo "set reassemble no"
-	echo "pass in  quick $family proto tcp from port $1 flags SA/SA divert-packet port $IPFW_DIVERT_PORT no state"
-	echo "pass in  quick $family proto tcp from port $1 no state"
-	echo "pass out quick $family proto tcp to   port $1 divert-packet port $IPFW_DIVERT_PORT no state"
+	[ "$1" = tcp ] && echo "pass in quick $family proto $1 from port $2 flags SA/SA divert-packet port $IPFW_DIVERT_PORT no state"
+	echo "pass in  quick $family proto $1 from port $2 no state"
+	echo "pass out quick $family proto $1 to   port $2 divert-packet port $IPFW_DIVERT_PORT no state"
 	echo "pass"
 }
 opf_prepare_dvtws()
 {
-	# $1 - port
-	opf_dvtws_anchor $1 | pfctl -qf -
+	# $1 - tcp/udp
+	# $2 - port
+	opf_dvtws_anchor $1 $2 | pfctl -qf -
 	pfctl -qe
 }
 
@@ -399,6 +401,14 @@ curl_supports_connect_to()
 	[ "$?" != 2 ]
 }
 
+curl_supports_http3()
+{
+	# if it has http3 : curl: (3) HTTP/3 requested for non-HTTPS URL
+	# otherwise : curl: (2) option --http3-only: is unknown
+	curl --connect-to 127.0.0.1:: -o /dev/null --max-time 1 --http3-only http://127.0.0.1:65535 2>/dev/null
+	[ "$?" != 2 ]
+}
+
 hdrfile_http_code()
 {
 	# $1 - hdr file
@@ -467,7 +477,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl_with_dig $1 $2 -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
@@ -475,10 +485,19 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 -${1}ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
 }
 
-pktws_ipt_prepare()
+curl_test_http3()
+{
+	# $1 - ip version : 4/6
+	# $2 - domain name
+
+	# force TLS1.3 mode
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1 
+}
+
+pktws_ipt_prepare_tcp()
 {
 	# $1 - port
 	case "$FWTYPE" in
@@ -527,11 +546,11 @@ pktws_ipt_prepare()
 			IPFW_ADD divert $IPFW_DIVERT_PORT tcp from any $1 to me proto ip${IPV} tcpflags syn,ack in not diverted not sockarg
 			;;
 		opf)
-			opf_prepare_dvtws $1
+			opf_prepare_dvtws tcp $1
 			;;
 	esac
 }
-pktws_ipt_unprepare()
+pktws_ipt_unprepare_tcp()
 {
 	# $1 - port
 	case "$FWTYPE" in
@@ -561,6 +580,49 @@ pktws_ipt_unprepare()
 			;;
 	esac
 }
+pktws_ipt_prepare_udp()
+{
+	# $1 - port
+	case "$FWTYPE" in
+		iptables)
+			IPT OUTPUT -t mangle -p udp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+			;;
+		nftables)
+			nft add table inet $NFT_TABLE
+			nft "add chain inet $NFT_TABLE premangle { type filter hook output priority -152; }"
+			nft "add rule inet $NFT_TABLE premangle meta nfproto ipv${IPV} udp dport $1 mark and 0x40000000 != 0x40000000 queue num $QNUM"
+			;;
+		ipfw)
+			# disable PF to avoid interferences
+			pf_is_avail && pfctl -qd
+
+			IPFW_ADD divert $IPFW_DIVERT_PORT udp from me to any $1 proto ip${IPV} out not diverted not sockarg
+			;;
+		opf)
+			opf_prepare_dvtws udp $1
+			;;
+	esac
+}
+pktws_ipt_unprepare_udp()
+{
+	# $1 - port
+	case "$FWTYPE" in
+		iptables)
+			IPT_DEL OUTPUT -t mangle -p udp --dport $1 -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK -j NFQUEUE --queue-num $QNUM
+			;;
+		nftables)
+			nft delete table inet $NFT_TABLE 2>/dev/null
+			;;
+		ipfw)
+			IPFW_DEL
+			pf_is_avail && pf_restore
+			;;
+		opf)
+			pf_restore
+			;;
+	esac
+}
+
 pktws_start()
 {
 	case "$UNAME" in
@@ -716,7 +778,7 @@ warn_fool()
 		datanoack) echo 'WARNING ! although datanoack fooling worked it may break NAT and may only work with external IP. Additionally it may require nftables to work correctly.' ;;
 	esac
 }
-pktws_check_domain_bypass()
+pktws_check_domain_http_bypass()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
@@ -812,7 +874,25 @@ pktws_check_domain_bypass()
 
 	report_strategy $1 $3 $PKTWSD
 }
-tpws_check_domain_bypass()
+pktws_check_domain_http3_bypass()
+{
+	# $1 - test function
+	# $2 - domain
+	
+	local f desync frag tests
+
+	pktws_curl_test_update $1 $2 --dpi-desync=fake
+	
+	[ "$IPV" = 6 ] && {
+		f="hopbyhop destopt"
+		for desync in $f; do
+			pktws_curl_test_update $1 $2 --dpi-desync=$desync
+		done
+	}
+	
+	report_strategy $1 $2 $PKTWSD
+}
+tpws_check_domain_http_bypass()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
@@ -842,7 +922,17 @@ tpws_check_domain_bypass()
 	report_strategy $1 $3 tpws
 }
 
-check_domain()
+
+curl_has_reason_to_continue()
+{
+	# $1 - curl return code
+	for c in 1 2 3 4 6 27 ; do
+		[ $1 = $c ] && return 1
+	done
+	return 0
+}
+
+check_domain_http_tcp()
 {
 	# $1 - test function
 	# $2 - port
@@ -855,7 +945,7 @@ check_domain()
 	echo \* $1 ipv$IPV $4
 
 	# in case was interrupted before
-	pktws_ipt_unprepare $2
+	pktws_ipt_unprepare_tcp $2
 	ws_kill
 
 	echo "- checking without DPI bypass"
@@ -864,44 +954,86 @@ check_domain()
 		[ "$FORCE" = 1 ] || return
 	}
 	code=$?
-	for c in 1 2 3 4 6 27 ; do
-		[ $code = $c ] && {
-			report_append "ipv${IPV} $4 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
-			return
-		}
-	done
+	curl_has_reason_to_continue $code || {
+		report_append "ipv${IPV} $4 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
+		return
+	}
 
 	echo
 	if [ "$SKIP_TPWS" != 1 ]; then
-		tpws_check_domain_bypass $1 $3 $4
+		tpws_check_domain_http_bypass $1 $3 $4
 	fi
 
 	echo
 
 	[ "$SKIP_PKTWS" = 1 ] || {
 	        echo preparing $PKTWSD redirection
-		pktws_ipt_prepare $2
+		pktws_ipt_prepare_tcp $2
 
-		pktws_check_domain_bypass $1 $3 $4
+		pktws_check_domain_http_bypass $1 $3 $4
 
 		echo clearing $PKTWSD redirection
-		pktws_ipt_unprepare $2
+		pktws_ipt_unprepare_tcp $2
 	}
 }
+check_domain_http_udp()
+{
+	# $1 - test function
+	# $2 - port
+	# $3 - domain
+
+	local code c
+
+	echo
+	echo \* $1 ipv$IPV $3
+
+	# in case was interrupted before
+	pktws_ipt_unprepare_udp $2
+	ws_kill
+
+	echo "- checking without DPI bypass"
+	curl_test $1 $3 && {
+		report_append "ipv${IPV} $3 $1 : working without bypass"
+		[ "$FORCE" = 1 ] || return
+	}
+	code=$?
+	curl_has_reason_to_continue $code || {
+		report_append "ipv${IPV} $3 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
+		return
+	}
+
+	echo
+	[ "$SKIP_PKTWS" = 1 ] || {
+	        echo preparing $PKTWSD redirection
+		pktws_ipt_prepare_udp $2
+
+		pktws_check_domain_http3_bypass $1 $3
+
+		echo clearing $PKTWSD redirection
+		pktws_ipt_unprepare_udp $2
+	}
+}
+
+
 check_domain_http()
 {
 	# $1 - domain
-	check_domain curl_test_http 80 0 $1
+	check_domain_http_tcp curl_test_http 80 0 $1
 }
 check_domain_https_tls12()
 {
 	# $1 - domain
-	check_domain curl_test_https_tls12 443 1 $1
+	check_domain_http_tcp curl_test_https_tls12 443 1 $1
 }
 check_domain_https_tls13()
 {
 	# $1 - domain
-	check_domain curl_test_https_tls13 443 1 $1
+	check_domain_http_tcp curl_test_https_tls13 443 1 $1
+}
+check_domain_http3()
+{
+	# $1 - domain
+	check_domain_http_udp curl_test_http3 443 $1
 }
 
 configure_ip_version()
@@ -930,6 +1062,8 @@ configure_curl_opt()
 	}
 	TLS13=
 	curl_supports_tls13 && TLS13=1
+	HTTP3=
+	curl_supports_http3 && HTTP3=1
 }
 
 linux_ipv6_defrag_can_be_disabled()
@@ -1013,9 +1147,11 @@ ask_params()
 	configure_curl_opt
 
 	ENABLE_HTTP=1
+	echo
 	ask_yes_no_var ENABLE_HTTP "check http"
 
 	ENABLE_HTTPS_TLS12=1
+	echo
 	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
 
 	ENABLE_HTTPS_TLS13=0
@@ -1031,6 +1167,15 @@ ask_params()
 		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
 	else
 		echo "installed curl version does not support TLS 1.3 . tests disabled."
+	fi
+
+	ENABLE_HTTP3=0
+	echo
+	if [ -n "$HTTP3" ]; then
+		ENABLE_HTTP3=1
+		ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
+	else
+		echo "installed curl version does not support http3 QUIC. tests disabled."
 	fi
 
 	IGNORE_CA=0
@@ -1188,8 +1333,9 @@ unprepare_all()
 	# make sure we are not in a middle state that impacts connectivity
 	rm -f "$HDRTEMP"
 	[ -n "$IPV" ] && {
-		pktws_ipt_unprepare 80
-		pktws_ipt_unprepare 443
+		pktws_ipt_unprepare_tcp 80
+		pktws_ipt_unprepare_tcp 443
+		pktws_ipt_unprepare_udp 443
 	}
 	ws_kill
 	cleanup
@@ -1234,6 +1380,7 @@ for dom in $DOMAINS; do
 		[ "$ENABLE_HTTP" = 1 ] && check_domain_http $dom
 		[ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $dom
 		[ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $dom
+		[ "$ENABLE_HTTP3" = 1 ] && check_domain_http3 $dom
 	done
 done
 trap - PIPE
