@@ -251,7 +251,16 @@ check_prerequisites()
 	echo \* checking prerequisites
 	
 	[ "$UNAME" = Darwin -o -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
-		echo $PKTWS or $TPWS or $MDIG is not available. run \"$ZAPRET_BASE/install_bin.sh\" or make -C \"$ZAPRET_BASE\"
+		local target
+		case $UNAME in
+			Darwin)
+				target="mac"
+				;;
+			OpenBSD)
+				target="bsd"
+				;;
+		esac
+		echo $PKTWS or $TPWS or $MDIG is not available. run \"$ZAPRET_BASE/install_bin.sh\" or \`make -C \"$ZAPRET_BASE\" $target\`
 		exitp 6
 	}
 
