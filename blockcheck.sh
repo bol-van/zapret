@@ -438,7 +438,7 @@ curl_test_http()
 	# $1 - ip version : 4/6
 	# $2 - domain name
 	local code loc
-	curl_with_dig $1 $2 -SsD "$HDRTEMP" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
+	curl_with_dig $1 $2 -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
 		code=$?
 		rm -f "$HDRTEMP"
 		return $code
