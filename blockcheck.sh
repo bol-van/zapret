@@ -858,17 +858,15 @@ pktws_check_domain_http_bypass()
 	done
 
 	# OpenBSD has checksum issues with fragmented packets
-	if [ "$UNAME" != "OpenBSD" ]; then
-		[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
-			for frag in 24 32 40 64 80 104; do
-				tests="ipfrag2"
-				[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
-				for desync in $tests; do
-					pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
-				done
+	[ "$UNAME" != "OpenBSD" ] && [ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
+		for frag in 24 32 40 64 80 104; do
+			tests="ipfrag2"
+			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
+			for desync in $tests; do
+				pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
 			done
-		}
-	fi
+		done
+	}
 
 	report_strategy $1 $3 $PKTWSD
 }
@@ -888,7 +886,9 @@ pktws_check_domain_http3_bypass()
 			pktws_curl_test_update $1 $2 --dpi-desync=$desync
 		done
 	}
-	[ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
+
+	# OpenBSD has checksum issues with fragmented packets
+	[ "$UNAME" != "OpenBSD" ] && [ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
 		for frag in 8 16 24 32 40 64; do
 			tests="ipfrag2"
 			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
