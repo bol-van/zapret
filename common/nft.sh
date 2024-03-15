@@ -70,9 +70,6 @@ nft_del_all_chains_from_table()
 
 nft_create_chains()
 {
-	# NOTE : postrouting hook has priority 99 to hook packets with original source but NATed destination
-	# NOTE : prerouting hook has priority -99 for the same reason
-	# NOTE : postnat is intended for hooks after NAT. many undersired things can happen. use with care. to activate set env POSTNAT=1
 cat << EOF | nft -f -
 	add chain inet $ZAPRET_NFT_TABLE dnat_output { type nat hook output priority -101; }
 	flush chain inet $ZAPRET_NFT_TABLE dnat_output
@@ -98,7 +95,7 @@ cat << EOF | nft -f -
 	add chain inet $ZAPRET_NFT_TABLE prenat { type filter hook prerouting priority -101; }
 	flush chain inet $ZAPRET_NFT_TABLE prenat
 	add chain inet $ZAPRET_NFT_TABLE predefrag { type filter hook output priority -401; }
-	flush chain inet $ZAPRET_NFT_TABLE predefrag 
+	flush chain inet $ZAPRET_NFT_TABLE predefrag
 	add chain inet $ZAPRET_NFT_TABLE predefrag_nfqws
 	flush chain inet $ZAPRET_NFT_TABLE predefrag_nfqws
 	add rule inet $ZAPRET_NFT_TABLE predefrag mark and $DESYNC_MARK !=0 jump predefrag_nfqws comment "nfqws generated : avoid drop by INVALID conntrack state"
@@ -115,13 +112,6 @@ EOF
 		nft_flush_chain predefrag_nfqws
 		nft_add_rule predefrag_nfqws notrack comment \"do not track nfqws generated packets to avoid nat tampering and defragmentation\"
 	}
-# unfortunately this approach breaks udp desync of the connection initiating packet (new, first one)
-# however without notrack ipfrag will not work
-# postrouting priority : 99 - before srcnat, 101 - after srcnat
-#	add chain inet $ZAPRET_NFT_TABLE predefrag { type filter hook output priority -401; }
-#	flush chain inet $ZAPRET_NFT_TABLE predefrag 
-#	add rule inet $ZAPRET_NFT_TABLE predefrag mark and $DESYNC_MARK !=0 notrack comment "do not track nfqws generated packets to avoid nat tampering and defragmentation"
-
 }
 nft_del_chains()
 {
@@ -457,7 +447,7 @@ nft_fw_tpws()
 }
 is_postnat()
 {
-	[ "$POSTNAT" = 1 -o "$POSTNAT_ALL" = 1 ]
+	[ "$POSTNAT" != 0 -o "$POSTNAT_ALL" = 1 ]
 }
 get_postchain()
 {
@@ -696,7 +686,6 @@ zapret_apply_firewall_rules_nft()
 				fi
 			fi
 
-			POSTNAT=0
 			get_nfqws_qnums_quic qn qn6
 			if [ -n "$qn" ]; then
 				f4=
