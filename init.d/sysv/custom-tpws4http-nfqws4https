@@ -47,8 +47,6 @@ zapret_custom_firewall_nft()
 {
 	# stop logic is not required
 
-	# do not use POSTNAT for udp first packet desync !
-	local POSTNAT=1
 	local f4 f6
 	local first_packet_only="$nft_connbytes 1-$(first_packets_for_mode)"
 	local desync="mark and $DESYNC_MARK == 0"
