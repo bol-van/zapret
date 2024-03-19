@@ -769,6 +769,10 @@ test_has_split()
 {
 	contains "$1" split || contains "$1" disorder
 }
+test_has_fake()
+{
+	contains "$1" fake
+}
 warn_fool()
 {
 	case "$1" in
@@ -776,6 +780,33 @@ warn_fool()
 		datanoack) echo 'WARNING ! although datanoack fooling worked it may break NAT and may only work with external IP. Additionally it may require nftables to work correctly.' ;;
 	esac
 }
+pktws_curl_test_update_vary()
+{
+	# $1 - test function
+	# $2 - encrypted test : 1/0
+	# $3 - domain
+	# $4 - desync mode
+	# $5,$6,... - strategy
+
+	local testf=$1 sec=$2 domain=$3 desync=$4 zerofake split fake
+	
+	shift; shift; shift; shift
+	
+	zerofake=http
+	[ "$sec" = 1 ] && zerofake=tls
+	zerofake="--dpi-desync-fake-$zerofake=0x00000000"
+	
+	for fake in '' $zerofake ; do
+		for split in '' '--dpi-desync-split-pos=1' ; do
+			pktws_curl_test_update $testf $domain --dpi-desync=$desync "$@" $fake $split && return 0
+			test_has_split $desync || break
+		done
+		test_has_fake $desync || break
+	done
+
+	return 1
+}
+
 pktws_check_domain_http_bypass()
 {
 	# $1 - test function
@@ -822,42 +853,41 @@ pktws_check_domain_http_bypass()
 		[ -n "$e" ] && {
 			pktws_curl_test_update $1 $3 $e
 			for desync in split2 disorder2; do
-				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
+				pktws_curl_test_update_vary $1 $2 $3 $desync $e
 			done
 		}
 		for desync in $tests; do
-			s="--dpi-desync=$desync"
 			for ttl in $ttls; do
-				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=$ttl $e && break
-				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=$ttl $e && break
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=$ttl $e && break
 			done
 			for delta in 1 2 3 4 5; do
-				pktws_curl_test_update $1 $3 $s --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e || {
-					test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e
-				}
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e
 			done
 			f=
 			[ "$UNAME" = "OpenBSD" ] || f="badsum"
 			f="$f badseq md5sig datanoack"
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
-				pktws_curl_test_update $1 $3 $s --dpi-desync-fooling=$fooling $e && warn_fool $fooling
-				test_has_split $desync && pktws_curl_test_update $1 $3 $s --dpi-desync-split-pos=1 --dpi-desync-fooling=$fooling $e && warn_fool $fooling
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling $e && warn_fool $fooling
 			done
 		done
 		[ "$IPV" = 6 ] && {
 			f="hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2"
 			[ -n "$IP6_DEFRAG_DISABLE" ] && f="$f ipfrag1 ipfrag1,split2 ipfrag1,disorder2"
 			for desync in $f; do
-				pktws_curl_test_update $1 $3 --dpi-desync=$desync $e
-				test_has_split $desync && pktws_curl_test_update $1 $3 --dpi-desync-split-pos=1 --dpi-desync=$desync $e
+				pktws_curl_test_update_vary $1 $2 $3 $desync $e
 			done
 		}
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
 
-	pktws_curl_test_update $1 $3 --dpi-desync=syndata
+	s="http_iana_org.bin"
+	[ "$sec" = 1 ] && s="tls_clienthello_iana_org.bin"
+	for desync in syndata syndata,split2 syndata,disorder2 syndata,split2 syndata,disorder2 ; do
+		pktws_curl_test_update_vary $1 $2 $3 $desync
+		pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s"
+	done
 
 	# OpenBSD has checksum issues with fragmented packets
 	[ "$UNAME" != "OpenBSD" ] && [ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
