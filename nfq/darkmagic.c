@@ -56,6 +56,16 @@ uint8_t tcp_find_scale_factor(const struct tcphdr *tcp)
 	if (scale && scale[1]==3) return scale[2];
 	return SCALE_NONE;
 }
+bool tcp_has_fastopen(const struct tcphdr *tcp)
+{
+	uint8_t *opt;
+	// new style RFC7413
+	opt = tcp_find_option((struct tcphdr*)tcp, 34);
+	if (opt) return true;
+	// old style RFC6994
+	opt = tcp_find_option((struct tcphdr*)tcp, 254);
+	return opt && opt[1]>=4 && opt[2]==0xF9 && opt[3]==0x89;
+}
 
 // n prefix (nsport, nwsize) means network byte order
 static void fill_tcphdr(

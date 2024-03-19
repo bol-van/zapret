@@ -456,6 +456,17 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 					return res;
 				break;
 			case DESYNC_SYNDATA:
+				// make sure we are not breaking TCP fast open
+				if (tcp_has_fastopen(tcphdr))
+				{
+					DLOG("received SYN with TCP fast open option. syndata desync is not applied.\n");
+					break;
+				}
+				if (len_payload)
+				{
+					DLOG("received SYN with data payload. syndata desync is not applied.\n");
+					break;
+				}
 				pkt1_len = sizeof(pkt1);
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 					ttl_orig,0,0,0, params.fake_syndata,params.fake_syndata_size, pkt1,&pkt1_len))

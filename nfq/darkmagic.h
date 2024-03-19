@@ -132,6 +132,7 @@ void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const st
 uint8_t *tcp_find_option(struct tcphdr *tcp, uint8_t kind);
 uint32_t *tcp_find_timestamps(struct tcphdr *tcp);
 uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
+bool tcp_has_fastopen(const struct tcphdr *tcp);
 
 // auto creates internal socket and uses it for subsequent calls
 bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len);
