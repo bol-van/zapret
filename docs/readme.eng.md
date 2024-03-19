@@ -185,6 +185,7 @@ nfqws takes the following parameters:
  --dpi-desync-fake-http=<filename>|0xHEX        ; file containing fake http request
  --dpi-desync-fake-tls=<filename>|0xHEX         ; file containing fake TLS ClientHello (for https)
  --dpi-desync-fake-unknown=<filename>|0xHEX     ; file containing unknown protocol fake payload
+ --dpi-desync-fake-syndata=<filename>|0xHEX     ; file containing SYN data payload
  --dpi-desync-fake-quic=<filename>|0xHEX        ; file containing fake QUIC Initial
  --dpi-desync-fake-wireguard=<filename>|0xHEX   ; file containing fake wireguard handshake initiation
  --dpi-desync-fake-dht=<filename>|0xHEX         ; file containing fake DHT (d1..e)
@@ -370,6 +371,10 @@ then `/etc/init.d/firewall restart`
 
 Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
 If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
+
+### SYNDATA mode
+
+Normally SYNs come without data payload. If it's present it's ignored by all major OS, but may not be ignored by DPI.
 
 ### Virtual Machines
 

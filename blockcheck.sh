@@ -477,7 +477,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
 }
 curl_test_https_tls13()
 {
@@ -485,7 +485,7 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
 }
 
 curl_test_http3()
@@ -493,8 +493,8 @@ curl_test_http3()
 	# $1 - ip version : 4/6
 	# $2 - domain name
 
-	# force HTTP3 (QUIC) mode
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
+	# force TLS1.3 mode
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1 
 }
 
 ipt_scheme()
@@ -856,6 +856,8 @@ pktws_check_domain_http_bypass()
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
+
+	pktws_curl_test_update $1 $3 --dpi-desync=syndata
 
 	# OpenBSD has checksum issues with fragmented packets
 	[ "$UNAME" != "OpenBSD" ] && [ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {

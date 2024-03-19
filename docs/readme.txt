@@ -236,7 +236,7 @@ nfqws
  --hostnospace					; убрать пробел после "Host:" и переместить его в конец значения "User-Agent:" для сохранения длины пакета
  --hostspell=HoST				; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
  --domcase					; домен после Host: сделать таким : TeSt.cOm
- --dpi-desync=[<mode0>,]<mode>[,<mode2]		; атака по десинхронизации DPI. mode : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper
+ --dpi-desync=[<mode0>,]<mode>[,<mode2]		; атака по десинхронизации DPI. mode : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>        	; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
  --dpi-desync-ttl=<int>                 	; установить ttl для десинхронизирующих пакетов
  --dpi-desync-ttl6=<int>               		; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение ttl
@@ -253,6 +253,7 @@ nfqws
  --dpi-desync-fake-http=<filename>|0xHEX	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному www.iana.org
  --dpi-desync-fake-tls=<filename>|0xHEX	        ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному www.iana.org
  --dpi-desync-fake-unknown=<filename>|0xHEX	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
+ --dpi-desync-fake-syndata=<filename>|0xHEX	; файл, содержащий фейковый пейлоад пакета SYN для режима десинхронизации syndata
  --dpi-desync-fake-quic=<filename>|0xHEX        ; файл, содержащий фейковый QUIC Initial
  --dpi-desync-fake-dht=<filename>|0xHEX 	; файл, содержащий фейковый пейлоад DHT протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
  --dpi-desync-fake-unknown-udp=<filename>|0xHEX ; файл, содержащий фейковый пейлоад неизвестного udp протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
@@ -429,7 +430,7 @@ mark нужен, чтобы сгенерированный поддельный 
 
 КОМБИНИРОВАНИЕ МЕТОДОВ ДЕСИНХРОНИЗАЦИИ
 В параметре dpi-desync можно указать до 3 режимов через запятую.
-0 фаза предполагает работу на этапе установления соединения. Может быть synack.
+0 фаза предполагает работу на этапе установления соединения. Может быть synack или syndata.
 На 0 фазу не действует фильтр по hostlist.
 Последующие режимы отрабатывают на пакетах с данными.
 Режим 1-й фазы может быть fake,rst,rstack. Режим 2-й фазы может быть disorder,disorder2,split,split2,ipfrag2.
@@ -457,6 +458,9 @@ ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
 Лучше делать так, потому что отсутствие дропа INVALID в FORWARD может привести к нежелательным утечкам пакетов из LAN.
 Если не принять эти меры, отсылка SYN,ACK сегмента вызовет ошибку и операция будет прервана.
 Остальные режимы тоже не сработают. Если поймете, что вам synack не нужен, обязательно верните правило дропа INVALID.
+
+РЕЖИМ SYNDATA
+Тут все просто. Добавляются данные в пакет SYN. Все ОС их игнорируют, а DPI может воспринять.
 
 ВИРТУАЛЬНЫЕ МАШИНЫ
 Изнутри VM от virtualbox и vmware в режиме NAT не работают многие техники пакетной магии nfqws.
