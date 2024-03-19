@@ -477,7 +477,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1 
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
 }
 curl_test_https_tls13()
 {
@@ -485,7 +485,7 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1 
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
 }
 
 curl_test_http3()
@@ -494,7 +494,7 @@ curl_test_http3()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1 
+	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
 }
 
 ipt_scheme()

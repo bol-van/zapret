@@ -560,6 +560,12 @@ bool ip_frag(
 		return false;
 }
 
+void rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl)
+{
+	if (ip)	ip->ip_ttl = ttl;
+	if (ip6) ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = ttl;
+}
+
 
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport)
 {

@@ -53,7 +53,7 @@ void desync_init(void)
 
 bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 {
-	return mode==DESYNC_SYNACK;
+	return mode==DESYNC_SYNACK || mode==DESYNC_SYNDATA;
 }
 bool desync_valid_first_stage(enum dpi_desync_mode mode)
 {
@@ -89,6 +89,8 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 		return DESYNC_RSTACK;
 	else if (!strcmp(s,"synack"))
 		return DESYNC_SYNACK;
+	else if (!strcmp(s,"syndata"))
+		return DESYNC_SYNDATA;
 	else if (!strcmp(s,"disorder"))
 		return DESYNC_DISORDER;
 	else if (!strcmp(s,"disorder2"))
@@ -437,18 +439,54 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		extract_endpoints(ip, ip6hdr, tcphdr, NULL, &src, &dst);
 	}
 
-	if (params.desync_mode0==DESYNC_SYNACK && tcp_syn_segment(tcphdr))
+	if (tcp_syn_segment(tcphdr))
 	{
-		pkt1_len = sizeof(pkt1);
-		if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-			ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-			NULL, 0, pkt1, &pkt1_len))
+		switch (params.desync_mode0)
 		{
-			return res;
+			case DESYNC_SYNACK:
+				pkt1_len = sizeof(pkt1);
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+					NULL, 0, pkt1, &pkt1_len))
+				{
+					return res;
+				}
+				DLOG("sending fake SYNACK\n");
+				if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+					return res;
+				break;
+			case DESYNC_SYNDATA:
+				pkt1_len = sizeof(pkt1);
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+					ttl_orig,0,0,0, params.fake_syndata,params.fake_syndata_size, pkt1,&pkt1_len))
+				{
+					return res;
+				}
+				DLOG("sending SYN with fake data : ");
+				hexdump_limited_dlog(params.fake_syndata,params.fake_syndata_size,PKTDATA_MAXDUMP); DLOG("\n")
+				if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+					return res;
+
+				#ifdef __linux__
+				// if used in postnat chain, dropping SYN will cause conntrack connection teardown
+				// so we need to workaround this.
+				// we can't use low ttl because TCP/IP stack listens to ttl expired ICMPs in response to SYN and reset connection
+				// we also can't use TCP fooling because DPI would accept fooled packets
+				if (ip)
+				{
+				    // routers will drop IP frames with invalid checksum
+				    ip->ip_sum ^= htons(0xBEAF);
+				    res=modify;
+				}
+				else
+				    // ipv6 does not have checksum
+				    // consider we are free of NAT in ipv6 case. just drop
+				    res=drop;
+				#else
+				    res=drop;
+				#endif
+				break;
 		}
-		DLOG("sending fake SYNACK\n");
-		if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
-			return res;
 	}
 
 	if (params.desync_cutoff)

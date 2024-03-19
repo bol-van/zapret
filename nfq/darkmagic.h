@@ -124,7 +124,8 @@ bool ip_frag(
 	size_t frag_pos, uint32_t ident,
 	uint8_t *pkt1, size_t *pkt1_size,
 	uint8_t *pkt2, size_t *pkt2_size);
-
+	
+void rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl);
 
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport);
 void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr,const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
