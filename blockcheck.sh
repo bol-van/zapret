@@ -11,29 +11,32 @@ ZAPRET_BASE="$EXEDIR"
 . "$ZAPRET_BASE/common/fwtype.sh"
 . "$ZAPRET_BASE/common/virt.sh"
 
-[ -n "$QNUM" ] || QNUM=59780
-[ -n "$SOCKS_PORT" ] || SOCKS_PORT=1993
-[ -n "$TPWS_UID" ] || TPWS_UID=1
-[ -n "$TPWS_GID" ] || TPWS_GID=3003
-[ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
-[ -n "$DVTWS" ] || DVTWS="$ZAPRET_BASE/nfq/dvtws"
-[ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
-[ -n "$MDIG" ] || MDIG="$ZAPRET_BASE/mdig/mdig"
+QNUM=${QNUM:-59780}
+SOCKS_PORT=${SOCKS_PORT:-1993}
+TPWS_UID=${TPWS_UID:-1}
+TPWS_GID=${TPWS_GID:-3003}
+NFQWS=${NFQWS:-${ZAPRET_BASE}/nfq/nfqws}
+DVTWS=${DVTWS:-${ZAPRET_BASE}/nfq/dvtws}
+TPWS=${TPWS:-${ZAPRET_BASE}/tpws/tpws}
+MDIG=${MDIG:-${ZAPRET_BASE}/mdig/mdig}
 DESYNC_MARK=0x10000000
-[ -n "$IPFW_RULE_NUM" ] || IPFW_RULE_NUM=1
-[ -n "$IPFW_DIVERT_PORT" ] || IPFW_DIVERT_PORT=59780
-[ -n "$DOMAINS" ] || DOMAINS=rutracker.org
-[ -n "$CURL_MAX_TIME" ] || CURL_MAX_TIME=3
-[ -n "$MIN_TTL" ] || MIN_TTL=1
-[ -n "$MAX_TTL" ] || MAX_TTL=12
-[ -n "$USER_AGENT" ] || USER_AGENT="Mozilla"
+IPFW_RULE_NUM=${IPFW_RULE_NUM:-1}
+IPFW_DIVERT_PORT=${IPFW_DIVERT_PORT:-59780}
+DOMAINS=${DOMAINS:-rutracker.org}
+CURL_MAX_TIME=${CURL_MAX_TIME:-3}
+MIN_TTL=${MIN_TTL:-1}
+MAX_TTL=${MAX_TTL:-12}
+USER_AGENT=${USER_AGENT:-Mozilla}
+HTTP_PORT=${HTTP_PORT:-80}
+HTTPS_PORT=${HTTPS_PORT:-443}
+QUIC_PORT=${QUIC_PORT:-443}
 
 HDRTEMP=/tmp/zapret-hdr.txt
 
 NFT_TABLE=blockcheck
 
-[ -n "$DNSCHECK_DNS" ] || DNSCHECK_DNS="8.8.8.8 1.1.1.1 77.88.8.1"
-[ -n "$DNSCHECK_DOM" ] || DNSCHECK_DOM="pornhub.com putinhuylo.com rutracker.org www.torproject.org bbc.com"
+DNSCHECK_DNS=${DNSCHECK_DNS:-8.8.8.8 1.1.1.1 77.88.8.1}
+DNSCHECK_DOM=${DNSCHECK_DOM:-pornhub.com putinhuylo.com rutracker.org www.torproject.org bbc.com}
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -426,20 +429,22 @@ curl_connect_to()
 {
 	# $1 - ip version : 4/6
 	# $2 - domain name
+	# $3 - port
 	local ip=$(mdig_resolve $1 $2)
-	[ -n "$ip" ] && echo "--connect-to $2::[$ip]"
+	[ -n "$ip" ] && echo "--connect-to $2::[$ip]${3:+:$3}"
 }
 curl_with_dig()
 {
 	# $1 - ip version : 4/6
 	# $2 - domain name
-	# $3+ - curl params
-	local connect_to=$(curl_connect_to $1 $2)
+	# $3 - port
+	# $4+ - curl params
+	local connect_to=$(curl_connect_to $1 $2 $3)
 	[ -n "$connect_to" ] || {
 		echo "could not resolve ipv$1 $2"
 		return 6
 	}
-	shift ; shift
+	shift ; shift ; shift
 	ALL_PROXY="$ALL_PROXY" curl $connect_to "$@"
 }
 
@@ -448,7 +453,7 @@ curl_test_http()
 	# $1 - ip version : 4/6
 	# $2 - domain name
 	local code loc
-	curl_with_dig $1 $2 -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
+	curl_with_dig $1 $2 $HTTP_PORT -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
 		code=$?
 		rm -f "$HDRTEMP"
 		return $code
@@ -477,7 +482,7 @@ curl_test_https_tls12()
 	# $2 - domain name
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 $HTTPS_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
 }
 curl_test_https_tls13()
 {
@@ -485,7 +490,7 @@ curl_test_https_tls13()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 $HTTPS_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
 }
 
 curl_test_http3()
@@ -494,7 +499,7 @@ curl_test_http3()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 $QUIC_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
 }
 
 ipt_scheme()
