@@ -374,7 +374,9 @@ If you realize you don't need the synack mode it's highly suggested to restore d
 
 ### SYNDATA mode
 
-Normally SYNs come without data payload. If it's present it's ignored by all major OS, but may not be ignored by DPI.
+Normally SYNs come without data payload. If it's present it's ignored by all major OS if TCP fast open (TFO) is not involved, but may not be ignored by DPI.
+Original connections with TFO are not touched because otherwise they would be definitely broken.
+Without extra parameter payload is 16 zero bytes.
 
 ### Virtual Machines
 
