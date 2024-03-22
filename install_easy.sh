@@ -163,6 +163,16 @@ select_mode_https()
 }
 select_mode_quic()
 {
+	[ "$SUBSYS" = "keenetic" ] && {
+		echo
+		echo "WARNING ! Keenetic is not officially supported by zapret."
+		echo "WARNING ! This firmware requires additional manual iptables setup to support udp desync properly."
+		echo "WARNING ! Keenetic uses proprietary ndmmark to limit MASQUERADE."
+		echo "WARNING ! Desynced packets may go outside without MASQUERADE with LAN source ip."
+		echo "WARNING ! To fix this you need to add additional MASQUERADE rule to iptables nat table."
+		echo "WARNING ! Installer WILL NOT fix it for you automatically."
+		echo "WARNING ! If you cannot understand what it is all about - do not enable QUIC."
+	}
 	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && [ "$MODE" != "tpws" ] && {
 		echo
 		ask_yes_no_var MODE_QUIC "enable quic support"

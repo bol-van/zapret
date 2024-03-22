@@ -125,6 +125,7 @@ check_system()
 		echo easy installer only supports Linux and MacOS. check readme.txt for supported systems and manual setup info.
 		exitp 5
 	fi
+	linux_get_subsys
 	echo system is based on $SYSTEM
 	[ -n "$info" ] && echo $info
 }

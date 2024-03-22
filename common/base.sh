@@ -146,6 +146,8 @@ linux_get_subsys()
 	INIT=$(basename "$INIT")
 	if [ -f "/etc/openwrt_release" ] && [ "$INIT" = "procd" ] ; then
 		SUBSYS=openwrt
+	elif [ -x "/bin/ndm" ] ; then
+		SUBSYS=keenetic
 	else
 		# generic linux
 		SUBSYS=
