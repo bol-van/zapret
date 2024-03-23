@@ -91,25 +91,6 @@ static bool socks_send_rep_errno(uint8_t ver, int fd, int errn)
 {
 	return ver==5 ? socks5_send_rep_errno(fd,errn) : socks4_send_rep_errno(fd, errn);
 }
-static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)
-{
-	// if proxy mode acknowledge connection request
-	// conn = remote. conn->partner = local
-	if (!conn->remote || !conn->partner) return false;
-	bool bres = true;
-	switch(conn->partner->conn_type)
-	{
-		case CONN_TYPE_SOCKS:
-			if (conn->partner->socks_state==S_WAIT_CONNECTION)
-			{
-				conn->partner->socks_state=S_TCP;
-				bres = socks_send_rep_errno(conn->partner->socks_ver,conn->partner->fd,sock_err);
-				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d",bres,sock_err,conn->fd,conn->partner->fd)
-			}
-			break;
-	}
-	return bres;
-}
 
 
 ssize_t send_with_ttl(int fd, const void *buf, size_t len, int flags, int ttl)
@@ -327,6 +308,26 @@ bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
 	}
 	dbgprint_socket_buffers(fd);
 	return true;
+}
+
+static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)
+{
+	// if proxy mode acknowledge connection request
+	// conn = remote. conn->partner = local
+	if (!conn->remote || !conn_partner_alive(conn)) return false;
+	bool bres = true;
+	switch(conn->partner->conn_type)
+	{
+		case CONN_TYPE_SOCKS:
+			if (conn->partner->socks_state==S_WAIT_CONNECTION)
+			{
+				conn->partner->socks_state=S_TCP;
+				bres = socks_send_rep_errno(conn->partner->socks_ver,conn->partner->fd,sock_err);
+				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d",bres,sock_err,conn->fd,conn->partner->fd)
+			}
+			break;
+	}
+	return bres;
 }
 
 //Createas a socket and initiates the connection to the host specified by 
@@ -595,13 +596,6 @@ static bool check_connection_attempt(tproxy_conn_t *conn, int efd)
 		return true;
 	}
 
-	if (!conn_partner_alive(conn))
-	{
-		// local leg died ?
-		VPRINT("check_connection_attempt : fd=%d (remote) : local leg died. failing this connection attempt.", conn->fd)
-		return false;
-	}
-
 	// check the connection was sucessfull. it means its not in in SO_ERROR state
 	if(getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
 	{
@@ -611,11 +605,14 @@ static bool check_connection_attempt(tproxy_conn_t *conn, int efd)
 	if (!errn)
 	{
 		VPRINT("Socket fd=%d (remote) connected", conn->fd)
-		if (!epoll_set_flow(conn, true, false) || !epoll_set_flow(conn->partner, true, false))
+		if (!epoll_set_flow(conn, true, false) || conn_partner_alive(conn) && !epoll_set_flow(conn->partner, true, false))
+		{
 			return false;
+		}
 		conn->state = CONN_AVAILABLE;
 	}
-	return proxy_remote_conn_ack(conn,get_so_error(conn->fd)) && !errn;
+	proxy_remote_conn_ack(conn,get_so_error(conn->fd));
+	return !errn;
 }
 
 
@@ -1132,13 +1129,13 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 				{
 					conn->trd+=rd;
 					conn->partner->wr_buf[buffer_number].len = rd;
-					
+
 					conn->partner->bFlowOut = true;
-					
+
 					size_t split_pos;
-	
+
 					tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes+5, &conn->partner->wr_buf[buffer_number].len, &split_pos);
-					
+
 					if (epoll_update_flow(conn->partner))
 						return true;
 						
