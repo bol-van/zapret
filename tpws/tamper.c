@@ -64,7 +64,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			bHaveHost = true;
 			VPRINT("Requested Host is : %s", Host)
 			for(pc = Host; *pc; pc++) *pc=tolower(*pc);
-			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host, &bHostExcluded);
+			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
 		if (!bBypass)
 		{
@@ -228,7 +228,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		{
 			VPRINT("hostname: %s",Host)
 			bHaveHost = true;
-			bBypass = !HostlistCheck(params.hostlist, params.hostlist_exclude, Host, &bHostExcluded);
+			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
 		if (bBypass)
 		{
@@ -307,7 +307,7 @@ static void auto_hostlist_failed(const char *hostname)
 		
 		VPRINT("auto hostlist : rechecking %s to avoid duplicates", hostname);
 		bool bExcluded=false;
-		if (!HostlistCheck(params.hostlist, params.hostlist_exclude, hostname, &bExcluded) && !bExcluded)
+		if (!HostlistCheck(hostname, &bExcluded) && !bExcluded)
 		{
 			VPRINT("auto hostlist : adding %s", hostname);
 			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
@@ -321,6 +321,7 @@ static void auto_hostlist_failed(const char *hostname)
 				perror("write to auto hostlist:");
 				return;
 			}
+			params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
 		}
 		else
 		{

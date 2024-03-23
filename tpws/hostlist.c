@@ -2,7 +2,7 @@
 #include "hostlist.h"
 #include "gzip.h"
 #include "params.h"
-
+#include "helpers.h"
 
 // inplace tolower() and add to pool
 static bool addpool(strpool **hostlist, char **s, const char *end)
@@ -132,7 +132,7 @@ bool SearchHostList(strpool *hostlist, const char *host)
 }
 
 // return : true = apply fooling, false = do not apply
-bool HostlistCheck(strpool *hostlist, strpool *hostlist_exclude, const char *host, bool *excluded)
+static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const char *host, bool *excluded)
 {
 	if (excluded) *excluded = false;
 	if (hostlist_exclude)
@@ -150,4 +150,37 @@ bool HostlistCheck(strpool *hostlist, strpool *hostlist_exclude, const char *hos
 		return SearchHostList(hostlist, host);
 	}
 	return true;
+}
+
+// return : true = apply fooling, false = do not apply
+bool HostlistCheck(const char *host, bool *excluded)
+{
+	if (*params.hostlist_auto_filename)
+	{
+		time_t t = file_mod_time(params.hostlist_auto_filename);
+		if (t!=params.hostlist_auto_mod_time)
+		{
+			printf("Autohostlist was modified by another process. Reloading include hostslist.\n");
+			if (!LoadIncludeHostLists())
+			{
+				// what will we do without hostlist ?? sure, gonna die
+				exit(1);
+			}
+			params.hostlist_auto_mod_time = t;
+		}
+	}
+	return HostlistCheck_(params.hostlist, params.hostlist_exclude, host, excluded);
+}
+
+bool LoadIncludeHostLists()
+{
+	if (!LoadHostLists(&params.hostlist, &params.hostlist_files))
+		return false;
+	if (*params.hostlist_auto_filename)
+		params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
+	return true;
+}
+bool LoadExcludeHostLists()
+{
+	return LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files);
 }

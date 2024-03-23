@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
+#include <sys/stat.h>
 
 void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
 {
@@ -255,4 +256,10 @@ int fprint_localtime(FILE *F)
 	time(&now);
 	localtime_r(&now,&t);
 	return fprintf(F, "%02d.%02d.%04d %02d:%02d:%02d", t.tm_mday, t.tm_mon + 1, t.tm_year + 1900, t.tm_hour, t.tm_min, t.tm_sec);
+}
+
+time_t file_mod_time(const char *filename)
+{
+	struct stat st;
+	return stat(filename,&st)==-1 ? 0 : st.st_mtime;
 }

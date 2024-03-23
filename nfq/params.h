@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 #define TLS_PARTIALS_ENABLE	true
 
@@ -68,6 +69,7 @@ struct params_s
 	struct str_list_head hostlist_files, hostlist_exclude_files;
 	char hostlist_auto_filename[PATH_MAX], hostlist_auto_debuglog[PATH_MAX];
 	int hostlist_auto_fail_threshold, hostlist_auto_fail_time, hostlist_auto_retrans_threshold;
+	time_t hostlist_auto_mod_time;
 	hostfail_pool *hostlist_auto_fail_counters;
 
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;

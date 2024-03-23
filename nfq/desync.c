@@ -235,7 +235,7 @@ static void auto_hostlist_failed(const char *hostname)
 		
 		DLOG("auto hostlist : rechecking %s to avoid duplicates\n", hostname);
 		bool bExcluded=false;
-		if (!HostlistCheck(params.hostlist, params.hostlist_exclude, hostname, &bExcluded) && !bExcluded)
+		if (!HostlistCheck(hostname, &bExcluded) && !bExcluded)
 		{
 			DLOG("auto hostlist : adding %s\n", hostname);
 			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
@@ -249,6 +249,7 @@ static void auto_hostlist_failed(const char *hostname)
 				perror("write to auto hostlist:");
 				return;
 			}
+			params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
 		}
 		else
 		{
@@ -615,7 +616,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 		{
 			bool bExcluded;
 			DLOG("hostname: %s\n",host)
-			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host, &bExcluded))
+			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(host, &bExcluded))
 			{
 				DLOG("not applying tampering to this request\n")
 				if (ctrack)
@@ -1074,7 +1075,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		{
 			DLOG("hostname: %s\n",host)
 			bool bExcluded;
-			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(params.hostlist, params.hostlist_exclude, host, &bExcluded))
+			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(host, &bExcluded))
 			{
 				DLOG("not applying tampering to this request\n")
 				if (!bExcluded && *params.hostlist_auto_filename && ctrack)

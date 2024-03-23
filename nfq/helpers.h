@@ -45,3 +45,5 @@ bool parse_hex_str(const char *s, uint8_t *pbuf, size_t *size);
 void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize);
 
 int fprint_localtime(FILE *F);
+
+time_t file_mod_time(const char *filename);

@@ -56,8 +56,7 @@ static void dohup(void)
 {
 	if (bHup)
 	{
-		if (!LoadHostLists(&params.hostlist, &params.hostlist_files) ||
-			!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
+		if (!LoadIncludeHostLists() || !LoadExcludeHostLists())
 		{
 			// what will we do without hostlist ?? sure, gonna die
 			exit(1);
@@ -1232,13 +1231,13 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	if (!LoadHostLists(&params.hostlist, &params.hostlist_files))
+	if (!LoadIncludeHostLists())
 	{
 		fprintf(stderr, "Include hostlist load failed\n");
 		exit_clean(1);
 	}
 	if (*params.hostlist_auto_filename) NonEmptyHostlist(&params.hostlist);
-	if (!LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files))
+	if (!LoadExcludeHostLists())
 	{
 		fprintf(stderr, "Exclude hostlist load failed\n");
 		exit_clean(1);

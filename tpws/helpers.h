@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <time.h>
 
 char *strncasestr(const char *s,const char *find, size_t slen);
 
@@ -44,3 +45,5 @@ static inline void phton16(uint8_t *p, uint16_t v) {
 }
 
 int fprint_localtime(FILE *F);
+
+time_t file_mod_time(const char *filename);

@@ -796,6 +796,10 @@ may start to break the website. This situation can only be controlled manually.
 Remove undesired domain from the autohostlist file, restart nfqws/tpws or send them SIGHUP.
 Use exclude hostlist to prevent further auto additions.
 
+It's possible to use one auto hostlist with multiple processes. All processes check for file modification time.
+If a process modified autohostlist, all others will reread it automatically.
+All processes must run with the same uid.
+
 If zapret scripts are used then autohostlist is `ipset/zapret-hosts-auto.txt`
 and exlude list is `ipset/zapret-hosts-user-exclude.txt`. autohostlist mode
 includes hostlist mode. You can use `ipset/zapret-hosts-user.txt`.
