@@ -154,6 +154,25 @@ static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, 
 	sb->flags = flags;
 	return true;
 }
+static bool send_buffer_realloc(send_buffer_t *sb, size_t extra_bytes)
+{
+	if (sb->data)
+	{
+		uint8_t *p = (uint8_t*)realloc(sb->data, sb->len + extra_bytes);
+		if (p)
+		{
+			sb->data = p;
+			DBGPRINT("reallocated send_buffer from %zd to %zd", sb->len, sb->len + extra_bytes)
+			return true;
+		}
+		else
+		{
+			DBGPRINT("failed to realloc send_buffer from %zd to %zd", sb->len, sb->len + extra_bytes)
+		}
+	}
+	return false;
+}
+
 static void send_buffer_free(send_buffer_t *sb)
 {
 	if (sb->data)
@@ -1117,7 +1136,10 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 					conn->partner->bFlowOut = true;
 					
 					size_t split_pos;
-					tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes, &conn->partner->wr_buf[buffer_number].len, &split_pos);
+	
+					// tamper may increase data block size by up to 5 bytes
+					if (send_buffer_realloc(conn->partner->wr_buf+buffer_number,5))
+						tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes, &conn->partner->wr_buf[buffer_number].len, &split_pos);
 					
 					if (epoll_update_flow(conn->partner))
 						return true;
