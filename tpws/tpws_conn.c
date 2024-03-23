@@ -134,14 +134,14 @@ ssize_t send_with_ttl(int fd, const void *buf, size_t len, int flags, int ttl)
 }
 
 
-static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, int flags, int ttl)
+static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, size_t extra_bytes, int flags, int ttl)
 {
 	if (sb->data)
 	{
 		fprintf(stderr,"FATAL : send_buffer_create but buffer is not empty\n");
 		exit(1);
 	}
-	sb->data = malloc(len);
+	sb->data = malloc(len + extra_bytes);
 	if (!sb->data)
 	{
 		DBGPRINT("send_buffer_create failed. errno=%d",errno)
@@ -288,7 +288,7 @@ static ssize_t send_or_buffer(send_buffer_t *sb, int fd, const void *buf, size_t
 		if (wr<0 && errno==EAGAIN) wr=0;
 		if (wr>=0 && wr<len)
 		{
-			if (!send_buffer_create(sb, buf+wr, len-wr, flags, ttl))
+			if (!send_buffer_create(sb, buf+wr, len-wr, 0, flags, ttl))
 				wr=-1;
 		}
 	}
@@ -1125,7 +1125,7 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 		DBGPRINT("read_all_and_buffer(%d) numbytes=%d",buffer_number,numbytes)
 		if (numbytes>0)
 		{
-			if (send_buffer_create(conn->partner->wr_buf+buffer_number, NULL, numbytes, 0, 0))
+			if (send_buffer_create(conn->partner->wr_buf+buffer_number, NULL, numbytes, 5, 0, 0))
 			{
 				ssize_t rd = recv(conn->fd, conn->partner->wr_buf[buffer_number].data, numbytes, MSG_DONTWAIT);
 				if (rd>0)
@@ -1137,9 +1137,7 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 					
 					size_t split_pos;
 	
-					// tamper may increase data block size by up to 5 bytes
-					if (send_buffer_realloc(conn->partner->wr_buf+buffer_number,5))
-						tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes, &conn->partner->wr_buf[buffer_number].len, &split_pos);
+					tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes+5, &conn->partner->wr_buf[buffer_number].len, &split_pos);
 					
 					if (epoll_update_flow(conn->partner))
 						return true;
