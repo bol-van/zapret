@@ -248,7 +248,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				default:
 					break;
 			}
-			if (tpos)
+			if (tpos && (5+*size)<=segment_buffer_size)
 			{
 				// construct 2 TLS records from one
 				uint16_t l = pntoh16(segment+3); // length
