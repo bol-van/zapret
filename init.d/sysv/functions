@@ -19,12 +19,14 @@ user_exists()
 useradd_compat()
 {
 	# $1 - username
-
 	# skip for readonly systems
 	[ -w "/etc" ] && {
 		if exists useradd ; then
 			useradd --no-create-home --system --shell /bin/false $1
 		elif is_linked_to_busybox adduser ; then
+			# some systems may miss nogroup group in /etc/group
+			# adduser fails if it's absent and no group is specified
+			addgroup nogroup 2>/dev/null
 			# busybox has special adduser syntax
 			adduser -S -H -D $1
 		elif exists adduser; then
