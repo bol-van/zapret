@@ -664,11 +664,12 @@ curl_test()
 	while [ $n -lt $REPEATS ]; do
 		n=$(($n+1))
 		[ $REPEATS -gt 1 ] && printf "[attempt $n] "
-		$1 "$IPV" $2 && {
+		if $1 "$IPV" $2 ; then
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
-			continue
-		}
-		code=$?
+		else
+			code=$?
+			[ "$SCANLEVEL" = quick ] && break
+		fi
 	done
 	if [ $code = 254 ]; then
 		echo "UNAVAILABLE"
@@ -812,13 +813,13 @@ pktws_curl_test_update_vary()
 	return 1
 }
 
-pktws_check_domain_http_bypass()
+pktws_check_domain_http_bypass_()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
 	# $3 - domain
 
-	local strategy tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta
+	local tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -830,57 +831,76 @@ pktws_check_domain_http_bypass()
 	ok=0
 	pktws_curl_test_update $1 $3 $s
 	ret=$?
-	[ "$ret" = 0 ] && ok=1
-	[ "$ret" != 0 -o "$FORCE" = 1 ] && {
-		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase
+	[ "$ret" = 0 ] && {
+		[ "$SCANLEVEL" = quick ] && return
+		ok=1
+	}
+	[ "$ret" != 0 -o "$SCANLEVEL" = force ] && {
+		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase && [ "$SCANLEVEL" = quick ] && return
 		for pos in 1 3 4 5 10 50 100; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
 			if pktws_curl_test_update $1 $3 $s; then
+				[ "$SCANLEVEL" = quick ] && return
 				ok=1
 				break
 			elif [ "$sec" = 0 ]; then
-				pktws_curl_test_update $1 $3 $s --hostcase
+				pktws_curl_test_update $1 $3 $s --hostcase && [ "$SCANLEVEL" = quick ] && return
 			fi
 		done
 	}
-	[ "$ok" = 1 -a "$FORCE" != 1 ] || tests="$tests split fake,split2 fake,split"
+	[ "$ok" = 1 -a "$SCANLEVEL" != force ] || tests="$tests split fake,split2 fake,split"
 
 	pktws_curl_test_update $1 $3 --dpi-desync=disorder2
 	ret=$?
-	[ "$ret" != 0 -o "$FORCE" = 1 ] && {
+	[ "$ret" = 0 -a "$SCANLEVEL" = quick ] && return
+	[ "$ret" != 0 -o "$SCANLEVEL" = force ] && {
 	    pktws_curl_test_update $1 $3 --dpi-desync=disorder2 --dpi-desync-split-pos=1
 	    ret=$?
+	    [ "$ret" = 0 -a "$SCANLEVEL" = quick ] && return
 	}
-	[ "$ret" != 0 -o "$FORCE" = 1 ] && tests="$tests disorder fake,disorder2 fake,disorder"
+	[ "$ret" != 0 -o "$SCANLEVEL" = force ] && tests="$tests disorder fake,disorder2 fake,disorder"
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
 	for e in '' '--wssize 1:6'; do
 		[ -n "$e" ] && {
-			pktws_curl_test_update $1 $3 $e
+			pktws_curl_test_update $1 $3 $e && [ "$SCANLEVEL" = quick ] && return
 			for desync in split2 disorder2; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync $e
+				pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		}
 		for desync in $tests; do
 			for ttl in $ttls; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=$ttl $e && break
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=$ttl $e && {
+					[ "$SCANLEVEL" = quick ] && return
+					break
+				}
 			done
+			ok=0
 			for delta in 1 2 3 4 5; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e && ok=1
 			done
+			[ "$ok" = 1 ] &&
+			{
+				echo "WARNING ! although autottl worked it requires testing on multiple domains to find out reliable delta"
+				echo "WARNING ! if a reliable delta cannot be found it's a good idea not to use autottl"
+				[ "$SCANLEVEL" = quick ] && return
+			}			
 			f=
 			[ "$UNAME" = "OpenBSD" ] || f="badsum"
 			f="$f badseq md5sig datanoack"
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling $e && warn_fool $fooling
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling $e && {
+					warn_fool $fooling
+					[ "$SCANLEVEL" = quick ] && return
+				}
 			done
 		done
 		[ "$IPV" = 6 ] && {
 			f="hopbyhop hopbyhop,split2 hopbyhop,disorder2 destopt destopt,split2 destopt,disorder2"
 			[ -n "$IP6_DEFRAG_DISABLE" ] && f="$f ipfrag1 ipfrag1,split2 ipfrag1,disorder2"
 			for desync in $f; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync $e
+				pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		}
 		# do not do wssize test for http. it's useless
@@ -890,37 +910,35 @@ pktws_check_domain_http_bypass()
 	s="http_iana_org.bin"
 	[ "$sec" = 1 ] && s="tls_clienthello_iana_org.bin"
 	for desync in syndata syndata,split2 syndata,disorder2 syndata,split2 syndata,disorder2 ; do
-		pktws_curl_test_update_vary $1 $2 $3 $desync
-		pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s"
+		pktws_curl_test_update_vary $1 $2 $3 $desync && [ "$SCANLEVEL" = quick ] && return
+		pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s" && [ "$SCANLEVEL" = quick ] && return
 	done
+}
+pktws_check_domain_http_bypass()
+{
+	# $1 - test function
+	# $2 - encrypted test : 1/0
+	# $3 - domain
 
-	# OpenBSD has checksum issues with fragmented packets
-	[ "$UNAME" != "OpenBSD" ] && [ "$IPV" = 4 -o -n "$IP6_DEFRAG_DISABLE" ] && {
-		for frag in 24 32 40 64 80 104; do
-			tests="ipfrag2"
-			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
-			for desync in $tests; do
-				pktws_curl_test_update $1 $3 --dpi-desync=$desync --dpi-desync-ipfrag-pos-tcp=$frag
-			done
-		done
-	}
-
+	local strategy
+	pktws_check_domain_http_bypass_ "$@"
 	report_strategy $1 $3 $PKTWSD
 }
-pktws_check_domain_http3_bypass()
+
+pktws_check_domain_http3_bypass_()
 {
 	# $1 - test function
 	# $2 - domain
 	
 	local f desync frag tests
 
-	pktws_curl_test_update $1 $2 --dpi-desync=fake
+	pktws_curl_test_update $1 $2 --dpi-desync=fake && [ "$SCANLEVEL" = quick ] && return
 
 	[ "$IPV" = 6 ] && {
 		f="hopbyhop destopt"
 		[ -n "$IP6_DEFRAG_DISABLE" ] && f="$f ipfrag1"
 		for desync in $f; do
-			pktws_curl_test_update $1 $2 --dpi-desync=$desync
+			pktws_curl_test_update $1 $2 --dpi-desync=$desync && [ "$SCANLEVEL" = quick ] && return
 		done
 	}
 
@@ -930,11 +948,19 @@ pktws_check_domain_http3_bypass()
 			tests="ipfrag2"
 			[ "$IPV" = 6 ] && tests="$tests hopbyhop,ipfrag2 destopt,ipfrag2"
 			for desync in $tests; do
-				pktws_curl_test_update $1 $2 --dpi-desync=$desync --dpi-desync-ipfrag-pos-udp=$frag
+				pktws_curl_test_update $1 $2 --dpi-desync=$desync --dpi-desync-ipfrag-pos-udp=$frag && [ "$SCANLEVEL" = quick ] && return
 			done
 		done
 	}
 	
+}
+pktws_check_domain_http3_bypass()
+{
+	# $1 - test function
+	# $2 - domain
+
+	local strategy
+	pktws_check_domain_http3_bypass_ "$@"
 	report_strategy $1 $2 $PKTWSD
 }
 tpws_check_domain_http_bypass()
@@ -961,7 +987,7 @@ tpws_check_domain_http_bypass()
 			done
 		done
 		for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob'; do
-			tpws_curl_test_update $1 $3 $s2 && [ "$FORCE" != 1 ] && break
+			tpws_curl_test_update $1 $3 $s2 && [ "$SCANLEVEL" != force ] && break
 		done
 	fi
 	report_strategy $1 $3 tpws
@@ -996,7 +1022,7 @@ check_domain_http_tcp()
 	echo "- checking without DPI bypass"
 	curl_test $1 $4 && {
 		report_append "ipv${IPV} $4 $1 : working without bypass"
-		[ "$FORCE" = 1 ] || return
+		[ "$SCANLEVEL" = force ] || return
 	}
 	code=$?
 	curl_has_reason_to_continue $code || {
@@ -1005,9 +1031,7 @@ check_domain_http_tcp()
 	}
 
 	echo
-	if [ "$SKIP_TPWS" != 1 ]; then
-		tpws_check_domain_http_bypass $1 $3 $4
-	fi
+	[ "$SKIP_TPWS" = 1 ] || tpws_check_domain_http_bypass $1 $3 $4
 
 	echo
 
@@ -1039,7 +1063,7 @@ check_domain_http_udp()
 	echo "- checking without DPI bypass"
 	curl_test $1 $3 && {
 		report_append "ipv${IPV} $3 $1 : working without bypass"
-		[ "$FORCE" = 1 ] || return
+		[ "$SCANLEVEL" = force ] || return
 	}
 	code=$?
 	curl_has_reason_to_continue $code || {
@@ -1217,6 +1241,7 @@ ask_params()
 	ENABLE_HTTP3=0
 	echo
 	if [ -n "$HTTP3" ]; then
+		echo "make sure target domain(s) support QUIC or result will be negative in any case"
 		ENABLE_HTTP3=1
 		ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
 	else
@@ -1245,8 +1270,13 @@ ask_params()
 	}
 
 	echo
-	FORCE=0
-	ask_yes_no_var FORCE "do all tests despite of result ?"
+	echo quick    - scan as fast as possible to reveal any working strategy
+	echo standard - do investigation what works on your DPI
+	echo force    - scan maximum despite of result
+	SCANLEVEL=${SCANLEVEL:-standard}
+	ask_list SCANLEVEL "quick standard force" "$SCANLEVEL"
+	# disable tpws checks by default in quick mode
+	[ "$SCANLEVEL" = quick -a -z "$SKIP_TPWS" ] && SKIP_TPWS=1
 
 	echo
 
@@ -1436,5 +1466,11 @@ cleanup
 echo
 echo \* SUMMARY
 report_print
+echo
+echo "Please note this SUMMARY does not guarantee a magic pill for you to copy/paste and be happy."
+echo "Understanding how strategies work is very desirable."
+echo "This knowledge allows to understand better which strategies to prefer and which to avoid if possible, how to combine strategies."
+echo "Blockcheck does it's best to prioritize good strategies but it's not bullet-proof."
+echo "It was designed not as magic pill maker but as a DPI bypass test tool."
 
 exitp 0
