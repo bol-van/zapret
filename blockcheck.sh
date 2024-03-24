@@ -963,33 +963,47 @@ pktws_check_domain_http3_bypass()
 	pktws_check_domain_http3_bypass_ "$@"
 	report_strategy $1 $2 $PKTWSD
 }
-tpws_check_domain_http_bypass()
+tpws_check_domain_http_bypass_()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
 	# $3 - domain
-	local s s2 pos strategy sec="$2"
+	local s s2 pos sec="$2"
 	if [ "$sec" = 0 ]; then
 		for s in '--hostcase' '--hostspell=hoSt' '--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
 			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384' ; do
-			tpws_curl_test_update $1 $3 $s
+			tpws_curl_test_update $1 $3 $s && [ "$SCANLEVEL" = quick ] && return
 		done
 		for s2 in '' '--disorder' '--oob'; do
 			for s in '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' ; do
-				tpws_curl_test_update $1 $3 $s $s2
+				tpws_curl_test_update $1 $3 $s $s2 && [ "$SCANLEVEL" = quick ] && return
 			done
 		done
 	else
 		for s2 in '' '--disorder' '--oob'; do
 			for pos in 1 2 3 4 5 10 50 100; do
 				s="--split-pos=$pos"
-				tpws_curl_test_update $1 $3 $s $s2 && break
+				tpws_curl_test_update $1 $3 $s $s2 && {
+					[ "$SCANLEVEL" = quick ] && return
+					break
+				}
 			done
 		done
 		for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob'; do
-			tpws_curl_test_update $1 $3 $s2 && [ "$SCANLEVEL" != force ] && break
+			tpws_curl_test_update $1 $3 $s2 && [ "$SCANLEVEL" != force ] && {
+				[ "$SCANLEVEL" = quick ] && return
+				break
+			}
 		done
 	fi
+}
+tpws_check_domain_http_bypass()
+{
+	# $1 - test function
+	# $2 - encrypted test : 1/0
+	# $3 - domain
+	local strategy
+	tpws_check_domain_http_bypass_ "$@"
 	report_strategy $1 $3 tpws
 }
 
