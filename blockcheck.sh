@@ -875,16 +875,6 @@ pktws_check_domain_http_bypass_()
 					break
 				}
 			done
-			ok=0
-			for delta in 1 2 3 4 5; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e && ok=1
-			done
-			[ "$ok" = 1 ] &&
-			{
-				echo "WARNING ! although autottl worked it requires testing on multiple domains to find out reliable delta"
-				echo "WARNING ! if a reliable delta cannot be found it's a good idea not to use autottl"
-				[ "$SCANLEVEL" = quick ] && return
-			}			
 			f=
 			[ "$UNAME" = "OpenBSD" ] || f="badsum"
 			f="$f badseq datanoack md5sig"
@@ -903,6 +893,18 @@ pktws_check_domain_http_bypass_()
 				pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		}
+		for desync in $tests; do
+			ok=0
+			for delta in 1 2 3 4 5; do
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e && ok=1
+			done
+			[ "$ok" = 1 ] &&
+			{
+				echo "WARNING ! although autottl worked it requires testing on multiple domains to find out reliable delta"
+				echo "WARNING ! if a reliable delta cannot be found it's a good idea not to use autottl"
+				[ "$SCANLEVEL" = quick ] && return
+			}			
+		done
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
 	done
