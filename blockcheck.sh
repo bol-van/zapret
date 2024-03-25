@@ -932,9 +932,14 @@ pktws_check_domain_http3_bypass_()
 	# $1 - test function
 	# $2 - domain
 	
-	local f desync frag tests
+	local f desync frag tests rep
 
-	pktws_curl_test_update $1 $2 --dpi-desync=fake && [ "$SCANLEVEL" = quick ] && return
+	for rep in '' 2 5 10 20; do
+		pktws_curl_test_update $1 $2 --dpi-desync=fake ${rep:+--dpi-desync-repeats=$rep} && [ "$SCANLEVEL" != force ] && {
+			[ "$SCANLEVEL" = quick ] && return
+			break
+		}
+	done
 
 	[ "$IPV" = 6 ] && {
 		f="hopbyhop destopt"
