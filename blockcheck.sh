@@ -837,12 +837,12 @@ pktws_check_domain_http_bypass_()
 	}
 	[ "$ret" != 0 -o "$SCANLEVEL" = force ] && {
 		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase && [ "$SCANLEVEL" = quick ] && return
-		for pos in 1 3 4 5 10 50 100; do
+		for pos in 1 3 4 5 10 50; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
 			if pktws_curl_test_update $1 $3 $s; then
 				[ "$SCANLEVEL" = quick ] && return
 				ok=1
-				break
+				[ "$SCANLEVEL" = force ] || break
 			elif [ "$sec" = 0 ]; then
 				pktws_curl_test_update $1 $3 $s --hostcase && [ "$SCANLEVEL" = quick ] && return
 			fi
@@ -887,7 +887,7 @@ pktws_check_domain_http_bypass_()
 			}			
 			f=
 			[ "$UNAME" = "OpenBSD" ] || f="badsum"
-			f="$f badseq md5sig datanoack"
+			f="$f badseq datanoack md5sig"
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
 				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling $e && {
@@ -970,26 +970,32 @@ tpws_check_domain_http_bypass_()
 	# $3 - domain
 	local s s2 pos sec="$2"
 	if [ "$sec" = 0 ]; then
-		for s in '--hostcase' '--hostspell=hoSt' '--hostdot' '--hosttab' '--hostnospace' '--methodspace' '--methodeol' '--unixeol' \
+		for s in '--hostcase' '--hostspell=hoSt' '--hostdot' '--hosttab' '--hostnospace' '--domcase' \
 			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384' ; do
 			tpws_curl_test_update $1 $3 $s && [ "$SCANLEVEL" = quick ] && return
 		done
-		for s2 in '' '--disorder' '--oob'; do
+		for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
 			for s in '--split-http-req=method' '--split-http-req=method --hostcase' '--split-http-req=host' '--split-http-req=host --hostcase' ; do
 				tpws_curl_test_update $1 $3 $s $s2 && [ "$SCANLEVEL" = quick ] && return
 			done
 		done
+		for s in  '--methodspace' '--unixeol' '--methodeol'; do
+			tpws_curl_test_update $1 $3 $s && [ "$SCANLEVEL" = quick ] && return
+		done
 	else
-		for s2 in '' '--disorder' '--oob'; do
-			for pos in 1 2 3 4 5 10 50 100; do
+		for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
+			for pos in 1 2 3 4 5 10 50; do
 				s="--split-pos=$pos"
-				tpws_curl_test_update $1 $3 $s $s2 && {
+				tpws_curl_test_update $1 $3 $s $s2 && [ "$SCANLEVEL" != force ] && {
 					[ "$SCANLEVEL" = quick ] && return
 					break
 				}
 			done
 		done
-		for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob'; do
+		for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --oob' \
+				'--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob --disorder' \
+				'--tlsrec=sni --split-pos=1' '--tlsrec=sni --split-pos=1 --oob' '--tlsrec=sni --split-pos=1 --disorder' \
+				'--tlsrec=sni --split-pos=1 --oob --disorder'; do
 			tpws_curl_test_update $1 $3 $s2 && [ "$SCANLEVEL" != force ] && {
 				[ "$SCANLEVEL" = quick ] && return
 				break
