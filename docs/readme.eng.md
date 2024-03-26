@@ -576,8 +576,9 @@ tpws is transparent proxy.
  --split-http-req=method|host	; split http request at specified logical position.
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
- --disorder                     ; when splitting simulate sending second fragment first
- --oob[=<char>|0xHEX]		; when splitting send out of band byte. default is HEX 0x00.
+ --disorder[=http|tls]          ; when splitting simulate sending second fragment first
+ --oob[=http|tls]               ; when splitting send out of band byte. default is HEX 0x00.
+ --oob-data=<char>|0xHEX        ; override default 0x00 OOB byte.
  --hostcase                     ; change Host: => host:
  --hostspell                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostdot                      ; add "." after Host: name
@@ -795,10 +796,6 @@ However false positives still can occur in case target website is behaving abnor
 may start to break the website. This situation can only be controlled manually.
 Remove undesired domain from the autohostlist file, restart nfqws/tpws or send them SIGHUP.
 Use exclude hostlist to prevent further auto additions.
-
-It's possible to use one auto hostlist with multiple processes. All processes check for file modification time.
-If a process modified autohostlist, all others will reread it automatically.
-All processes must run with the same uid.
 
 If zapret scripts are used then autohostlist is `ipset/zapret-hosts-auto.txt`
 and exlude list is `ipset/zapret-hosts-user-exclude.txt`. autohostlist mode

@@ -262,3 +262,12 @@ tpws: out of band send when splitting (--oob)
 nfqws: autottl
 nfqws: datanoack fooling
 nftables: use POSTNAT path for tcp redirections to allow NAT-breaking strategies. use additional mark bit DESYNC_MARK_POSTNAT.
+
+v55
+
+tpws: incompatible oob parameter change. it doesn't take oob byte anymore. instead it takes optional protocol filter - http or tls.
+  the same is done with disorder. oob byte can be specified in parameter --oob-data.
+blockcheck: quick mode, strategy order optimizations, QUIC protocol support
+nfqws: syndata desync mode
+
+   á

@@ -101,6 +101,7 @@ ssize_t send_with_ttl(int fd, const void *buf, size_t len, int flags, int ttl)
 	{
 		DBGPRINT("send_with_ttl %d fd=%d",ttl,fd);
 		if (!set_ttl_hl(fd, ttl))
+			//fprintf(stderr,"could not set ttl %d to fd=%d\n",ttl,fd);
 			fprintf(stderr,"could not set ttl %d to fd=%d\n",ttl,fd);
 	}
 	wr = send(fd, buf, len, flags);
@@ -915,7 +916,7 @@ static bool in_tamper_out_range(tproxy_conn_t *conn)
 		(!params.tamper_cutoff || (params.tamper_cutoff_n ? (conn->tnrd+1) : conn->trd) < params.tamper_cutoff);
 }
 
-static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_size, size_t *segment_size, size_t *split_pos)
+static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_size, size_t *segment_size, size_t *split_pos, uint8_t *split_flags)
 {
 	*split_pos=0;
 	if (params.tamper)
@@ -935,7 +936,7 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 				params.tamper_start_n ? "n" : "" , params.tamper_start,
 				params.tamper_cutoff_n ? "n" : "" , params.tamper_cutoff,
 				in_range ? "IN RANGE" : "OUT OF RANGE")
-			if (in_range) tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos);
+			if (in_range) tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos,split_flags);
 		}
 	}
 }
@@ -1029,28 +1030,30 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			if (rd>0)
 			{
 				size_t split_pos;
+				uint8_t split_flags;
 
 				bs = rd;
 
 				// tamper needs to know stream position of the block start
-				tamper(conn, buf, sizeof(buf), &bs, &split_pos);
+				tamper(conn, buf, sizeof(buf), &bs, &split_pos, &split_flags);
 				// increase after tamper
 				conn->tnrd++;
 				conn->trd+=rd;
 
 				if (split_pos)
 				{
-					VPRINT("Splitting at pos %zu", split_pos)
-					if (params.oob)
+					VPRINT("Splitting at pos %zu%s", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "")
+					if (split_flags && SPLIT_FLAG_OOB)
 					{
+						VPRINT("Sending OOB byte %02X", params.oob_byte)
 						uint8_t oob_save;
 						oob_save = buf[split_pos];
 						buf[split_pos] = params.oob_byte;
-						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos+1, MSG_OOB, params.disorder ? 1 : 0);
+						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos+1, MSG_OOB, !!(split_flags & SPLIT_FLAG_DISORDER));
 						buf[split_pos] = oob_save;
 					}
 					else
-						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, 0, params.disorder ? 1 : 0);
+						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, 0, !!(split_flags & SPLIT_FLAG_DISORDER));
 					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 					if (wr >= 0)
 					{
@@ -1133,8 +1136,9 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 					conn->partner->bFlowOut = true;
 
 					size_t split_pos;
+					uint8_t split_flags;
 
-					tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes+5, &conn->partner->wr_buf[buffer_number].len, &split_pos);
+					tamper(conn, conn->partner->wr_buf[buffer_number].data, numbytes+5, &conn->partner->wr_buf[buffer_number].len, &split_pos, &split_flags);
 
 					if (epoll_update_flow(conn->partner))
 						return true;

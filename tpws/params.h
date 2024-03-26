@@ -50,7 +50,8 @@ struct params_s
 	int tlsrec_pos;
 	bool split_any_protocol;
 	int split_pos;
-	bool disorder, oob;
+	bool disorder, disorder_http, disorder_tls;
+	bool oob, oob_http, oob_tls;
 	uint8_t oob_byte;
 	int ttl_default;
 

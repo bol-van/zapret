@@ -25,7 +25,7 @@ bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
 
 static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 // segment buffer has at least 5 extra bytes to extend data block
-void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos)
+void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos, uint8_t *split_flags)
 {
 	uint8_t *p, *pp, *pHost = NULL;
 	size_t method_len = 0, pos;
@@ -37,6 +37,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	DBGPRINT("tamper_out")
 
 	*split_pos=0;
+	*split_flags=0;
 
 	for (method = http_methods; *method; method++)
 	{
@@ -209,6 +210,8 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				default:
 					if (params.split_pos < *size) *split_pos = params.split_pos;
 			}
+			if (params.disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
+			if (params.oob_http) *split_flags |= SPLIT_FLAG_OOB;
 		}
 		else
 		{
@@ -269,6 +272,9 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		
 			if (params.split_pos < *size)
 				*split_pos = params.split_pos;
+
+			if (params.disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
+			if (params.oob_tls) *split_flags |= SPLIT_FLAG_OOB;
 		}
 	}
 	else if (params.split_any_protocol && params.split_pos < *size)
@@ -279,7 +285,8 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		DBGPRINT("tamper_out put hostname : %s", Host)
 		ctrack->hostname=strdup(Host);
 	}
-
+	if (params.disorder) *split_flags |= SPLIT_FLAG_DISORDER;
+	if (params.oob) *split_flags |= SPLIT_FLAG_OOB;
 }
 
 
