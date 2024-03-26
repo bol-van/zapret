@@ -661,7 +661,6 @@ tpws - это transparent proxy.
  --oob[=http|tls]       ; отправить байт out-of-band data (OOB) в конце первой части сплита
  --oob-data=<char>|0xHEX ; переопределить байт OOB. по умолчанию 0x00.
  --disorder		; путем манипуляций с сокетом вынуждает отправлять первым второй сегмент разделенного запроса
- --oob[=<char>|0xHEX]	; отправить байт out-of-band data (OOB) в конце первой части сплита
  --hostcase             ; менять регистр заголовка "Host:". по умолчанию на "host:".
  --hostspell=HoST	; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
  --hostdot		; добавление точки после имени хоста : "Host: kinozal.tv."
