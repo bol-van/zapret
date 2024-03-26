@@ -4,6 +4,9 @@
 # can help in case /tmp has not enough space
 #TMPDIR=/opt/zapret/tmp
 
+# redefine user for zapret daemons. required on Keenetic
+#WS_USER=nobody
+
 # override firewall type : iptables,nftables,ipfw
 #FWTYPE=iptables
 
