@@ -24,6 +24,7 @@ IPFW_RULE_NUM=${IPFW_RULE_NUM:-1}
 IPFW_DIVERT_PORT=${IPFW_DIVERT_PORT:-59780}
 DOMAINS=${DOMAINS:-rutracker.org}
 CURL_MAX_TIME=${CURL_MAX_TIME:-3}
+CURL_MAX_TIME_QUIC=${CURL_MAX_TIME_QUIC:-$CURL_MAX_TIME}
 MIN_TTL=${MIN_TTL:-1}
 MAX_TTL=${MAX_TTL:-12}
 USER_AGENT=${USER_AGENT:-Mozilla}
@@ -499,7 +500,7 @@ curl_test_http3()
 	# $2 - domain name
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 $QUIC_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 $QUIC_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME_QUIC --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
 }
 
 ipt_scheme()
@@ -1030,6 +1031,29 @@ curl_has_reason_to_continue()
 	return 0
 }
 
+check_domain_prolog()
+{
+	# $1 - test function
+	# $2 - port
+	# $3 - domain
+
+	local code
+
+	echo
+	echo \* $1 ipv$IPV $3
+
+	echo "- checking without DPI bypass"
+	curl_test $1 $3 && {
+		report_append "ipv${IPV} $3 $1 : working without bypass"
+		[ "$SCANLEVEL" = force ] || return 1
+	}
+	code=$?
+	curl_has_reason_to_continue $code || {
+		report_append "ipv${IPV} $3 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
+		return 1
+	}
+	return 0
+}
 check_domain_http_tcp()
 {
 	# $1 - test function
@@ -1037,32 +1061,19 @@ check_domain_http_tcp()
 	# $3 - encrypted test : 1/0
 	# $4 - domain
 
-	local code c
-
-	echo
-	echo \* $1 ipv$IPV $4
-
 	# in case was interrupted before
 	pktws_ipt_unprepare_tcp $2
 	ws_kill
 
-	echo "- checking without DPI bypass"
-	curl_test $1 $4 && {
-		report_append "ipv${IPV} $4 $1 : working without bypass"
-		[ "$SCANLEVEL" = force ] || return
-	}
-	code=$?
-	curl_has_reason_to_continue $code || {
-		report_append "ipv${IPV} $4 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
-		return
-	}
+	check_domain_prolog $1 $2 $4 || return
 
-	echo
-	[ "$SKIP_TPWS" = 1 ] || tpws_check_domain_http_bypass $1 $3 $4
-
-	echo
+	[ "$SKIP_TPWS" = 1 ] || {
+		echo
+		tpws_check_domain_http_bypass $1 $3 $4
+	}
 
 	[ "$SKIP_PKTWS" = 1 ] || {
+		echo
 	        echo preparing $PKTWSD redirection
 		pktws_ipt_prepare_tcp $2
 
@@ -1078,28 +1089,14 @@ check_domain_http_udp()
 	# $2 - port
 	# $3 - domain
 
-	local code c
-
-	echo
-	echo \* $1 ipv$IPV $3
-
 	# in case was interrupted before
 	pktws_ipt_unprepare_udp $2
 	ws_kill
 
-	echo "- checking without DPI bypass"
-	curl_test $1 $3 && {
-		report_append "ipv${IPV} $3 $1 : working without bypass"
-		[ "$SCANLEVEL" = force ] || return
-	}
-	code=$?
-	curl_has_reason_to_continue $code || {
-		report_append "ipv${IPV} $3 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
-		return
-	}
+	check_domain_prolog $1 $2 $3 || return
 
-	echo
 	[ "$SKIP_PKTWS" = 1 ] || {
+		echo
 	        echo preparing $PKTWSD redirection
 		pktws_ipt_prepare_udp $2
 
