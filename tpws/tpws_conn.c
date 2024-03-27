@@ -1076,7 +1076,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				conn->tnrd++;
 				conn->trd+=rd;
 
-				if (split_pos && bs<=sizeof(buf))
+				if (split_pos && bs<sizeof(buf))
 				{
 					VPRINT("Splitting at pos %zu%s", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "")
 
