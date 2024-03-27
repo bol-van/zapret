@@ -971,12 +971,16 @@ pktws_check_domain_http3_bypass()
 	pktws_check_domain_http3_bypass_ "$@"
 	report_strategy $1 $2 $PKTWSD
 }
+warn_mss()
+{
+	echo 'WARNING ! although mss worked it may not work on all sites and will likely cause significant slowdown. it may only be required for TLS1.2, not TLS1.3'
+}
 tpws_check_domain_http_bypass_()
 {
 	# $1 - test function
 	# $2 - encrypted test : 1/0
 	# $3 - domain
-	local s s2 pos sec="$2"
+	local s mss s2 s3 pos sec="$2"
 	if [ "$sec" = 0 ]; then
 		for s in '--hostcase' '--hostspell=hoSt' '--hostdot' '--hosttab' '--hostnospace' '--domcase' \
 			'--hostpad=1024' '--hostpad=2048' '--hostpad=4096' '--hostpad=8192' '--hostpad=16384' ; do
@@ -991,23 +995,29 @@ tpws_check_domain_http_bypass_()
 			tpws_curl_test_update $1 $3 $s && [ "$SCANLEVEL" = quick ] && return
 		done
 	else
-		for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
-			for pos in 1 2 3 4 5 10 50; do
-				s="--split-pos=$pos"
-				tpws_curl_test_update $1 $3 $s $s2 && [ "$SCANLEVEL" != force ] && {
+		
+		for mss in '' 88; do
+			s3=${mss:+--mss=$mss --mss-pf=443}
+			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
+				for pos in 1 2 3 4 5 10 50; do
+					s="--split-pos=$pos"
+					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss && [ "$SCANLEVEL" != force ] && {
+						[ "$SCANLEVEL" = quick ] && return
+						break
+					}
+				done
+			done
+			for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --oob' \
+					'--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob --disorder' \
+					'--tlsrec=sni --split-pos=1' '--tlsrec=sni --split-pos=1 --oob' '--tlsrec=sni --split-pos=1 --disorder' \
+					'--tlsrec=sni --split-pos=1 --oob --disorder'; do
+				tpws_curl_test_update $1 $3 $s2 $s3 && warn_mss && [ "$SCANLEVEL" != force ] && {
 					[ "$SCANLEVEL" = quick ] && return
 					break
 				}
 			done
-		done
-		for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --oob' \
-				'--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob --disorder' \
-				'--tlsrec=sni --split-pos=1' '--tlsrec=sni --split-pos=1 --oob' '--tlsrec=sni --split-pos=1 --disorder' \
-				'--tlsrec=sni --split-pos=1 --oob --disorder'; do
-			tpws_curl_test_update $1 $3 $s2 && [ "$SCANLEVEL" != force ] && {
-				[ "$SCANLEVEL" = quick ] && return
-				break
-			}
+			# only linux supports mss
+			[ "$UNAME" = Linux ] || break
 		done
 	fi
 }
