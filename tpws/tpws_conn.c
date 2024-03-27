@@ -958,6 +958,25 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 	}
 }
 
+// buffer must have at least one extra byte for OOB
+static ssize_t send_or_buffer_oob(send_buffer_t *sb, int fd, uint8_t *buf, size_t len, int ttl, bool oob)
+{
+	ssize_t wr;
+	if (oob)
+	{
+		VPRINT("Sending OOB byte %02X", params.oob_byte)
+		uint8_t oob_save;
+		oob_save = buf[len];
+		buf[len] = params.oob_byte;
+		wr = send_or_buffer(sb, fd, buf, len+1, MSG_OOB, ttl);
+		buf[len] = oob_save;
+	}
+	else
+		wr = send_or_buffer(sb, fd, buf, len, 0, ttl);
+	return wr;
+}
+
+
 #define RD_BLOCK_SIZE 65536
 #define MAX_WASTE (1024*1024)
 static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32_t evt)
@@ -1057,25 +1076,16 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				conn->tnrd++;
 				conn->trd+=rd;
 
-				if (split_pos)
+				if (split_pos && bs<=sizeof(buf))
 				{
 					VPRINT("Splitting at pos %zu%s", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "")
-					if (split_flags & SPLIT_FLAG_OOB)
-					{
-						VPRINT("Sending OOB byte %02X", params.oob_byte)
-						uint8_t oob_save;
-						oob_save = buf[split_pos];
-						buf[split_pos] = params.oob_byte;
-						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos+1, MSG_OOB, !!(split_flags & SPLIT_FLAG_DISORDER));
-						buf[split_pos] = oob_save;
-					}
-					else
-						wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, 0, !!(split_flags & SPLIT_FLAG_DISORDER));
+
+					wr = send_or_buffer_oob(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, !!(split_flags & SPLIT_FLAG_DISORDER), !!(split_flags & SPLIT_FLAG_OOB));
 					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 					if (wr >= 0)
 					{
 						conn->partner->twr += wr;
-						wr = send_or_buffer(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0, 0);
+						wr = send_or_buffer_oob(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0, false);
 						DBGPRINT("send_or_buffer(2) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 						if (wr>0) conn->partner->twr += wr;
 					}
