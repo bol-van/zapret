@@ -680,16 +680,32 @@ void parse_params(int argc, char *argv[])
 			params.debug = optarg ? atoi(optarg) : 1;
 			break;
 		case 43: /* local-rcvbuf */
+#ifdef __linux__
 			params.local_rcvbuf = atoi(optarg)/2;
+#else
+			params.local_rcvbuf = atoi(optarg);
+#endif
 			break;
 		case 44: /* local-sndbuf */
+#ifdef __linux__
 			params.local_sndbuf = atoi(optarg)/2;
+#else
+			params.local_sndbuf = atoi(optarg);
+#endif
 			break;
 		case 45: /* remote-rcvbuf */
+#ifdef __linux__
 			params.remote_rcvbuf = atoi(optarg)/2;
+#else
+			params.remote_rcvbuf = atoi(optarg);
+#endif
 			break;
 		case 46: /* remote-sndbuf */
+#ifdef __linux__
 			params.remote_sndbuf = atoi(optarg)/2;
+#else
+			params.remote_sndbuf = atoi(optarg);
+#endif
 			break;
 		case 47: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
