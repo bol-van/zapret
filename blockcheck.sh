@@ -997,7 +997,7 @@ tpws_check_domain_http_bypass_()
 	else
 		
 		for mss in '' 88; do
-			s3=${mss:+--mss=$mss --mss-pf=443}
+			s3=${mss:+--mss=$mss --mss-pf=$HTTPS_PORT}
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
 				for pos in 1 2 3 4 5 10 50; do
 					s="--split-pos=$pos"
