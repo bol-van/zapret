@@ -1168,6 +1168,8 @@ Cleanup : `wsl --unregister tpws`
 
 Tested in windows 10 build 19041 (20.04).
 
+`--oob` , `--mss` and `--disorder` do not work.
+
 NOTICE. There is native windows solution GoodByeDPI. It works on packet level like nfqws.
 
 ### Other devices
