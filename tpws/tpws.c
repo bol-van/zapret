@@ -189,6 +189,10 @@ static void exithelp(void)
 		" --unixeol\t\t\t\t; replace 0D0A to 0A\n"
 		" --tlsrec=sni\t\t\t\t; make 2 TLS records. split at SNI. don't split if SNI is not present\n"
 		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n"
+#ifdef __linux__
+		" --mss=<int>\t\t\t\t; set client MSS. forces server to split messages but significantly decreases speed !\n"
+		" --mss-pf=[~]port1[-port2]\t\t; MSS port filter. ~ means negation\n"
+#endif
 		" --tamper-start=[n]<pos>\t\t; start tampering only from specified outbound stream position. default is 0. 'n' means data block number.\n"
 		" --tamper-cutoff=[n]<pos>\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
@@ -324,6 +328,9 @@ void parse_params(int argc, char *argv[])
 		{ "tamper-cutoff",required_argument,0,0 },// optidx=51
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
 		{ "enable-pf",no_argument,0,0 },// optidx=52
+#elif defined(__linux__)
+		{ "mss",required_argument,0,0 },// optidx=52
+		{ "mss-pf",required_argument,0,0 },// optidx=53
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -722,6 +729,23 @@ void parse_params(int argc, char *argv[])
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
 		case 52: /* enable-pf */
 			params.pf_enable = true;
+			break;
+#elif defined(__linux__)
+		case 52: /* mss */
+			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
+			params.mss = atoi(optarg);
+			if (params.mss<88 || params.mss>32767)
+			{
+				fprintf(stderr, "Invalid value for MSS. Linux accepts MSS 88-32767.\n");
+				exit_clean(1);
+			}
+			break;
+		case 53: /* mss-pf */
+			if (!pf_parse(optarg,&params.mss_pf))
+			{
+				fprintf(stderr, "Invalid MSS port filter.\n");
+				exit_clean(1);
+			}
 			break;
 #endif
 		}

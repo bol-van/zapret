@@ -20,7 +20,6 @@
 #include "tpws_conn.h"
 #include "redirect.h"
 #include "tamper.h"
-#include "params.h"
 #include "socks.h"
 #include "helpers.h"
 
@@ -336,7 +335,7 @@ static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)
 //Returns -1 if something fails, >0 on success (socket fd).
 static int connect_remote(const struct sockaddr *remote_addr)
 {
-	int remote_fd = 0, yes = 1, no = 0;
+	int remote_fd = 0, yes = 1, no = 0, v;
     
 	
  	if((remote_fd = socket(remote_addr->sa_family, SOCK_STREAM, 0)) < 0)
@@ -368,9 +367,27 @@ static int connect_remote(const struct sockaddr *remote_addr)
 	}
 	if (setsockopt(remote_fd, IPPROTO_TCP, TCP_NODELAY, params.skip_nodelay ? &no : &yes, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_NODELAY, connect_remote)");
+		perror("setsockopt (TCP_NODELAY, connect_remote)");
 		close(remote_fd);
 		return -1;
+	}
+	if (params.mss)
+	{
+		uint16_t port = saport(remote_addr);
+		if (pf_in_range(port,&params.mss_pf))
+		{
+			VPRINT("Setting MSS %d",params.mss)
+			if (setsockopt(remote_fd, IPPROTO_TCP, TCP_MAXSEG, &params.mss, sizeof(int)) <0)
+			{
+				perror("setsockopt (TCP_MAXSEG, connect_remote)");
+				close(remote_fd);
+				return -1;
+			}
+		}
+		else
+		{
+			VPRINT("Not setting MSS. Port %u is out of MSS port range.",port)
+		}
 	}
 	if(connect(remote_fd, remote_addr, remote_addr->sa_family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)) < 0)
 	{
@@ -1043,7 +1060,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				if (split_pos)
 				{
 					VPRINT("Splitting at pos %zu%s", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "")
-					if (split_flags && SPLIT_FLAG_OOB)
+					if (split_flags & SPLIT_FLAG_OOB)
 					{
 						VPRINT("Sending OOB byte %02X", params.oob_byte)
 						uint8_t oob_save;
@@ -1394,3 +1411,37 @@ ex:
 	if (listen_conn) free(listen_conn);
 	return retval;
 }
+
+
+bool pf_in_range(uint16_t port, const port_filter *pf)
+{
+	return port && ((!pf->from && !pf->to || port>=pf->from && port<=pf->to) ^ pf->neg);
+}
+bool pf_parse(const char *s, port_filter *pf)
+{
+	unsigned int v1,v2;
+
+	if (!s) return false;
+	if (*s=='~') 
+	{
+		pf->neg=true;
+		s++;
+	}
+	else
+		pf->neg=false;
+	if (sscanf(s,"%u-%u",&v1,&v2)==2)
+	{
+		if (!v1 || v1>65535 || v2>65535 || v1>v2) return false;
+		pf->from=(uint16_t)v1;
+		pf->to=(uint16_t)v2;
+	}
+	else if (sscanf(s,"%u",&v1)==1)
+	{
+		if (!v1 || v1>65535) return false;
+		pf->to=pf->from=(uint16_t)v1;
+	}
+	else
+		return false;
+	return true;
+}
+

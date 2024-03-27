@@ -591,6 +591,8 @@ tpws is transparent proxy.
  --unixeol                      ; replace 0D0A to 0A
  --tlsrec=sni                   ; make 2 TLS records. split at SNI. don't split if SNI is not present.
  --tlsrec-pos=<pos>             ; make 2 TLS records. split at specified pos
+ --mss=<int>                    ; set client MSS. forces server to split messages but significantly decreases speed !
+ --mss-pf=[~]port1[-port2]      ; MSS port filter. ~ means negation
  --tamper-start=[n]<pos>        ; start tampering only from specified outbound stream position. byte pos or block number ('n'). default is 0.
  --tamper-cutoff=[n]<pos>       ; do not tamper anymore after specified outbound stream position. byte pos or block number ('n'). default is unlimited.
  --daemon                       ; daemonize
@@ -663,6 +665,15 @@ This works fine in Linux and MacOS but unexpectedly in FreeBSD and OpenBSD
 `--tlsrec` breaks significant number of sites. Crypto libraries on end servers usually accept fine modified ClientHello
 but middleboxes such as CDNs and ddos guards - not always.
 Use of `--tlsrec` without filters is discouraged.
+
+`--mss` sets TCP_MAXSEG socket option. Client sets this value in MSS TCP option in the SYN packet.
+Server replies with it's own MSS in SYN,ACK packet. Usually servers lower their packet sizes but they still don't
+fit to supplied MSS. The greater MSS client sets the bigger server's packets will be.
+If it's enough to split TLS 1.2 ServerHello, it may fool DPI that checks certificate domain name.
+This scheme may significantly lower speed. Hostlist and TLS version filters are not possible.
+`--mss-pf` sets port filter for MSS. Use `mss-pf=443` to apply MSS only for https.
+Likely not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
+Use only if nothing better is available. Works only in Linux, not BSD or MacOS.
 
 
 ## Ways to get a list of blocked IP

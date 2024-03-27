@@ -5,6 +5,7 @@
 #include <sys/queue.h>
 #include <time.h>
 #include "tamper.h"
+#include "params.h"
 
 #define BACKLOG 10
 #define MAX_EPOLL_EVENTS 64
@@ -87,7 +88,7 @@ struct tproxy_conn
 	struct send_buffer wr_buf[4];
 
 	t_ctrack track;
-	
+
 	//Create the struct which contains ptrs to next/prev element
 	TAILQ_ENTRY(tproxy_conn) conn_ptrs;
 };
@@ -99,3 +100,6 @@ TAILQ_HEAD(tailhead, tproxy_conn);
 
 
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);
+
+bool pf_in_range(uint16_t port, const port_filter *pf);
+bool pf_parse(const char *s, port_filter *pf);

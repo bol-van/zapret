@@ -24,6 +24,12 @@ struct bind_s
 	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 };
 
+typedef struct
+{
+	uint16_t from,to;
+	bool neg;
+} port_filter;
+
 struct params_s
 {
 	struct bind_s binds[MAX_BINDS];
@@ -54,6 +60,9 @@ struct params_s
 	bool oob, oob_http, oob_tls;
 	uint8_t oob_byte;
 	int ttl_default;
+
+	int mss;
+	port_filter mss_pf;
 
 	char pidfile[256];
 
