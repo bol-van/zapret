@@ -1076,7 +1076,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				conn->tnrd++;
 				conn->trd+=rd;
 
-				if (split_pos && bs<sizeof(buf))
+				if (split_pos && bs<=sizeof(buf) && split_pos<sizeof(buf))
 				{
 					VPRINT("Splitting at pos %zu%s", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "")
 
@@ -1085,7 +1085,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 					if (wr >= 0)
 					{
 						conn->partner->twr += wr;
-						wr = send_or_buffer_oob(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0, false);
+						wr = send_or_buffer(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0, 0);
 						DBGPRINT("send_or_buffer(2) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
 						if (wr>0) conn->partner->twr += wr;
 					}
