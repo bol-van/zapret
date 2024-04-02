@@ -561,6 +561,7 @@ tpws is transparent proxy.
  --remote-sndbuf=<bytes>	; SO_SNDBUF for remote legs
  --skip-nodelay			; do not set TCP_NODELAY for outgoing connections. incompatible with split.
  --no-resolve			; disable socks5 remote dns
+ --resolver-threads=<int>       ; number of resolver worker threads
  --maxconn=<max_connections>	; max number of local legs
  --maxfiles=<max_open_files>    ; max file descriptors (setrlimit). min requirement is (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode.
 				; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
@@ -646,12 +647,10 @@ It's possible to bind to any nonexistent address in transparent mode but in sock
 In socks proxy mode no additional system privileges are required. Connections to local IPs of the system where tpws runs are prohibited.
 tpws supports remote dns resolving (curl : `--socks5-hostname`  firefox : `socks_remote_dns=true`) , but does it in blocking mode.
 
-tpws uses async sockets for all activity but resolving can break this model.
-
-if tpws serves many clients it can cause trouble. also DoS attack is possible against tpws.
-
-if remote resolving causes trouble configure clients to use local name resolution and use
-`--no-resolve` option on tpws side.
+tpws uses async sockets for all activities. Domain names are resolved in multi threaded pool.
+Resolving does not freeze other connections. But if there're too many requests resolving delays may increase.
+Number of resolver threads is choosen automatically proportinally to `--maxconn` and can be override using `--resolver-threads`.
+To disable hostname resolve use `--no-resolve` option.
 
 `--disorder` is an additional flag to any split option.
 It tries to simulate `--disorder2` option of `nfqws` using standard socket API without the need of additional privileges.
@@ -670,7 +669,8 @@ Use of `--tlsrec` without filters is discouraged.
 Server replies with it's own MSS in SYN,ACK packet. Usually servers lower their packet sizes but they still don't
 fit to supplied MSS. The greater MSS client sets the bigger server's packets will be.
 If it's enough to split TLS 1.2 ServerHello, it may fool DPI that checks certificate domain name.
-This scheme may significantly lower speed. Hostlist and TLS version filters are not possible.
+This scheme may significantly lower speed. Hostlist filter is possible only in socks mode if client uses remote resolving (firefox `network.proxy.socks_remote_dns`).
+TLS version filters are not possible.
 `--mss-pf` sets port filter for MSS. Use `mss-pf=443` to apply MSS only for https.
 Likely not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
 Use only if nothing better is available. Works only in Linux, not BSD or MacOS.

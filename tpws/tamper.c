@@ -280,9 +280,10 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	else if (params.split_any_protocol && params.split_pos < *size)
 		*split_pos = params.split_pos;
 		
-	if (bHaveHost && bBypass && !bHostExcluded && !ctrack->hostname && *params.hostlist_auto_filename)
+	if (bHaveHost && bBypass && !bHostExcluded && *params.hostlist_auto_filename)
 	{
 		DBGPRINT("tamper_out put hostname : %s", Host)
+		if (ctrack->hostname) free(ctrack->hostname);
 		ctrack->hostname=strdup(Host);
 	}
 	if (params.disorder) *split_flags |= SPLIT_FLAG_DISORDER;
@@ -332,7 +333,7 @@ static void auto_hostlist_failed(const char *hostname)
 		}
 		else
 		{
-			VPRINT("auto hostlist: NOT adding %s", hostname);
+			VPRINT("auto hostlist : NOT adding %s", hostname);
 			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
 		}
 	}
@@ -343,6 +344,8 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 	bool bFail=false;
 
 	DBGPRINT("tamper_in hostname=%s", ctrack->hostname)
+
+	if (!*params.hostlist_auto_filename) return;
 
 	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 
@@ -376,6 +379,8 @@ void rst_in(t_ctrack *ctrack)
 {
 	DBGPRINT("rst_in hostname=%s", ctrack->hostname)
 
+	if (!*params.hostlist_auto_filename) return;
+
 	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 
 	if (!ctrack->bTamperInCutoff && ctrack->hostname)
@@ -388,6 +393,8 @@ void rst_in(t_ctrack *ctrack)
 void hup_out(t_ctrack *ctrack)
 {
 	DBGPRINT("hup_out hostname=%s", ctrack->hostname)
+
+	if (!*params.hostlist_auto_filename) return;
 
 	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 

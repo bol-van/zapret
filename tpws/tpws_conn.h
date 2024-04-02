@@ -6,6 +6,7 @@
 #include <time.h>
 #include "tamper.h"
 #include "params.h"
+#include "resolver.h"
 
 #define BACKLOG 10
 #define MAX_EPOLL_EVENTS 64
@@ -59,10 +60,12 @@ struct tproxy_conn
 	enum {
 		S_WAIT_HANDSHAKE=0,
 		S_WAIT_REQUEST,
+		S_WAIT_RESOLVE,
 		S_WAIT_CONNECTION,
 		S_TCP
 	} socks_state;
 	uint8_t socks_ver;
+	struct resolve_item *socks_ri;
 
 	// these value are used in flow control. we do not use ET (edge triggered) polling
 	// if we dont disable notifications they will come endlessly until condition becomes false and will eat all cpu time

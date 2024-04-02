@@ -138,7 +138,8 @@ static void exithelp(void)
 		" * multiple binds are supported. each bind-addr, bind-iface* start new bind\n"
 		" --port=<port>\t\t\t\t; only one port number for all binds is supported\n"
 		" --socks\t\t\t\t; implement socks4/5 proxy instead of transparent proxy\n"
-		" --no-resolve\t\t\t\t; disable socks5 remote dns ability (resolves are not async, they block all activity)\n"
+		" --no-resolve\t\t\t\t; disable socks5 remote dns ability\n"
+		" --resolver-threads=<int>\t\t; number of resolver worker threads\n"
 		" --local-rcvbuf=<bytes>\n"
 		" --local-sndbuf=<bytes>\n"
 		" --remote-rcvbuf=<bytes>\n"
@@ -323,14 +324,15 @@ void parse_params(int argc, char *argv[])
 		{ "remote-sndbuf",required_argument,0,0 },// optidx=46
 		{ "socks",no_argument,0,0 },// optidx=47
 		{ "no-resolve",no_argument,0,0 },// optidx=48
-		{ "skip-nodelay",no_argument,0,0 },// optidx=49
-		{ "tamper-start",required_argument,0,0 },// optidx=50
-		{ "tamper-cutoff",required_argument,0,0 },// optidx=51
+		{ "resolver-threads",required_argument,0,0 },// optidx=49
+		{ "skip-nodelay",no_argument,0,0 },// optidx=50
+		{ "tamper-start",required_argument,0,0 },// optidx=51
+		{ "tamper-cutoff",required_argument,0,0 },// optidx=52
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=52
+		{ "enable-pf",no_argument,0,0 },// optidx=53
 #elif defined(__linux__)
-		{ "mss",required_argument,0,0 },// optidx=52
-		{ "mss-pf",required_argument,0,0 },// optidx=53
+		{ "mss",required_argument,0,0 },// optidx=53
+		{ "mss-pf",required_argument,0,0 },// optidx=54
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -713,10 +715,18 @@ void parse_params(int argc, char *argv[])
 		case 48: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 49: /* skip-nodelay */
+		case 49: /* resolver-threads */
+			params.resolver_threads = atoi(optarg);
+			if (params.resolver_threads<1 || params.resolver_threads>300)
+			{
+				fprintf(stderr, "resolver-threads must be within 1..300\n");
+				exit_clean(1);
+			}
+			break;
+		case 50: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
-		case 50: /* tamper-start */
+		case 51: /* tamper-start */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -729,7 +739,7 @@ void parse_params(int argc, char *argv[])
 				params.tamper_start = atoi(p);
 			}
 			break;
-		case 51: /* tamper-cutoff */
+		case 52: /* tamper-cutoff */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -743,11 +753,11 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 52: /* enable-pf */
+		case 53: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__)
-		case 52: /* mss */
+		case 53: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			params.mss = atoi(optarg);
 			if (params.mss<88 || params.mss>32767)
@@ -756,7 +766,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 53: /* mss-pf */
+		case 54: /* mss-pf */
 			if (!pf_parse(optarg,&params.mss_pf))
 			{
 				fprintf(stderr, "Invalid MSS port filter.\n");
@@ -780,6 +790,7 @@ void parse_params(int argc, char *argv[])
 		fprintf(stderr, "Cannot split with --skip-nodelay\n");
 		exit_clean(1);
 	}
+	if (!params.resolver_threads) params.resolver_threads = 5 + params.maxconn/50;
 
 	if (*params.hostlist_auto_filename) params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
 	if (!LoadIncludeHostLists())

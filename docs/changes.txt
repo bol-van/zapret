@@ -270,4 +270,7 @@ tpws: incompatible oob parameter change. it doesn't take oob byte anymore. inste
 blockcheck: quick mode, strategy order optimizations, QUIC protocol support
 nfqws: syndata desync mode
 
-   á
+v56
+
+tpws: mss fooling
+tpws: multi thread resolver. eliminates blocks related to hostname resolve.

@@ -44,7 +44,7 @@ struct params_s
 	uid_t uid;
 	gid_t gid;
 	bool daemon;
-	int maxconn,maxfiles,max_orphan_time;
+	int maxconn,resolver_threads,maxfiles,max_orphan_time;
 	int local_rcvbuf,local_sndbuf,remote_rcvbuf,remote_sndbuf;
 
 	bool tamper; // any tamper option is set
