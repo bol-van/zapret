@@ -914,6 +914,9 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 						return proxy_mode_connect_remote((struct sockaddr *)&ss,conn,conn_list);
 					}
 					break;
+				case S_WAIT_RESOLVE:
+					DBGPRINT("socks received message while in S_WAIT_RESOLVE. hanging up")
+					break;
 				case S_WAIT_CONNECTION:
 					DBGPRINT("socks received message while in S_WAIT_CONNECTION. hanging up")
 					break;
