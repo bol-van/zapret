@@ -649,7 +649,7 @@ tpws supports remote dns resolving (curl : `--socks5-hostname`  firefox : `socks
 
 tpws uses async sockets for all activities. Domain names are resolved in multi threaded pool.
 Resolving does not freeze other connections. But if there're too many requests resolving delays may increase.
-Number of resolver threads is choosen automatically proportinally to `--maxconn` and can be override using `--resolver-threads`.
+Number of resolver threads is choosen automatically proportinally to `--maxconn` and can be overriden using `--resolver-threads`.
 To disable hostname resolve use `--no-resolve` option.
 
 `--disorder` is an additional flag to any split option.
