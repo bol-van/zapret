@@ -345,32 +345,33 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 
 	DBGPRINT("tamper_in hostname=%s", ctrack->hostname)
 
-	if (!*params.hostlist_auto_filename) return;
-
-	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
-
-	if (ctrack->l7proto==HTTP && ctrack->hostname)
+	if (*params.hostlist_auto_filename)
 	{
-		if (IsHttpReply(segment,*size))
+		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+
+		if (ctrack->l7proto==HTTP && ctrack->hostname)
 		{
-			VPRINT("incoming HTTP reply detected for hostname %s", ctrack->hostname);
-			bFail = HttpReplyLooksLikeDPIRedirect(segment, *size, ctrack->hostname);
-			if (bFail)
+			if (IsHttpReply(segment,*size))
 			{
-				VPRINT("redirect to another domain detected. possibly DPI redirect.")
-				HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+				VPRINT("incoming HTTP reply detected for hostname %s", ctrack->hostname);
+				bFail = HttpReplyLooksLikeDPIRedirect(segment, *size, ctrack->hostname);
+				if (bFail)
+				{
+					VPRINT("redirect to another domain detected. possibly DPI redirect.")
+					HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+				}
+				else
+					VPRINT("local or in-domain redirect detected. it's not a DPI redirect.")
 			}
 			else
-				VPRINT("local or in-domain redirect detected. it's not a DPI redirect.")
-		}
-		else
-		{
-			// received not http reply. do not monitor this connection anymore
-			VPRINT("incoming unknown HTTP data detected for hostname %s", ctrack->hostname);
-		}
-		if (bFail)
-			auto_hostlist_failed(ctrack->hostname);
-		
+			{
+				// received not http reply. do not monitor this connection anymore
+				VPRINT("incoming unknown HTTP data detected for hostname %s", ctrack->hostname);
+			}
+			if (bFail)
+				auto_hostlist_failed(ctrack->hostname);
+
+		}	
 	}
 	ctrack->bTamperInCutoff = true;
 }

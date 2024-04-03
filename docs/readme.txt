@@ -658,6 +658,7 @@ tpws - это transparent proxy.
  --local-sndbuf=<bytes> ; SO_SNDBUF для соединений client-proxy
  --remote-rcvbuf=<bytes> ; SO_RCVBUF для соединений proxy-target
  --remote-sndbuf=<bytes> ; SO_SNDBUF для соединений proxy-target
+ --nosplice             ; не использовать splice на linux системах
  --skip-nodelay		; не устанавливать в исходящих соединения TCP_NODELAY. несовместимо со split.
 
  --split-http-req=method|host	; способ разделения http запросов на сегменты : около метода (GET,POST) или около заголовка Host
@@ -1581,6 +1582,8 @@ tpws в режиме socks можно запускать и под более-м
 
 Не работают функции --oob и --mss из-за ограничений реализации WSL.
 --disorder не работает из-за особенностей tcp/ip стека windows.
+Может не срабатывать детект RST в autohostlist.
+WSL может глючить с pipes, ломая тем самым splice и приводя к зацикливанию процесса. Может потребоваться --nosplice.
 
 ЗАМЕЧАНИЕ. Под Windows существует нативное решение GoodByeDPI, выполняющее дурение на пакетном уровне (по типу nfqws).
 

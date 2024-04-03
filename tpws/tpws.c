@@ -144,6 +144,9 @@ static void exithelp(void)
 		" --local-sndbuf=<bytes>\n"
 		" --remote-rcvbuf=<bytes>\n"
 		" --remote-sndbuf=<bytes>\n"
+#ifdef __linux__
+		" --nosplice\t\t\t\t; do not use splice to transfer data between sockets\n"
+#endif
 		" --skip-nodelay\t\t\t\t; do not set TCP_NODELAY option for outgoing connections (incompatible with split options)\n"
 		" --maxconn=<max_connections>\n"
 #ifdef SPLICE_PRESENT
@@ -333,6 +336,7 @@ void parse_params(int argc, char *argv[])
 #elif defined(__linux__)
 		{ "mss",required_argument,0,0 },// optidx=53
 		{ "mss-pf",required_argument,0,0 },// optidx=54
+		{ "nosplice",no_argument,0,0 },// optidx=55
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -773,6 +777,9 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
+		case 55: /* nosplice */
+			params.nosplice = true;
+			break;
 #endif
 		}
 	}
@@ -912,11 +919,11 @@ static bool set_ulimit(void)
 
 	if (!params.maxfiles)
 	{
-		// 4 fds per tamper connection (2 pipe + 2 socket), 6 fds for tcp proxy connection (4 pipe + 2 socket)
+		// 4 fds per tamper connection (2 pipe + 2 socket), 6 fds for tcp proxy connection (4 pipe + 2 socket), 2 fds (2 socket) for nosplice
 		// additional 1/2 for unpaired remote legs sending buffers
 		// 16 for listen_fd, epoll, hostlist, ...
 #ifdef SPLICE_PRESENT
-		fdmax = (params.tamper && !params.tamper_start && !params.tamper_cutoff ? 4 : 6) * params.maxconn;
+		fdmax = (params.nosplice ? 2 : (params.tamper && !params.tamper_start && !params.tamper_cutoff ? 4 : 6)) * params.maxconn;
 #else
 		fdmax = 2 * params.maxconn;
 #endif

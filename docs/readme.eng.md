@@ -559,6 +559,7 @@ tpws is transparent proxy.
  --local-sndbuf=<bytes>		; SO_SNDBUF for local legs
  --remote-rcvbuf=<bytes>        ; SO_RCVBUF for remote legs
  --remote-sndbuf=<bytes>	; SO_SNDBUF for remote legs
+ --nosplice                     ; do not use splice to transfer data between sockets
  --skip-nodelay			; do not set TCP_NODELAY for outgoing connections. incompatible with split.
  --no-resolve			; disable socks5 remote dns
  --resolver-threads=<int>       ; number of resolver worker threads
@@ -1169,6 +1170,8 @@ Cleanup : `wsl --unregister tpws`
 Tested in windows 10 build 19041 (20.04).
 
 `--oob` , `--mss` and `--disorder` do not work.
+RST detection in autohostlist scheme may not work.
+WSL may glitch with pipes. `--nosplice` may be required.
 
 NOTICE. There is native windows solution GoodByeDPI. It works on packet level like nfqws.
 

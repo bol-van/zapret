@@ -440,7 +440,7 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 #ifdef SPLICE_PRESENT
 	// if dont tamper - both legs are spliced, create 2 pipes
 	// otherwise create pipe only in local leg
-	if ((!remote || !params.tamper || params.tamper_start || params.tamper_cutoff ) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
+	if (!params.nosplice && ( !remote || !params.tamper || params.tamper_start || params.tamper_cutoff ) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
 	{
 		fprintf(stderr, "Could not create the splice pipe\n");
 		free_conn(conn);
@@ -662,7 +662,7 @@ static bool handle_unsent(tproxy_conn_t *conn)
 	DBGPRINT("+handle_unsent, fd=%d has_unsent=%d has_unsent_partner=%d",conn->fd,conn_has_unsent(conn),conn_partner_alive(conn) ? conn_has_unsent(conn->partner) : false)
 	
 #ifdef SPLICE_PRESENT
-	if (conn->wr_unsent)
+	if (!params.nosplice && conn->wr_unsent)
 	{
 		wr = splice(conn->splice_pipe[0], NULL, conn->fd, NULL, conn->wr_unsent, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
 		DBGPRINT("splice unsent=%zd wr=%zd err=%d",conn->wr_unsent,wr,errno)
@@ -1067,7 +1067,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	{
 		DBGPRINT("%s leg fd=%d stream pos : %" PRIu64 "(n%" PRIu64 ")/%" PRIu64, conn->remote ? "remote" : "local", conn->fd, conn->trd,conn->tnrd+1,conn->twr)
 #ifdef SPLICE_PRESENT
-		if (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff || !conn->remote && !in_tamper_out_range(conn))
+		if (!params.nosplice && (!params.tamper || conn->remote && conn->partner->track.bTamperInCutoff || !conn->remote && !in_tamper_out_range(conn)))
 		{
 			// incoming data from remote leg we splice without touching
 			// pipe is in the local leg, so its in conn->partner->splice_pipe

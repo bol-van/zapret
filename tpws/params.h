@@ -81,6 +81,9 @@ struct params_s
 #if defined(BSD)
 	bool pf_enable;
 #endif
+#ifdef __linux__
+	bool nosplice;
+#endif
 };
 
 extern struct params_s params;
