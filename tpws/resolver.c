@@ -38,6 +38,19 @@ static t_resolver resolver = { .bInit = false };
 #define rlist_lock pthread_mutex_lock(&resolver.resolve_list_lock)
 #define rlist_unlock pthread_mutex_unlock(&resolver.resolve_list_lock)
 
+static void resolver_clear_list(void)
+{
+	struct resolve_item *ri;
+
+	for (;;)
+	{
+		ri = TAILQ_FIRST(&resolver.resolve_list);
+		if (!ri) break;
+		TAILQ_REMOVE(&resolver.resolve_list, ri, next);
+		free(ri);
+	}
+}
+
 int resolver_thread_count(void)
 {
 	return resolver.bInit ? resolver.threads : 0;
@@ -187,6 +200,7 @@ ex1:
 	pthread_mutex_destroy(&resolver.resolve_list_lock);
 	return false;
 }
+
 void resolver_deinit(void)
 {
 	if (resolver.bInit)
@@ -210,6 +224,8 @@ void resolver_deinit(void)
 		#else
 			sem_destroy(resolver.sem);
 		#endif
+
+		resolver_clear_list();
 
 		memset(&resolver,0,sizeof(resolver));
 	}
