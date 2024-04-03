@@ -115,12 +115,6 @@ SYS_process_vm_writev,
 #ifdef SYS_process_madvise
 SYS_process_madvise,
 #endif
-#ifdef SYS_tkill
-SYS_tkill,
-#endif
-#ifdef SYS_tgkill
-SYS_tgkill,
-#endif
 SYS_kill, SYS_ptrace
 };
 #define BLOCKED_SYSCALL_COUNT (sizeof(blocked_syscalls)/sizeof(*blocked_syscalls))

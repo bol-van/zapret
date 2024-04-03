@@ -46,6 +46,10 @@ int resolver_thread_count(void)
 static void *resolver_thread(void *arg)
 {
 	int r;
+	sigset_t signal_mask;
+
+	sigemptyset(&signal_mask);
+	sigaddset(&signal_mask, SIG_BREAK);
 
 	//printf("resolver_thread %d start\n",syscall(SYS_gettid));
 	for(;;)
@@ -80,14 +84,17 @@ static void *resolver_thread(void *arg)
 				snprintf(sport,sizeof(sport),"%u",ri->port);
 				memset(&hints, 0, sizeof(struct addrinfo));
 				hints.ai_socktype = SOCK_STREAM;
+				// unfortunately getaddrinfo cannot be interrupted with a signal. we cannot cancel a query
 				ri->ga_res = getaddrinfo(ri->dom,sport,&hints,&ai);
 				if (!ri->ga_res)
 				{
 					memcpy(&ri->ss, ai->ai_addr, ai->ai_addrlen);
 					freeaddrinfo(ai);
 				}
-
 				//printf("THREAD %d END JOB %s  FIRST=%p\n", syscall(SYS_gettid), ri->dom, TAILQ_FIRST(&resolver.resolve_list));
+
+				// never interrupt this
+				pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
 				wr = write(resolver.fd_signal_pipe,&ri,sizeof(void*));
 				if (wr<0)
 				{
@@ -101,6 +108,7 @@ static void *resolver_thread(void *arg)
 					fprintf(stderr,"write resolve_pipe : not full write\n");
 					exit(1000);
 				}
+				pthread_sigmask(SIG_UNBLOCK, &signal_mask, NULL);
 			}
 		}
 	}

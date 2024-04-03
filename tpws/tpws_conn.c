@@ -705,8 +705,9 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 	bool bConnFooling=true;
 	if (conn->track.hostname && params.mss)
 	{
-		VPRINT("0-phase desync hostlist check")
 		bConnFooling=HostlistCheck(conn->track.hostname, NULL);
+		if (!bConnFooling)
+			VPRINT("0-phase desync hostlist check negative. not acting on this connection.")
 	}
 
 	if ((remote_fd = connect_remote(sa, bConnFooling)) < 0)
