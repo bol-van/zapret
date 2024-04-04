@@ -6,6 +6,7 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <time.h>
+#include "tpws.h"
 #include "pools.h"
 
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
@@ -81,7 +82,7 @@ struct params_s
 #if defined(BSD)
 	bool pf_enable;
 #endif
-#ifdef __linux__
+#ifdef SPLICE_PRESENT
 	bool nosplice;
 #endif
 };

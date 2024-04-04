@@ -1,6 +1,6 @@
 CC ?= cc
 CFLAGS += -std=gnu99 -s -O3 -Wno-logical-op-parentheses
-LIBS = -lz
+LIBS = -lz -lpthread
 SRC_FILES = *.c
 
 all: tpws

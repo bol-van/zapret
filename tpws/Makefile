@@ -1,7 +1,7 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Wno-logical-op-parentheses -O3
 CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
-LIBS = -lz
+LIBS = -lz -lpthread
 SRC_FILES = *.c
 
 all: tpws

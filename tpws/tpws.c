@@ -144,7 +144,7 @@ static void exithelp(void)
 		" --local-sndbuf=<bytes>\n"
 		" --remote-rcvbuf=<bytes>\n"
 		" --remote-sndbuf=<bytes>\n"
-#ifdef __linux__
+#ifdef SPLICE_PRESENT
 		" --nosplice\t\t\t\t; do not use splice to transfer data between sockets\n"
 #endif
 		" --skip-nodelay\t\t\t\t; do not set TCP_NODELAY option for outgoing connections (incompatible with split options)\n"
@@ -336,7 +336,9 @@ void parse_params(int argc, char *argv[])
 #elif defined(__linux__)
 		{ "mss",required_argument,0,0 },// optidx=53
 		{ "mss-pf",required_argument,0,0 },// optidx=54
+#ifdef SPLICE_PRESENT
 		{ "nosplice",no_argument,0,0 },// optidx=55
+#endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
 		{ NULL,0,NULL,0 }
@@ -777,9 +779,11 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
+#ifdef SPLICE_PRESENT
 		case 55: /* nosplice */
 			params.nosplice = true;
 			break;
+#endif
 #endif
 		}
 	}
