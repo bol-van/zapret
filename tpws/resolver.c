@@ -179,14 +179,24 @@ bool resolver_init(int threads, int fd_signal_pipe)
 	action.sa_handler = sigbreak;
 	sigaction(SIG_BREAK, &action, NULL);
 
+
+	pthread_attr_t attr;
+	if (pthread_attr_init(&attr)) goto ex1;
+	// set minimum thread stack size
+	if (pthread_attr_setstacksize(&attr,20480))
+	{
+		pthread_attr_destroy(&attr);
+		goto ex1;
+	}
 	for(t=0, resolver.threads=threads ; t<threads ; t++)
 	{
-		if (pthread_create(resolver.thread + t, NULL, resolver_thread, NULL))
+		if (pthread_create(resolver.thread + t, &attr, resolver_thread, NULL))
 		{
 			resolver.threads=t;
 			break;
 		}
 	}
+	pthread_attr_destroy(&attr);
 	if (!resolver.threads)
 	{
 		// could not start any threads
