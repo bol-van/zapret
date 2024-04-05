@@ -133,81 +133,6 @@ static void sigbreak(int sig)
 {
 }
 
-bool resolver_init(int threads, int fd_signal_pipe)
-{
-	int t;
-	struct sigaction action;
-
-	if (threads<1 || resolver.bInit) return false;
-
-	memset(&resolver,0,sizeof(resolver));
-	resolver.bInit = true;
-
-#ifdef __APPLE__
-	// MacOS does not support unnamed semaphores
-
-	char sn[64];
-	snprintf(sn,sizeof(sn),"%s_%d",sem_name,getpid());
-	resolver.sem = sem_open(sn,O_CREAT,0600,0);
-	if (resolver.sem==SEM_FAILED)
-	{
-		perror("sem_open");
-		return false;
-	}
-	// unlink immediately to remove tails
-	sem_unlink(sn);
-#else
-	if (sem_init(&resolver._sem,0,0)==-1)
-	{	
-		perror("sem_init");
-		return false;
-	}
-	resolver.sem = &resolver._sem;
-#endif
-
-	if (pthread_mutex_init(&resolver.resolve_list_lock, NULL)) return false;
-
-	resolver.bStop = false;
-	resolver.fd_signal_pipe = fd_signal_pipe;
-	TAILQ_INIT(&resolver.resolve_list);
-
-	// start as many threads as we can up to specified number
-	resolver.thread = malloc(sizeof(pthread_t)*threads);
-	if (!resolver.thread) goto ex1;
-
-	memset(&action,0,sizeof(action));
-	action.sa_handler = sigbreak;
-	sigaction(SIG_BREAK, &action, NULL);
-
-
-	pthread_attr_t attr;
-	if (pthread_attr_init(&attr)) goto ex2;
-	// set minimum thread stack size
-	if (pthread_attr_setstacksize(&attr,20480))
-	{
-		pthread_attr_destroy(&attr);
-		goto ex2;
-	}
-	for(t=0, resolver.threads=threads ; t<threads ; t++)
-	{
-		if (pthread_create(resolver.thread + t, &attr, resolver_thread, NULL))
-		{
-			resolver.threads=t;
-			break;
-		}
-	}
-	pthread_attr_destroy(&attr);
-	if (!resolver.threads) goto ex2;
-
-	return true;
-
-ex2:
-	free(resolver.thread);
-ex1:
-	pthread_mutex_destroy(&resolver.resolve_list_lock);
-	return false;
-}
-
 void resolver_deinit(void)
 {
 	if (resolver.bInit)
@@ -237,6 +162,79 @@ void resolver_deinit(void)
 		memset(&resolver,0,sizeof(resolver));
 	}
 }
+
+bool resolver_init(int threads, int fd_signal_pipe)
+{
+	int t;
+	struct sigaction action;
+
+	if (threads<1 || resolver.bInit) return false;
+
+	memset(&resolver,0,sizeof(resolver));
+	resolver.bInit = true;
+
+#ifdef __APPLE__
+	// MacOS does not support unnamed semaphores
+
+	char sn[64];
+	snprintf(sn,sizeof(sn),"%s_%d",sem_name,getpid());
+	resolver.sem = sem_open(sn,O_CREAT,0600,0);
+	if (resolver.sem==SEM_FAILED)
+	{
+		perror("sem_open");
+		goto ex;
+	}
+	// unlink immediately to remove tails
+	sem_unlink(sn);
+#else
+	if (sem_init(&resolver._sem,0,0)==-1)
+	{	
+		perror("sem_init");
+		goto ex;
+	}
+	resolver.sem = &resolver._sem;
+#endif
+
+	if (pthread_mutex_init(&resolver.resolve_list_lock, NULL)) goto ex;
+
+	resolver.fd_signal_pipe = fd_signal_pipe;
+	TAILQ_INIT(&resolver.resolve_list);
+
+	// start as many threads as we can up to specified number
+	resolver.thread = malloc(sizeof(pthread_t)*threads);
+	if (!resolver.thread) goto ex;
+
+	memset(&action,0,sizeof(action));
+	action.sa_handler = sigbreak;
+	sigaction(SIG_BREAK, &action, NULL);
+
+
+	pthread_attr_t attr;
+	if (pthread_attr_init(&attr)) goto ex;
+	// set minimum thread stack size
+	if (pthread_attr_setstacksize(&attr,20480))
+	{
+		pthread_attr_destroy(&attr);
+		goto ex;
+	}
+	for(t=0, resolver.threads=threads ; t<threads ; t++)
+	{
+		if (pthread_create(resolver.thread + t, &attr, resolver_thread, NULL))
+		{
+			resolver.threads=t;
+			break;
+		}
+	}
+	pthread_attr_destroy(&attr);
+	if (!resolver.threads) goto ex;
+
+	return true;
+
+ex:
+	resolver_deinit();
+	return false;
+}
+
 
 
 struct resolve_item *resolver_queue(const char *dom, uint16_t port, void *ptr)
