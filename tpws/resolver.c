@@ -181,12 +181,12 @@ bool resolver_init(int threads, int fd_signal_pipe)
 
 
 	pthread_attr_t attr;
-	if (pthread_attr_init(&attr)) goto ex1;
+	if (pthread_attr_init(&attr)) goto ex2;
 	// set minimum thread stack size
 	if (pthread_attr_setstacksize(&attr,20480))
 	{
 		pthread_attr_destroy(&attr);
-		goto ex1;
+		goto ex2;
 	}
 	for(t=0, resolver.threads=threads ; t<threads ; t++)
 	{
@@ -197,15 +197,12 @@ bool resolver_init(int threads, int fd_signal_pipe)
 		}
 	}
 	pthread_attr_destroy(&attr);
-	if (!resolver.threads)
-	{
-		// could not start any threads
-		free(resolver.thread);
-		goto ex1;
-	}
+	if (!resolver.threads) goto ex2;
 
 	return true;
 
+ex2:
+	free(resolver.thread);
 ex1:
 	pthread_mutex_destroy(&resolver.resolve_list_lock);
 	return false;
