@@ -321,6 +321,35 @@ static void reasm_orig_fin(t_ctrack *ctrack)
 }
 
 
+static packet_process_result ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, packet_process_result res)
+{
+#ifdef __linux__
+	// if used in postnat chain, dropping initial packet will cause conntrack connection teardown
+	// so we need to workaround this.
+	// we can't use low ttl for UDP because TCP/IP stack listens to ttl expired ICMPs and notify socket
+	// we also can't use TCP fooling because DPI would accept fooled packets
+	if (ip && ctrack && ctrack->pcounter_orig==1)
+	{
+		// routers will drop IP frames with invalid checksum
+		if (ip->ip_p==IPPROTO_TCP)
+		{
+			// linux recalc ip checksum in tcp
+			// need another limiter
+			ip->ip_ttl=1;
+		}
+		else
+			ip->ip_sum ^= htons(0xBEAF);
+		
+		return res==frag ? modfrag : modify;
+	}
+	else
+#endif
+	// ipv6 does not have checksum
+    	// consider we are free of NAT in ipv6 case. just drop
+	// BSDs also do not need this
+	return drop;
+}
+
 
 // result : true - drop original packet, false = dont drop
 packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
@@ -479,26 +508,11 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 				if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return res;
 
-				#ifdef __linux__
-				// if used in postnat chain, dropping SYN will cause conntrack connection teardown
-				// so we need to workaround this.
-				// we can't use low ttl because TCP/IP stack listens to ttl expired ICMPs in response to SYN and reset connection
-				// we also can't use TCP fooling because DPI would accept fooled packets
-				if (ip)
-				{
-				    // routers will drop IP frames with invalid checksum
-				    ip->ip_sum ^= htons(0xBEAF);
-				    res=modify;
-				}
-				else
-				    // ipv6 does not have checksum
-				    // consider we are free of NAT in ipv6 case. just drop
-				    res=drop;
-				#else
-				    res=drop;
-				#endif
+				res = ct_new_postnat_fix(ctrack, ip, drop);
 				break;
 		}
+		// can do nothing else with SYN packet
+		return res;
 	}
 
 	if (params.desync_cutoff)
@@ -1142,7 +1156,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
 					// this mode is final, no other options available
-					return drop;
+					return ct_new_postnat_fix(ctrack, ip, drop);
 				}
 				desync_mode = params.desync_mode2;
 				break;
@@ -1163,7 +1177,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , data_pkt, len_pkt))
 					return res;
-				return drop;
+				return ct_new_postnat_fix(ctrack, ip, drop);
 			}
 			desync_mode = params.desync_mode2;
 		}
@@ -1180,7 +1194,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 				DLOG("resending original packet with increased by %d length\n", params.udplen_increment);
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return res;
-				return drop;
+				return ct_new_postnat_fix(ctrack, ip, drop);
 			case DESYNC_TAMPER:
 				if (IsDhtD1(data_payload,len_payload))
 				{
@@ -1205,7 +1219,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					DLOG("resending tampered DHT\n");
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
-					return drop;
+					return ct_new_postnat_fix(ctrack, ip, drop);
 				}
 				else
 				{
@@ -1261,7 +1275,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
 
-					return frag;
+					return ct_new_postnat_fix(ctrack, ip, frag);
 				}
 		}
 

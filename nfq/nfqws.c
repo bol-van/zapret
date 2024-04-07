@@ -146,7 +146,7 @@ static packet_process_result processPacketData(uint32_t *mark, const char *ifout
 		// ipv6 packets were with incorrect checksum
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (res==modify || res!=frag && ip6hdr)
+		if (res==modify || res!=frag && res!=modfrag && ip6hdr)
 #else
 		if (res==modify)
 #endif
@@ -169,7 +169,7 @@ static packet_process_result processPacketData(uint32_t *mark, const char *ifout
 		res = dpi_desync_udp_packet(*mark, ifout, data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (res==modify || res!=frag && ip6hdr)
+		if (res==modify || res!=frag && res!=modfrag && ip6hdr)
 #else
 		if (res==modify)
 #endif
@@ -216,6 +216,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 		switch (processPacketData(&mark, ifout, data, len))
 		{
 		case modify: 
+		case modfrag:
 			DLOG("packet: id=%d pass modified\n", id);
 			return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, len, data);
 		case drop:
