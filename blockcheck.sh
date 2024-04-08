@@ -906,15 +906,16 @@ pktws_check_domain_http_bypass_()
 				[ "$SCANLEVEL" = quick ] && return
 			}			
 		done
+
+		s="http_iana_org.bin"
+		[ "$sec" = 1 ] && s="tls_clienthello_iana_org.bin"
+		for desync in syndata syndata,split2 syndata,disorder2 syndata,split2 syndata,disorder2 ; do
+			pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
+			pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s" $e && [ "$SCANLEVEL" = quick ] && return
+		done
+
 		# do not do wssize test for http. it's useless
 		[ "$sec" = 1 ] || break
-	done
-
-	s="http_iana_org.bin"
-	[ "$sec" = 1 ] && s="tls_clienthello_iana_org.bin"
-	for desync in syndata syndata,split2 syndata,disorder2 syndata,split2 syndata,disorder2 ; do
-		pktws_curl_test_update_vary $1 $2 $3 $desync && [ "$SCANLEVEL" = quick ] && return
-		pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s" && [ "$SCANLEVEL" = quick ] && return
 	done
 }
 pktws_check_domain_http_bypass()
