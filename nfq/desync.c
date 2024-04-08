@@ -321,40 +321,60 @@ static void reasm_orig_fin(t_ctrack *ctrack)
 }
 
 
-static packet_process_result ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, packet_process_result res)
+static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, uint8_t proto, struct udphdr *udp, struct tcphdr *tcp, size_t *len_pkt)
 {
 #ifdef __linux__
 	// if used in postnat chain, dropping initial packet will cause conntrack connection teardown
 	// so we need to workaround this.
-	// we can't use low ttl for UDP because TCP/IP stack listens to ttl expired ICMPs and notify socket
-	// we also can't use TCP fooling because DPI would accept fooled packets
-	if (ip && ctrack && ctrack->pcounter_orig==1)
+	// we can't use low ttl because TCP/IP stack listens to ttl expired ICMPs and notify socket
+	// we also can't use fooling because DPI would accept fooled packets
+	if (ctrack && ctrack->pcounter_orig==1)
 	{
-		// routers will drop IP frames with invalid checksum
-		if (ip->ip_p==IPPROTO_TCP)
+		DLOG("applying linux postnat conntrack workaround\n")
+		if (proto==IPPROTO_UDP && udp && len_pkt)
 		{
-			// linux recalc ip checksum in tcp
-			// need another limiter
-			ip->ip_ttl=1;
+			// make malformed udp packet with zero length and invalid checksum
+			udp->len = 0; // invalid length. must be >=8
+			udp_fix_checksum(udp,sizeof(struct udphdr),ip,ip6);
+			udp->check ^= htons(0xBEAF);
+			// truncate packet
+			*len_pkt = (uint8_t*)udp - (ip ? (uint8_t*)ip : (uint8_t*)ip6) + sizeof(struct udphdr);
+			if (ip)
+			{
+				ip->ip_len = htons((uint16_t)*len_pkt);
+				ip4_fix_checksum(ip);
+			}
+			else if (ip6)
+				ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = (uint16_t)htons(sizeof(struct udphdr));
 		}
-		else
-			ip->ip_sum ^= htons(0xBEAF);
-		
-		return res==frag ? modfrag : modify;
+		else if (proto==IPPROTO_TCP && tcp)
+		{
+			// only SYN here is expected
+			// make flags invalid and also corrupt checksum
+			tcp->th_flags = 0;
+		}
+		if (ip)	ip->ip_sum ^= htons(0xBEAF);
+		return VERDICT_MODIFY | VERDICT_NOCSUM;
 	}
-	else
 #endif
-	// ipv6 does not have checksum
-    	// consider we are free of NAT in ipv6 case. just drop
-	// BSDs also do not need this
-	return drop;
+	return VERDICT_DROP;
+}
+
+static uint8_t ct_new_postnat_fix_tcp(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, struct tcphdr *tcphdr)
+{
+	return ct_new_postnat_fix(ctrack,ip,ip6,IPPROTO_TCP,NULL,tcphdr,NULL);
+}
+static uint8_t ct_new_postnat_fix_udp(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, struct udphdr *udphdr, size_t *len_pkt)
+{
+	return ct_new_postnat_fix(ctrack,ip,ip6,IPPROTO_UDP,udphdr,NULL,len_pkt);
 }
 
 
+
 // result : true - drop original packet, false = dont drop
-packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
+uint8_t dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
 {
-	packet_process_result res=pass;
+	uint8_t res=VERDICT_PASS;
 	t_ctrack *ctrack=NULL;
 	bool bReverse=false;
 
@@ -377,7 +397,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 	if (params.wsize && tcp_synack_segment(tcphdr))
 	{
 		tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
-		res=modify;
+		res=VERDICT_MODIFY;
 	}
 	
 	if (bReverse)
@@ -450,7 +470,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 			{
 				if (params.wssize_cutoff) DLOG("wssize-cutoff not reached (mode %c): %llu/%u\n", params.wssize_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.wssize_cutoff_mode), params.wssize_cutoff);
 				tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
-				res=modify;
+				res=VERDICT_MODIFY;
 			}
 		}
 		else
@@ -508,7 +528,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 				if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return res;
 
-				res = ct_new_postnat_fix(ctrack, ip, drop);
+				res = ct_new_postnat_fix_tcp(ctrack, ip, ip6hdr, tcphdr);
 				break;
 		}
 		// can do nothing else with SYN packet
@@ -663,14 +683,14 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 			{
 				DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3])
 				memcpy(phost + 2, params.hostspell, 4);
-				res=modify;
+				res=VERDICT_MODIFY;
 			}
 			if (params.domcase)
 			{
 				DLOG("mixing domain case\n");
 				for (p = phost+7; p < (data_payload + len_payload) && *p != '\r' && *p != '\n'; p++)
 					*p = (((size_t)p) & 1) ? tolower(*p) : toupper(*p);
-				res=modify;
+				res=VERDICT_MODIFY;
 			}
 			uint8_t *pua;
 			if (params.hostnospace &&
@@ -688,7 +708,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 					memmove(pua + 1, pua, phost - pua + 7);
 					*pua = ' ';
 				}
-				res=modify;
+				res=VERDICT_MODIFY;
 			}
 		}
 
@@ -756,7 +776,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
 					// this mode is final, no other options available
-					return drop;
+					return VERDICT_DROP;
 				}
 				desync_mode = params.desync_mode2;
 		}
@@ -769,23 +789,23 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 			{
 					if (params.desync_retrans)
 					{
-						DLOG("dropping original packet to force retransmission. len=%zu len_payload=%zu\n", len_pkt, len_payload)
+						DLOG("dropping original packet to force retransmission. len=%zu len_payload=%zu\n", *len_pkt, len_payload)
 					}
 					else
 					{
-						DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
+						DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", *len_pkt, len_payload)
 						#ifdef __FreeBSD__
 						// FreeBSD tend to pass ipv6 frames with wrong checksum
-						if (res==modify || ip6hdr)
+						if ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
 						#else
 						// if original packet was tampered earlier it needs checksum fixed
-						if (res==modify)
+						if ((res & VERDICT_MASK)==VERDICT_MODIFY)
 						#endif
 							tcp_fix_checksum(tcphdr,len_tcp,ip,ip6hdr);
-						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , data_pkt, len_pkt))
+						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , data_pkt, *len_pkt))
 							return res;
 					}
-					return drop;
+					return VERDICT_DROP;
 			}
 			desync_mode = params.desync_mode2;
 		}
@@ -845,7 +865,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 							return res;
 					}
 
-					return drop;
+					return VERDICT_DROP;
 				}
 				break;
 			case DESYNC_SPLIT:
@@ -898,17 +918,17 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 							return res;
 					}
 
-					return drop;
+					return VERDICT_DROP;
 				}
 				break;
 			case DESYNC_IPFRAG2:
 				{
 					#ifdef __FreeBSD__
 					// FreeBSD tend to pass ipv6 frames with wrong checksum
-					if (res==modify || ip6hdr)
+					if ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
 					#else
 					// if original packet was tampered earlier it needs checksum fixed
-					if (res==modify)
+					if ((res & VERDICT_MASK)==VERDICT_MODIFY)
 					#endif
 						tcp_fix_checksum(tcphdr,len_tcp,ip,ip6hdr);
 
@@ -924,14 +944,14 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 					if (ip6hdr && (fooling_orig==FOOL_HOPBYHOP || fooling_orig==FOOL_DESTOPT))
 					{
 						pkt_orig_len = sizeof(pkt3);
-						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? IPPROTO_HOPOPTS : IPPROTO_DSTOPTS, data_pkt, len_pkt, pkt3, &pkt_orig_len))
+						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? IPPROTO_HOPOPTS : IPPROTO_DSTOPTS, data_pkt, *len_pkt, pkt3, &pkt_orig_len))
 							return res;
 						pkt_orig = pkt3;
 					}
 					else
 					{
 						pkt_orig = data_pkt;
-						pkt_orig_len = len_pkt;
+						pkt_orig_len = *len_pkt;
 					}
 
 					if (!ip_frag(pkt_orig, pkt_orig_len, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
@@ -947,7 +967,7 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
 
-					return frag;
+					return VERDICT_DROP;
 				}
 		}
 	
@@ -958,9 +978,9 @@ packet_process_result dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, 
 
 
 
-packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, uint8_t *data_payload, size_t len_payload)
+uint8_t dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, uint8_t *data_payload, size_t len_payload)
 {
-	packet_process_result res=pass;
+	uint8_t res=VERDICT_PASS;
 	t_ctrack *ctrack=NULL;
 	bool bReverse=false;
 
@@ -1156,7 +1176,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
 					// this mode is final, no other options available
-					return ct_new_postnat_fix(ctrack, ip, drop);
+					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 				}
 				desync_mode = params.desync_mode2;
 				break;
@@ -1166,18 +1186,18 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 		{
 			if (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(params.desync_mode2))
 			{
-				DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", len_pkt, len_payload)
+				DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", *len_pkt, len_payload)
 				#ifdef __FreeBSD__
 				// FreeBSD tend to pass ipv6 frames with wrong checksum
-				if (res==modify || ip6hdr)
+				if ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
 				#else
 				// if original packet was tampered earlier it needs checksum fixed
-				if (res==modify)
+				if ((res & VERDICT_MASK)==VERDICT_MODIFY)
 				#endif
 					udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
-				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , data_pkt, len_pkt))
+				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , data_pkt, *len_pkt))
 					return res;
-				return ct_new_postnat_fix(ctrack, ip, drop);
+				return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 			}
 			desync_mode = params.desync_mode2;
 		}
@@ -1194,7 +1214,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 				DLOG("resending original packet with increased by %d length\n", params.udplen_increment);
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return res;
-				return ct_new_postnat_fix(ctrack, ip, drop);
+				return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 			case DESYNC_TAMPER:
 				if (IsDhtD1(data_payload,len_payload))
 				{
@@ -1219,7 +1239,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					DLOG("resending tampered DHT\n");
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
-					return ct_new_postnat_fix(ctrack, ip, drop);
+					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 				}
 				else
 				{
@@ -1231,10 +1251,10 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 
 					#ifdef __FreeBSD__
 					// FreeBSD tend to pass ipv6 frames with wrong checksum
-					if (res==modify || ip6hdr)
+					if ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
 					#else
 					// if original packet was tampered earlier it needs checksum fixed
-					if (res==modify)
+					if ((res & VERDICT_MASK)==VERDICT_MODIFY)
 					#endif
 						udp_fix_checksum(udphdr,sizeof(struct udphdr)+len_payload,ip,ip6hdr);
 
@@ -1252,14 +1272,14 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					if (ip6hdr && (fooling_orig==FOOL_HOPBYHOP || fooling_orig==FOOL_DESTOPT))
 					{
 						pkt_orig_len = sizeof(pkt3);
-						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? IPPROTO_HOPOPTS : IPPROTO_DSTOPTS, data_pkt, len_pkt, pkt3, &pkt_orig_len))
+						if (!ip6_insert_simple_hdr(fooling_orig==FOOL_HOPBYHOP ? IPPROTO_HOPOPTS : IPPROTO_DSTOPTS, data_pkt, *len_pkt, pkt3, &pkt_orig_len))
 							return res;
 						pkt_orig = pkt3;
 					}
 					else
 					{
 						pkt_orig = data_pkt;
-						pkt_orig_len = len_pkt;
+						pkt_orig_len = *len_pkt;
 					}
 
 					if (!ip_frag(pkt_orig, pkt_orig_len, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
@@ -1275,7 +1295,7 @@ packet_process_result dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, 
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return res;
 
-					return ct_new_postnat_fix(ctrack, ip, frag);
+					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 				}
 		}
 

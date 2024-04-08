@@ -80,15 +80,15 @@ static void onusr2(int sig)
 
 
 
-static packet_process_result processPacketData(uint32_t *mark, const char *ifout, uint8_t *data_pkt, size_t len_pkt)
+static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
 	struct ip *ip = NULL;
 	struct ip6_hdr *ip6hdr = NULL;
 	struct tcphdr *tcphdr = NULL;
 	struct udphdr *udphdr = NULL;
-	size_t len = len_pkt, len_with_th;
+	size_t len = *len_pkt, len_with_th;
 	uint8_t *data = data_pkt;
-	packet_process_result res = pass;
+	uint8_t res = VERDICT_PASS;
 	uint8_t proto;
 
 #ifdef __linux__
@@ -146,9 +146,9 @@ static packet_process_result processPacketData(uint32_t *mark, const char *ifout
 		// ipv6 packets were with incorrect checksum
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (res==modify || res!=frag && res!=modfrag && ip6hdr)
+		if (!(res & VERDICT_NOCSUM) && ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr && (res & VERDICT_MASK)==VERDICT_PASS))
 #else
-		if (res==modify)
+		if (!(res & VERDICT_NOCSUM) && (res & VERDICT_MASK)==VERDICT_MODIFY)
 #endif
 			tcp_fix_checksum(tcphdr,len_with_th,ip,ip6hdr);
 	}
@@ -169,9 +169,9 @@ static packet_process_result processPacketData(uint32_t *mark, const char *ifout
 		res = dpi_desync_udp_packet(*mark, ifout, data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
 #ifdef __FreeBSD__
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (res==modify || res!=frag && res!=modfrag && ip6hdr)
+		if (!(res & VERDICT_NOCSUM) && ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr && (res & VERDICT_MASK)==VERDICT_PASS))
 #else
-		if (res==modify)
+		if (!(res & VERDICT_NOCSUM) && (res & VERDICT_MASK)==VERDICT_MODIFY)
 #endif
 			udp_fix_checksum(udphdr,len_with_th,ip,ip6hdr);
 	}
@@ -187,8 +187,8 @@ static packet_process_result processPacketData(uint32_t *mark, const char *ifout
 #ifdef __linux__
 static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *cookie)
 {
-	int id;
-	int len;
+	int id, ilen;
+	size_t len;
 	struct nfqnl_msg_packet_hdr *ph;
 	uint8_t *data;
 	uint32_t ifidx;
@@ -198,7 +198,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	id = ph ? ntohl(ph->packet_id) : 0;
 
 	uint32_t mark = nfq_get_nfmark(nfa);
-	len = nfq_get_payload(nfa, &data);
+	ilen = nfq_get_payload(nfa, &data);
 
 	*ifout=0;
 	if (params.bind_fix4 || params.bind_fix6)
@@ -206,21 +206,21 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 		ifidx = nfq_get_outdev(nfa);
 		if (ifidx) if_indextoname(ifidx,ifout);
 
-		DLOG("packet: id=%d len=%d ifout=%s(%u)\n", id, len, ifout, ifidx)
+		DLOG("packet: id=%d len=%d mark=%08X ifout=%s(%u)\n", id, ilen, mark, ifout, ifidx)
 	}
 	else
 		// save some syscalls
-		DLOG("packet: id=%d len=%d\n", id, len)
-	if (len >= 0)
+		DLOG("packet: id=%d len=%d mark=%08X\n", id, ilen, mark)
+	if (ilen >= 0)
 	{
-		switch (processPacketData(&mark, ifout, data, len))
+		len = ilen;
+		uint8_t res = processPacketData(&mark, ifout, data, &len);
+		switch(res & VERDICT_MASK)
 		{
-		case modify: 
-		case modfrag:
-			DLOG("packet: id=%d pass modified\n", id);
-			return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, len, data);
-		case drop:
-		case frag:
+		case VERDICT_MODIFY:
+			DLOG("packet: id=%d pass modified. len=%zu\n", id, len);
+			return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, (uint32_t)len, data);
+		case VERDICT_DROP:
 			DLOG("packet: id=%d drop\n", id);
 			return nfq_set_verdict2(qh, id, NF_DROP, mark, 0, NULL);
 		}
@@ -343,7 +343,6 @@ static int dvt_main(void)
 	unsigned int id=0;
 	socklen_t socklen;
 	ssize_t rd,wr;
-	packet_process_result ppr;
 	fd_set fdset;
 
 	{
@@ -439,18 +438,24 @@ static int dvt_main(void)
 				else if (rd>0)
 				{
 					uint32_t mark=0;
-					DLOG("packet: id=%u len=%zd\n", id, rd)
-					ppr = processPacketData(&mark, NULL, buf, rd);
-					switch (ppr)
+					uint8_t res;
+					size_t len = rd;
+
+					DLOG("packet: id=%u len=%zu\n", id, len)
+					res = processPacketData(&mark, NULL, buf, &len);
+					switch (res & VERDICT_MASK)
 					{
-					case pass:
-					case modify:
-						DLOG(ppr==pass ? "packet: id=%u reinject unmodified\n" : "packet: id=%u reinject modified\n", id);
-						wr = sendto(fd[i], buf, rd, 0, (struct sockaddr*)&sa_from, socklen);
+					case VERDICT_PASS:
+					case VERDICT_MODIFY:
+						if ((res & VERDICT_MASK)==VERDICT_PASS)
+							DLOG("packet: id=%u reinject unmodified\n", id)
+						else
+							DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
+						wr = sendto(fd[i], buf, len, 0, (struct sockaddr*)&sa_from, socklen);
 						if (wr<0)
 							perror("reinject sendto");
-						else if (wr!=rd)
-							fprintf(stderr,"reinject sendto: not all data was reinjected. received %zd, sent %zd\n", rd, wr);
+						else if (wr!=len)
+							fprintf(stderr,"reinject sendto: not all data was reinjected. received %zu, sent %zd\n", len, wr);
 						break;
 					default:
 						DLOG("packet: id=%u drop\n", id);
