@@ -806,6 +806,8 @@ pktws_curl_test_update_vary()
 	for fake in '' $zerofake ; do
 		for split in '' '--dpi-desync-split-pos=1' ; do
 			pktws_curl_test_update $testf $domain --dpi-desync=$desync "$@" $fake $split && return 0
+			# split-pos=1 is meaningful for DPIs searching for 16 03 in TLS. no reason to apply to http
+			[ "$sec" = 1 ] || break
 			test_has_split $desync || break
 		done
 		test_has_fake $desync || break
