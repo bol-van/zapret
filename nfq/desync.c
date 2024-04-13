@@ -116,7 +116,7 @@ static bool rawsend_rep(const struct sockaddr* dst,uint32_t fwmark,const char *i
 }
 
 
-static uint64_t cutoff_get_limit(t_ctrack *ctrack, char mode)
+static uint64_t cutoff_get_limit(const t_ctrack *ctrack, char mode)
 {
 	switch(mode)
 	{
@@ -126,7 +126,7 @@ static uint64_t cutoff_get_limit(t_ctrack *ctrack, char mode)
 		default: return 0;
 	}
 }
-static bool cutoff_test(t_ctrack *ctrack, uint64_t cutoff, char mode)
+static bool cutoff_test(const t_ctrack *ctrack, uint64_t cutoff, char mode)
 {
 	return cutoff && cutoff_get_limit(ctrack, mode)>=cutoff;
 }
@@ -361,6 +361,45 @@ static uint8_t ct_new_postnat_fix_udp(const t_ctrack *ctrack, struct ip *ip, str
 }
 
 
+static bool check_desync_interval(const t_ctrack *ctrack)
+{
+	if (params.desync_start)
+	{
+		if (ctrack)
+		{
+			if (!cutoff_test(ctrack, params.desync_start, params.desync_start_mode))
+			{
+				DLOG("desync-start not reached (mode %c): %llu/%u . not desyncing\n", params.desync_start_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_start_mode), params.desync_start);
+				return false;
+			}
+			DLOG("desync-start reached (mode %c): %llu/%u\n", params.desync_start_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_start_mode), params.desync_start);
+		}
+		else
+		{
+			DLOG("not desyncing. desync-start is set but conntrack entry is missing\n");
+			return false;
+		}
+	}
+	if (params.desync_cutoff)
+	{
+		if (ctrack)
+		{
+			if (ctrack->b_desync_cutoff)
+			{
+				DLOG("desync-cutoff reached (mode %c): %llu/%u . not desyncing\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+				return false;
+			}
+			DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+		}
+		else
+		{
+			DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
+			return false;
+		}
+	}
+	return true;
+}
+
 
 // result : true - drop original packet, false = dont drop
 uint8_t dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t len_tcp, uint8_t *data_payload, size_t len_payload)
@@ -526,25 +565,10 @@ uint8_t dpi_desync_tcp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_
 		return res;
 	}
 
-	if (params.desync_cutoff)
-	{
-		if (ctrack)
-		{
-			if (ctrack->b_desync_cutoff)
-			{
-				DLOG("not desyncing. desync-cutoff reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
-				return res;
-			}
-			DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
-		}
-		else
-		{
-			DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
-			return res;
-		}
-	}
-
 	if (!params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase && !*params.hostlist_auto_filename) return res; // nothing to do. do not waste cpu
+
+	// start and cutoff limiters
+	if (!check_desync_interval(ctrack)) return res;
 
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)
 	{
@@ -990,26 +1014,11 @@ uint8_t dpi_desync_udp_packet(uint32_t fwmark, const char *ifout, uint8_t *data_
 	//ConntrackPoolDump(&params.conntrack);
 
 	if (bReverse) return res; // nothing to do. do not waste cpu
-	
-	if (params.desync_cutoff)
-	{
-		if (ctrack)
-		{
-			if (ctrack->b_desync_cutoff)
-			{
-				DLOG("not desyncing. desync-cutoff reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
-				return res;
-			}
-			DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
-		}
-		else
-		{
-			DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
-			return res;
-		}
-	}
 
 	if (params.desync_mode==DESYNC_NONE && !*params.hostlist_auto_filename) return res; // do not waste cpu
+
+	// start and cutoff limiters
+	if (!check_desync_interval(ctrack)) return res;
 
 	if (len_payload)
 	{

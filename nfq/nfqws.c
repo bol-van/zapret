@@ -565,6 +565,7 @@ static void exithelp(void)
 		" --dpi-desync-fake-unknown-udp=<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
 		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
 		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
+		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
@@ -712,7 +713,7 @@ int main(int argc, char **argv)
 	params.desync_ttl6 = 0xFF; // unused
 	params.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
 	params.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
-	params.wssize_cutoff_mode = params.desync_cutoff_mode = 'n'; // packet number by default
+	params.wssize_cutoff_mode = params.desync_start_mode = params.desync_cutoff_mode = 'n'; // packet number by default
 	params.udplen_increment = UDPLEN_INCREMENT_DEFAULT;
 	params.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
 	params.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
@@ -781,17 +782,18 @@ int main(int argc, char **argv)
 		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=38
 		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=39
 		{"dpi-desync-cutoff",required_argument,0,0},// optidx=40
-		{"hostlist",required_argument,0,0},		// optidx=41
-		{"hostlist-exclude",required_argument,0,0},	// optidx=42
-		{"hostlist-auto",required_argument,0,0},	// optidx=43
-		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=44
-		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=45
-		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=46
-		{"hostlist-auto-debug",required_argument,0,0},	// optidx=47
+		{"dpi-desync-start",required_argument,0,0},// optidx=41
+		{"hostlist",required_argument,0,0},		// optidx=42
+		{"hostlist-exclude",required_argument,0,0},	// optidx=43
+		{"hostlist-auto",required_argument,0,0},	// optidx=44
+		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=45
+		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=46
+		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=47
+		{"hostlist-auto-debug",required_argument,0,0},	// optidx=48
 	
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=48
-		{"bind-fix6",no_argument,0,0},		// optidx=49
+		{"bind-fix4",no_argument,0,0},		// optidx=49
+		{"bind-fix6",no_argument,0,0},		// optidx=50
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1127,21 +1129,28 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 41: /* hostlist */
+		case 41: /* desync-start */
+			if (!parse_cutoff(optarg, &params.desync_start, &params.desync_start_mode))
+			{
+				fprintf(stderr, "invalid desync-start value\n");
+				exit_clean(1);
+			}
+			break;
+		case 42: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 42: /* hostlist-exclude */
+		case 43: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 43: /* hostlist-auto */
+		case 44: /* hostlist-auto */
 			if (*params.hostlist_auto_filename)
 			{
 				fprintf(stderr, "only one auto hostlist is supported\n");
@@ -1172,7 +1181,7 @@ int main(int argc, char **argv)
 			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
 			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
 			break;
-		case 44: /* hostlist-auto-fail-threshold */
+		case 45: /* hostlist-auto-fail-threshold */
 			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
 			{
@@ -1180,7 +1189,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 45: /* hostlist-auto-fail-time */
+		case 46: /* hostlist-auto-fail-time */
 			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_time<1)
 			{
@@ -1188,7 +1197,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 46: /* hostlist-auto-retrans-threshold */
+		case 47: /* hostlist-auto-retrans-threshold */
 			params.hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_retrans_threshold<2 || params.hostlist_auto_retrans_threshold>10)
 			{
@@ -1196,7 +1205,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 47: /* hostlist-auto-debug */
+		case 48: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1212,10 +1221,10 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifdef __linux__
-		case 48: /* bind-fix4 */
+		case 49: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 49: /* bind-fix6 */
+		case 50: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif

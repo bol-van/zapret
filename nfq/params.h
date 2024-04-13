@@ -50,8 +50,8 @@ struct params_s
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
 	unsigned int desync_repeats,desync_split_pos,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
-	char desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
-	unsigned int desync_cutoff;
+	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
+	unsigned int desync_start, desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
