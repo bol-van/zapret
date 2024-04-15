@@ -499,7 +499,7 @@ curl_test_http3()
 	# $1 - ip version : 4/6
 	# $2 - domain name
 
-	# force TLS1.3 mode
+	# force QUIC only mode without tcp
 	curl_with_dig $1 $2 $QUIC_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME_QUIC --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
 }
 
