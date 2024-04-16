@@ -790,7 +790,7 @@ warn_fool()
 pktws_curl_test_update_vary()
 {
 	# $1 - test function
-	# $2 - encrypted test : 1/0
+	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 	# $4 - desync mode
 	# $5,$6,... - strategy
@@ -800,7 +800,7 @@ pktws_curl_test_update_vary()
 	shift; shift; shift; shift
 	
 	zerofake=http
-	[ "$sec" = 1 ] && zerofake=tls
+	[ "$sec" = 0 ] || zerofake=tls
 	zerofake="--dpi-desync-fake-$zerofake=0x00000000"
 	
 	for fake in '' $zerofake ; do
@@ -819,7 +819,7 @@ pktws_curl_test_update_vary()
 pktws_check_domain_http_bypass_()
 {
 	# $1 - test function
-	# $2 - encrypted test : 1/0
+	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
 	local tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta
@@ -910,20 +910,20 @@ pktws_check_domain_http_bypass_()
 		done
 
 		s="http_iana_org.bin"
-		[ "$sec" = 1 ] && s="tls_clienthello_iana_org.bin"
+		[ "$sec" = 0 ] || s="tls_clienthello_iana_org.bin"
 		for desync in syndata syndata,split2 syndata,disorder2 syndata,split2 syndata,disorder2 ; do
 			pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s" $e && [ "$SCANLEVEL" = quick ] && return
 		done
 
-		# do not do wssize test for http. it's useless
+		# do not do wssize test for http and TLS 1.3. it's useless
 		[ "$sec" = 1 ] || break
 	done
 }
 pktws_check_domain_http_bypass()
 {
 	# $1 - test function
-	# $2 - encrypted test : 1/0
+	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
 	local strategy
@@ -981,8 +981,9 @@ warn_mss()
 tpws_check_domain_http_bypass_()
 {
 	# $1 - test function
-	# $2 - encrypted test : 1/0
+	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
+
 	local s mss s2 s3 pos sec="$2"
 	if [ "$sec" = 0 ]; then
 		for s in '--hostcase' '--hostspell=hoSt' '--hostdot' '--hosttab' '--hostnospace' '--domcase' \
@@ -998,7 +999,6 @@ tpws_check_domain_http_bypass_()
 			tpws_curl_test_update $1 $3 $s && [ "$SCANLEVEL" = quick ] && return
 		done
 	else
-		
 		for mss in '' 88; do
 			s3=${mss:+--mss=$mss --mss-pf=$HTTPS_PORT}
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
@@ -1020,15 +1020,16 @@ tpws_check_domain_http_bypass_()
 				}
 			done
 			# only linux supports mss
-			[ "$UNAME" = Linux ] || break
+			[ "$UNAME" = Linux -a "$sec" = 1 ] || break
 		done
 	fi
 }
 tpws_check_domain_http_bypass()
 {
 	# $1 - test function
-	# $2 - encrypted test : 1/0
+	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
+
 	local strategy
 	tpws_check_domain_http_bypass_ "$@"
 	report_strategy $1 $3 tpws
@@ -1071,7 +1072,7 @@ check_domain_http_tcp()
 {
 	# $1 - test function
 	# $2 - port
-	# $3 - encrypted test : 1/0
+	# $3 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $4 - domain
 
 	# in case was interrupted before
@@ -1134,7 +1135,7 @@ check_domain_https_tls12()
 check_domain_https_tls13()
 {
 	# $1 - domain
-	check_domain_http_tcp curl_test_https_tls13 443 1 $1
+	check_domain_http_tcp curl_test_https_tls13 443 2 $1
 }
 check_domain_http3()
 {
