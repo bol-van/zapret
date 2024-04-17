@@ -688,6 +688,9 @@ int main(int argc, char **argv)
 	memcpy(params.hostspell, "host", 4); // default hostspell
 	*pidfile = 0;
 
+#ifdef __linux__
+	params.qnum = -1;
+#endif
 	params.desync_fwmark = DPI_DESYNC_FWMARK_DEFAULT;
 	params.desync_skip_nosni = true;
 	params.desync_split_pos = 2;
@@ -1230,6 +1233,21 @@ int main(int argc, char **argv)
 #endif
 		}
 	}
+
+#ifdef __linux__
+	if (params.qnum<0)
+	{
+		fprintf(stderr, "Need queue number (--qnum)\n");
+		exit_clean(1);
+	}
+#elif defined(BSD)
+	if (!params.port)
+	{
+		fprintf(stderr, "Need divert port (--port)\n");
+		exit_clean(1);
+	}
+#endif
+
 	// not specified - use desync_ttl value instead
 	if (params.desync_ttl6 == 0xFF) params.desync_ttl6=params.desync_ttl;
 	if (!AUTOTTL_ENABLED(params.desync_autottl6)) params.desync_autottl6 = params.desync_autottl;
@@ -1237,14 +1255,6 @@ int main(int argc, char **argv)
 		DLOG("autottl ipv4 %u:%u-%u\n",params.desync_autottl.delta,params.desync_autottl.min,params.desync_autottl.max)
 	if (AUTOTTL_ENABLED(params.desync_autottl6))
 		DLOG("autottl ipv6 %u:%u-%u\n",params.desync_autottl6.delta,params.desync_autottl6.min,params.desync_autottl6.max)
-
-#ifdef BSD
-	if (!params.port)
-	{
-		fprintf(stderr, "Need port number\n");
-		exit_clean(1);
-	}
-#endif
 
 	if (!LoadIncludeHostLists())
 	{
