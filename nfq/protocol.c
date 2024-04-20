@@ -125,6 +125,20 @@ bool IsTLSClientHello(const uint8_t *data, size_t len, bool bPartialIsOK)
 	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
 }
 
+size_t TLSHandshakeLen(const uint8_t *data)
+{
+	return data[1] << 16 | data[2] << 8 | data[3]; // HandshakeProtocol length
+}
+bool IsTLSHandshakeClientHello(const uint8_t *data, size_t len)
+{
+	return len>=4 && data[0]==0x01;
+}
+bool IsTLSHandshakeFull(const uint8_t *data, size_t len)
+{
+	return (4+TLSHandshakeLen(data))<=len;
+}
+
+
 // bPartialIsOK=true - accept partial packets not containing the whole TLS message
 bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK)
 {
@@ -143,14 +157,11 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 
 	size_t l, ll;
 
+	if (!bPartialIsOK && !IsTLSHandshakeFull(data,len)) return false;
+
 	l = 1 + 3 + 2 + 32;
 	// SessionIDLength
 	if (len < (l + 1)) return false;
-	if (!bPartialIsOK)
-	{
-	    ll = data[1] << 16 | data[2] << 8 | data[3]; // HandshakeProtocol length
-	    if (len < (ll + 4)) return false;
-	}
 	l += data[l] + 1;
 	// CipherSuitesLength
 	if (len < (l + 2)) return false;
@@ -276,7 +287,7 @@ bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, si
 	// offset must be 0 if it's a full segment, not just a chunk
 	if (coff || (offset+tvb_get_size(data[offset])) >= len) return false;
 	offset += tvb_get_varint(data + offset, &clen);
-	if (data[offset] != 0x01 || (offset + clen) > len) return false;
+	if ((offset + clen) > len || !IsTLSHandshakeClientHello(data+offset,clen)) return false;
 	if (hello_offset) *hello_offset = offset;
 	if (hello_len) *hello_len = (size_t)clen;
 	return true;

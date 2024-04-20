@@ -79,108 +79,16 @@ static void onusr2(int sig)
 }
 
 
-
 static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
-	struct ip *ip = NULL;
-	struct ip6_hdr *ip6hdr = NULL;
-	struct tcphdr *tcphdr = NULL;
-	struct udphdr *udphdr = NULL;
-	size_t len = *len_pkt, len_with_th;
-	uint8_t *data = data_pkt;
-	uint8_t res = VERDICT_PASS;
-	uint8_t proto;
-
 #ifdef __linux__
 	if (*mark & params.desync_fwmark)
 	{
 		DLOG("ignoring generated packet\n")
-		return res;
+		return VERDICT_PASS;
 	}
 #endif
-
-	if (proto_check_ipv4(data, len))
-	{
-		ip = (struct ip *) data;
-		proto = ip->ip_p;
-		proto_skip_ipv4(&data, &len);
-		if (params.debug)
-		{
-			printf("IP4: ");
-			print_ip(ip);
-		}
-	}
-	else if (proto_check_ipv6(data, len))
-	{
-		ip6hdr = (struct ip6_hdr *) data;
-		proto_skip_ipv6(&data, &len, &proto, NULL);
-		if (params.debug)
-		{
-			printf("IP6: ");
-			print_ip6hdr(ip6hdr, proto);
-		}
-	}
-	else
-	{
-		// not ipv6 and not ipv4
-		return res;
-	}
-
-	if (proto==IPPROTO_TCP && proto_check_tcp(data, len))
-	{
-		tcphdr = (struct tcphdr *) data;
-		len_with_th = len;
-		proto_skip_tcp(&data, &len);
-
-		if (params.debug)
-		{
-			printf(" ");
-			print_tcphdr(tcphdr);
-			printf("\n");
-		}
-
-		if (len) { DLOG("TCP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
-
-		res = dpi_desync_tcp_packet(*mark, ifout, data_pkt, len_pkt, ip, ip6hdr, tcphdr, len_with_th, data, len);
-		// in my FreeBSD divert tests only ipv4 packets were reinjected with correct checksum
-		// ipv6 packets were with incorrect checksum
-#ifdef __FreeBSD__
-		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (!(res & VERDICT_NOCSUM) && ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr && (res & VERDICT_MASK)==VERDICT_PASS))
-#else
-		if (!(res & VERDICT_NOCSUM) && (res & VERDICT_MASK)==VERDICT_MODIFY)
-#endif
-			tcp_fix_checksum(tcphdr,len_with_th,ip,ip6hdr);
-	}
-	else if (proto==IPPROTO_UDP && proto_check_udp(data, len))
-	{
-		udphdr = (struct udphdr *) data;
-		len_with_th = len;
-		proto_skip_udp(&data, &len);
-
-		if (params.debug)
-		{
-			printf(" ");
-			print_udphdr(udphdr);
-			printf("\n");
-		}
-		if (len) { DLOG("UDP: ") hexdump_limited_dlog(data, len, 32); DLOG("\n") }
-
-		res = dpi_desync_udp_packet(*mark, ifout, data_pkt, len_pkt, ip, ip6hdr, udphdr, data, len);
-#ifdef __FreeBSD__
-		// FreeBSD tend to pass ipv6 frames with wrong checksum
-		if (!(res & VERDICT_NOCSUM) && ((res & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr && (res & VERDICT_MASK)==VERDICT_PASS))
-#else
-		if (!(res & VERDICT_NOCSUM) && (res & VERDICT_MASK)==VERDICT_MODIFY)
-#endif
-			udp_fix_checksum(udphdr,len_with_th,ip,ip6hdr);
-	}
-	else
-	{
-		if (params.debug) printf("\n");
-	}
-
-	return res;
+	return dpi_desync_packet(*mark, ifout, data_pkt, len_pkt);
 }
 
 
@@ -214,8 +122,8 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	if (ilen >= 0)
 	{
 		len = ilen;
-		uint8_t res = processPacketData(&mark, ifout, data, &len);
-		switch(res & VERDICT_MASK)
+		uint8_t verdict = processPacketData(&mark, ifout, data, &len);
+		switch(verdict & VERDICT_MASK)
 		{
 		case VERDICT_MODIFY:
 			DLOG("packet: id=%d pass modified. len=%zu\n", id, len);
@@ -438,16 +346,16 @@ static int dvt_main(void)
 				else if (rd>0)
 				{
 					uint32_t mark=0;
-					uint8_t res;
+					uint8_t verdict;
 					size_t len = rd;
 
 					DLOG("packet: id=%u len=%zu\n", id, len)
-					res = processPacketData(&mark, NULL, buf, &len);
-					switch (res & VERDICT_MASK)
+					verdict = processPacketData(&mark, NULL, buf, &len);
+					switch (verdict & VERDICT_MASK)
 					{
 					case VERDICT_PASS:
 					case VERDICT_MODIFY:
-						if ((res & VERDICT_MASK)==VERDICT_PASS)
+						if ((verdict & VERDICT_MASK)==VERDICT_PASS)
 							DLOG("packet: id=%u reinject unmodified\n", id)
 						else
 							DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
@@ -544,9 +452,6 @@ static void exithelp(void)
 		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
-#ifdef __linux__
-		" --dpi-desync-retrans=0|1\t\t\t; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission\n"
-#endif
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
@@ -765,38 +670,37 @@ int main(int argc, char **argv)
 		{"dpi-desync-autottl",optional_argument,0,0},	// optidx=18
 		{"dpi-desync-autottl6",optional_argument,0,0},	// optidx=19
 		{"dpi-desync-fooling",required_argument,0,0},	// optidx=20
-		{"dpi-desync-retrans",optional_argument,0,0},	// optidx=21
-		{"dpi-desync-repeats",required_argument,0,0},	// optidx=22
-		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=23
-		{"dpi-desync-split-pos",required_argument,0,0},// optidx=24
-		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=25
-		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=26
-		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=27
-		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=28
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=29
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=30
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=31
-		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=32
-		{"dpi-desync-fake-syndata",required_argument,0,0},// optidx=33
-		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=34
-		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=35
-		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=36
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=37
-		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=38
-		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=39
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=40
-		{"dpi-desync-start",required_argument,0,0},// optidx=41
-		{"hostlist",required_argument,0,0},		// optidx=42
-		{"hostlist-exclude",required_argument,0,0},	// optidx=43
-		{"hostlist-auto",required_argument,0,0},	// optidx=44
-		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=45
-		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=46
-		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=47
-		{"hostlist-auto-debug",required_argument,0,0},	// optidx=48
+		{"dpi-desync-repeats",required_argument,0,0},	// optidx=21
+		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=22
+		{"dpi-desync-split-pos",required_argument,0,0},// optidx=23
+		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=24
+		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=25
+		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=26
+		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=27
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=28
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=29
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=30
+		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=31
+		{"dpi-desync-fake-syndata",required_argument,0,0},// optidx=32
+		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=33
+		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=34
+		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=35
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=36
+		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=37
+		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=38
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=39
+		{"dpi-desync-start",required_argument,0,0},// optidx=40
+		{"hostlist",required_argument,0,0},		// optidx=41
+		{"hostlist-exclude",required_argument,0,0},	// optidx=42
+		{"hostlist-auto",required_argument,0,0},	// optidx=43
+		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=44
+		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=45
+		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=46
+		{"hostlist-auto-debug",required_argument,0,0},	// optidx=47
 	
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=49
-		{"bind-fix6",no_argument,0,0},		// optidx=50
+		{"bind-fix4",no_argument,0,0},		// optidx=48
+		{"bind-fix6",no_argument,0,0},		// optidx=49
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1012,32 +916,24 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 21: /* dpi-desync-retrans */
-#ifdef __linux__
-			params.desync_retrans = !optarg || atoi(optarg);
-#else
-			fprintf(stderr, "dpi-desync-retrans is only supported in linux\n");
-			exit_clean(1);
-#endif
-			break;
-		case 22: /* dpi-desync-repeats */
+		case 21: /* dpi-desync-repeats */
 			if (sscanf(optarg,"%u",&params.desync_repeats)<1 || !params.desync_repeats || params.desync_repeats>20)
 			{
 				fprintf(stderr, "dpi-desync-repeats must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
-		case 23: /* dpi-desync-skip-nosni */
+		case 22: /* dpi-desync-skip-nosni */
 			params.desync_skip_nosni = !optarg || atoi(optarg);
 			break;
-		case 24: /* dpi-desync-split-pos */
+		case 23: /* dpi-desync-split-pos */
 			if (sscanf(optarg,"%u",&params.desync_split_pos)<1 || params.desync_split_pos<1 || params.desync_split_pos>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-split-pos must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
 				exit_clean(1);
 			}
 			break;
-		case 25: /* dpi-desync-ipfrag-pos-tcp */
+		case 24: /* dpi-desync-ipfrag-pos-tcp */
 			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_tcp)<1 || params.desync_ipfrag_pos_tcp<1 || params.desync_ipfrag_pos_tcp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-ipfrag-pos-tcp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
@@ -1049,7 +945,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 26: /* dpi-desync-ipfrag-pos-udp */
+		case 25: /* dpi-desync-ipfrag-pos-udp */
 			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_udp)<1 || params.desync_ipfrag_pos_udp<1 || params.desync_ipfrag_pos_udp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				fprintf(stderr, "dpi-desync-ipfrag-pos-udp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
@@ -1061,63 +957,63 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 27: /* dpi-desync-badseq-increments */
+		case 26: /* dpi-desync-badseq-increments */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_increment))
 			{
 				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 28: /* dpi-desync-badack-increment */
+		case 27: /* dpi-desync-badack-increment */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_ack_increment))
 			{
 				fprintf(stderr, "dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 29: /* dpi-desync-any-protocol */
+		case 28: /* dpi-desync-any-protocol */
 			params.desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 30: /* dpi-desync-fake-http */
+		case 29: /* dpi-desync-fake-http */
 			params.fake_http_size = sizeof(params.fake_http);
 			load_file_or_exit(optarg,params.fake_http,&params.fake_http_size);
 			break;
-		case 31: /* dpi-desync-fake-tls */
+		case 30: /* dpi-desync-fake-tls */
 			params.fake_tls_size = sizeof(params.fake_tls);
 			load_file_or_exit(optarg,params.fake_tls,&params.fake_tls_size);
 			break;
-		case 32: /* dpi-desync-fake-unknown */
+		case 31: /* dpi-desync-fake-unknown */
 			params.fake_unknown_size = sizeof(params.fake_unknown);
 			load_file_or_exit(optarg,params.fake_unknown,&params.fake_unknown_size);
 			break;
-		case 33: /* dpi-desync-fake-syndata */
+		case 32: /* dpi-desync-fake-syndata */
 			params.fake_syndata_size = sizeof(params.fake_syndata);
 			load_file_or_exit(optarg,params.fake_syndata,&params.fake_syndata_size);
 			break;
-		case 34: /* dpi-desync-fake-quic */
+		case 33: /* dpi-desync-fake-quic */
 			params.fake_quic_size = sizeof(params.fake_quic);
 			load_file_or_exit(optarg,params.fake_quic,&params.fake_quic_size);
 			break;
-		case 35: /* dpi-desync-fake-wireguard */
+		case 34: /* dpi-desync-fake-wireguard */
 			params.fake_wg_size = sizeof(params.fake_wg);
 			load_file_or_exit(optarg,params.fake_wg,&params.fake_wg_size);
 			break;
-		case 36: /* dpi-desync-fake-dht */
+		case 35: /* dpi-desync-fake-dht */
 			params.fake_dht_size = sizeof(params.fake_dht);
 			load_file_or_exit(optarg,params.fake_dht,&params.fake_dht_size);
 			break;
-		case 37: /* dpi-desync-fake-unknown-udp */
+		case 36: /* dpi-desync-fake-unknown-udp */
 			params.fake_unknown_udp_size = sizeof(params.fake_unknown_udp);
 			load_file_or_exit(optarg,params.fake_unknown_udp,&params.fake_unknown_udp_size);
 			break;
-		case 38: /* dpi-desync-udplen-increment */
+		case 37: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&params.udplen_increment)<1 || params.udplen_increment>0x7FFF || params.udplen_increment<-0x8000)
 			{
 				fprintf(stderr, "dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
 				exit_clean(1);
 			}
 			break;
-		case 39: /* dpi-desync-udplen-pattern */
+		case 38: /* dpi-desync-udplen-pattern */
 			{
 				char buf[sizeof(params.udplen_pattern)];
 				size_t sz=sizeof(buf);
@@ -1125,35 +1021,35 @@ int main(int argc, char **argv)
 				fill_pattern(params.udplen_pattern,sizeof(params.udplen_pattern),buf,sz);
 			}
 			break;
-		case 40: /* desync-cutoff */
+		case 39: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
 				fprintf(stderr, "invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 41: /* desync-start */
+		case 40: /* desync-start */
 			if (!parse_cutoff(optarg, &params.desync_start, &params.desync_start_mode))
 			{
 				fprintf(stderr, "invalid desync-start value\n");
 				exit_clean(1);
 			}
 			break;
-		case 42: /* hostlist */
+		case 41: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 43: /* hostlist-exclude */
+		case 42: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
 				fprintf(stderr, "strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
-		case 44: /* hostlist-auto */
+		case 43: /* hostlist-auto */
 			if (*params.hostlist_auto_filename)
 			{
 				fprintf(stderr, "only one auto hostlist is supported\n");
@@ -1184,7 +1080,7 @@ int main(int argc, char **argv)
 			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
 			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
 			break;
-		case 45: /* hostlist-auto-fail-threshold */
+		case 44: /* hostlist-auto-fail-threshold */
 			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
 			{
@@ -1192,7 +1088,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 46: /* hostlist-auto-fail-time */
+		case 45: /* hostlist-auto-fail-time */
 			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_time<1)
 			{
@@ -1200,7 +1096,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 47: /* hostlist-auto-retrans-threshold */
+		case 46: /* hostlist-auto-retrans-threshold */
 			params.hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_retrans_threshold<2 || params.hostlist_auto_retrans_threshold>10)
 			{
@@ -1208,7 +1104,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 48: /* hostlist-auto-debug */
+		case 47: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1224,10 +1120,10 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifdef __linux__
-		case 49: /* bind-fix4 */
+		case 48: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 50: /* bind-fix6 */
+		case 49: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #endif

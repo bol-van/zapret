@@ -274,3 +274,12 @@ v56
 
 tpws: mss fooling
 tpws: multi thread resolver. eliminates blocks related to hostname resolve.
+
+v57
+
+tpws: --nosplice option
+nfqws: postnat fixes
+nfqws: --dpi-desync-start option
+nfqws: packet delay for kyber TLS and QUIC
+nfqws: --dpi-desync-retrans obsolete
+nfqws: --qnum is mandatory, no more default queue 0

@@ -11,6 +11,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include "packet_queue.h"
+
 #ifndef IPPROTO_DIVERT
 #define IPPROTO_DIVERT 258
 #endif
@@ -38,6 +40,12 @@ uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 #define FOOL_DATANOACK	0x100
 
 #define SCALE_NONE ((uint8_t)-1)
+
+#define VERDICT_PASS	0
+#define VERDICT_MODIFY	1
+#define VERDICT_DROP	2
+#define VERDICT_MASK	3
+#define VERDICT_NOCSUM	4
 
 // seq and wsize have network byte order
 bool prepare_tcp_segment4(
@@ -136,6 +144,9 @@ bool tcp_has_fastopen(const struct tcphdr *tcp);
 
 // auto creates internal socket and uses it for subsequent calls
 bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len);
+bool rawsend_rp(const struct rawpacket *rp);
+// return trues if all packets were send successfully
+bool rawsend_queue(struct rawpacket_tailhead *q);
 // should pre-do it if dropping privileges. otherwise its not necessary
 bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 // cleans up socket autocreated by rawsend
@@ -158,6 +169,14 @@ bool proto_check_tcp(const uint8_t *data, size_t len);
 void proto_skip_tcp(uint8_t **data, size_t *len);
 bool proto_check_udp(const uint8_t *data, size_t len);
 void proto_skip_udp(uint8_t **data, size_t *len);
+void proto_dissect_l3l4(
+	uint8_t *data, size_t len,
+	struct ip **ip, struct ip6_hdr **ip6,
+	uint8_t *proto,
+	struct tcphdr **tcp,
+	struct udphdr **udp,
+	size_t *transport_len,
+	uint8_t **data_payload, size_t *len_payload);
 
 bool tcp_synack_segment(const struct tcphdr *tcphdr);
 bool tcp_syn_segment(const struct tcphdr *tcphdr);
@@ -177,3 +196,6 @@ typedef struct
 #define AUTOTTL_SET_DEFAULT(a) {(a).delta=AUTOTTL_DEFAULT_DELTA; (a).min=AUTOTTL_DEFAULT_MIN; (a).max=AUTOTTL_DEFAULT_MAX;}
 
 uint8_t autottl_guess(uint8_t ttl, const autottl *attl);
+
+void verdict_tcp_csum_fix(uint8_t verdict, struct tcphdr *tcphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr);
+void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr);

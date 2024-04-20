@@ -14,6 +14,8 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
+#include "packet_queue.h"
+
 //#define HASH_BLOOM 20
 #define HASH_NONFATAL_OOM 1
 #undef HASH_FUNCTION
@@ -63,7 +65,7 @@ typedef struct
 	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
 	
 	uint8_t req_retrans_counter;		// number of request retransmissions
-	bool req_seq_start_present, req_seq_present;
+	bool req_seq_present,req_seq_finalized;
 	uint32_t req_seq_start,req_seq_end;	// sequence interval of the request (to track retransmissions)
 
 	uint8_t autottl;
@@ -71,10 +73,11 @@ typedef struct
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff;
 
-	t_reassemble reasm_orig;
-
 	t_l7proto l7proto;
 	char *hostname;
+	
+	t_reassemble reasm_orig;
+	struct rawpacket_tailhead delayed;
 } t_ctrack;
 
 typedef struct
@@ -94,6 +97,8 @@ typedef struct
 void ConntrackPoolInit(t_conntrack *p, time_t purge_interval, uint32_t timeout_syn, uint32_t timeout_established, uint32_t timeout_fin, uint32_t timeout_udp);
 void ConntrackPoolDestroy(t_conntrack *p);
 bool ConntrackPoolFeed(t_conntrack *p, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr, size_t len_payload, t_ctrack **ctrack, bool *bReverse);
+// do not create, do not update. only find existing
+bool ConntrackPoolDoubleSearch(t_conntrack *p, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr, t_ctrack **ctrack, bool *bReverse);
 bool ConntrackPoolDrop(t_conntrack *p, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr);
 void CaonntrackExtractConn(t_conn *c, bool bReverse, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr);
 void ConntrackPoolDump(const t_conntrack *p);
@@ -101,6 +106,7 @@ void ConntrackPoolPurge(t_conntrack *p);
 void ConntrackClearHostname(t_ctrack *track);
 
 bool ReasmInit(t_reassemble *reasm, size_t size_requested, uint32_t seq_start);
+bool ReasmResize(t_reassemble *reasm, size_t new_size);
 void ReasmClear(t_reassemble *reasm);
 // false means reassemble session has failed and we should ReasmClear() it
 bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len);

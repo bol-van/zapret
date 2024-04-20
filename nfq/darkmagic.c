@@ -10,7 +10,7 @@
 #include <errno.h>
 
 #include "helpers.h"
-
+#include "params.h"
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
@@ -840,6 +840,64 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t *
 	// we have garbage
 }
 
+void proto_dissect_l3l4(
+	uint8_t *data, size_t len,
+	struct ip **ip, struct ip6_hdr **ip6,
+	uint8_t *proto,
+	struct tcphdr **tcp,
+	struct udphdr **udp,
+	size_t *transport_len,
+	uint8_t **data_payload, size_t *len_payload)
+{
+	*ip = NULL;
+	*ip6 = NULL;
+	*proto = 0;
+	*tcp = NULL;
+	*transport_len = 0;
+	*udp = NULL;
+	*data_payload = NULL;
+	*len_payload = 0;
+	
+	if (proto_check_ipv4(data, len))
+	{
+		*ip = (struct ip *) data;
+		*proto = (*ip)->ip_p;
+		proto_skip_ipv4(&data, &len);
+	}
+	else if (proto_check_ipv6(data, len))
+	{
+		*ip6 = (struct ip6_hdr *) data;
+		proto_skip_ipv6(&data, &len, proto, NULL);
+	}
+	else
+	{
+		return;
+	}
+
+	if (*proto==IPPROTO_TCP && proto_check_tcp(data, len))
+	{
+		*tcp = (struct tcphdr *) data;
+		*transport_len = len;
+
+		proto_skip_tcp(&data, &len);
+
+		*data_payload = data;
+		*len_payload = len;
+
+	}
+	else if (*proto==IPPROTO_UDP && proto_check_udp(data, len))
+	{
+		*udp = (struct udphdr *) data;
+		*transport_len = len;
+		
+		proto_skip_udp(&data, &len);
+
+		*data_payload = data;
+		*len_payload = len;
+	}
+}
+
+
 bool tcp_synack_segment(const struct tcphdr *tcphdr)
 {
 	/* check for set bits in TCP hdr */
@@ -1204,6 +1262,20 @@ nofix:
 	return true;
 }
 
+bool rawsend_rp(const struct rawpacket *rp)
+{
+	return rawsend((struct sockaddr*)&rp->dst,rp->fwmark,rp->ifout,rp->packet,rp->len);
+}
+bool rawsend_queue(struct rawpacket_tailhead *q)
+{
+	struct rawpacket *rp;
+	bool b;
+	for (b=true; (rp=rawpacket_dequeue(q)) ; rawpacket_free(rp))
+		b &= rawsend_rp(rp);
+	return b;
+}
+
+
 // return guessed fake ttl value. 0 means unsuccessfull, should not perform autottl fooling
 // ttl = TTL of incoming packet
 uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
@@ -1232,4 +1304,28 @@ uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 	if (fake>=path) return 0;
 
 	return fake;
+}
+
+
+void verdict_tcp_csum_fix(uint8_t verdict, struct tcphdr *tcphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr)
+{
+	#ifdef __FreeBSD__
+	// FreeBSD tend to pass ipv6 frames with wrong checksum
+	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
+	#else
+	// if original packet was tampered earlier it needs checksum fixed
+	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
+	#endif
+		tcp_fix_checksum(tcphdr,transport_len,ip,ip6hdr);
+}
+void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr)
+{
+	#ifdef __FreeBSD__
+	// FreeBSD tend to pass ipv6 frames with wrong checksum
+	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
+	#else
+	// if original packet was tampered earlier it needs checksum fixed
+	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
+	#endif
+		udp_fix_checksum(udphdr,transport_len,ip,ip6hdr);
 }

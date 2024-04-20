@@ -173,7 +173,6 @@ nfqws takes the following parameters:
  --dpi-desync-autottl=[<delta>[:<min>[-<max>]]] ; auto ttl mode for both ipv4 and ipv6. default: 1:3-20
  --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only
  --dpi-desync-fooling=<mode>[,<mode>]           ; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2
- --dpi-desync-retrans=0|1                       ; 0(default)=reinject original data packet after fake  1=drop original data packet to force its retransmission
  --dpi-desync-repeats=<N>                       ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1                    ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
  --dpi-desync-split-pos=<1..9216>               ; data payload split position
@@ -263,10 +262,7 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
 
 `--dpi-desync-fooling` takes multiple comma separated values.
 
-For fake,rst,rstack modes original packet can be sent after the fake one or just dropped.
-If its dropped OS will perform first retransmission after 0.2 sec, then the delay increases exponentially.
-Delay can help to make sure fake and original packets are properly ordered and processed on DPI.
-When `dpi-desync-retrans=1` its mandatory to use connbytes in iptables rule. Otherwise loop happens.
+For fake,rst,rstack modes original packet is sent after the fake.
 
 Disorder mode splits original packet and sends packets in the following order :
 1. 2nd segment
@@ -460,6 +456,16 @@ Useful with `--dpi-desync-any-protocol=1`.
 If the connection falls out of the conntrack and --dpi-desync-cutoff is set, dpi desync will not be applied.
 
 Set conntrack timeouts appropriately.
+
+### Reassemble
+
+nfqws supports reassemble of TLS and QUIC ClientHello.
+They can consist of multiple packets if kyber crypto is used (default from chromium 124).
+Chromium randomizes TLS fingerprint. SNI can be in any packet.
+Stateful DPIs usually reassemble all packets in the request then apply block decision.
+If nfqws receives a partial ClientHello it begins reassemble session. Packets are delayed until it's finished.
+Then the first packet goes through desync using fully reassembled message. Other packets are sent
+without desync. On any error reassemble is cancelled and all delayed packets are sent immediately without desync.
 
 ### UDP support
 

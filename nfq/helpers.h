@@ -5,9 +5,9 @@
 #include <sys/socket.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
-
-#include "params.h"
+#include <time.h>
 
 void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit);
 char *strncasestr(const char *s,const char *find, size_t slen);

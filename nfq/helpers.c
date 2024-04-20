@@ -5,8 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
-#include <time.h>
 #include <sys/stat.h>
+
+
+#include "params.h"
 
 void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
 {

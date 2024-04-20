@@ -37,6 +37,7 @@ static void ConntrackClearTrack(t_ctrack *track)
 {
 	ConntrackClearHostname(track);
 	ReasmClear(&track->reasm_orig);
+	rawpacket_queue_destroy(&track->delayed);
 }
 
 static void ConntrackFreeElem(t_conntrack_pool *elem)
@@ -99,19 +100,24 @@ static void ConntrackInitTrack(t_ctrack *t)
 	memset(t,0,sizeof(*t));
 	t->scale_orig = t->scale_reply = SCALE_NONE;
 	time(&t->t_start);
+	rawpacket_queue_init(&t->delayed);
 }
-
+static void ConntrackReInitTrack(t_ctrack *t)
+{
+	ConntrackClearTrack(t);
+	ConntrackInitTrack(t);
+}
 
 static t_conntrack_pool *ConntrackNew(t_conntrack_pool **pp, const t_conn *c)
 {
-	t_conntrack_pool *new;
-	if (!(new = malloc(sizeof(*new)))) return NULL;
-	new->conn = *c;
+	t_conntrack_pool *ctnew;
+	if (!(ctnew = malloc(sizeof(*ctnew)))) return NULL;
+	ctnew->conn = *c;
 	oom = false;
-	HASH_ADD(hh, *pp, conn, sizeof(*c), new);
-	if (oom) { free(new); return NULL; }
-	ConntrackInitTrack(&new->track);
-	return new;
+	HASH_ADD(hh, *pp, conn, sizeof(*c), ctnew);
+	if (oom) { free(ctnew); return NULL; }
+	ConntrackInitTrack(&ctnew->track);
+	return ctnew;
 }
 
 // non-tcp packets are passed with tcphdr=NULL but len_payload filled
@@ -135,13 +141,13 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 	{
 		if (tcp_syn_segment(tcphdr))
 		{
-			if (t->state!=SYN) ConntrackInitTrack(t); // erase current entry
+			if (t->state!=SYN) ConntrackReInitTrack(t); // erase current entry
 			t->seq0 = htonl(tcphdr->th_seq);
 		}
 		else if (tcp_synack_segment(tcphdr))
 		{
-			if (t->state!=SYN) ConntrackInitTrack(t); // erase current entry
-				if (!t->seq0) t->seq0 = htonl(tcphdr->th_ack)-1;
+			if (t->state!=SYN) ConntrackReInitTrack(t); // erase current entry
+			if (!t->seq0) t->seq0 = htonl(tcphdr->th_ack)-1;
 			t->ack0 = htonl(tcphdr->th_seq);
 		}
 		else if (tcphdr->th_flags & (TH_FIN|TH_RST))
@@ -192,6 +198,35 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 	time(&t->t_last);
 }
 
+static bool ConntrackPoolDoubleSearchPool(t_conntrack_pool **pp, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr, t_ctrack **ctrack, bool *bReverse)
+{
+	bool b_rev;
+	t_conn conn,connswp;
+	t_conntrack_pool *ctr;
+
+	ConntrackExtractConn(&conn,false,ip,ip6,tcphdr,udphdr);
+	if ((ctr=ConntrackPoolSearch(*pp,&conn)))
+	{
+		if (bReverse) *bReverse = false;
+		if (ctrack) *ctrack = &ctr->track;
+		return true;
+	}
+	else
+	{
+		connswap(&conn,&connswp);
+		if ((ctr=ConntrackPoolSearch(*pp,&connswp)))
+		{
+			if (bReverse) *bReverse = true;
+			if (ctrack) *ctrack = &ctr->track;
+			return true;
+		}
+	}
+	return false;
+}
+bool ConntrackPoolDoubleSearch(t_conntrack *p, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr, t_ctrack **ctrack, bool *bReverse)
+{
+	return ConntrackPoolDoubleSearchPool(&p->pool, ip, ip6, tcphdr, udphdr, ctrack, bReverse);
+}
 
 static bool ConntrackPoolFeedPool(t_conntrack_pool **pp, const struct ip *ip, const struct ip6_hdr *ip6, const struct tcphdr *tcphdr, const struct udphdr *udphdr, size_t len_payload, t_ctrack **ctrack, bool *bReverse)
 {
@@ -343,9 +378,18 @@ bool ReasmInit(t_reassemble *reasm, size_t size_requested, uint32_t seq_start)
 	reasm->seq = seq_start;
 	return true;
 }
+bool ReasmResize(t_reassemble *reasm, size_t new_size)
+{
+	uint8_t *p = realloc(reasm->packet, new_size);
+	if (!p) return false;
+	reasm->packet = p;
+	reasm->size = new_size;
+	if (reasm->size_present > new_size) reasm->size_present = new_size;
+	return true;
+}
 bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len)
 {
-	if (reasm->seq!=seq) return false; // fail session if out of sequence
+	if (seq!=-1 && reasm->seq!=seq) return false; // fail session if out of sequence
 	
 	size_t szcopy;
 	szcopy = reasm->size - reasm->size_present;
