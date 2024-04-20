@@ -1166,7 +1166,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 					}
 				}
 
-				uint8_t defrag[sizeof(clean)];
+				uint8_t defrag[16384];
 				size_t hello_offset, hello_len, defrag_len = sizeof(defrag);
 				if (QUICDefragCrypto(pclean,clean_len,defrag,&defrag_len))
 				{
