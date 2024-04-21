@@ -351,7 +351,7 @@ static bool is_quic_version_with_v1_labels(uint32_t version)
 }
 static bool is_quic_v2(uint32_t version)
 {
-    return version == 0x709A50C4;
+    return version == 0x6b3343cf;
 }
 
 static bool quic_hkdf_expand_label(const uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
@@ -413,9 +413,9 @@ static bool quic_derive_initial_secret(const quic_cid_t *cid, uint8_t *client_in
 		0x7a, 0x4e, 0xde, 0xf4, 0xe7, 0xcc, 0xee, 0x5f, 0xa4, 0x50,
 		0x6c, 0x19, 0x12, 0x4f, 0xc8, 0xcc, 0xda, 0x6e, 0x03, 0x3d
 	};
-	static const uint8_t handshake_salt_v2_draft_00[20] = {
-		0xa7, 0x07, 0xc2, 0x03, 0xa5, 0x9b, 0x47, 0x18, 0x4a, 0x1d,
-		0x62, 0xca, 0x57, 0x04, 0x06, 0xea, 0x7a, 0xe3, 0xe5, 0xd3
+	static const uint8_t handshake_salt_v2[20] = {
+		0x0d, 0xed, 0xe3, 0xde, 0xf7, 0x00, 0xa6, 0xdb, 0x81, 0x93,
+		0x81, 0xbe, 0x6e, 0x26, 0x9d, 0xcb, 0xf9, 0xbd, 0x2e, 0xd9
 	};
 
 	int err;
@@ -445,7 +445,7 @@ static bool quic_derive_initial_secret(const quic_cid_t *cid, uint8_t *client_in
 		salt = handshake_salt_v1;
 	}
 	else {
-		salt = handshake_salt_v2_draft_00;
+		salt = handshake_salt_v2;
 	}
 
 	err = hkdfExtract(SHA256, salt, 20, cid->cid, cid->len, secret);
@@ -484,7 +484,7 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	if (!quic_derive_initial_secret(&dcid, client_initial_secret, ver)) return false;
 
 	uint8_t aeskey[16], aesiv[12], aeshp[16];
-	bool v1_label = is_quic_version_with_v1_labels(ver);
+	bool v1_label = !is_quic_v2(ver);
 	if (!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic key" : "tls13 quicv2 key", aeskey, sizeof(aeskey)) ||
 		!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic iv" : "tls13 quicv2 iv", aesiv, sizeof(aesiv)) ||
 		!quic_hkdf_expand_label(client_initial_secret, SHA256HashSize, v1_label ? "tls13 quic hp" : "tls13 quicv2 hp", aeshp, sizeof(aeshp)))
