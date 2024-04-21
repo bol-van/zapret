@@ -342,13 +342,6 @@ static bool is_quic_draft_max(uint32_t draft_version, uint8_t max_version)
 {
 	return draft_version && draft_version <= max_version;
 }
-static bool is_quic_version_with_v1_labels(uint32_t version)
-{
-	if (((version & 0xFFFFFF00) == 0x51303500)  /* Q05X */ ||
-		((version & 0xFFFFFF00) == 0x54303500)) /* T05X */
-		return true;
-	return is_quic_draft_max(QUICDraftVersion(version), 34);
-}
 static bool is_quic_v2(uint32_t version)
 {
     return version == 0x6b3343cf;
