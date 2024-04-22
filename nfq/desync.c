@@ -269,14 +269,15 @@ static bool send_delayed(t_ctrack *ctrack)
 }
 
 
-static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
+static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
 {
 	ReasmClear(reasm);
 	if (sz<=szMax)
 	{
-		if (ReasmInit(reasm,sz,ctrack->seq_last))
+		uint32_t seq = (proto==IPPROTO_TCP) ? ctrack->seq_last : 0;
+		if (ReasmInit(reasm,sz,seq))
 		{
-			ReasmFeed(reasm,ctrack->seq_last,data_payload,len_payload);
+			ReasmFeed(reasm,seq,data_payload,len_payload);
 			DLOG("starting reassemble. now we have %zu/%zu\n",reasm->size_present,reasm->size);
 			return true;
 		}
@@ -287,15 +288,16 @@ static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, size_t sz, size_t
 		DLOG("unexpected large payload for reassemble: size=%zu\n",sz);
 	return false;
 }
-static bool reasm_orig_start(t_ctrack *ctrack, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
+static bool reasm_orig_start(t_ctrack *ctrack, uint8_t proto, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
 {
-	return reasm_start(ctrack,&ctrack->reasm_orig,sz,szMax,data_payload,len_payload);
+	return reasm_start(ctrack,&ctrack->reasm_orig,proto,sz,szMax,data_payload,len_payload);
 }
 static bool reasm_feed(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, const uint8_t *data_payload, size_t len_payload)
 {
 	if (ctrack && !ReasmIsEmpty(reasm))
 	{
-		if (ReasmFeed(reasm,proto==IPPROTO_TCP ? (size_t)ctrack->seq_last : reasm->size_present, data_payload, len_payload))
+		uint32_t seq = (proto==IPPROTO_TCP) ? ctrack->seq_last : (uint32_t)reasm->size_present;
+		if (ReasmFeed(reasm, seq, data_payload, len_payload))
 		{
 			DLOG("reassemble : feeding data payload size=%zu. now we have %zu/%zu\n", len_payload,reasm->size_present,reasm->size)
 			return true;
@@ -698,7 +700,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 					!(ctrack->req_seq_finalized && seq_within(ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end)))
 				{
 					// do not reconstruct unexpected large payload (they are feeding garbage ?)
-					if (!reasm_orig_start(ctrack,TLSRecordLen(data_payload),16384,data_payload,len_payload))
+					if (!reasm_orig_start(ctrack,IPPROTO_TCP,TLSRecordLen(data_payload),16384,data_payload,len_payload))
 					{
 						reasm_orig_cancel(ctrack);
 						return verdict;
@@ -1189,7 +1191,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 						if (bIsHello && !bReqFull && ReasmIsEmpty(&ctrack->reasm_orig))
 						{
 							// preallocate max buffer to avoid reallocs that cause memory copy
-							if (!reasm_orig_start(ctrack,16384,16384,clean,clean_len))
+							if (!reasm_orig_start(ctrack,IPPROTO_UDP,16384,16384,clean,clean_len))
 							{
 								reasm_orig_cancel(ctrack);
 								return verdict;

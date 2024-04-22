@@ -142,13 +142,13 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 		if (tcp_syn_segment(tcphdr))
 		{
 			if (t->state!=SYN) ConntrackReInitTrack(t); // erase current entry
-			t->seq0 = htonl(tcphdr->th_seq);
+			t->seq0 = ntohl(tcphdr->th_seq);
 		}
 		else if (tcp_synack_segment(tcphdr))
 		{
 			if (t->state!=SYN) ConntrackReInitTrack(t); // erase current entry
-			if (!t->seq0) t->seq0 = htonl(tcphdr->th_ack)-1;
-			t->ack0 = htonl(tcphdr->th_seq);
+			if (!t->seq0) t->seq0 = ntohl(tcphdr->th_ack)-1;
+			t->ack0 = ntohl(tcphdr->th_seq);
 		}
 		else if (tcphdr->th_flags & (TH_FIN|TH_RST))
 		{
@@ -159,25 +159,25 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 			if (t->state==SYN) 
 			{
 				t->state=ESTABLISHED;
-				if (!bReverse && !t->ack0) t->ack0 = htonl(tcphdr->th_ack)-1;
+				if (!bReverse && !t->ack0) t->ack0 = ntohl(tcphdr->th_ack)-1;
 			}
 		}
 		scale = tcp_find_scale_factor(tcphdr);
 		if (bReverse)
 		{
-			t->pos_orig = t->seq_last = htonl(tcphdr->th_ack);
-			t->ack_last = htonl(tcphdr->th_seq);
+			t->pos_orig = t->seq_last = ntohl(tcphdr->th_ack);
+			t->ack_last = ntohl(tcphdr->th_seq);
 			t->pos_reply = t->ack_last + len_payload;
-			t->winsize_reply = htons(tcphdr->th_win);
+			t->winsize_reply = ntohs(tcphdr->th_win);
 			if (scale!=SCALE_NONE) t->scale_reply = scale;
 			
 		}
 		else
 		{
-			t->seq_last = htonl(tcphdr->th_seq);
+			t->seq_last = ntohl(tcphdr->th_seq);
 			t->pos_orig = t->seq_last + len_payload;
-			t->pos_reply = t->ack_last = htonl(tcphdr->th_ack);
-			t->winsize_orig = htons(tcphdr->th_win);
+			t->pos_reply = t->ack_last = ntohl(tcphdr->th_ack);
+			t->winsize_orig = ntohs(tcphdr->th_win);
 			if (scale!=SCALE_NONE) t->scale_orig = scale;
 		}
 	}
@@ -387,7 +387,7 @@ bool ReasmResize(t_reassemble *reasm, size_t new_size)
 	if (reasm->size_present > new_size) reasm->size_present = new_size;
 	return true;
 }
-bool ReasmFeed(t_reassemble *reasm, size_t seq, const void *payload, size_t len)
+bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len)
 {
 	if (reasm->seq!=seq) return false; // fail session if out of sequence
 	

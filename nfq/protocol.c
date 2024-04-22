@@ -131,7 +131,7 @@ size_t TLSHandshakeLen(const uint8_t *data)
 }
 bool IsTLSHandshakeClientHello(const uint8_t *data, size_t len)
 {
-	return len>=4 && data[0]==0x01;
+	return len>=4 && data[0]==0x01 && TLSHandshakeLen(data)>0;
 }
 bool IsTLSHandshakeFull(const uint8_t *data, size_t len)
 {
