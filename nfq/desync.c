@@ -277,7 +277,7 @@ static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, size_t sz, size_t
 		if (ReasmInit(reasm,sz,ctrack->seq_last))
 		{
 			ReasmFeed(reasm,ctrack->seq_last,data_payload,len_payload);
-			DLOG(reasm->size_present==reasm->size ? "starting reassemble. now we have %zu\n" : "starting reassemble. now we have %zu/%zu\n",reasm->size_present,reasm->size);
+			DLOG("starting reassemble. now we have %zu/%zu\n",reasm->size_present,reasm->size);
 			return true;
 		}
 		else
@@ -295,9 +295,9 @@ static bool reasm_feed(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, con
 {
 	if (ctrack && !ReasmIsEmpty(reasm))
 	{
-		if (ReasmFeed(reasm,proto==IPPROTO_TCP ? ctrack->seq_last : -1,data_payload,len_payload))
+		if (ReasmFeed(reasm,proto==IPPROTO_TCP ? (size_t)ctrack->seq_last : reasm->size_present, data_payload, len_payload))
 		{
-			DLOG(reasm->size_present==reasm->size ? "reassemble : feeding data payload size=%zu. now we have %zu\n" : "reassemble : feeding data payload size=%zu. now we have %zu/%zu\n", len_payload,reasm->size_present,reasm->size)
+			DLOG("reassemble : feeding data payload size=%zu. now we have %zu/%zu\n", len_payload,reasm->size_present,reasm->size)
 			return true;
 		}
 		else
@@ -313,26 +313,25 @@ static bool reasm_orig_feed(t_ctrack *ctrack, uint8_t proto, const uint8_t *data
 {
 	return reasm_feed(ctrack, &ctrack->reasm_orig, proto, data_payload, len_payload);
 }
-static void reasm_orig_fin(t_ctrack *ctrack)
-{
-	if (ctrack && ReasmIsFull(&ctrack->reasm_orig))
-	{
-		DLOG("reassemble session finished\n");
-		ReasmClear(&ctrack->reasm_orig);
-		send_delayed(ctrack);
-	}
-}
-static void reasm_orig_cancel(t_ctrack *ctrack)
+static void reasm_orig_stop(t_ctrack *ctrack, const char *dlog_msg)
 {
 	if (ctrack)
 	{
 		if (!ReasmIsEmpty(&ctrack->reasm_orig))
 		{
-			DLOG("reassemble session cancelled\n");
+			DLOG("%s",dlog_msg);
 			ReasmClear(&ctrack->reasm_orig);
 		}
 		send_delayed(ctrack);
 	}
+}
+static void reasm_orig_cancel(t_ctrack *ctrack)
+{
+	reasm_orig_stop(ctrack, "reassemble session cancelled\n");
+}
+static void reasm_orig_fin(t_ctrack *ctrack)
+{
+	reasm_orig_stop(ctrack, "reassemble session finished\n");
 }
 
 
@@ -655,6 +654,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 		{
 			DLOG("packet contains HTTP request\n")
 			if (ctrack && !ctrack->l7proto) ctrack->l7proto = HTTP;
+
+			// we do not reassemble http
+			reasm_orig_cancel(ctrack);
+
 			forced_wssize_cutoff(ctrack);
 			fake = params.fake_http;
 			fake_size = params.fake_http_size;
@@ -664,7 +667,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 				if (!bHaveHost)
 				{
 					DLOG("not applying tampering to HTTP without Host:\n")
-					reasm_orig_fin(ctrack);
 					return verdict;
 				}
 			}
@@ -698,7 +700,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 					// do not reconstruct unexpected large payload (they are feeding garbage ?)
 					if (!reasm_orig_start(ctrack,TLSRecordLen(data_payload),16384,data_payload,len_payload))
 					{
-						fprintf(stderr, "reasm start failed ! out of memory.\n");
 						reasm_orig_cancel(ctrack);
 						return verdict;
 					}
@@ -746,7 +747,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			if (params.desync_skip_nosni && !bHaveHost)
 			{
 				DLOG("not applying tampering to TLS ClientHello without hostname in the SNI\n")
-				reasm_orig_fin(ctrack);
+				reasm_orig_cancel(ctrack);
 				return verdict;
 			}
 			
@@ -755,7 +756,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			bKnownProtocol = true;
 		}
 
-		reasm_orig_fin(ctrack);
+		reasm_orig_cancel(ctrack);
 		rdata_payload=NULL;
 
 		if (bHaveHost)
@@ -1065,6 +1066,21 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 	return verdict;
 }
 
+// return : true - should continue, false - should stop with verdict
+static bool quic_reasm_cancel(t_ctrack *ctrack, const char *reason)
+{
+	reasm_orig_cancel(ctrack);
+	if (params.desync_any_proto)
+	{
+		DLOG("%s. applying tampering because desync_any_proto is set\n",reason)
+		return true;
+	}
+	else
+	{
+		DLOG("%s. not applying tampering because desync_any_proto is not set\n",reason)
+		return false;
+	}
+}
 
 static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
 {
@@ -1127,7 +1143,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 			
 			if (ctrack && !ctrack->l7proto) ctrack->l7proto = QUIC;
 
-			uint8_t clean[9000], *pclean;
+			uint8_t clean[16384], *pclean;
 			size_t clean_len;
 			bool bIsHello = false;
 			
@@ -1145,14 +1161,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 			{
 				if (ctrack && !ReasmIsEmpty(&ctrack->reasm_orig))
 				{
-					size_t newlen = ctrack->reasm_orig.size_present  + clean_len;
-					if (newlen>16384)
-					{
-						DLOG("QUIC reasm is too long. cancelling.\n");
-						reasm_orig_cancel(ctrack);
-						return verdict; // cannot be first packet
-					}
-					if (ReasmResize(&ctrack->reasm_orig, newlen))
+					if (ReasmHasSpace(&ctrack->reasm_orig, clean_len))
 					{
 						reasm_orig_feed(ctrack,IPPROTO_UDP,clean,clean_len);
 						pclean = ctrack->reasm_orig.packet;
@@ -1160,7 +1169,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 					}
 					else
 					{
-						fprintf(stderr, "reasm update failed ! out of memory.\n");
+						DLOG("QUIC reasm is too long. cancelling.\n");
 						reasm_orig_cancel(ctrack);
 						return verdict; // cannot be first packet
 					}
@@ -1179,9 +1188,9 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 					{
 						if (bIsHello && !bReqFull && ReasmIsEmpty(&ctrack->reasm_orig))
 						{
-							if (!reasm_orig_start(ctrack,clean_len,clean_len,clean,clean_len))
+							// preallocate max buffer to avoid reallocs that cause memory copy
+							if (!reasm_orig_start(ctrack,16384,16384,clean,clean_len))
 							{
-								fprintf(stderr, "reasm start failed ! out of memory.\n");
 								reasm_orig_cancel(ctrack);
 								return verdict;
 							}
@@ -1220,40 +1229,19 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 					}
 					else
 					{
-						reasm_orig_cancel(ctrack);
-						if (params.desync_any_proto)
-							DLOG("QUIC initial without ClientHello. applying tampering because desync_any_proto is set\n")
-						else
-						{
-							DLOG("not applying tampering to QUIC initial without ClientHello\n")
-							return verdict;
-						}
+						if (!quic_reasm_cancel(ctrack,"QUIC initial without ClientHello")) return verdict;
 					}
 				}
 				else
 				{
 					// defrag failed
-					reasm_orig_cancel(ctrack);
-					if (params.desync_any_proto)
-						DLOG("QUIC initial without CRYPTO frame. applying tampering because desync_any_proto is set\n")
-					else
-					{
-						DLOG("not applying tampering to QUIC initial without CRYPTO frame\n")
-						return verdict;
-					}
+					if (!quic_reasm_cancel(ctrack,"QUIC initial defrag CRYPTO failed")) return verdict;
 				}
 			}
 			else
 			{
 				// decrypt failed
-				reasm_orig_cancel(ctrack);
-				if (params.desync_any_proto)
-					DLOG("QUIC initial decryption failed. applying tampering because desync_any_proto is set\n")
-				else
-				{
-					DLOG("not applying tampering to QUIC initial that could not be decrypted\n")
-					return verdict;
-				}
+				if (!quic_reasm_cancel(ctrack,"QUIC initial decryption failed")) return verdict;
 			}
 			
 			fake = params.fake_quic;
@@ -1301,8 +1289,11 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 				DLOG("not applying tampering to this request\n")
 				if (!bExcluded && *params.hostlist_auto_filename && ctrack)
 				{
-					if (!ctrack->hostname) ctrack->hostname=strdup(host);
-					process_retrans_fail(ctrack, IPPROTO_UDP);
+					if (!ctrack->hostname)
+						// first request is not retrans
+						ctrack->hostname=strdup(host);
+					else
+						process_retrans_fail(ctrack, IPPROTO_UDP);
 				}
 				return verdict;
 			}

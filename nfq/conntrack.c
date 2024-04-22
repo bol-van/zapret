@@ -387,9 +387,9 @@ bool ReasmResize(t_reassemble *reasm, size_t new_size)
 	if (reasm->size_present > new_size) reasm->size_present = new_size;
 	return true;
 }
-bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len)
+bool ReasmFeed(t_reassemble *reasm, size_t seq, const void *payload, size_t len)
 {
-	if (seq!=-1 && reasm->seq!=seq) return false; // fail session if out of sequence
+	if (reasm->seq!=seq) return false; // fail session if out of sequence
 	
 	size_t szcopy;
 	szcopy = reasm->size - reasm->size_present;
@@ -399,4 +399,8 @@ bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t le
 	reasm->seq += (uint32_t)szcopy;
 
 	return true;
+}
+bool ReasmHasSpace(t_reassemble *reasm, size_t len)
+{
+	return (reasm->size_present+len)<=reasm->size;
 }

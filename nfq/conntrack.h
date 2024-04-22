@@ -39,7 +39,7 @@ typedef struct
 // this structure helps to reassemble continuous packets streams. it does not support out-of-orders
 typedef struct {
 	uint8_t *packet;		// allocated for size during reassemble request. requestor must know the message size.
-	uint32_t seq;			// current seq number. if a packet comes with an unexpected seq - it fails reassemble session.
+	size_t seq;			// current seq number. if a packet comes with an unexpected seq - it fails reassemble session.
 	size_t size;			// expected message size. success means that we have received exactly 'size' bytes and have them in 'packet'
 	size_t size_present;		// how many bytes already stored in 'packet'
 } t_reassemble;
@@ -109,6 +109,8 @@ bool ReasmInit(t_reassemble *reasm, size_t size_requested, uint32_t seq_start);
 bool ReasmResize(t_reassemble *reasm, size_t new_size);
 void ReasmClear(t_reassemble *reasm);
 // false means reassemble session has failed and we should ReasmClear() it
-bool ReasmFeed(t_reassemble *reasm, uint32_t seq, const void *payload, size_t len);
+bool ReasmFeed(t_reassemble *reasm, size_t seq, const void *payload, size_t len);
+// check if it has enough space to buffer 'len' bytes
+bool ReasmHasSpace(t_reassemble *reasm, size_t len);
 inline static bool ReasmIsEmpty(t_reassemble *reasm) {return !reasm->size;}
 inline static bool ReasmIsFull(t_reassemble *reasm) {return !ReasmIsEmpty(reasm) && (reasm->size==reasm->size_present);}
