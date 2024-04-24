@@ -65,7 +65,7 @@ typedef struct
 	uint8_t scale_orig, scale_reply;	// last seen window scale factor. SCALE_NONE if none
 	
 	uint8_t req_retrans_counter;		// number of request retransmissions
-	bool req_seq_present,req_seq_finalized;
+	bool req_seq_present,req_seq_finalized,req_seq_abandoned;
 	uint32_t req_seq_start,req_seq_end;	// sequence interval of the request (to track retransmissions)
 
 	uint8_t autottl;
@@ -75,6 +75,7 @@ typedef struct
 
 	t_l7proto l7proto;
 	char *hostname;
+	bool hostname_ah_check;			// should perform autohostlist checks
 	
 	t_reassemble reasm_orig;
 	struct rawpacket_tailhead delayed;

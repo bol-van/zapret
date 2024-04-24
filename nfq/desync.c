@@ -144,7 +144,7 @@ static void maybe_cutoff(t_ctrack *ctrack, uint8_t proto)
 			ctrack->b_cutoff |= \
 			    (!params.wssize || ctrack->b_wssize_cutoff) &&
 			    (!params.desync_cutoff || ctrack->b_desync_cutoff) &&
-			    (!*params.hostlist_auto_filename || ctrack->req_retrans_counter==RETRANS_COUNTER_STOP) &&
+			    (!ctrack->hostname_ah_check || ctrack->req_retrans_counter==RETRANS_COUNTER_STOP) &&
 			    ReasmIsEmpty(&ctrack->reasm_orig);
 	}
 }
@@ -167,7 +167,7 @@ static void forced_wssize_cutoff(t_ctrack *ctrack)
 
 static void ctrack_stop_retrans_counter(t_ctrack *ctrack)
 {
-	if (ctrack && *params.hostlist_auto_filename)
+	if (ctrack && ctrack->hostname_ah_check)
 	{
 		ctrack->req_retrans_counter = RETRANS_COUNTER_STOP;
 		maybe_cutoff(ctrack, IPPROTO_TCP);
@@ -177,11 +177,11 @@ static void ctrack_stop_retrans_counter(t_ctrack *ctrack)
 // return true if retrans trigger fires
 static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold)
 {
-	if (*params.hostlist_auto_filename && ctrack && ctrack->req_retrans_counter!=RETRANS_COUNTER_STOP)
+	if (ctrack && ctrack->hostname_ah_check && ctrack->req_retrans_counter!=RETRANS_COUNTER_STOP)
 	{
 		if (l4proto==IPPROTO_TCP)
 		{
-			if (!ctrack->req_seq_finalized)
+			if (!ctrack->req_seq_finalized || ctrack->req_seq_abandoned)
 				return false;
 			if (!seq_within(ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end))
 			{
@@ -441,14 +441,13 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 {
 	uint8_t verdict=VERDICT_PASS;
 
-	t_ctrack *ctrack=NULL;
-	const t_reassemble *reasm_replay=NULL;
+	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
 
 	struct sockaddr_storage src, dst;
 	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
 	size_t pkt1_len, pkt2_len;
-	uint8_t ttl_orig,ttl_fake,ttl_auto=0,flags_orig,scale_factor;
+	uint8_t ttl_orig,ttl_fake,flags_orig,scale_factor;
 	uint32_t *timestamps;
 
 	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
@@ -456,24 +455,21 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 
 	if (replay)
 	{
-		t_ctrack *ctrack;
-		bool bReverse;
+		// in replay mode conntrack_replay is not NULL and ctrack is NULL
+
 		//ConntrackPoolDump(&params.conntrack);
-		if (ConntrackPoolDoubleSearch(&params.conntrack, ip, ip6hdr, tcphdr, NULL, &ctrack, &bReverse) && !bReverse)
-		{
-			reasm_replay = &ctrack->reasm_orig;
-			ttl_auto = ctrack->autottl;
-		}
-		else
+		if (!ConntrackPoolDoubleSearch(&params.conntrack, ip, ip6hdr, tcphdr, NULL, &ctrack_replay, &bReverse) || bReverse)
 			return verdict;
 	}
 	else
 	{
+		// in real mode ctrack may be NULL or not NULL, conntrack_replay is equal to ctrack
+
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, NULL, len_payload, &ctrack, &bReverse))
 		{
+			ctrack_replay = ctrack;
 			maybe_cutoff(ctrack, IPPROTO_TCP);
-			ttl_auto = ctrack->autottl;
 		}
 		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 
@@ -503,7 +499,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			// process reply packets for auto hostlist mode
 			// by looking at RSTs or HTTP replies we decide whether original request looks like DPI blocked
 			// we only process first-sequence replies. do not react to subsequent redirects or RSTs
-			if (*params.hostlist_auto_filename && ctrack && ctrack->hostname && (ctrack->ack_last-ctrack->ack0)==1)
+			if (ctrack && ctrack->hostname && ctrack->hostname_ah_check && (ctrack->ack_last-ctrack->ack0)==1)
 			{
 				bool bFail=false;
 				if (tcphdr->th_flags & TH_RST)
@@ -566,7 +562,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 
 	if (params.desync_mode0!=DESYNC_NONE || params.desync_mode!=DESYNC_NONE) // save some cpu
 	{
-		ttl_fake = ttl_auto ? ttl_auto : (ip6hdr ? (params.desync_ttl6 ? params.desync_ttl6 : ttl_orig) : (params.desync_ttl ? params.desync_ttl : ttl_orig));
+		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (params.desync_ttl6 ? params.desync_ttl6 : ttl_orig) : (params.desync_ttl ? params.desync_ttl : ttl_orig));
 		flags_orig = *((uint8_t*)tcphdr+13);
 		scale_factor = tcp_find_scale_factor(tcphdr);
 		timestamps = tcp_find_timestamps(tcphdr);
@@ -639,10 +635,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 		const uint8_t *rdata_payload = data_payload;
 		size_t rlen_payload = len_payload;
 		
-		if (reasm_replay)
+		if (replay)
 		{
-			rdata_payload = reasm_replay->packet;
-			rlen_payload = reasm_replay->size_present;
+			rdata_payload = ctrack_replay->reasm_orig.packet;
+			rlen_payload = ctrack_replay->reasm_orig.size_present;
 		}
 		else if (reasm_orig_feed(ctrack,IPPROTO_TCP,data_payload,len_payload))
 		{
@@ -696,7 +692,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			{
 				if (!ctrack->l7proto) ctrack->l7proto = TLS;
 				// do not reasm retransmissions
-				if (!bReqFull && ReasmIsEmpty(&ctrack->reasm_orig) &&
+				if (!bReqFull && ReasmIsEmpty(&ctrack->reasm_orig) && !ctrack->req_seq_abandoned &&
 					!(ctrack->req_seq_finalized && seq_within(ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end)))
 				{
 					// do not reconstruct unexpected large payload (they are feeding garbage ?)
@@ -741,7 +737,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 						replay_queue(&ctrack->delayed);
 						reasm_orig_fin(ctrack);
 					}
-					if (!ctrack->hostname && bHaveHost) ctrack->hostname=strdup(host);
 					return VERDICT_DROP;
 				}
 			}
@@ -761,25 +756,37 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 		reasm_orig_cancel(ctrack);
 		rdata_payload=NULL;
 
+		if (ctrack && ctrack->req_seq_finalized)
+		{
+			uint32_t dseq = ctrack->seq_last - ctrack->req_seq_end;
+			// do not react to 32-bit overflowed sequence numbers. allow 16 Mb grace window then cutoff.
+			if (dseq>=0x1000000 && !(dseq & 0x80000000)) ctrack->req_seq_abandoned=true;
+		}
+
 		if (bHaveHost)
 		{
-			bool bExcluded;
 			DLOG("hostname: %s\n",host)
-			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(host, &bExcluded))
+			if (params.hostlist || params.hostlist_exclude)
 			{
-				DLOG("not applying tampering to this request\n")
-				if (ctrack)
+				bool bBypass;
+				if (HostlistCheck(host, &bBypass))
+					ctrack_stop_retrans_counter(ctrack_replay);
+				else
 				{
-					if (!bExcluded && *params.hostlist_auto_filename)
+					if (ctrack_replay)
 					{
-						if (!ctrack->hostname) ctrack->hostname=strdup(host);
+						ctrack_replay->hostname_ah_check = *params.hostlist_auto_filename && !bBypass;
+						if (ctrack_replay->hostname_ah_check)
+						{
+							if (!ctrack_replay->hostname) ctrack_replay->hostname=strdup(host);
+						}
+						else
+							ctrack_stop_retrans_counter(ctrack_replay);
 					}
-					else
-						ctrack_stop_retrans_counter(ctrack);
+					DLOG("not applying tampering to this request\n")
+					return verdict;
 				}
-				return verdict;
 			}
-			ctrack_stop_retrans_counter(ctrack);
 		}
 		
 		if (!bKnownProtocol)
@@ -1088,7 +1095,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 {
 	uint8_t verdict=VERDICT_PASS;
 
-	t_ctrack *ctrack=NULL;
+	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
 
 	struct sockaddr_storage src, dst;
@@ -1096,23 +1103,24 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 	size_t pkt1_len, pkt2_len;
 	uint8_t ttl_orig,ttl_fake;
 	
-	t_reassemble *reasm_replay = NULL;
-
 	if (replay)
 	{
-		t_ctrack *ctrack;
-		bool bReverse;
+		// in replay mode conntrack_replay is not NULL and ctrack is NULL
+
 		//ConntrackPoolDump(&params.conntrack);
-		if (ConntrackPoolDoubleSearch(&params.conntrack, ip, ip6hdr, NULL, udphdr, &ctrack, &bReverse) && !bReverse)
-			reasm_replay = &ctrack->reasm_orig;
-		else
+		if (!ConntrackPoolDoubleSearch(&params.conntrack, ip, ip6hdr, NULL, udphdr, &ctrack_replay, &bReverse) || bReverse)
 			return verdict;
 	}
 	else
 	{
+		// in real mode ctrack may be NULL or not NULL, conntrack_replay is equal to ctrack
+
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, NULL, udphdr, len_payload, &ctrack, &bReverse))
+		{
+			ctrack_replay = ctrack;
 			maybe_cutoff(ctrack, IPPROTO_UDP);
+		}
 		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 		//ConntrackPoolDump(&params.conntrack);
 	}
@@ -1142,17 +1150,16 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 		if (IsQUICInitial(data_payload,len_payload))
 		{
 			DLOG("packet contains QUIC initial\n")
-			
 			if (ctrack && !ctrack->l7proto) ctrack->l7proto = QUIC;
 
 			uint8_t clean[16384], *pclean;
 			size_t clean_len;
 			bool bIsHello = false;
-			
-			if (reasm_replay)
+
+			if (replay)
 			{
-				clean_len = reasm_replay->size_present;
-				pclean = reasm_replay->packet;
+				clean_len = ctrack_replay->reasm_orig.size_present;
+				pclean = ctrack_replay->reasm_orig.packet;
 			}
 			else
 			{
@@ -1185,7 +1192,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 					bool bReqFull = bIsHello ? IsTLSHandshakeFull(defrag+hello_offset,hello_len) : false;
 
 					DLOG(bIsHello ? bReqFull ? "packet contains full TLS ClientHello\n" : "packet contains partial TLS ClientHello\n" : "packet does not contain TLS ClientHello\n")
-				
+
 					if (ctrack)
 					{
 						if (bIsHello && !bReqFull && ReasmIsEmpty(&ctrack->reasm_orig))
@@ -1285,19 +1292,26 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 		if (bHaveHost)
 		{
 			DLOG("hostname: %s\n",host)
-			bool bExcluded;
-			if ((params.hostlist || params.hostlist_exclude) && !HostlistCheck(host, &bExcluded))
+			if (params.hostlist || params.hostlist_exclude)
 			{
-				DLOG("not applying tampering to this request\n")
-				if (!bExcluded && *params.hostlist_auto_filename && ctrack)
+				bool bBypass;
+				if (!HostlistCheck(host, &bBypass))
 				{
-					if (!ctrack->hostname)
-						// first request is not retrans
-						ctrack->hostname=strdup(host);
-					else
-						process_retrans_fail(ctrack, IPPROTO_UDP);
+					if (ctrack_replay)
+					{
+						ctrack_replay->hostname_ah_check = *params.hostlist_auto_filename && !bBypass;
+						if (ctrack_replay->hostname_ah_check)
+						{
+							// first request is not retrans
+							if (ctrack_replay->hostname)
+								process_retrans_fail(ctrack_replay, IPPROTO_UDP);
+							else
+								ctrack_replay->hostname=strdup(host);
+						}
+					}
+					DLOG("not applying tampering to this request\n")
+					return verdict;
 				}
-				return verdict;
 			}
 		}
 
