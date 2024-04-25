@@ -167,6 +167,7 @@ bool HostlistCheck(const char *host, bool *excluded)
 				exit(1);
 			}
 			params.hostlist_auto_mod_time = t;
+			NonEmptyHostlist(&params.hostlist);
 		}
 	}
 	return HostlistCheck_(params.hostlist, params.hostlist_exclude, host, excluded);
