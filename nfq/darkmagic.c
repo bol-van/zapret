@@ -652,8 +652,10 @@ const char *proto_name(uint8_t proto)
 			return "6in4";
 		case IPPROTO_IPIP:
 			return "4in4";
+#ifdef IPPROTO_GRE
 		case IPPROTO_GRE:
 			return "gre";
+#endif
 #ifdef IPPROTO_SCTP
 		case IPPROTO_SCTP:
 			return "sctp";
