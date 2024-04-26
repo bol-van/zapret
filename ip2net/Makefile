@@ -1,6 +1,7 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Wno-logical-op-parentheses -O3
 CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
+CFLAGS_WIN = -static
 LIBS = 
 LIBS_WIN = -lws2_32
 SRC_FILES = ip2net.c qsort.c
@@ -21,7 +22,7 @@ mac: $(SRC_FILES)
 	rm -f ip2netx ip2neta
 
 win: $(SRC_FILES)
-	$(CC) $(CFLAGS) -o ip2net $(SRC_FILES) $(LDFLAGS) $(LIBS_WIN)
+	$(CC) -s $(CFLAGS) $(CFLAGS_WIN) -o ip2net $(SRC_FILES) $(LDFLAGS) $(LIBS_WIN)
 
 clean:
 	rm -f ip2net *.o

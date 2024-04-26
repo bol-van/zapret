@@ -1,6 +1,7 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Wno-logical-op-parentheses -O3
 CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
+CFLAGS_WIN = -static
 LIBS = -lpthread
 LIBS_WIN = -lws2_32
 SRC_FILES = *.c
@@ -21,7 +22,7 @@ mac: $(SRC_FILES)
 	rm -f mdigx mdiga
 
 win: $(SRC_FILES)
-	$(CC) $(CFLAGS) -o mdig -static $(SRC_FILES) $(LDFLAGS) $(LIBS_WIN)
+	$(CC) -s $(CFLAGS) $(CFLAGS_WIN) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS_WIN)
 
 clean:
 	rm -f mdig *.o
