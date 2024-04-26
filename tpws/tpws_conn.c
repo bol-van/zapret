@@ -1530,37 +1530,3 @@ ex:
 	if (resolve_pipe[1]) close(resolve_pipe[1]);
 	return retval;
 }
-
-
-bool pf_in_range(uint16_t port, const port_filter *pf)
-{
-	return port && ((!pf->from && !pf->to || port>=pf->from && port<=pf->to) ^ pf->neg);
-}
-bool pf_parse(const char *s, port_filter *pf)
-{
-	unsigned int v1,v2;
-
-	if (!s) return false;
-	if (*s=='~') 
-	{
-		pf->neg=true;
-		s++;
-	}
-	else
-		pf->neg=false;
-	if (sscanf(s,"%u-%u",&v1,&v2)==2)
-	{
-		if (!v1 || v1>65535 || v2>65535 || v1>v2) return false;
-		pf->from=(uint16_t)v1;
-		pf->to=(uint16_t)v2;
-	}
-	else if (sscanf(s,"%u",&v1)==1)
-	{
-		if (!v1 || v1>65535) return false;
-		pf->to=pf->from=(uint16_t)v1;
-	}
-	else
-		return false;
-	return true;
-}
-

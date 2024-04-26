@@ -103,6 +103,3 @@ TAILQ_HEAD(tailhead, tproxy_conn);
 
 
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);
-
-bool pf_in_range(uint16_t port, const port_filter *pf);
-bool pf_parse(const char *s, port_filter *pf);

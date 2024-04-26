@@ -8,6 +8,7 @@
 #include <time.h>
 #include "tpws.h"
 #include "pools.h"
+#include "helpers.h"
 
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
@@ -24,12 +25,6 @@ struct bind_s
 	enum bindll bindll;
 	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 };
-
-typedef struct
-{
-	uint16_t from,to;
-	bool neg;
-} port_filter;
 
 struct params_s
 {
