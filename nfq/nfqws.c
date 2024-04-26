@@ -78,6 +78,15 @@ static void onusr2(int sig)
 	printf("\n");
 }
 
+static void pre_desync(void)
+{
+	signal(SIGHUP, onhup);
+	signal(SIGUSR1, onusr1);
+	signal(SIGUSR2, onusr2);
+
+	desync_init();
+}
+
 
 static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
@@ -189,17 +198,16 @@ static int nfq_main(void)
 	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
 		goto exiterr;
 
+#ifndef __CYGWIN__
 	sec_harden();
 
 	if (params.droproot && !droproot(params.uid, params.gid))
 		goto exiterr;
+
 	print_id();
+#endif
 
-	signal(SIGHUP, onhup);
-	signal(SIGUSR1, onusr1);
-	signal(SIGUSR2, onusr2);
-
-	desync_init();
+	pre_desync();
 
 	fd = nfq_fd(h);
 
@@ -311,10 +319,7 @@ static int dvt_main(void)
 		goto exiterr;
 	print_id();
 
-	signal(SIGHUP, onhup);
-	signal(SIGUSR1, onusr1);
-
-	desync_init();
+	pre_desync();
 
 	for(;;)
 	{
@@ -385,7 +390,75 @@ exiterr:
 	return res;
 }
 
-#endif
+
+#elif defined (__CYGWIN__)
+
+static int win_main(const char *windivert_filter)
+{
+	size_t len;
+	unsigned int id;
+	uint8_t verdict;
+	bool bOutbound;
+	uint8_t packet[16384];
+	uint32_t mark;
+	WINDIVERT_ADDRESS wa;
+	char ifout[22];
+
+	if (!windivert_init(windivert_filter))
+		return 1;
+
+	printf("windivert initialized. capture is started.\n");
+
+	pre_desync();
+
+	for (id=0;;id++)
+	{
+		len = sizeof(packet);
+		if (!windivert_recv(packet, &len, &wa))
+		{
+			if (errno==ENOBUFS)
+			{
+				DLOG("windivert: ignoring too large packet\n")
+				continue; // too large packet
+			}
+			fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
+			break;
+		}
+		*ifout=0;
+		snprintf(ifout,sizeof(ifout),"%u.%u",wa.Network.IfIdx, wa.Network.SubIfIdx);
+		DLOG("packet: id=%u len=%zu outbound=%u IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%s\n", id, len, wa.Outbound, wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, ifout)
+		if (wa.Impostor)
+		{
+			DLOG("windivert: skipping impostor packet\n")
+			continue;
+		}
+		if (wa.Loopback)
+		{
+			DLOG("windivert: skipping loopback packet\n")
+			continue;
+		}
+		mark=0;
+		// pseudo interface id IfIdx.SubIfIdx
+		verdict = processPacketData(&mark, ifout, packet, &len);
+		switch (verdict & VERDICT_MASK)
+		{
+			case VERDICT_PASS:
+			case VERDICT_MODIFY:
+				if ((verdict & VERDICT_MASK)==VERDICT_PASS)
+					DLOG("packet: id=%u reinject unmodified\n", id)
+				else
+					DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
+				if (!windivert_send(packet, len, &wa))
+					fprintf(stderr,"windivert: reinject of packet id=%u failed\n", id);
+				break;
+			default:
+				DLOG("packet: id=%u drop\n", id);
+		}
+	}
+	return 0;
+}
+
+#endif // multiple OS divert handlers
 
 
 
@@ -427,16 +500,35 @@ static void exithelp(void)
 #endif
 		" --daemon\t\t\t\t\t; daemonize\n"
 		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
+#ifndef __CYGWIN__
 		" --user=<username>\t\t\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t\t\t; drop root privs\n"
+#endif
 #ifdef __linux__
 		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
 		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
+		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
+#ifdef __CYGWIN__
+		"\nWINDIVERT FILTER:\n"
+		" --wf-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
+		" --wf-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
+		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
+		" --wf-raw=<filter>|@<filename>\t\t\t; raw windivert filter string or filename\n"
+		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
+#endif
+		"\nHOSTLIST FILTER:\n"
+		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
+		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
+		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n"
+		"\nTAMPER:\n"
 		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
 		" --hostcase\t\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
@@ -471,15 +563,9 @@ static void exithelp(void)
 		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
 		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
 		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
-		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
-		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
-		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
-		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
-		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n",
+		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
+		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
@@ -488,8 +574,7 @@ static void exithelp(void)
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
 		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
-		UDPLEN_INCREMENT_DEFAULT,
-		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT
+		UDPLEN_INCREMENT_DEFAULT
 	);
 	exit(1);
 }
@@ -580,12 +665,151 @@ bool parse_autottl(const char *s, autottl *t)
 	return true;
 }
 
+#ifdef __CYGWIN__
+static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *buf, size_t len)
+{
+	char *e,*p,c,s1[64];
+	port_filter pf;
+	int n;
+
+	if (len<3) return false;
+
+	for (n=0,p=opt,*buf='(',buf[1]=0 ; p ; n++)
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+		if (!pf_parse(p,&pf)) return false;
+
+		if (pf.from==pf.to)
+			snprintf(s1, sizeof(s1), "(%s.%s %s %u)", l4, portname, pf.neg ? "!=" : "==", pf.from);
+		else
+			snprintf(s1, sizeof(s1), "(%s.%s %s %u %s %s.%s %s %u)", l4, portname, pf.neg ? "<" : ">=", pf.from, pf.neg ? "or" : "and" , l4, portname, pf.neg ? ">" : "<=", pf.to);
+		if (n) strncat(buf," or ",len-strlen(buf)-1);
+		strncat(buf, s1, len-strlen(buf)-1);
+
+		if (e)
+		{
+			*e++=c;
+		}
+		p = e;
+	}
+	strncat(buf, ")", len-strlen(buf)-1);
+	return true;
+}
+static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
+{
+	char *e,*p,c;
+
+	for (p=opt,*ipv4=*ipv6=false ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (!strcmp(p,"ipv4"))
+			*ipv4 = true;
+		else if (!strcmp(p,"ipv6"))
+			*ipv6 = true;
+		else return false;
+
+		if (e)
+		{
+			*e++=c;
+		}
+		p = e;
+	}
+	return true;
+}
+
+#define DIVERT_NO_LOCALNETSv4_DST "(" \
+                   "(ip.DstAddr < 127.0.0.1 or ip.DstAddr > 127.255.255.255) and " \
+                   "(ip.DstAddr < 10.0.0.0 or ip.DstAddr > 10.255.255.255) and " \
+                   "(ip.DstAddr < 192.168.0.0 or ip.DstAddr > 192.168.255.255) and " \
+                   "(ip.DstAddr < 172.16.0.0 or ip.DstAddr > 172.31.255.255) and " \
+                   "(ip.DstAddr < 169.254.0.0 or ip.DstAddr > 169.254.255.255))"
+#define DIVERT_NO_LOCALNETSv4_SRC "(" \
+                   "(ip.SrcAddr < 127.0.0.1 or ip.SrcAddr > 127.255.255.255) and " \
+                   "(ip.SrcAddr < 10.0.0.0 or ip.SrcAddr > 10.255.255.255) and " \
+                   "(ip.SrcAddr < 192.168.0.0 or ip.SrcAddr > 192.168.255.255) and " \
+                   "(ip.SrcAddr < 172.16.0.0 or ip.SrcAddr > 172.31.255.255) and " \
+                   "(ip.SrcAddr < 169.254.0.0 or ip.SrcAddr > 169.254.255.255))"
+
+#define DIVERT_NO_LOCALNETSv6_DST "(" \
+                   "(ipv6.DstAddr > ::1) and " \
+                   "(ipv6.DstAddr < 2001::0 or ipv6.DstAddr >= 2001:1::0) and " \
+                   "(ipv6.DstAddr < fc00::0 or ipv6.DstAddr >= fe00::0) and " \
+                   "(ipv6.DstAddr < fe80::0 or ipv6.DstAddr >= fec0::0) and " \
+                   "(ipv6.DstAddr < ff00::0 or ipv6.DstAddr >= ffff::0))"
+#define DIVERT_NO_LOCALNETSv6_SRC "(" \
+                   "(ipv6.SrcAddr > ::1) and " \
+                   "(ipv6.SrcAddr < 2001::0 or ipv6.SrcAddr >= 2001:1::0) and " \
+                   "(ipv6.SrcAddr < fc00::0 or ipv6.SrcAddr >= fe00::0) and " \
+                   "(ipv6.SrcAddr < fe80::0 or ipv6.SrcAddr >= fec0::0) and " \
+                   "(ipv6.SrcAddr < ff00::0 or ipv6.SrcAddr >= ffff::0))"
+
+#define DIVERT_NO_LOCALNETS_SRC "(" DIVERT_NO_LOCALNETSv4_SRC " or " DIVERT_NO_LOCALNETSv6_SRC ")"
+#define DIVERT_NO_LOCALNETS_DST "(" DIVERT_NO_LOCALNETSv4_DST " or " DIVERT_NO_LOCALNETSv6_DST ")"
+
+#define DIVERT_TCP_INBOUNDS "tcp.Ack and tcp.Syn or tcp.Rst or tcp.Fin"
+
+// HTTP/1.? 30(2|7)
+#define DIVERT_HTTP_REDIRECT "tcp.PayloadLength>=12 and tcp.Payload32[0]==0x48545450 and tcp.Payload16[2]==0x2F31 and tcp.Payload[6]==0x2E and tcp.Payload16[4]==0x2033 and tcp.Payload[10]==0x30 and (tcp.Payload[11]==0x32 or tcp.Payload[11]==0x37)"
+
+#define DIVERT_PROLOG "!impostor and !loopback"
+
+static bool wf_make_filter(
+	char *wf, size_t len,
+	bool ipv4, bool ipv6,
+	const char *pf_tcp_src, const char *pf_tcp_dst,
+	const char *pf_udp_src, const char *pf_udp_dst)
+{
+	char pf_src_buf[512],pf_dst_buf[512];
+	const char *pf_dst;
+	const char *f_tcpin = *pf_tcp_src ? *params.hostlist_auto_filename ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
+
+	if (!*pf_tcp_src && !*pf_udp_src) return false;
+	if (*pf_tcp_src && *pf_udp_src)
+	{
+		snprintf(pf_dst_buf,sizeof(pf_dst_buf),"(%s or %s)",pf_tcp_dst,pf_udp_dst);
+		pf_dst = pf_dst_buf;
+	}
+	else
+		pf_dst = *pf_tcp_dst ? pf_tcp_dst : pf_udp_dst;
+	snprintf(wf,len,
+ 	       DIVERT_PROLOG " and%s\n ((outbound and %s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
+		ipv4 ? ipv6 ? "" : " ip and" : " ipv6 and",
+		pf_dst,
+		ipv4 ? ipv6 ? " and " DIVERT_NO_LOCALNETS_DST : " and " DIVERT_NO_LOCALNETSv4_DST : " and " DIVERT_NO_LOCALNETSv6_DST,
+		*pf_tcp_src ? "" : " and false",
+		*f_tcpin ? " and " : "",
+		*f_tcpin ? f_tcpin : "",
+		*pf_tcp_src ? " and " : "",
+		*pf_tcp_src ? pf_tcp_src : "",
+		*pf_tcp_src ? " and " : "",
+		*pf_tcp_src ? ipv4 ? ipv6 ? DIVERT_NO_LOCALNETS_SRC : DIVERT_NO_LOCALNETSv4_SRC : DIVERT_NO_LOCALNETSv6_SRC : ""
+		);
+
+	return true;
+}
+
+#endif	
+
 int main(int argc, char **argv)
 {
 	int result, v;
 	int option_index = 0;
 	bool daemon = false;
 	char pidfile[256];
+#ifdef __CYGWIN__
+	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
+	bool wf_ipv4=true, wf_ipv6=true;
+	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
+#endif
 	
 	srandom(time(NULL));
 
@@ -629,12 +853,14 @@ int main(int argc, char **argv)
 
 	LIST_INIT(&params.hostlist_files);
 	LIST_INIT(&params.hostlist_exclude_files);
-	
+
+#ifndef __CYGWIN__
 	if (can_drop_root()) // are we root ?
 	{
 		params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
 		params.droproot = true;
 	}
+#endif
 
 	const struct option long_options[] = {
 		{"debug",optional_argument,0,0},	// optidx=0
@@ -647,8 +873,13 @@ int main(int argc, char **argv)
 #endif
 		{"daemon",no_argument,0,0},		// optidx=2
 		{"pidfile",required_argument,0,0},	// optidx=3
+#ifndef __CYGWIN__
 		{"user",required_argument,0,0 },	// optidx=4
 		{"uid",required_argument,0,0 },		// optidx=5
+#else
+		{"disabled_argument_2",no_argument,0,0},	// optidx=4
+		{"disabled_argument_3",no_argument,0,0},	// optidx=5
+#endif
 		{"wsize",required_argument,0,0},	// optidx=6
 		{"wssize",required_argument,0,0},	// optidx=7
 		{"wssize-cutoff",required_argument,0,0},// optidx=8
@@ -663,7 +894,7 @@ int main(int argc, char **argv)
 #elif defined(SO_USER_COOKIE)
 		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=15
 #else
-		{"disabled_argument_2",no_argument,0,0},	// optidx=15
+		{"disabled_argument_4",no_argument,0,0},	// optidx=15
 #endif
 		{"dpi-desync-ttl",required_argument,0,0},	// optidx=16
 		{"dpi-desync-ttl6",required_argument,0,0},	// optidx=17
@@ -701,6 +932,12 @@ int main(int argc, char **argv)
 #ifdef __linux__
 		{"bind-fix4",no_argument,0,0},		// optidx=48
 		{"bind-fix6",no_argument,0,0},		// optidx=49
+#elif defined(__CYGWIN__)
+		{"wf-l3",required_argument,0,0},	// optidx=48
+		{"wf-tcp",required_argument,0,0},	// optidx=49
+		{"wf-udp",required_argument,0,0},	// optidx=50
+		{"wf-raw",required_argument,0,0},	// optidx=51
+		{"wf-save",required_argument,0,0},	// optidx=52
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -713,6 +950,7 @@ int main(int argc, char **argv)
 		case 0: /* debug */
 			params.debug = !optarg || atoi(optarg);
 			break;
+#ifndef __CYGWIN__
 		case 1: /* qnum or port */
 #ifdef __linux__
 			params.qnum = atoi(optarg);
@@ -733,6 +971,7 @@ int main(int argc, char **argv)
 			}
 #endif
 			break;
+#endif
 		case 2: /* daemon */
 			daemon = true;
 			break;
@@ -740,6 +979,7 @@ int main(int argc, char **argv)
 			strncpy(pidfile, optarg, sizeof(pidfile));
 			pidfile[sizeof(pidfile) - 1] = '\0';
 			break;
+#ifndef __CYGWIN__
 		case 4: /* user */
 		{
 			struct passwd *pwd = getpwnam(optarg);
@@ -762,6 +1002,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+#endif
 		case 6: /* wsize */
 			if (!parse_ws_scale_factor(optarg,&params.wsize,&params.wscale))
 				exit_clean(1);
@@ -847,6 +1088,7 @@ int main(int argc, char **argv)
 				#endif
 			}
 			break;
+#ifndef __CYGWIN__
 		case 15: /* dpi-desync-fwmark/dpi-desync-sockarg */
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 			params.desync_fwmark = 0;
@@ -861,6 +1103,7 @@ int main(int argc, char **argv)
 			exit_clean(1);
 #endif
 			break;
+#endif
 		case 16: /* dpi-desync-ttl */
 			params.desync_ttl = (uint8_t)atoi(optarg);
 			break;
@@ -1069,8 +1312,10 @@ int main(int argc, char **argv)
 					fprintf(stderr, "gzipped auto hostlists are not supported\n");
 					exit_clean(1);
 				}
+#ifndef __CYGWIN__
 				if (params.droproot && chown(optarg, params.uid, -1))
 					fprintf(stderr, "could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
+#endif
 			}
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
@@ -1113,8 +1358,10 @@ int main(int argc, char **argv)
 					exit_clean(1);
 				}
 				fclose(F);
+#ifndef __CYGWIN__
 				if (params.droproot && chown(optarg, params.uid, -1))
 					fprintf(stderr, "could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
+#endif
 				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
@@ -1126,6 +1373,48 @@ int main(int argc, char **argv)
 		case 49: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
+#elif defined(__CYGWIN__)
+		case 48: /* wf-l3 */
+			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
+			{
+				fprintf(stderr, "bad value for --wf-l3\n");
+				exit_clean(1);
+			}
+			break;
+		case 49: /* wf-tcp */
+			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
+				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
+			{
+				fprintf(stderr, "bad value for --wf-tcp\n");
+				exit_clean(1);
+			}
+			break;
+		case 50: /* wf-udp */
+			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
+				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
+			{
+				fprintf(stderr, "bad value for --wf-udp\n");
+				exit_clean(1);
+			}
+			break;
+		case 51: /* wf-raw */
+			if (optarg[0]=='@')
+			{
+				size_t sz = sizeof(windivert_filter)-1;
+				load_file_or_exit(optarg+1,windivert_filter,&sz);
+				windivert_filter[sz] = 0;
+			}
+			else
+			{
+				strncpy(windivert_filter, optarg, sizeof(windivert_filter));
+				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
+			}
+			break;
+		case 52: /* wf-save */
+			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
+			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
+			break;
+
 #endif
 		}
 	}
@@ -1142,6 +1431,34 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Need divert port (--port)\n");
 		exit_clean(1);
 	}
+#elif defined(__CYGWIN__)
+	if (!*windivert_filter)
+	{
+		if (!*wf_pf_tcp_src && !*wf_pf_udp_src)
+		{
+			fprintf(stderr, "windivert filter : must specify port filter\n");
+			exit_clean(1);
+		}
+		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
+		{
+			fprintf(stderr, "windivert filter : could not make filter\n");
+			exit_clean(1);
+		}
+	}
+	DLOG("windivert filter size: %zu\nwindivert filter:\n%s\n",strlen(windivert_filter),windivert_filter)
+	if (*wf_save_file)
+	{
+		if (save_file(wf_save_file,windivert_filter,strlen(windivert_filter)))
+		{
+			printf("windivert filter: raw filter saved to %s\n", wf_save_file);
+			exit_clean(0);
+		}
+		else
+		{
+			fprintf(stderr, "windivert filter: could not save raw filter to %s\n", wf_save_file);
+			exit_clean(0);
+		}
+	}
 #endif
 
 	// not specified - use desync_ttl value instead
@@ -1157,7 +1474,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Include hostlist load failed\n");
 		exit_clean(1);
 	}
-	if (*params.hostlist_auto_filename) NonEmptyHostlist(&params.hostlist);
+	if (*params.hostlist_auto_filename)
+		NonEmptyHostlist(&params.hostlist);
 	if (!LoadExcludeHostLists())
 	{
 		fprintf(stderr, "Exclude hostlist load failed\n");
@@ -1179,6 +1497,8 @@ int main(int argc, char **argv)
 	result = nfq_main();
 #elif defined(BSD)
 	result = dvt_main();
+#elif defined(__CYGWIN__)
+	result = win_main(windivert_filter);
 #else
 	#error unsupported OS
 #endif

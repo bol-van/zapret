@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 
-#include "darkmagic.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,9 +7,12 @@
 #include <arpa/inet.h>
 #include <sys/param.h>
 #include <errno.h>
+#include <fcntl.h>
 
+#include "darkmagic.h"
 #include "helpers.h"
 #include "params.h"
+
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
@@ -642,6 +644,8 @@ const char *proto_name(uint8_t proto)
 			return "udp";
 		case IPPROTO_ICMP:
 			return "icmp";
+		case IPPROTO_ICMPV6:
+			return "icmp6";
 		case IPPROTO_IGMP:
 			return "igmp";
 		case IPPROTO_ESP:
@@ -950,8 +954,133 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 }
 
 
+#ifdef __CYGWIN__
 
+static HANDLE w_filter = NULL, w_event = NULL;
 
+static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
+{
+	LPTSTR errormessage = NULL;
+	DWORD errorcode = 0;
+	HANDLE h;
+
+	h = WinDivertOpen(filter, WINDIVERT_LAYER_NETWORK, 0, flags);
+	if (h != INVALID_HANDLE_VALUE)
+	{
+        	return h;
+	}
+	errorcode = GetLastError();
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, errorcode, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPTSTR)&errormessage, 0, NULL);
+	fprintf(stderr, "windivert: error opening filter: %s", errormessage);
+	LocalFree(errormessage);
+	if (errorcode == 577)
+		fprintf(stderr,"windivert: try to disable secure boot and install OS patches\n");
+	return NULL;
+}
+void rawsend_cleanup(void)
+{
+	if (w_filter)
+	{
+		WinDivertClose(w_filter);
+		w_filter=NULL;
+	}
+	if (w_event)
+	{
+		CloseHandle(w_event);
+		w_event=NULL;
+	}
+}
+bool windivert_init(const char *filter)
+{
+	rawsend_cleanup();
+	w_filter = windivert_init_filter(filter, 0);
+	if (w_filter)
+	{
+		w_event = CreateEventW(NULL,FALSE,FALSE,NULL);
+		if (!w_event)
+		{
+			rawsend_cleanup();
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa)
+{
+	UINT recv_len;
+	DWORD err;
+	OVERLAPPED ovl = { .hEvent = w_event };
+	DWORD rd;
+	char c;
+
+	if (WinDivertRecvEx(hFilter, packet, *len, &recv_len, 0, wa, NULL, &ovl))
+	{
+		*len = recv_len;
+		return true;
+	}
+	for(;;)
+	{
+		err = GetLastError();
+		switch(err)
+		{
+			case ERROR_IO_PENDING:
+				// make signals working
+				while(WaitForSingleObject(w_event,50)==WAIT_TIMEOUT) usleep(0);
+				if (!GetOverlappedResult(hFilter,&ovl,&rd,TRUE))
+					continue;
+				*len = rd;
+				return true;
+			case ERROR_INSUFFICIENT_BUFFER:
+				errno = ENOBUFS;
+				break;
+			case ERROR_NO_DATA:
+				errno = ESHUTDOWN;
+				break;
+			default:
+				errno = EIO;
+		}
+		break;
+	}
+	return false;
+}
+bool windivert_recv(uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa)
+{
+	return windivert_recv_filter(w_filter,packet,len,wa);
+}
+
+static bool windivert_send_filter(HANDLE hFilter, const uint8_t *packet, size_t len, const WINDIVERT_ADDRESS *wa)
+{
+	return WinDivertSend(hFilter,packet,(UINT)len,NULL,wa);
+}
+bool windivert_send(const uint8_t *packet, size_t len, const WINDIVERT_ADDRESS *wa)
+{
+	return windivert_send_filter(w_filter,packet,len,wa);
+}
+
+bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len)
+{
+	WINDIVERT_ADDRESS wa;
+
+	memset(&wa,0,sizeof(wa));
+	// pseudo interface id IfIdx.SubIfIdx
+	if (sscanf(ifout,"%u.%u",&wa.Network.IfIdx,&wa.Network.SubIfIdx)!=2)
+	{
+		errno = EINVAL;
+		return false;
+	}
+	wa.Outbound=1;
+	wa.IPChecksum=1;
+	wa.TCPChecksum=1;
+	wa.UDPChecksum=1;
+	wa.IPv6 = (dst->sa_family==AF_INET6);
+
+	return windivert_send(data,len,&wa);
+}
+
+#else // *nix
 
 static int rawsend_sock4=-1, rawsend_sock6=-1;
 static bool b_bind_fix4=false, b_bind_fix6=false;
@@ -1264,6 +1393,8 @@ nofix:
 	return true;
 }
 
+#endif // not CYGWIN
+
 bool rawsend_rp(const struct rawpacket *rp)
 {
 	return rawsend((struct sockaddr*)&rp->dst,rp->fwmark,rp->ifout,rp->packet,rp->len);
@@ -1311,23 +1442,35 @@ uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 
 void verdict_tcp_csum_fix(uint8_t verdict, struct tcphdr *tcphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr)
 {
-	#ifdef __FreeBSD__
-	// FreeBSD tend to pass ipv6 frames with wrong checksum
-	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
-	#else
-	// if original packet was tampered earlier it needs checksum fixed
-	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
-	#endif
-		tcp_fix_checksum(tcphdr,transport_len,ip,ip6hdr);
+	if (!(verdict & VERDICT_NOCSUM))
+	{
+		// always fix csum for windivert. original can be partial or bad
+		#ifndef __CYGWIN__
+		#ifdef __FreeBSD__
+		// FreeBSD tend to pass ipv6 frames with wrong checksum
+		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
+		#else
+		// if original packet was tampered earlier it needs checksum fixed
+		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
+		#endif
+		#endif
+			tcp_fix_checksum(tcphdr,transport_len,ip,ip6hdr);
+	}
 }
 void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr)
 {
-	#ifdef __FreeBSD__
-	// FreeBSD tend to pass ipv6 frames with wrong checksum
-	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
-	#else
-	// if original packet was tampered earlier it needs checksum fixed
-	if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
-	#endif
-		udp_fix_checksum(udphdr,transport_len,ip,ip6hdr);
+	if (!(verdict & VERDICT_NOCSUM))
+	{
+		// always fix csum for windivert. original can be partial or bad
+		#ifndef __CYGWIN__
+		#ifdef __FreeBSD__
+		// FreeBSD tend to pass ipv6 frames with wrong checksum
+		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
+		#else
+		// if original packet was tampered earlier it needs checksum fixed
+		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
+		#endif
+		#endif
+			udp_fix_checksum(udphdr,transport_len,ip,ip6hdr);
+	}
 }

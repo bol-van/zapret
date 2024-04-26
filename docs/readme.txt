@@ -1,4 +1,4 @@
-zapret v.57
+zapret v.58
 
 English
 -------
@@ -16,10 +16,12 @@ For english version refer to docs/readme.eng.txt
 Поддерживаются традиционные Linux системы, FreeBSD, OpenBSD, частично MacOS.
 В некоторых случаях возможна самостоятельная прикрутка решения к различным прошивкам.
 
+Большая часть функционала работает на windows.
+
 Как побыстрее начать
 --------------------
 
-Читайте docs/quick_start.txt
+Читайте docs/quick_start.txt для linux и openwrt, docs/quick_start_windows.txt для windows.
 
 
 Как это работает
@@ -1559,29 +1561,10 @@ FreeBSD, OpenBSD, MacOS
 Описано в docs/bsd.txt
 
 
-Windows (WSL)
--------------
+Windows
+-------
 
-tpws в режиме socks можно запускать и под более-менее современными билдами windows 10 и windows server
-с установленным WSL. Совсем не обязательно устанавливать дистрибутив убунту, как вам напишут почти в каждой
-статье про WSL, которую вы найдете в сети. tpws - статический бинарик, ему дистрибутив не нужен.
-
-Установить WSL : dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all
-Скопировать на целевую систему binaries/x86_64/tpws_wsl.tgz.
-Выполнить : wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz
-Запустить : wsl -d tpws --exec /tpws --uid=1 --no-resolve --socks --bind-addr=127.0.0.1 --port=1080 <параметры_дурения>
-Прописать socks 127.0.0.1:1080 в броузер или другую программу.
-
-Удаление : wsl --unregister tpws
-
-Проверено на windows 10 build 19041 (20.04).
-
-Не работают функции --oob и --mss из-за ограничений реализации WSL.
---disorder не работает из-за особенностей tcp/ip стека windows.
-Может не срабатывать детект RST в autohostlist.
-WSL может глючить с pipes, ломая тем самым splice и приводя к зацикливанию процесса. Может потребоваться --nosplice.
-
-ЗАМЕЧАНИЕ. Под Windows существует нативное решение GoodByeDPI, выполняющее дурение на пакетном уровне (по типу nfqws).
+Описано в docs/windows.txt
 
 
 Другие прошивки

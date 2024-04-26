@@ -18,9 +18,9 @@ check_dir()
 			# ash and dash try to execute invalid executables as a script. they interpret binary garbage with possible negative consequences
 			# bash and zsh do not do this
 			if exists bash; then
-				out=$(echo 0.0.0.0 | bash -c "$exe" 2>/dev/null)
+				out=$(echo 0.0.0.0 | bash -c "\"$exe"\" 2>/dev/null)
 			elif exists zsh; then
-				out=$(echo 0.0.0.0 | zsh -c "$exe" 2>/dev/null)
+				out=$(echo 0.0.0.0 | zsh -c "\"$exe\"" 2>/dev/null)
 			else
 				# find does not use its own shell exec
 				# it uses execvp(). in musl libc it does not call shell, in glibc it DOES call /bin/sh
@@ -49,15 +49,27 @@ ccp()
 }
 
 UNAME=$(uname)
-if [ "$UNAME" = "Linux" ]; then
- ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
-elif [ "$UNAME" = "Darwin" ]; then
- ARCHLIST="my mac64"
-elif [ "$UNAME" = "FreeBSD" ]; then
- ARCHLIST="my freebsd-x64"
-else
- ARCHLIST="my"
-fi
+unset PKTWS
+case $UNAME in
+	Linux)
+		ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
+		PKTWS=nfqws
+		;;
+	Darwin)
+		ARCHLIST="my mac64"
+		;;
+	FreeBSD)
+		ARCHLIST="my freebsd-x64"
+		PKTWS=dvtws
+		;;
+	CYGWIN*)
+		UNAME=CYGWIN
+		ARCHLIST="win64"
+		PKTWS=winws
+		;;
+	*)
+		ARCHLIST="my"
+esac
 
 if [ "$1" = "getarch" ]; then
 	for arch in $ARCHLIST
@@ -77,12 +89,8 @@ else
 			echo installing binaries ...
 			ccp $arch/ip2net ip2net
 			ccp $arch/mdig mdig
-			if [ "$UNAME" = "Linux" ]; then
-			 ccp $arch/nfqws nfq
-			else
-			 ccp $arch/dvtws nfq
-			fi
-			ccp $arch/tpws tpws
+			[ -n "$PKTWS" ] && ccp $arch/$PKTWS nfq
+			[ "$UNAME" = CYGWIN ] || ccp $arch/tpws tpws
 	 		exit 0
 		else
 			echo $arch is NOT OK

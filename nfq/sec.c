@@ -270,17 +270,18 @@ bool dropcaps(void)
 	}
 	return true;
 }
-#else // __linux__
 
+#endif // __linux__
+
+#ifndef __CYGWIN__
+
+#ifndef __linux__
 bool sec_harden(void)
 {
 	// noop
 	return true;
 }
-
-#endif // __linux__
-
-
+#endif
 
 bool can_drop_root(void)
 {
@@ -329,6 +330,7 @@ void print_id(void)
 {
  int i,N;
  gid_t g[128];
+
  printf("Running as UID=%u GID=",getuid());
  N=getgroups(sizeof(g)/sizeof(*g),g);
  if (N>0)
@@ -340,6 +342,9 @@ void print_id(void)
  else
 	printf("%u\n",getgid());
 }
+
+#endif
+
 
 void daemonize(void)
 {

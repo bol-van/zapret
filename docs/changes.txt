@@ -283,3 +283,7 @@ nfqws: --dpi-desync-start option
 nfqws: packet delay for kyber TLS and QUIC
 nfqws: --dpi-desync-retrans obsolete
 nfqws: --qnum is mandatory, no more default queue 0
+
+v58
+
+winws

@@ -47,3 +47,11 @@ void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize
 int fprint_localtime(FILE *F);
 
 time_t file_mod_time(const char *filename);
+
+typedef struct
+{
+	uint16_t from,to;
+	bool neg;
+} port_filter;
+bool pf_in_range(uint16_t port, const port_filter *pf);
+bool pf_parse(const char *s, port_filter *pf);

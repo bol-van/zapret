@@ -17,6 +17,7 @@ TPWS_UID=${TPWS_UID:-1}
 TPWS_GID=${TPWS_GID:-3003}
 NFQWS=${NFQWS:-${ZAPRET_BASE}/nfq/nfqws}
 DVTWS=${DVTWS:-${ZAPRET_BASE}/nfq/dvtws}
+WINWS=${WINWS:-${ZAPRET_BASE}/nfq/winws}
 TPWS=${TPWS:-${ZAPRET_BASE}/tpws/tpws}
 MDIG=${MDIG:-${ZAPRET_BASE}/mdig/mdig}
 DESYNC_MARK=0x10000000
@@ -191,7 +192,9 @@ mdig_resolve()
 {
 	# $1 - ip version 4/6
 	# $2 - hostname
-	echo "$2" | "$MDIG" --family=$1 | head -n 1
+
+	# windows version of mdig outputs 0D0A line ending. remove 0D.
+	echo "$2" | "$MDIG" --family=$1 | head -n 1 | tr -d '\r'
 }
 
 check_system()
@@ -229,6 +232,12 @@ check_system()
 			PKTWSD=dvtws
 			FWTYPE=mpf
 			;;
+		CYGWIN*)
+			UNAME=CYGWIN
+			PKTWS="$WINWS"
+			PKTWSD=winws
+			FWTYPE=windivert
+			;;
 		*)
 			echo $UNAME not supported
 			exitp 5
@@ -256,7 +265,7 @@ check_prerequisites()
 {
 	echo \* checking prerequisites
 	
-	[ "$UNAME" = Darwin -o -x "$PKTWS" ] && [ -x "$TPWS" ] && [ -x "$MDIG" ] || {
+	[ "$UNAME" = Darwin -o -x "$PKTWS" ] && [ "$UNAME" = CYGWIN -o -x "$TPWS" ] && [ -x "$MDIG" ] || {
 		local target
 		case $UNAME in
 			Darwin)
@@ -322,6 +331,9 @@ check_prerequisites()
 			# no divert sockets in MacOS
 			[ "$UNAME" = "Darwin" ] && SKIP_PKTWS=1
 			pf_save
+			;;
+		CYGWIN)
+			SKIP_TPWS=1
 			;;
 	esac
 
@@ -446,6 +458,7 @@ curl_with_dig()
 		return 6
 	}
 	shift ; shift ; shift
+
 	ALL_PROXY="$ALL_PROXY" curl $connect_to "$@"
 }
 
@@ -558,6 +571,10 @@ pktws_ipt_prepare()
 		opf)
 			opf_prepare_dvtws $1 $2
 			;;
+		windivert)
+			WF="--wf-l3=ipv${IPV} --wf-${1}=$2"
+			;;
+
 	esac
 }
 pktws_ipt_unprepare()
@@ -577,6 +594,9 @@ pktws_ipt_unprepare()
 			;;
 		opf)
 			pf_restore
+			;;
+		windivert)
+			unset WF
 			;;
 	esac
 }
@@ -635,6 +655,9 @@ pktws_start()
 			;;
 		FreeBSD|OpenBSD)
 			"$DVTWS" --port=$IPFW_DIVERT_PORT "$@" >/dev/null &
+			;;
+		CYGWIN)
+			"$WINWS" $WF "$@" >/dev/null &
 			;;
 	esac
 	PID=$!
@@ -711,7 +734,7 @@ pktws_curl_test()
 	# $1 - test function
 	# $2 - domain
 	# $3,$4,$5, ... - nfqws/dvtws params
-	echo - checking $PKTWSD $3 $4 $5 $6 $7 $8 $9
+	echo - checking $PKTWSD ${WF:+$WF }$3 $4 $5 $6 $7 $8 $9
 	ws_curl_test pktws_start "$@"
 }
 xxxws_curl_test_update()
@@ -726,7 +749,7 @@ xxxws_curl_test_update()
 	shift
 	$xxxf $testf $dom "$@"
 	code=$?
-	[ $code = 0 ] && strategy="${strategy:-$@}"
+	[ $code = 0 ] && strategy="${WF:+$WF }${strategy:-$@}"
 	return $code
 }
 pktws_curl_test_update()
@@ -1329,6 +1352,10 @@ pingtest()
 		OpenBSD)
 			ping -c 1 -w 1 $1 >/dev/null
 			;;
+		CYGWIN)
+			# cygwin does not have own PING by default. use windows PING.
+			ping -n 1 -w 1000 $1 >/dev/null
+			;;
 		*)
 			ping -c 1 -W 1 $1 >/dev/null
 			;;
@@ -1356,7 +1383,7 @@ lookup4()
 	# $2 - DNS
 	case "$LOOKUP" in
 		nslookup)
-			nslookup $1 $2 | sed -n '/Name:/,$p' | grep ^Address | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
+			nslookup $1 $2 2>/dev/null | sed -n '/Name:/,$p' | sed  -nre 's/^.*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
 			;;
 		host)
 			host -t A $1 $2 | grep "has address" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
@@ -1367,7 +1394,9 @@ check_dns_spoof()
 {
 	# $1 - domain
 	# $2 - public DNS
-	echo $1 | "$MDIG" --family=4 >"$DNSCHECK_DIG1"
+
+	# windows version of mdig outputs 0D0A line ending. remove 0D.
+	echo $1 | "$MDIG" --family=4 | tr -d '\r' >"$DNSCHECK_DIG1"
 	lookup4 $1 $2 >"$DNSCHECK_DIG2"
 	# check whether system resolver returns anything other than public DNS
 	grep -qvFf "$DNSCHECK_DIG2" "$DNSCHECK_DIG1"
@@ -1475,7 +1504,7 @@ sigpipe()
 fsleep_setup
 fix_sbin_path
 check_system
-require_root
+[ "$UNAME" = CYGWIN ] || require_root
 check_prerequisites
 trap sigint_cleanup INT
 check_dns
@@ -1485,6 +1514,7 @@ trap - INT
 
 PID=
 NREPORT=
+unset WF
 trap sigint INT
 trap sigpipe PIPE
 for dom in $DOMAINS; do

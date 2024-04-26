@@ -9,6 +9,8 @@ blocked by Roskomnadzor), but most others are common.
 
 Mainly OpenWRT targeted but also supports traditional Linux, FreeBSD, OpenBSD, partially MacOS.
 
+Most features are also supported in Windows.
+
 ## How it works
 
 In the simplest case you are dealing with passive DPI. Passive DPI can read passthrough traffic,
@@ -1158,29 +1160,7 @@ see docs/bsd.eng.md
 
 ### Windows (WSL)
 
-Using WSL (Windows subsystem for Linux) it's possible to run tpws in socks mode under rather new builds of
-windows 10 and windows server.
-Its not required to install any linux distributions as suggested in most articles.
-tpws is static binary. It doesn't need a distribution.
-
-Install WSL : `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all`
-
-Copy binaries/x86_64/tpws_wsl.tgz to the target system.
-Run : `wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz`
-
-Run tpws : `wsl -d tpws --exec /tpws --uid=1 --no-resolve --socks --bind-addr=127.0.0.1 --port=1080 <fooling_options>`
-
-Configure socks as 127.0.0.1:1080 in a browser or another program.
-
-Cleanup : `wsl --unregister tpws`
-
-Tested in windows 10 build 19041 (20.04).
-
-`--oob` , `--mss` and `--disorder` do not work.
-RST detection in autohostlist scheme may not work.
-WSL may glitch with pipes. `--nosplice` may be required.
-
-NOTICE. There is native windows solution GoodByeDPI. It works on packet level like nfqws.
+see docs/windows.eng.md
 
 ### Other devices
 

@@ -52,9 +52,12 @@ bool dropcaps(void);
 
 #endif
 
+#ifndef __CYGWIN__
 bool sec_harden(void);
 bool can_drop_root(void);
 bool droproot(uid_t uid, gid_t gid);
 void print_id(void);
+#endif
+
 void daemonize(void);
 bool writepid(const char *filename);

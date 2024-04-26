@@ -2,9 +2,10 @@ CC ?= gcc
 CFLAGS += -std=gnu99 -Wno-logical-op-parentheses -O3
 CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
 CFLAGS_MAC = -mmacosx-version-min=10.8
+CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
-LIBS_CYGWIN = -lz
+LIBS_CYGWIN = -lz -Lwindivert -lwindivert
 SRC_FILES = *.c crypto/*.c
 
 all: nfqws
@@ -23,7 +24,7 @@ mac: $(SRC_FILES)
 	rm -f dvtwsx dvtwsa
 
 cygwin:
-	$(CC) -s $(CFLAGS) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN)
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN)
 
 clean:
-	rm -f nfqws dvtws *.o
+	rm -f nfqws dvtws winws.exe *.o

@@ -1,15 +1,21 @@
 #pragma once
 
-#include "checksum.h"
-
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/param.h>
+
+#include "checksum.h"
+
+#ifdef __CYGWIN__
+#include "windivert/windivert.h"
+#endif
 
 #include "packet_queue.h"
 
@@ -142,17 +148,26 @@ uint32_t *tcp_find_timestamps(struct tcphdr *tcp);
 uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
 bool tcp_has_fastopen(const struct tcphdr *tcp);
 
+#ifdef __CYGWIN__
+bool windivert_init(const char *filter);
+bool windivert_recv(uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa);
+bool windivert_send(const uint8_t *packet, size_t len, const WINDIVERT_ADDRESS *wa);
+#else
+// should pre-do it if dropping privileges. otherwise its not necessary
+bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
+#endif
+
 // auto creates internal socket and uses it for subsequent calls
 bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len);
 bool rawsend_rp(const struct rawpacket *rp);
 // return trues if all packets were send successfully
 bool rawsend_queue(struct rawpacket_tailhead *q);
-// should pre-do it if dropping privileges. otherwise its not necessary
-bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 // cleans up socket autocreated by rawsend
 void rawsend_cleanup(void);
 
+#ifdef BSD
 int socket_divert(sa_family_t family);
+#endif
 
 const char *proto_name(uint8_t proto);
 uint16_t family_from_proto(uint8_t l3proto);
