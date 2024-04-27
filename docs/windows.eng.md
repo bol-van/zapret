@@ -43,6 +43,7 @@ Task of `iptables` is done inside `winws` through `windivert` filters. `Windiver
 `winws` can automate filter construction using simple ip version and port filter. Raw filters are also supported.
 
 ```
+ --wf-iface=<int>[:<int>]                       ; numeric network interface and subinterface indexes
  --wf-l3=ipv4|ipv6                              ; L3 protocol filter. multiple comma separated values allowed.
  --wf-tcp=[~]port1[-port2]                      ; TCP port filter. ~ means negation. multiple comma separated values allowed.
  --wf-udp=[~]port1[-port2]                      ; UDP port filter. ~ means negation. multiple comma separated values allowed.
@@ -51,6 +52,10 @@ Task of `iptables` is done inside `winws` through `windivert` filters. `Windiver
 ```
 
 `--wf-l3`, `--wf-tcp`, `--wf-udp` can take multiple comma separated arguments.
+
+Interface indexes can be discovered using this command : `netsh int ip show int`
+
+If you can't find index this way use `winws --debug` to see index there. Subinterface index is almost always 0 and you can omit it.
 
 Multiple `winws` processes are allowed. However, it's discouraged to intersect their filters.
 

@@ -489,95 +489,6 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 }
 
 
-static void exithelp(void)
-{
-	printf(
-		" --debug=0|1\n"
-#ifdef __linux__
-		" --qnum=<nfqueue_number>\n"
-#elif defined(BSD)
-		" --port=<port>\t\t\t\t\t; divert port\n"
-#endif
-		" --daemon\t\t\t\t\t; daemonize\n"
-		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
-#ifndef __CYGWIN__
-		" --user=<username>\t\t\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t\t\t; drop root privs\n"
-#endif
-#ifdef __linux__
-		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
-		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
-#endif
-		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
-#ifdef __CYGWIN__
-		"\nWINDIVERT FILTER:\n"
-		" --wf-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
-		" --wf-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
-		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
-		" --wf-raw=<filter>|@<filename>\t\t\t; raw windivert filter string or filename\n"
-		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
-#endif
-		"\nHOSTLIST FILTER:\n"
-		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
-		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
-		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
-		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
-		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n"
-		"\nTAMPER:\n"
-		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
-		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
-		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --hostcase\t\t\t\t\t; change Host: => host:\n"
-		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
-		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper\n"
-#ifdef __linux__
-		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
-#elif defined(SO_USER_COOKIE)
-		" --dpi-desync-sockarg=<int|0xHEX>\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
-#endif
-		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for desync packet\n"
-		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
-		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
-		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
-		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
-		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
-		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
-		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
-		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
-		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
-		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
-		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
-		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
-		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
-		" --dpi-desync-fake-wireguard=<filename>|0xHEX\t; file containing fake wireguard handshake initiation\n"
-		" --dpi-desync-fake-dht=<filename>|0xHEX\t\t; file containing DHT protocol fake payload (d1...e)\n"
-		" --dpi-desync-fake-unknown-udp=<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
-		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
-		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
-		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
-		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
-		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
-		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
-#if defined(__linux__) || defined(SO_USER_COOKIE)
-		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
-#endif
-		AUTOTTL_DEFAULT_DELTA,AUTOTTL_DEFAULT_MIN,AUTOTTL_DEFAULT_MAX,
-		DPI_DESYNC_MAX_FAKE_LEN,
-		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
-		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
-		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
-		UDPLEN_INCREMENT_DEFAULT
-	);
-	exit(1);
-}
 
 static void cleanup_params(void)
 {
@@ -588,11 +499,6 @@ static void cleanup_params(void)
 	StrPoolDestroy(&params.hostlist_exclude);
 	StrPoolDestroy(&params.hostlist);
 	HostFailPoolDestroy(&params.hostlist_auto_fail_counters);
-}
-static void exithelp_clean(void)
-{
-	cleanup_params();
-	exithelp();
 }
 static void exit_clean(int code)
 {
@@ -755,7 +661,7 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 #define DIVERT_NO_LOCALNETS_SRC "(" DIVERT_NO_LOCALNETSv4_SRC " or " DIVERT_NO_LOCALNETSv6_SRC ")"
 #define DIVERT_NO_LOCALNETS_DST "(" DIVERT_NO_LOCALNETSv4_DST " or " DIVERT_NO_LOCALNETSv6_DST ")"
 
-#define DIVERT_TCP_INBOUNDS "tcp.Ack and tcp.Syn or tcp.Rst or tcp.Fin"
+#define DIVERT_TCP_INBOUNDS "(tcp.Ack and tcp.Syn or tcp.Rst or tcp.Fin)"
 
 // HTTP/1.? 30(2|7)
 #define DIVERT_HTTP_REDIRECT "tcp.PayloadLength>=12 and tcp.Payload32[0]==0x48545450 and tcp.Payload16[2]==0x2F31 and tcp.Payload[6]==0x2E and tcp.Payload16[4]==0x2033 and tcp.Payload[10]==0x30 and (tcp.Payload[11]==0x32 or tcp.Payload[11]==0x37)"
@@ -764,13 +670,16 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 
 static bool wf_make_filter(
 	char *wf, size_t len,
+	unsigned int IfIdx,unsigned int SubIfIdx,
 	bool ipv4, bool ipv6,
 	const char *pf_tcp_src, const char *pf_tcp_dst,
 	const char *pf_udp_src, const char *pf_udp_dst)
 {
-	char pf_src_buf[512],pf_dst_buf[512];
+	char pf_src_buf[512],pf_dst_buf[512],iface[64];
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? *params.hostlist_auto_filename ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
+
+	snprintf(iface,sizeof(iface)," ifIdx=%u and subIfIdx=%u and",IfIdx,SubIfIdx);
 
 	if (!*pf_tcp_src && !*pf_udp_src) return false;
 	if (*pf_tcp_src && *pf_udp_src)
@@ -781,7 +690,8 @@ static bool wf_make_filter(
 	else
 		pf_dst = *pf_tcp_dst ? pf_tcp_dst : pf_udp_dst;
 	snprintf(wf,len,
- 	       DIVERT_PROLOG " and%s\n ((outbound and %s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
+ 	       DIVERT_PROLOG " and%s%s\n ((outbound and %s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
+		IfIdx ? iface : "",
 		ipv4 ? ipv6 ? "" : " ip and" : " ipv6 and",
 		pf_dst,
 		ipv4 ? ipv6 ? " and " DIVERT_NO_LOCALNETS_DST : " and " DIVERT_NO_LOCALNETSv4_DST : " and " DIVERT_NO_LOCALNETSv6_DST,
@@ -797,7 +707,105 @@ static bool wf_make_filter(
 	return true;
 }
 
-#endif	
+#endif
+
+
+static void exithelp(void)
+{
+	printf(
+		" --debug=0|1\n"
+#ifdef __linux__
+		" --qnum=<nfqueue_number>\n"
+#elif defined(BSD)
+		" --port=<port>\t\t\t\t\t; divert port\n"
+#endif
+		" --daemon\t\t\t\t\t; daemonize\n"
+		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
+#ifndef __CYGWIN__
+		" --user=<username>\t\t\t\t; drop root privs\n"
+		" --uid=uid[:gid]\t\t\t\t; drop root privs\n"
+#endif
+#ifdef __linux__
+		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
+		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
+#endif
+		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
+#ifdef __CYGWIN__
+		"\nWINDIVERT FILTER:\n"
+		" --wf-iface=<int>[:<int>]\t\t\t; numeric network interface and subinterface indexes\n"
+		" --wf-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
+		" --wf-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
+		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
+		" --wf-raw=<filter>|@<filename>\t\t\t; raw windivert filter string or filename\n"
+		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
+#endif
+		"\nHOSTLIST FILTER:\n"
+		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
+		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
+		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n"
+		"\nTAMPER:\n"
+		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
+		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
+		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --hostcase\t\t\t\t\t; change Host: => host:\n"
+		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
+		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper\n"
+#ifdef __linux__
+		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
+#elif defined(SO_USER_COOKIE)
+		" --dpi-desync-sockarg=<int|0xHEX>\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
+#endif
+		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for desync packet\n"
+		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
+		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
+		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
+		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
+		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
+		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
+		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
+		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
+		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
+		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
+		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
+		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
+		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
+		" --dpi-desync-fake-wireguard=<filename>|0xHEX\t; file containing fake wireguard handshake initiation\n"
+		" --dpi-desync-fake-dht=<filename>|0xHEX\t\t; file containing DHT protocol fake payload (d1...e)\n"
+		" --dpi-desync-fake-unknown-udp=<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
+		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
+		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
+		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
+		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
+		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
+		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
+#if defined(__linux__) || defined(SO_USER_COOKIE)
+		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
+#endif
+		AUTOTTL_DEFAULT_DELTA,AUTOTTL_DEFAULT_MIN,AUTOTTL_DEFAULT_MAX,
+		DPI_DESYNC_MAX_FAKE_LEN,
+		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
+		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
+		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
+		UDPLEN_INCREMENT_DEFAULT
+	);
+	exit(1);
+}
+static void exithelp_clean(void)
+{
+	cleanup_params();
+	exithelp();
+}
+
 
 int main(int argc, char **argv)
 {
@@ -808,6 +816,7 @@ int main(int argc, char **argv)
 #ifdef __CYGWIN__
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
 	bool wf_ipv4=true, wf_ipv6=true;
+	unsigned int IfIdx=0, SubIfIdx=0;
 	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
 #endif
 	
@@ -933,11 +942,12 @@ int main(int argc, char **argv)
 		{"bind-fix4",no_argument,0,0},		// optidx=48
 		{"bind-fix6",no_argument,0,0},		// optidx=49
 #elif defined(__CYGWIN__)
-		{"wf-l3",required_argument,0,0},	// optidx=48
-		{"wf-tcp",required_argument,0,0},	// optidx=49
-		{"wf-udp",required_argument,0,0},	// optidx=50
-		{"wf-raw",required_argument,0,0},	// optidx=51
-		{"wf-save",required_argument,0,0},	// optidx=52
+		{"wf-iface",required_argument,0,0},	// optidx=48
+		{"wf-l3",required_argument,0,0},	// optidx=49
+		{"wf-tcp",required_argument,0,0},	// optidx=50
+		{"wf-udp",required_argument,0,0},	// optidx=51
+		{"wf-raw",required_argument,0,0},	// optidx=52
+		{"wf-save",required_argument,0,0},	// optidx=53
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1374,14 +1384,21 @@ int main(int argc, char **argv)
 			params.bind_fix6 = true;
 			break;
 #elif defined(__CYGWIN__)
-		case 48: /* wf-l3 */
+		case 48: /* wf-iface */
+			if (!sscanf(optarg,"%u:%u",&IfIdx,&SubIfIdx))
+			{
+				fprintf(stderr, "bad value for --wf-iface\n");
+				exit_clean(1);
+			}
+			break;
+		case 49: /* wf-l3 */
 			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
 			{
 				fprintf(stderr, "bad value for --wf-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 49: /* wf-tcp */
+		case 50: /* wf-tcp */
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
 			{
@@ -1389,7 +1406,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 50: /* wf-udp */
+		case 51: /* wf-udp */
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
 			{
@@ -1397,7 +1414,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 51: /* wf-raw */
+		case 52: /* wf-raw */
 			if (optarg[0]=='@')
 			{
 				size_t sz = sizeof(windivert_filter)-1;
@@ -1410,7 +1427,7 @@ int main(int argc, char **argv)
 				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
 			}
 			break;
-		case 52: /* wf-save */
+		case 53: /* wf-save */
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
@@ -1439,7 +1456,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "windivert filter : must specify port filter\n");
 			exit_clean(1);
 		}
-		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
+		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), IfIdx, SubIfIdx, wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
 		{
 			fprintf(stderr, "windivert filter : could not make filter\n");
 			exit_clean(1);
