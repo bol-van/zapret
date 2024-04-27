@@ -732,7 +732,7 @@ static void exithelp(void)
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"
-		" --wf-iface=<int>[:<int>]\t\t\t; numeric network interface and subinterface indexes\n"
+		" --wf-iface=<int>[.<int>]\t\t\t; numeric network interface and subinterface indexes\n"
 		" --wf-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --wf-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
 		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
@@ -1385,7 +1385,7 @@ int main(int argc, char **argv)
 			break;
 #elif defined(__CYGWIN__)
 		case 48: /* wf-iface */
-			if (!sscanf(optarg,"%u:%u",&IfIdx,&SubIfIdx))
+			if (!sscanf(optarg,"%u.%u",&IfIdx,&SubIfIdx))
 			{
 				fprintf(stderr, "bad value for --wf-iface\n");
 				exit_clean(1);

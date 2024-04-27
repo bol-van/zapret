@@ -59,8 +59,6 @@ If you can't find index this way use `winws --debug` to see index there. Subinte
 
 Multiple `winws` processes are allowed. However, it's discouraged to intersect their filters.
 
-Paths are passed in `cygwin` format. Windows drives are mapped to `/cygdrive/x`. For example : `/cygdrive/c/Users/vasya/zapret`.
-
 `Cygwin` shell does not run binaries if their directory has it's own copy of `cygwin1.dll`.
 That's why exists separate standalone version in `binaries/win64/zapret-tpws`.
 `Cygwin` is required for `blockcheck.sh` support but `winws` itself can be run standalone without cygwin.
@@ -86,6 +84,11 @@ Windows does not have them. To execute `blockcheck.sh` use `cygwin` command prom
 It's not possible to use `WSL`. It's not the same as `cygwin`.
 First run once `install_bin.sh` then `blockcheck.sh`.
 
+Backslashes in windows paths shoud be doubled. Or use cygwin path notation.
+```
+cd "C:\\Users\\vasya"
+cd "/cygdrive/c/Users/vasya"
+```
 `Cygwin` is required only for `blockcheck.sh`. Standalone `winws` can be run without it.
 
 
