@@ -1383,7 +1383,7 @@ lookup4()
 	# $2 - DNS
 	case "$LOOKUP" in
 		nslookup)
-			nslookup $1 $2 2>/dev/null | sed -n '/Name:/,$p' | sed  -nre 's/^.*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
+			nslookup $1 $2 2>/dev/null | sed -e '1,3d' -nre 's/^[^0-9]*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
 			;;
 		host)
 			host -t A $1 $2 | grep "has address" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
