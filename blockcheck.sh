@@ -1384,7 +1384,6 @@ lookup4()
 	case "$LOOKUP" in
 		nslookup)
 			nslookup $1 $2 2>/dev/null | sed -n '/Name:/,$p' | sed  -nre 's/^.*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
-nslookup lenta.ru 1.1.1.1 2>/dev/null | sed -ne '1,3d' -nre 's/^Address: (([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
 			;;
 		host)
 			host -t A $1 $2 | grep "has address" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
