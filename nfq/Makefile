@@ -27,4 +27,4 @@ cygwin:
 	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) winmanifest.o
 
 clean:
-	rm -f nfqws dvtws winws.exe *.o
+	rm -f nfqws dvtws winws.exe
