@@ -24,7 +24,7 @@ mac: $(SRC_FILES)
 	rm -f dvtwsx dvtwsa
 
 cygwin:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN)
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) winmanifest.o
 
 clean:
 	rm -f nfqws dvtws winws.exe *.o
