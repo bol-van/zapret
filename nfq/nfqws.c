@@ -1540,10 +1540,6 @@ int main(int argc, char **argv)
 ex:
 	rawsend_cleanup();
 	cleanup_params();
-#ifdef __CYGWIN__
-	service_stopped();
-
-#endif
 	return result;
 exiterr:
 	result = 1;

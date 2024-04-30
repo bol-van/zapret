@@ -19,8 +19,6 @@ void service_main(int argc __attribute__((unused)), char *argv[] __attribute__((
 
 bool service_run(int argc, char *argv[])
 {
-	int i;
-
 	SERVICE_TABLE_ENTRY ServiceTable[] = {
 		{SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION)service_main},
 		{NULL, NULL}
@@ -37,10 +35,6 @@ static void service_set_status(DWORD state)
 	ServiceStatus.dwCurrentState = state;
 	SetServiceStatus(hStatus, &ServiceStatus);
 }
-void service_stopped()
-{
-	service_set_status(SERVICE_STOPPED);
-}
 
 // Control handler function
 void service_controlhandler(DWORD request)
@@ -50,18 +44,13 @@ void service_controlhandler(DWORD request)
 	case SERVICE_CONTROL_STOP:
 	case SERVICE_CONTROL_SHUTDOWN:
 		bQuit = true;
-		service_set_status(SERVICE_STOP_PENDING);
-		break;
-	default:
-		// Report current status
-		SetServiceStatus(hStatus, &ServiceStatus);
+		ServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
 		break;
 	}
-	return;
+	SetServiceStatus(hStatus, &ServiceStatus);
 }
 
-void service_main(int argc __attribute__((unused)),
-	char *argv[] __attribute__((unused)))
+void service_main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)))
 {
 	ServiceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ServiceStatus.dwCurrentState = SERVICE_RUNNING;
