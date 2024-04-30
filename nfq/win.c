@@ -1,9 +1,6 @@
 #ifdef __CYGWIN__
 
-#include <unistd.h>
-#include <signal.h>
 #include <windows.h>
-#include <stdio.h>
 
 #include "win.h"
 #include "nfqws.h"
