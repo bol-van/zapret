@@ -438,8 +438,8 @@ static int win_main(const char *windivert_filter)
 			break;
 		}
 		*ifout=0;
-		snprintf(ifout,sizeof(ifout),"%u.%u",wa.Network.IfIdx, wa.Network.SubIfIdx);
-		DLOG("packet: id=%u len=%zu outbound=%u IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%s\n", id, len, wa.Outbound, wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, ifout)
+		if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
+		DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx)
 		if (wa.Impostor)
 		{
 			DLOG("windivert: skipping impostor packet\n")
