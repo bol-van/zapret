@@ -211,6 +211,7 @@ typedef struct
 #define AUTOTTL_SET_DEFAULT(a) {(a).delta=AUTOTTL_DEFAULT_DELTA; (a).min=AUTOTTL_DEFAULT_MIN; (a).max=AUTOTTL_DEFAULT_MAX;}
 
 uint8_t autottl_guess(uint8_t ttl, const autottl *attl);
+void do_nat(bool bOutbound, struct ip *ip, struct ip6_hdr *ip6, struct tcphdr *tcphdr, struct udphdr *udphdr, const struct sockaddr_in *target4, const struct sockaddr_in6 *target6);
 
 void verdict_tcp_csum_fix(uint8_t verdict, struct tcphdr *tcphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr);
 void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr);

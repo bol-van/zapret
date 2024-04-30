@@ -29,6 +29,12 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#include "win.h"
+#endif
+
+
 #ifdef __linux__
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #define NF_DROP 0
@@ -41,7 +47,9 @@
 #define CTRACK_T_UDP	60
 
 struct params_s params;
-
+#ifdef __CYGWIN__
+bool bQuit=false;
+#endif
 
 static bool bHup = false;
 static void onhup(int sig)
@@ -421,6 +429,11 @@ static int win_main(const char *windivert_filter)
 				DLOG("windivert: ignoring too large packet\n")
 				continue; // too large packet
 			}
+			else if (errno==EINTR)
+			{
+				DLOG("QUIT requested\n")
+				break;
+			}
 			fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
 			break;
 		}
@@ -707,6 +720,12 @@ static bool wf_make_filter(
 	return true;
 }
 
+bool WinSrvInstall(const char *name, const char *binpath)
+{
+	return false;
+}
+
+
 #endif
 
 
@@ -809,13 +828,21 @@ static void exithelp_clean(void)
 
 int main(int argc, char **argv)
 {
+#ifdef __CYGWIN__
+	if (service_run(argc, argv))
+	{
+		// we were running as service. now exit.
+		return 0;
+	}
+#endif
+
 	int result, v;
 	int option_index = 0;
 	bool daemon = false;
 	char pidfile[256];
 #ifdef __CYGWIN__
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
-	bool wf_ipv4=true, wf_ipv6=true;
+	bool wf_ipv4=true, wf_ipv6=true, srv_inst=false, srv_del=false;
 	unsigned int IfIdx=0, SubIfIdx=0;
 	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
 #endif
@@ -1431,7 +1458,6 @@ int main(int argc, char **argv)
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
-
 #endif
 		}
 	}
@@ -1473,7 +1499,7 @@ int main(int argc, char **argv)
 		else
 		{
 			fprintf(stderr, "windivert filter: could not save raw filter to %s\n", wf_save_file);
-			exit_clean(0);
+			exit_clean(1);
 		}
 	}
 #endif
@@ -1522,6 +1548,10 @@ int main(int argc, char **argv)
 ex:
 	rawsend_cleanup();
 	cleanup_params();
+#ifdef __CYGWIN__
+	service_stopped();
+
+#endif
 	return result;
 exiterr:
 	result = 1;

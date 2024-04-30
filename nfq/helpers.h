@@ -19,6 +19,8 @@ bool append_to_list_file(const char *filename, const char *s);
 void print_sockaddr(const struct sockaddr *sa);
 void ntop46(const struct sockaddr *sa, char *str, size_t len);
 void ntop46_port(const struct sockaddr *sa, char *str, size_t len);
+bool pton4_port(const char *s, struct sockaddr_in *sa);
+bool pton6_port(const char *s, struct sockaddr_in6 *sa);
 
 bool seq_within(uint32_t s, uint32_t s1, uint32_t s2);
 

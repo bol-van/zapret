@@ -12,6 +12,7 @@
 #include "darkmagic.h"
 #include "helpers.h"
 #include "params.h"
+#include "nfqws.h"
 
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
@@ -1016,6 +1017,11 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 	DWORD rd;
 	char c;
 
+	if (bQuit)
+	{
+		errno=EINTR;
+		return false;
+	}
 	if (WinDivertRecvEx(hFilter, packet, *len, &recv_len, 0, wa, NULL, &ovl))
 	{
 		*len = recv_len;
@@ -1028,7 +1034,15 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 		{
 			case ERROR_IO_PENDING:
 				// make signals working
-				while(WaitForSingleObject(w_event,50)==WAIT_TIMEOUT) usleep(0);
+				while (WaitForSingleObject(w_event,50)==WAIT_TIMEOUT)
+				{
+					if (bQuit)
+					{
+						errno=EINTR;
+						return false;
+					}
+					usleep(0);
+				}
 				if (!GetOverlappedResult(hFilter,&ovl,&rd,TRUE))
 					continue;
 				*len = rd;
@@ -1437,6 +1451,48 @@ uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 	if (fake>=path) return 0;
 
 	return fake;
+}
+
+void do_nat(bool bOutbound, struct ip *ip, struct ip6_hdr *ip6, struct tcphdr *tcphdr, struct udphdr *udphdr, const struct sockaddr_in *target4, const struct sockaddr_in6 *target6)
+{
+	uint16_t nport;
+
+	if (ip && target4)
+	{
+		nport = target4->sin_port;
+		if (bOutbound)
+			ip->ip_dst = target4->sin_addr;
+		else
+			ip->ip_src = target4->sin_addr;
+		ip4_fix_checksum(ip);
+	}
+	else if (ip6 && target6)
+	{
+		nport = target6->sin6_port;
+		if (bOutbound)
+			ip6->ip6_dst = target6->sin6_addr;
+		else
+			ip6->ip6_src = target6->sin6_addr;
+	}
+	else
+		return;
+	if (nport)
+	{
+		if (tcphdr)
+		{
+			if (bOutbound)
+				tcphdr->th_dport = nport;
+			else
+				tcphdr->th_sport = nport;
+		}
+		if (udphdr)
+		{
+			if (bOutbound)
+				udphdr->uh_dport = nport;
+			else
+				udphdr->uh_sport = nport;
+		}
+	}
 }
 
 
