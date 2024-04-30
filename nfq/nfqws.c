@@ -720,12 +720,6 @@ static bool wf_make_filter(
 	return true;
 }
 
-bool WinSrvInstall(const char *name, const char *binpath)
-{
-	return false;
-}
-
-
 #endif
 
 
@@ -842,7 +836,7 @@ int main(int argc, char **argv)
 	char pidfile[256];
 #ifdef __CYGWIN__
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
-	bool wf_ipv4=true, wf_ipv6=true, srv_inst=false, srv_del=false;
+	bool wf_ipv4=true, wf_ipv6=true;
 	unsigned int IfIdx=0, SubIfIdx=0;
 	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
 #endif
