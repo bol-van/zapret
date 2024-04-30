@@ -30,10 +30,8 @@
 #include <netinet/in.h>
 
 #ifdef __CYGWIN__
-#include <windows.h>
 #include "win.h"
 #endif
-
 
 #ifdef __linux__
 #include <libnetfilter_queue/libnetfilter_queue.h>
