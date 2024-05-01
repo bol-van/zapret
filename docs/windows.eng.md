@@ -74,8 +74,9 @@ You must choose to install `curl`. To compile from sources install `gcc-core`,`m
 
 It's possible to build x86 32-bit version but this version is not shipped. You have to build it yourself.
 32-bit `windivert` can be downloaded from it's developer github. Required version is 2.2.2.
-There's no `arm64` signed `windivert` driver. You can compile it yourself but it will run only with disabled driver signature checks.
-
+There's no `arm64` signed `windivert` driver and no `cygwin`.
+Theorecitally it would be possible to compile `windivert` kernel driver with test signature and run it on a arm64 system with disabled driver signature checks.
+User-mode part can be run under x64 emulation. But it was not tested.
 
 ### blockcheck
 
