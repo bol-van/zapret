@@ -959,6 +959,7 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 static HANDLE w_filter = NULL;
 static OVERLAPPED ovl = { .hEvent = NULL };
+DWORD w_win32_error=0;
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
@@ -971,24 +972,25 @@ static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 	hMutex = CreateMutexA(NULL,TRUE,mutex_name);
 	if (hMutex && GetLastError()==ERROR_ALREADY_EXISTS)
 		WaitForSingleObject(hMutex,INFINITE);
-
 	h = WinDivertOpen(filter, WINDIVERT_LAYER_NETWORK, 0, flags);
+	w_win32_error = GetLastError();
 
 	if (hMutex)
 	{
 		ReleaseMutex(hMutex);
 		CloseHandle(hMutex);
+		SetLastError(w_win32_error);
 	}
 
 	if (h != INVALID_HANDLE_VALUE) return h;
 
-	errorcode = GetLastError();
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, errorcode, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPTSTR)&errormessage, 0, NULL);
+		NULL, w_win32_error, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPTSTR)&errormessage, 0, NULL);
 	fprintf(stderr, "windivert: error opening filter: %s", errormessage);
 	LocalFree(errormessage);
-	if (errorcode == 577)
+	if (w_win32_error == ERROR_INVALID_IMAGE_HASH)
 		fprintf(stderr,"windivert: try to disable secure boot and install OS patches\n");
+
 	return NULL;
 }
 void rawsend_cleanup(void)
@@ -1014,6 +1016,7 @@ bool windivert_init(const char *filter)
 		ovl.hEvent = CreateEventW(NULL,FALSE,FALSE,NULL);
 		if (!ovl.hEvent)
 		{
+			w_win32_error = GetLastError();
 			rawsend_cleanup();
 			return false;
 		}
@@ -1041,8 +1044,8 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 	}
 	for(;;)
 	{
-		err = GetLastError();
-		switch(err)
+		w_win32_error = GetLastError();
+		switch(w_win32_error)
 		{
 			case ERROR_IO_PENDING:
 				// make signals working

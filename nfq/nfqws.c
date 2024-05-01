@@ -411,7 +411,7 @@ static int win_main(const char *windivert_filter)
 	char ifout[22];
 
 	if (!windivert_init(windivert_filter))
-		return 1;
+		return w_win32_error;
 
 	printf("windivert initialized. capture is started.\n");
 
