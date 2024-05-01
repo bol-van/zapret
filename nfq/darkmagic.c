@@ -959,7 +959,7 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 static HANDLE w_filter = NULL;
 static OVERLAPPED ovl = { .hEvent = NULL };
-DWORD w_win32_error=0;
+uint32_t w_win32_error=0;
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
@@ -1082,7 +1082,9 @@ bool windivert_recv(uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa)
 
 static bool windivert_send_filter(HANDLE hFilter, const uint8_t *packet, size_t len, const WINDIVERT_ADDRESS *wa)
 {
-	return WinDivertSend(hFilter,packet,(UINT)len,NULL,wa);
+	bool b = WinDivertSend(hFilter,packet,(UINT)len,NULL,wa);
+	w_win32_error = GetLastError();
+	return b;
 }
 bool windivert_send(const uint8_t *packet, size_t len, const WINDIVERT_ADDRESS *wa)
 {

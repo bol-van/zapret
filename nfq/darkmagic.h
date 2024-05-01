@@ -149,7 +149,7 @@ uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
 bool tcp_has_fastopen(const struct tcphdr *tcp);
 
 #ifdef __CYGWIN__
-extern DWORD w_win32_error;
+extern uint32_t w_win32_error;
 
 bool windivert_init(const char *filter);
 bool windivert_recv(uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa);
