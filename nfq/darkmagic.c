@@ -959,19 +959,29 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 static HANDLE w_filter = NULL;
 static OVERLAPPED ovl = { .hEvent = NULL };
-;
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
 	LPTSTR errormessage = NULL;
 	DWORD errorcode = 0;
-	HANDLE h;
+	HANDLE h, hMutex;
+	const char *mutex_name = "Global\\winws_windivert_mutex";
+
+	// windivert driver start in windivert.dll has race conditions
+	hMutex = CreateMutexA(NULL,TRUE,mutex_name);
+	if (hMutex && GetLastError()==ERROR_ALREADY_EXISTS)
+		WaitForSingleObject(hMutex,INFINITE);
 
 	h = WinDivertOpen(filter, WINDIVERT_LAYER_NETWORK, 0, flags);
-	if (h != INVALID_HANDLE_VALUE)
+
+	if (hMutex)
 	{
-        	return h;
+		ReleaseMutex(hMutex);
+		CloseHandle(hMutex);
 	}
+
+	if (h != INVALID_HANDLE_VALUE) return h;
+
 	errorcode = GetLastError();
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, errorcode, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPTSTR)&errormessage, 0, NULL);
