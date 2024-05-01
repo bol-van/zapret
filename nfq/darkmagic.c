@@ -957,7 +957,9 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 #ifdef __CYGWIN__
 
-static HANDLE w_filter = NULL, w_event = NULL;
+static HANDLE w_filter = NULL;
+static OVERLAPPED ovl = { .hEvent = NULL };
+;
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
@@ -983,13 +985,14 @@ void rawsend_cleanup(void)
 {
 	if (w_filter)
 	{
+		CancelIoEx(w_filter,&ovl);
 		WinDivertClose(w_filter);
 		w_filter=NULL;
 	}
-	if (w_event)
+	if (ovl.hEvent)
 	{
-		CloseHandle(w_event);
-		w_event=NULL;
+		CloseHandle(ovl.hEvent);
+		ovl.hEvent=NULL;
 	}
 }
 bool windivert_init(const char *filter)
@@ -998,8 +1001,8 @@ bool windivert_init(const char *filter)
 	w_filter = windivert_init_filter(filter, 0);
 	if (w_filter)
 	{
-		w_event = CreateEventW(NULL,FALSE,FALSE,NULL);
-		if (!w_event)
+		ovl.hEvent = CreateEventW(NULL,FALSE,FALSE,NULL);
+		if (!ovl.hEvent)
 		{
 			rawsend_cleanup();
 			return false;
@@ -1013,7 +1016,6 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 {
 	UINT recv_len;
 	DWORD err;
-	OVERLAPPED ovl = { .hEvent = w_event };
 	DWORD rd;
 	char c;
 
@@ -1034,7 +1036,7 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 		{
 			case ERROR_IO_PENDING:
 				// make signals working
-				while (WaitForSingleObject(w_event,50)==WAIT_TIMEOUT)
+				while (WaitForSingleObject(ovl.hEvent,50)==WAIT_TIMEOUT)
 				{
 					if (bQuit)
 					{
