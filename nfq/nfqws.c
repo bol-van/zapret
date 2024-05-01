@@ -433,7 +433,7 @@ static int win_main(const char *windivert_filter)
 				break;
 			}
 			fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
-			break;
+			return w_win32_error;
 		}
 		*ifout=0;
 		if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
