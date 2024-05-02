@@ -1,0 +1,3 @@
+*.cmd eol=crlf
+*.bat eol=crlf
+* text=auto eol=lf
