@@ -86,7 +86,7 @@ check_system()
 	UNAME=$(uname)
 	if [ "$UNAME" = "Linux" ]; then
 		# do not use 'exe' because it requires root
-		local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
+		local INIT="$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)"
 		[ -L "$INIT" ] && INIT=$(readlink "$INIT")
 		INIT=$(basename "$INIT")
 		# some distros include systemctl without systemd
@@ -316,7 +316,7 @@ check_package_exists_openwrt()
 check_package_openwrt()
 {
 	[ -n "$(opkg list-installed $1)" ] && return 0
-	local what=$(opkg whatprovides $1 | tail -n +2 | head -n 1)
+	local what="$(opkg whatprovides $1 | tail -n +2 | head -n 1)"
 	[ -n "$what" ] || return 1
 	[ -n "$(opkg list-installed $what)" ]
 }
@@ -361,7 +361,7 @@ openwrt_fw_section_del()
 {
 	# $1 - fw include postfix
 
-	local id=$(openwrt_fw_section_find $1)
+	local id="$(openwrt_fw_section_find $1)"
 	[ -n "$id" ] && {
 		uci delete firewall.@include[$id] && uci commit firewall
 		rm -f "$OPENWRT_FW_INCLUDE$1"
@@ -377,7 +377,7 @@ openwrt_fw_section_add()
 }
 openwrt_fw_section_configure()
 {
-	local id=$(openwrt_fw_section_add $1)
+	local id="$(openwrt_fw_section_add $1)"
 	[ -z "$id" ] ||
 	 ! uci set firewall.@include[$id].path="$OPENWRT_FW_INCLUDE" ||
 	 ! uci set firewall.@include[$id].reload="1" ||

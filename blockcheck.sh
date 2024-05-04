@@ -452,7 +452,7 @@ curl_with_dig()
 	# $2 - domain name
 	# $3 - port
 	# $4+ - curl params
-	local connect_to=$(curl_connect_to $1 $2 $3)
+	local connect_to="$(curl_connect_to $1 $2 $3)"
 	[ -n "$connect_to" ] || {
 		echo "could not resolve ipv$1 $2"
 		return 6
@@ -749,7 +749,7 @@ xxxws_curl_test_update()
 	shift
 	$xxxf $testf $dom "$@"
 	code=$?
-	[ $code = 0 ] && strategy="${strategy:-$@}"
+	[ $code = 0 ] && strategy="${WF:+$WF }${strategy:-$@}"
 	return $code
 }
 pktws_curl_test_update()
@@ -786,7 +786,7 @@ report_strategy()
 	if [ -n "$strategy" ]; then
 		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
-		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
+		report_append "ipv${IPV} $2 $1 : $3 $strategy"
 		return 0
 	else
 		echo "$1: $3 strategy for ipv${IPV} $2 not found"

@@ -24,7 +24,7 @@ get_virt()
 check_virt()
 {
 	echo \* checking virtualization
-	local vm=$(get_virt)
+	local vm="$(get_virt)"
 	if [ -n "$vm" ]; then
 		if [ "$vm" = "none" ]; then
 			echo running on bare metal

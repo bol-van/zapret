@@ -56,7 +56,7 @@ run_daemon()
 	# $2 - daemon
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
-	local DAEMONBASE=$(basename $2)
+	local DAEMONBASE="$(basename "$2")"
 	echo "Starting daemon $1: $2 $3"
 	procd_open_instance
 	procd_set_param command $2 $3

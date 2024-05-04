@@ -60,7 +60,7 @@ find_str_in_list()
 }
 end_with_newline()
 {
-	local c=$(tail -c 1)
+	local c="$(tail -c 1)"
 	[ "$c" = "" ]
 }
 
@@ -140,7 +140,7 @@ linux_min_version()
 }
 linux_get_subsys()
 {
-	local INIT=$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)
+	local INIT="$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)"
 
 	[ -L "$INIT" ] && INIT=$(readlink "$INIT")
 	INIT=$(basename "$INIT")
@@ -213,7 +213,7 @@ fsleep_setup()
 	elif busybox usleep 1 2>/dev/null; then
 		FSLEEP=2
 	else
-		local errtext=$(read -t 0.001 2>&1)
+		local errtext="$(read -t 0.001 2>&1)"
 		if [ -z "$errtext" ]; then
 			FSLEEP=3
 		# newer openwrt has ucode with system function that supports timeout in ms

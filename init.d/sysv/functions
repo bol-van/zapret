@@ -166,7 +166,7 @@ run_daemon()
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 
-	local DAEMONBASE=$(basename $2)
+	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
 	if exists start-stop-daemon ; then
@@ -191,7 +191,7 @@ stop_daemon()
 	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
-	local DAEMONBASE=$(basename $2)
+	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
 	if exists start-stop-daemon ; then

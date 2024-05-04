@@ -52,7 +52,7 @@ check_bins()
 	echo \* checking executables
 
 	fix_perms_bin_test "$EXEDIR"
-	local arch=$(get_bin_arch)
+	local arch="$(get_bin_arch)"
 	local make_target
 	[ "$FORCE_BUILD" = "1" ] && {
 		echo forced build mode
@@ -385,7 +385,7 @@ copy_all()
 }
 copy_openwrt()
 {
-	local ARCH=$(get_bin_arch)
+	local ARCH="$(get_bin_arch)"
 	local BINDIR="$1/binaries/$ARCH"
 	
 	[ -d "$2" ] || mkdir -p "$2"
@@ -500,7 +500,7 @@ check_location()
 					exitp 3
 				fi
 			fi
-			local B=$(dirname "$ZAPRET_TARGET")
+			local B="$(dirname "$ZAPRET_TARGET")"
 			[ -d "$B" ] || mkdir -p "$B"
 			$1 "$EXEDIR" "$ZAPRET_TARGET"
 			fix_perms "$ZAPRET_TARGET"

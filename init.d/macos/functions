@@ -25,7 +25,7 @@ run_daemon()
 	# $2 - daemon
 	# $3 - daemon args
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
-	local DAEMONBASE="$(basename $2)"
+	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE="$PIDDIR/$DAEMONBASE$1.pid"
 	local ARGS="--daemon --pidfile=$PIDFILE $3"
 	[ -f "$PIDFILE" ] && pgrep -qF "$PIDFILE" && {
@@ -42,7 +42,7 @@ stop_daemon()
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 
 	local PID
-	local DAEMONBASE="$(basename $2)"
+	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE="$PIDDIR/$DAEMONBASE$1.pid"
 	[ -f "$PIDFILE" ] && read PID <"$PIDFILE"
 	[ -n "$PID" ] && {
