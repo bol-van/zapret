@@ -76,7 +76,8 @@ check_system()
 
 	echo \* checking system
 
-	SYSTEM=""
+	SYSTEM=
+	SUBSYS=
 	SYSTEMCTL=$(whichq systemctl)
 
 	get_fwtype
@@ -119,13 +120,13 @@ check_system()
 			    exitp 5
 			fi
 		fi
+		linux_get_subsys
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
 	else
 		echo easy installer only supports Linux and MacOS. check readme.txt for supported systems and manual setup info.
 		exitp 5
 	fi
-	linux_get_subsys
 	echo system is based on $SYSTEM
 	[ -n "$info" ] && echo $info
 }
