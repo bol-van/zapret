@@ -749,7 +749,7 @@ xxxws_curl_test_update()
 	shift
 	$xxxf $testf $dom "$@"
 	code=$?
-	[ $code = 0 ] && strategy="${WF:+$WF }${strategy:-$@}"
+	[ $code = 0 ] && strategy="${strategy:-$@}"
 	return $code
 }
 pktws_curl_test_update()
@@ -786,7 +786,7 @@ report_strategy()
 	if [ -n "$strategy" ]; then
 		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
-		report_append "ipv${IPV} $2 $1 : $3 $strategy"
+		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
 		return 0
 	else
 		echo "$1: $3 strategy for ipv${IPV} $2 not found"
