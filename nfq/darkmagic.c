@@ -963,7 +963,7 @@ uint32_t w_win32_error=0;
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
-	LPTSTR errormessage = NULL;
+	LPSTR errormessage = NULL;
 	DWORD errorcode = 0;
 	HANDLE h, hMutex;
 	const char *mutex_name = "Global\\winws_windivert_mutex";
@@ -984,8 +984,8 @@ static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 
 	if (h != INVALID_HANDLE_VALUE) return h;
 
-	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, w_win32_error, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPTSTR)&errormessage, 0, NULL);
+	FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, w_win32_error, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPSTR)&errormessage, 0, NULL);
 	fprintf(stderr, "windivert: error opening filter: %s", errormessage);
 	LocalFree(errormessage);
 	if (w_win32_error == ERROR_INVALID_IMAGE_HASH)
