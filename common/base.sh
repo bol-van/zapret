@@ -278,6 +278,22 @@ random()
 	echo $(( ($r % ($2-$1+1)) + $1 ))
 }
 
+shell_name()
+{
+	[ -n "$SHELL_NAME" ] || {
+		[ -n "$UNAME" ] || UNAME="$(uname)"
+
+		if [ "$UNAME" = "Linux" ]; then
+			SHELL_NAME="$(readlink /proc/$$/exe)"
+			SHELL_NAME="$(basename "$SHELL_NAME")"
+		else
+			SHELL_NAME=$(ps -p $$ -o comm=)
+		fi
+
+		[ -n "$SHELL_NAME" ] || SHELL_NAME=$(basename "$SHELL")
+	}
+}
+
 std_ports()
 {
         HTTP_PORTS=${HTTP_PORTS:-80}
