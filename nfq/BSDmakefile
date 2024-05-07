@@ -9,4 +9,4 @@ dvtws: $(SRC_FILES)
 	$(CC) $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS)
 
 clean:
-	rm -f dvtws *.o
+	rm -f dvtws
