@@ -1,5 +1,3 @@
-// WinDivert 2.2.2. MODDED
-
 /*
  * windivert.h
  * (C) 2019, all rights reserved,
@@ -152,11 +150,8 @@ typedef struct
     UINT32 Impostor:1;                  /* Packet is impostor? */
     UINT32 IPv6:1;                      /* Packet is IPv6? */
     UINT32 IPChecksum:1;                /* Packet has valid IPv4 checksum? */
-
-// MODDED : UDPChecksum and TCPChecksum in original version are exchanged
-    UINT32 UDPChecksum:1;               /* Packet has valid UDP checksum? */
     UINT32 TCPChecksum:1;               /* Packet has valid TCP checksum? */
-
+    UINT32 UDPChecksum:1;               /* Packet has valid UDP checksum? */
     UINT32 Reserved1:8;
     UINT32 Reserved2;
     union
