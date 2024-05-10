@@ -1,3 +1,4 @@
+binaries/win64/readme.txt eol=crlf
 *.cmd eol=crlf
 *.bat eol=crlf
 * text=auto eol=lf
