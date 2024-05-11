@@ -1353,8 +1353,13 @@ pingtest()
 			ping -c 1 -w 1 $1 >/dev/null
 			;;
 		CYGWIN)
-			# cygwin does not have own PING by default. use windows PING.
-			ping -n 1 -w 1000 $1 >/dev/null
+			if starts_with "$(which ping)" /cygdrive; then
+				# cygwin does not have own PING by default. use windows PING.
+				ping -n 1 -w 1000 $1 >/dev/null
+			else
+				# they have installed cygwin ping
+				ping -c 1 -W 1 $1 >/dev/null
+			fi
 			;;
 		*)
 			ping -c 1 -W 1 $1 >/dev/null

@@ -49,6 +49,17 @@ contains()
 	# check if substring $2 contains in $1
 	[ "${1#*$2}" != "$1" ]
 }
+starts_with()
+{
+	# $1 : what
+	# $2 : starts with
+	case "$1" in
+		"$2"*)
+			return 0
+			;;
+	esac
+	return 1
+}
 find_str_in_list()
 {
 	[ -n "$1" ] && {
@@ -290,7 +301,7 @@ shell_name()
 			SHELL_NAME=$(ps -p $$ -o comm=)
 		fi
 
-		[ -n "$SHELL_NAME" ] || SHELL_NAME=$(basename "$SHELL")
+		[ -n "$SHELL_NAME" ] || SHELL_NAME="$(basename "$SHELL")"
 	}
 }
 
