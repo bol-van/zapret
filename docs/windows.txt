@@ -140,8 +140,8 @@ zapret-win-bundle
 /zapret-winws/_CMD_ADMIN.cmd - получить командную строку cmd в этой директории от имени администратора для тестирования winws
 с параметрами, вводимыми вручную
 /blockcheck/blockcheck.cmd - достаточно кликнуть по нему, чтобы пошел blockcheck с записью лога в blockcheck/blockcheck.log
-/cgywin/cygwin.cmd - запуск среды cygwin bash под текущим пользователем
-/cgywin/cygwin-admin.cmd - запуск среды cygwin bash под администратором
+/cygwin/cygwin.cmd - запуск среды cygwin bash под текущим пользователем
+/cygwin/cygwin-admin.cmd - запуск среды cygwin bash под администратором
 
 В среде cygwin уже настроены alias-ы на winws,blockcheck,ip2net,mdig. С путями возиться не нужно !
 Из cygwin можно не только тестировать winws, но и посылать сигналы.
