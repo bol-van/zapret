@@ -1037,6 +1037,7 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 		errno=EINTR;
 		return false;
 	}
+	usleep(0);
 	if (WinDivertRecvEx(hFilter, packet, *len, &recv_len, 0, wa, NULL, &ovl))
 	{
 		*len = recv_len;

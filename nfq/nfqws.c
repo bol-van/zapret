@@ -444,17 +444,20 @@ static int win_main(const char *windivert_filter)
 		DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx)
 		if (wa.Impostor)
 		{
-			DLOG("windivert: skipping impostor packet\n")
-			continue;
+			DLOG("windivert: passing impostor packet\n")
+			verdict = VERDICT_PASS;
 		}
-		if (wa.Loopback)
+		else if (wa.Loopback)
 		{
-			DLOG("windivert: skipping loopback packet\n")
-			continue;
+			DLOG("windivert: passing loopback packet\n")
+			verdict = VERDICT_PASS;
 		}
-		mark=0;
-		// pseudo interface id IfIdx.SubIfIdx
-		verdict = processPacketData(&mark, ifout, packet, &len);
+		else
+		{
+			mark=0;
+			// pseudo interface id IfIdx.SubIfIdx
+			verdict = processPacketData(&mark, ifout, packet, &len);
+		}
 		switch (verdict & VERDICT_MASK)
 		{
 			case VERDICT_PASS:
