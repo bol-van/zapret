@@ -417,6 +417,10 @@ static int win_main(const char *windivert_filter)
 
 	pre_desync();
 
+	// cygwin auto flush fails when piping
+	fflush(stdout);
+	fflush(stderr);
+
 	for (id=0;;id++)
 	{
 		len = sizeof(packet);
@@ -465,6 +469,10 @@ static int win_main(const char *windivert_filter)
 			default:
 				DLOG("packet: id=%u drop\n", id);
 		}
+
+		// cygwin auto flush fails when piping
+		fflush(stdout);
+		fflush(stderr);
 	}
 	return 0;
 }
