@@ -1267,7 +1267,7 @@ ask_params()
 
 	local IPVS_def=4
 	# yandex public dns
-	pingtest 2a02:6b8::feed:0ff && IPVS_def=46
+	pingtest 6 2a02:6b8::feed:0ff && IPVS_def=46
 	printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
 	read IPVS
 	[ -n "$IPVS" ] || IPVS=$IPVS_def
@@ -1349,21 +1349,49 @@ ask_params()
 
 pingtest()
 {
+	# $1 - ip version : 4 or 6
+	# $2 - domain or ip
+	# ping command can vary a lot. some implementations have -4/-6 options. others don.t
+	local PING=ping ret
+	if [ "$1" = 6 ]; then
+		if exists ping6; then
+			PING=ping6
+		else
+			PING="ping -6"
+		fi
+	else
+		if [ "$UNAME" = Darwin -o "$UNAME" = FreeBSD -o "$UNAME" = OpenBSD ]; then
+			# ping by default pings ipv4, ping6 only pings ipv6
+			# in FreeBSD -4/-6 options are supported, in others not
+			PING=ping
+		else
+			# this can be linux or cygwin
+			# in linux it's not possible for sure to figure out if it supports -4/-6. only try and check for result code=2 (invalid option)
+			PING="ping -4"
+		fi
+	fi
 	case "$UNAME" in
 		OpenBSD)
-			ping -c 1 -w 1 $1 >/dev/null
+			$PING -c 1 -w 1 $2 >/dev/null
 			;;
 		CYGWIN)
 			if starts_with "$(which ping)" /cygdrive; then
-				# cygwin does not have own PING by default. use windows PING.
-				ping -n 1 -w 1000 $1 >/dev/null
+				# cygwin does not have own ping by default. use windows PING.
+				$PING -n 1 -w 1000 $2 >/dev/null
 			else
 				# they have installed cygwin ping
-				ping -c 1 -W 1 $1 >/dev/null
+				$PING -c 1 -W 1 $2 >/dev/null
 			fi
 			;;
 		*)
-			ping -c 1 -W 1 $1 >/dev/null
+			$PING -c 1 -W 1 $2 >/dev/null 2>/dev/null
+			ret=$?
+			# can be because of unsupported -4 option
+			if [ "$ret" = 2 ]; then
+				ping -c 1 -W 1 $2 >/dev/null
+			else
+				return $ret
+			fi
 			;;
 	esac
 }
@@ -1376,7 +1404,7 @@ find_working_public_dns()
 {
 	local dns
 	for dns in $DNSCHECK_DNS; do
-		pingtest $dns && dnstest $dns && {
+		pingtest 4 $dns && dnstest $dns && {
 			PUBDNS=$dns
 			return 0
 		}
@@ -1389,7 +1417,11 @@ lookup4()
 	# $2 - DNS
 	case "$LOOKUP" in
 		nslookup)
-			nslookup $1 $2 2>/dev/null | sed -e '1,3d' -nre 's/^[^0-9]*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
+			if is_linked_to_busybox nslookup; then
+				nslookup $1 $2 2>/dev/null | sed -e '1,3d' -nre 's/^.*:[^0-9]*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
+			else
+				nslookup $1 $2 2>/dev/null | sed -e '1,3d' -nre 's/^[^0-9]*(([0-9]{1,3}\.){3}[0-9]{1,3}).*$/\1/p'
+			fi
 			;;
 		host)
 			host -t A $1 $2 | grep "has address" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}'
