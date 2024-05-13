@@ -1347,11 +1347,27 @@ ask_params()
 
 
 
+ping_with_fix()
+{
+	local ret
+	$PING $2 $1 >/dev/null 2>/dev/null
+	ret=$?
+	# can be because of unsupported -4 option
+	if [ "$ret" = 2 -o "$ret" = 64 ]; then
+		ping $2 $1 >/dev/null
+	else
+		return $ret
+	fi
+}
+
 pingtest()
 {
 	# $1 - ip version : 4 or 6
 	# $2 - domain or ip
+
 	# ping command can vary a lot. some implementations have -4/-6 options. others don.t
+	# WARNING ! macos ping6 command does not have timeout option. ping6 will fail
+
 	local PING=ping ret
 	if [ "$1" = 6 ]; then
 		if exists ping6; then
@@ -1371,6 +1387,10 @@ pingtest()
 		fi
 	fi
 	case "$UNAME" in
+		Darwin)
+			$PING -c 1 -t 1 $2 >/dev/null 2>/dev/null
+			# WARNING ! macos ping6 command does not have timeout option. ping6 will fail. but without timeout is not an option.
+			;;
 		OpenBSD)
 			$PING -c 1 -w 1 $2 >/dev/null
 			;;
@@ -1379,19 +1399,11 @@ pingtest()
 				# cygwin does not have own ping by default. use windows PING.
 				$PING -n 1 -w 1000 $2 >/dev/null
 			else
-				# they have installed cygwin ping
-				$PING -c 1 -W 1 $2 >/dev/null
+				ping_with_fix $2 '-c 1 -w 1'
 			fi
 			;;
 		*)
-			$PING -c 1 -W 1 $2 >/dev/null 2>/dev/null
-			ret=$?
-			# can be because of unsupported -4 option
-			if [ "$ret" = 2 ]; then
-				ping -c 1 -W 1 $2 >/dev/null
-			else
-				return $ret
-			fi
+			ping_with_fix $2 '-c 1 -W 1'
 			;;
 	esac
 }
