@@ -1265,9 +1265,12 @@ ask_params()
 	read dom
 	[ -n "$dom" ] && DOMAINS="$dom"
 
-	printf "ip protocol version(s) - 4, 6 or 46 for both (default: 4) : "
+	local IPVS_def=4
+	# yandex public dns
+	pingtest 2a02:6b8::feed:0ff && IPVS_def=46
+	printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
 	read IPVS
-	[ -n "$IPVS" ] || IPVS=4
+	[ -n "$IPVS" ] || IPVS=$IPVS_def
 	[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
 		echo 'invalid ip version(s). should be 4, 6 or 46.'
 		exitp 1
@@ -1287,13 +1290,11 @@ ask_params()
 	ENABLE_HTTPS_TLS13=0
 	echo
 	if [ -n "$TLS13" ]; then
-		echo "TLS 1.3 is the new standard for encrypted communications over TCP"
-		echo "its the most important feature for DPI bypass is encrypted TLS ServerHello"
-		echo "more and more sites enable TLS 1.3 but still there're many sites with only TLS 1.2 support"
-		echo "with TLS 1.3 more DPI bypass strategies can work but they may not apply to all sites"
-		echo "if a strategy works with TLS 1.2 it will also work with TLS 1.3"
-		echo "if nothing works with TLS 1.2 this test may find TLS1.3 only strategies"
-		echo "make sure that $DOMAINS support TLS 1.3 otherwise all test will return an error"
+		echo "TLS 1.3 uses encrypted ServerHello. DPI cannot check domain name in server response."
+		echo "This can allow more bypass strategies to work."
+		echo "What works for TLS 1.2 will also work for TLS 1.3 but not vice versa."
+		echo "Most sites nowadays support TLS 1.3 but not all. If you can't find a strategy for TLS 1.2 use this test."
+		echo "TLS 1.3 only strategy is better than nothing."
 		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
 	else
 		echo "installed curl version does not support TLS 1.3 . tests disabled."
