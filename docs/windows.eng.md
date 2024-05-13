@@ -75,8 +75,8 @@ You must choose to install `curl`. To compile from sources install `gcc-core`,`m
 It's possible to build x86 32-bit version but this version is not shipped. You have to build it yourself.
 32-bit `windivert` can be downloaded from it's developer github. Required version is 2.2.2.
 There's no `arm64` signed `windivert` driver and no `cygwin`.
-Theorecitally it would be possible to compile `windivert` kernel driver with test signature and run it on a arm64 system with disabled driver signature checks.
-User-mode part can be run under x64 emulation. But it was not tested.
+But it's possible to use unsigned driver version in test mode and user mode components with x64 emulation.
+x64 emulation requires `windows 11` and not supported in `windows 10`.
 
 ### blockcheck
 
@@ -88,6 +88,7 @@ First run once `install_bin.sh` then `blockcheck.sh`.
 Backslashes in windows paths shoud be doubled. Or use cygwin path notation.
 ```
 cd "C:\\Users\\vasya"
+cd "C:/Users/vasya"
 cd "/cygdrive/c/Users/vasya"
 ```
 `Cygwin` is required only for `blockcheck.sh`. Standalone `winws` can be run without it.
@@ -102,3 +103,28 @@ Edit `task_create.cmd` and write your `winws` parameters to `%WINWS1%` variable.
 clone the code in all cmd files to support multiple tasks `winws1,winws2,winws3,...`.
 
 Tasks can also be controlled from GUI `taskschd.msc`.
+
+
+### zapret-win-bundle
+
+To make your life easier there's ready to use [bundle](https://github.com/bol-van/zapret-win-bundle) with `cygwin`,`blockcheck` and `winws`.
+
+* `/zapret-winws` - standalone version of `winws` for everyday use. does not require any other folders.
+* `/zapret-winws/_CMD_ADMIN.cmd` - open `cmd` as administrator in the current folder
+* `/blockcheck/blockcheck.cmd` - run `blockcheck` with logging to `blockcheck/blockcheck.log`
+* `/cygwin/cygwin.cmd` - run `cygwin` shell as current user
+* `/cygwin/cygwin-admin.cmd` - run `cygwin` shell as administrator
+
+There're aliases in cygwin shell for `winws`,`blockcheck`,`ip2net`,`mdig`. No need to mess with paths.
+It's possible to send signals to `winws` using standard unix utilites : `pidof,kill,killall,pgrep,pkill`.
+`Cygwin` shares common process list per `cygwin1.dll` copy. If you run a `winws` from `zapret-winws`
+you won't be able to `kill` it because this folder contain its own copy of `cygwin1.dll`.
+
+It's possible to use `cygwin` shell to make `winws` debug log. Use `tee` command like this :
+
+```
+winws --debug --wf-tcp=80,443 | tee winws.log
+unix2dos winws.log
+```
+
+`winws.log` will be in `cygwin/home/<username>`. `unix2dos` helps with `windows 7` notepad. It's not necessary in `Windows 10` and later.
