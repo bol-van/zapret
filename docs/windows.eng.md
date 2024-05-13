@@ -104,6 +104,8 @@ clone the code in all cmd files to support multiple tasks `winws1,winws2,winws3,
 
 Tasks can also be controlled from GUI `taskschd.msc`.
 
+Also you can use windows services the same way with `service_*.cmd`.
+
 
 ### zapret-win-bundle
 
