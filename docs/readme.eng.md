@@ -7,7 +7,7 @@ The project is mainly aimed at the Russian audience to fight russian regulator n
 Some features of the project are russian reality specific (such as getting list of sites
 blocked by Roskomnadzor), but most others are common.
 
-Mainly OpenWRT targeted but also supports traditional Linux, FreeBSD, OpenBSD, partially MacOS.
+Mainly OpenWRT targeted but also supports traditional Linux, FreeBSD, OpenBSD, Windows, partially MacOS.
 
 Most features are also supported in Windows.
 
@@ -386,9 +386,7 @@ Set up bridge networking.
 ### CONNTRACK
 
 nfqws is equipped with minimalistic connection tracking system (conntrack)
-It's enabled if some specific DPI circumvention methods are involved.
-
-Currently these are `--wssize` and `--dpi-desync-cutoff`  options.
+It's used if some specific DPI circumvention methods are involved and helps to reassemble multi-packet requests.
 
 Conntrack can track connection phase : SYN,ESTABLISHED,FIN , packet counts in both directions , sequence numbers.
 
@@ -462,8 +460,8 @@ Set conntrack timeouts appropriately.
 ### Reassemble
 
 nfqws supports reassemble of TLS and QUIC ClientHello.
-They can consist of multiple packets if kyber crypto is used (default from chromium 124).
-Chromium randomizes TLS fingerprint. SNI can be in any packet.
+They can consist of multiple packets if kyber crypto is used (default starting from chromium 124).
+Chromium randomizes TLS fingerprint. SNI can be in any packet or in-between.
 Stateful DPIs usually reassemble all packets in the request then apply block decision.
 If nfqws receives a partial ClientHello it begins reassemble session. Packets are delayed until it's finished.
 Then the first packet goes through desync using fully reassembled message. Other packets are sent
@@ -491,9 +489,13 @@ By default fake payload is 64 zeroes. Can be overriden using `--dpi-desync-fake-
 
 ### IP fragmentation
 
-Modern network is very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled on the way. 
+Modern network can be very hostile to IP fragmentation. Fragmented packets are often not delivered or refragmented/reassembled on the way. 
 Frag position is set independently for tcp and udp. By default 24 and 8, must be multiple of 8.
 Offset starts from the transport header.
+
+tcp fragments are almost always filtered. It's absolutely not suitable for arbitrary websites.
+udp fragments have good chances to survive but not everywhere. It's good to assume success rate on QUIC between 50..75%.
+Likely more with your VPS. Sometimes filtered by DDoS protection.
 
 There are important nuances when working with fragments in Linux.
 
