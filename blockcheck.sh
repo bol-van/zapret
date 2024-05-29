@@ -1029,7 +1029,7 @@ tpws_check_domain_http_bypass_()
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
 				for pos in 1 2 3 4 5 10 50; do
 					s="--split-pos=$pos"
-					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss $s3&& [ "$SCANLEVEL" != force ] && {
+					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						break
 					}
