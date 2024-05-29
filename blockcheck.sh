@@ -999,8 +999,10 @@ pktws_check_domain_http3_bypass()
 }
 warn_mss()
 {
-	echo 'WARNING ! although mss worked it may not work on all sites and will likely cause significant slowdown. it may only be required for TLS1.2, not TLS1.3'
+	[ -n "$1" ] && echo 'WARNING ! although mss worked it may not work on all sites and will likely cause significant slowdown. it may only be required for TLS1.2, not TLS1.3'
+	return 0
 }
+
 tpws_check_domain_http_bypass_()
 {
 	# $1 - test function
@@ -1027,7 +1029,7 @@ tpws_check_domain_http_bypass_()
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
 				for pos in 1 2 3 4 5 10 50; do
 					s="--split-pos=$pos"
-					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss && [ "$SCANLEVEL" != force ] && {
+					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss $s3&& [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						break
 					}
@@ -1037,7 +1039,7 @@ tpws_check_domain_http_bypass_()
 					'--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob --disorder' \
 					'--tlsrec=sni --split-pos=1' '--tlsrec=sni --split-pos=1 --oob' '--tlsrec=sni --split-pos=1 --disorder' \
 					'--tlsrec=sni --split-pos=1 --oob --disorder'; do
-				tpws_curl_test_update $1 $3 $s2 $s3 && warn_mss && [ "$SCANLEVEL" != force ] && {
+				tpws_curl_test_update $1 $3 $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 					[ "$SCANLEVEL" = quick ] && return
 					break
 				}
