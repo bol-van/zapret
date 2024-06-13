@@ -277,6 +277,7 @@ replace_char()
 
 setup_md5()
 {
+	[ -n "$MD5" ] && return
 	MD5=md5sum
 	exists $MD5 || MD5=md5
 }
@@ -285,6 +286,7 @@ random()
 {
 	# $1 - min, $2 - max
 	local r rs
+	setup_md5
 	if [ -c /dev/urandom ]; then
 		read rs </dev/urandom
 	else

@@ -48,8 +48,6 @@ PF_RULES_SAVE=/tmp/pf-zapret-save.conf
 
 unset ALL_PROXY
 
-setup_md5
-
 killwait()
 {
 	# $1 - signal (-9, -2, ...)
