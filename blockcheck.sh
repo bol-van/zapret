@@ -48,6 +48,8 @@ PF_RULES_SAVE=/tmp/pf-zapret-save.conf
 
 unset ALL_PROXY
 
+setup_md5
+
 killwait()
 {
 	# $1 - signal (-9, -2, ...)
@@ -193,8 +195,28 @@ mdig_resolve()
 	# $1 - ip version 4/6
 	# $2 - hostname
 
-	# windows version of mdig outputs 0D0A line ending. remove 0D.
-	echo "$2" | "$MDIG" --family=$1 | head -n 1 | tr -d '\r'
+	local hostvar=$(echo $2 | sed -e 's/[\.-]/_/g')
+	local cachevar=DNSCACHE_${hostvar}_$1
+	local countvar=${cachevar}_COUNT
+	local count n ip ips
+	eval count=\$${countvar}
+	if [ -n "$count" ]; then
+		n=$(random 0 $(($count-1)))
+		eval ip=\$${cachevar}_$n
+		echo $ip
+		return 0
+	else
+		# windows version of mdig outputs 0D0A line ending. remove 0D.
+		ips="$(echo $2 | "$MDIG" --family=$1 | tr -d '\r' | xargs)"
+		[ -n "$ips" ] || return 1
+		count=0
+		for ip in $ips; do
+			eval ${cachevar}_$count=$ip
+			count=$(($count+1))
+		done
+		eval $countvar=$count
+		mdig_resolve "$@"
+	fi
 }
 
 check_system()
