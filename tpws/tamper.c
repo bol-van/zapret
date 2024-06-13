@@ -261,7 +261,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 
 			if ((5+*size)<=segment_buffer_size)
 			{
-				tpos = tls_pos(params.tlsrec, params.tlsrec_pos, segment, *size, 0);
+				tpos = tls_pos(params.tlsrec, params.tlsrec_pos+5, segment, *size, 0);
 				if (tpos>5)
 				{
 					// construct 2 TLS records from one
