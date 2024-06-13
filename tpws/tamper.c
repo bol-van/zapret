@@ -33,7 +33,7 @@ static size_t tls_pos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls
 		case tlspos_sniext:
 			if (TLSFindExt(tls,sz,0,&ext,&elen,false))
 				return (tpos_type==tlspos_sni) ? ext-tls+6 : ext-tls+1;
-			break;
+			// fall through
 		case tlspos_pos:
 			return tpos_pos;
 	}
