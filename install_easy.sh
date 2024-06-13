@@ -24,8 +24,7 @@ GET_LIST="$IPSET_DIR/get_config.sh"
 
 [ -n "$TPPORT" ] || TPPORT=988
 
-MD5=md5sum
-exists $MD5 || MD5=md5
+setup_md5
 
 check_readonly_system()
 {

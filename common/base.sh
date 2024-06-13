@@ -275,6 +275,12 @@ replace_char()
 	echo "$@" | tr $a $b
 }
 
+setup_md5()
+{
+	MD5=md5sum
+	exists $MD5 || MD5=md5
+}
+
 random()
 {
 	# $1 - min, $2 - max
