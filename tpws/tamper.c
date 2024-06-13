@@ -36,8 +36,9 @@ static size_t tls_pos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls
 			// fall through
 		case tlspos_pos:
 			return tpos_pos;
+		default:
+			return 0;
 	}
-	return 0;
 }
 
 
