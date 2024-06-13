@@ -9,7 +9,7 @@
 #include <stdio.h>
 
 // pHost points to "Host: ..."
-bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
+static bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
 {
 	if (!*pHost)
 	{
@@ -22,6 +22,24 @@ bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
 	}
 	return !!*pHost;
 }
+
+static size_t tls_pos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls, size_t sz, uint8_t type)
+{
+	size_t elen;
+	const uint8_t *ext;
+	switch(tpos_type)
+	{
+		case tlspos_sni:
+		case tlspos_sniext:
+			if (TLSFindExt(tls,sz,0,&ext,&elen,false))
+				return (tpos_type==tlspos_sni) ? ext-tls+6 : ext-tls+1;
+			break;
+		case tlspos_pos:
+			return tpos_pos;
+	}
+	return 0;
+}
+
 
 static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 // segment buffer has at least 5 extra bytes to extend data block
@@ -200,10 +218,10 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			}
 			switch (params.split_http_req)
 			{
-				case split_method:
+				case httpreqpos_method:
 					*split_pos = method_len - 1 + params.methodeol + (params.methodeol && !params.unixeol);
 					break;
-				case split_host:
+				case httpreqpos_host:
 					if (find_host(&pHost,segment,*size))
 						*split_pos = pHost + 6 - bRemovedHostSpace - segment;
 					break;
@@ -220,7 +238,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	}
 	else if (IsTLSClientHello(segment,*size,false))
 	{
-		size_t tpos=0,elen;
+		size_t tpos=0,spos=0;
 		const uint8_t *ext;
 		
 		if (!ctrack->l7proto) ctrack->l7proto=TLS;
@@ -239,39 +257,38 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		}
 		else
 		{
-			switch(params.tlsrec)
+			spos = tls_pos(params.split_tls, params.split_pos, segment, *size, 0);
+
+			if ((5+*size)<=segment_buffer_size)
 			{
-				case tlsrec_sni:
-					if (TLSFindExt(segment,*size,0,&ext,&elen,false))
-						tpos = ext-segment+1; // between typical 1st and 2nd char of hostname
-					break;
-				case tlsrec_pos:
-					tpos = params.tlsrec_pos;
-					break;
-				default:
-					break;
-			}
-			if (tpos && (5+*size)<=segment_buffer_size)
-			{
-				// construct 2 TLS records from one
-				uint16_t l = pntoh16(segment+3); // length
-				if (l>=2)
+				tpos = tls_pos(params.tlsrec, params.tlsrec_pos, segment, *size, 0);
+				if (tpos>5)
 				{
-					// length is checked in IsTLSClientHello and cannot exceed buffer size
-					if (tpos>=l) tpos=1;
-					VPRINT("making 2 TLS records at pos %zu",tpos)
-					memmove(segment+5+tpos+5,segment+5+tpos,*size-(5+tpos));
-					segment[5+tpos] = segment[0];
-					segment[5+tpos+1] = segment[1];
-					segment[5+tpos+2] = segment[2];
-					phton16(segment+5+tpos+3,l-tpos);
-					phton16(segment+3,tpos);
-					*size += 5;
+					// construct 2 TLS records from one
+					uint16_t l = pntoh16(segment+3); // length
+					if (l>=2)
+					{
+						// length is checked in IsTLSClientHello and cannot exceed buffer size
+						if ((tpos-5)>=l) tpos=5+1;
+						VPRINT("making 2 TLS records at pos %zu",tpos)
+						memmove(segment+tpos+5,segment+tpos,*size-tpos);
+						segment[tpos] = segment[0];
+						segment[tpos+1] = segment[1];
+						segment[tpos+2] = segment[2];
+						phton16(segment+tpos+3,l-(tpos-5));
+						phton16(segment+3,tpos-5);
+						*size += 5;
+						// split pos present and it is not before tlsrec split. increase split pos by tlsrec header size (5 bytes)
+						if (spos && spos>=tpos) spos+=5;
+					}
 				}
 			}
-		
-			if (params.split_pos < *size)
-				*split_pos = params.split_pos;
+
+			if (spos && spos < *size)
+			{
+				VPRINT("split pos %zu",spos);
+				*split_pos = spos;
+			}
 
 			if (params.disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
 			if (params.oob_tls) *split_flags |= SPLIT_FLAG_OOB;

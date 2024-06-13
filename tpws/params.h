@@ -13,8 +13,8 @@
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
-enum splithttpreq { split_none = 0, split_method, split_host };
-enum tlsrec { tlsrec_none = 0, tlsrec_sni, tlsrec_pos };
+enum httpreqpos { httpreqpos_none = 0, httpreqpos_method, httpreqpos_host };
+enum tlspos { tlspos_none = 0, tlspos_sni, tlspos_sniext, tlspos_pos };
 enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32
@@ -47,9 +47,10 @@ struct params_s
 	bool hostcase, hostdot, hosttab, hostnospace, methodspace, methodeol, unixeol, domcase;
 	int hostpad;
 	char hostspell[4];
-	enum splithttpreq split_http_req;
-	enum tlsrec tlsrec;
+	enum httpreqpos split_http_req;
+	enum tlspos tlsrec;
 	int tlsrec_pos;
+	enum tlspos split_tls;
 	bool split_any_protocol;
 	int split_pos;
 	bool disorder, disorder_http, disorder_tls;
