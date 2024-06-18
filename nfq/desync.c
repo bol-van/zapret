@@ -437,7 +437,27 @@ static bool process_desync_interval(t_ctrack *ctrack)
 
 static bool replay_queue(struct rawpacket_tailhead *q);
 
-static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
+static size_t pos_normalize(size_t split_pos, size_t reasm_offset, size_t len_payload)
+{
+	size_t rsplit_pos = split_pos;
+	// normalize split pos to current packet
+	split_pos=(split_pos>reasm_offset && (split_pos-reasm_offset)<len_payload) ? split_pos-reasm_offset : 0;
+	if (rsplit_pos)
+	{
+		if (split_pos==rsplit_pos)
+			DLOG("split pos %zu\n",split_pos)
+		else
+		{
+			if (split_pos)
+				DLOG("split pos was normalized to packet data offset : %zu -> %zu\n",rsplit_pos,split_pos)
+			else
+				DLOG("split pos %zu is outside of this packet %zu-%zu\n",rsplit_pos,reasm_offset,reasm_offset+len_payload)
+		}
+	}
+	return split_pos;
+}
+
+static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
 {
 	uint8_t verdict=VERDICT_PASS;
 
@@ -634,7 +654,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 		uint8_t *p, *phost;
 		const uint8_t *rdata_payload = data_payload;
 		size_t rlen_payload = len_payload;
-		
+		size_t split_pos;
+
 		if (replay)
 		{
 			rdata_payload = ctrack_replay->reasm_orig.packet;
@@ -655,7 +676,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 
 			// we do not reassemble http
 			reasm_orig_cancel(ctrack);
-
+			
 			forced_wssize_cutoff(ctrack);
 			fake = params.fake_http;
 			fake_size = params.fake_http_size;
@@ -679,6 +700,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 					DLOG("req retrans : tcp seq interval %u-%u\n",ctrack->req_seq_start,ctrack->req_seq_end);
 				}
 			}
+			split_pos = HttpPos(params.desync_split_http_req, params.desync_split_pos, rdata_payload, rlen_payload);
 			bKnownProtocol = true;
 		}
 		else if (IsTLSClientHello(rdata_payload,rlen_payload,TLS_PARTIALS_ENABLE))
@@ -722,9 +744,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 				if (!ReasmIsEmpty(&ctrack->reasm_orig))
 				{
 					verdict_tcp_csum_fix(verdict, tcphdr, transport_len, ip, ip6hdr);
-					if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, data_pkt, *len_pkt))
+					if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, data_pkt, *len_pkt, len_payload))
 					{
-						DLOG("DELAY desync until reasm is complete (%u)\n", rawpacket_queue_count(&ctrack->delayed));
+						DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
 					}
 					else
 					{
@@ -750,8 +772,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			
 			fake = params.fake_tls;
 			fake_size = params.fake_tls_size;
+			split_pos = TLSPos(params.desync_split_tls, params.desync_split_pos, rdata_payload, rlen_payload, 0);
 			bKnownProtocol = true;
 		}
+		else
+			split_pos=params.desync_split_pos;
 
 		reasm_orig_cancel(ctrack);
 		rdata_payload=NULL;
@@ -842,6 +867,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			print_sockaddr((struct sockaddr *)&dst);
 			printf("\n");
 		}
+		
+		if (!split_pos || split_pos>rlen_payload) split_pos=1;
+		split_pos=pos_normalize(split_pos,reasm_offset,len_payload);
 
 		enum dpi_desync_mode desync_mode = params.desync_mode;
 		uint32_t fooling_orig = FOOL_NONE;
@@ -852,6 +880,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 		switch(desync_mode)
 		{
 			case DESYNC_FAKE_KNOWN:
+				if (reasm_offset)
+				{
+					desync_mode = params.desync_mode2;
+					break;
+				}
 				if (!bKnownProtocol)
 				{
 					DLOG("not applying fake because of unknown protocol\n");
@@ -859,6 +892,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 					break;
 				}
 			case DESYNC_FAKE:
+				if (reasm_offset) break;
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 					fake, fake_size, pkt1, &pkt1_len))
@@ -871,6 +905,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 				break;
 			case DESYNC_RST:
 			case DESYNC_RSTACK:
+				if (reasm_offset) break;
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 					NULL, 0, pkt1, &pkt1_len))
@@ -884,7 +919,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			case DESYNC_DESTOPT:
 			case DESYNC_IPFRAG1:
 				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
-				if (ip6hdr && (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_tcp(params.desync_mode2)))
+				desync_mode = params.desync_mode2;
+				if (ip6hdr && (desync_mode==DESYNC_NONE || !desync_valid_second_stage_tcp(desync_mode) ||
+					(!split_pos && (desync_mode==DESYNC_SPLIT || desync_mode==DESYNC_SPLIT2 || desync_mode==DESYNC_DISORDER || desync_mode==DESYNC_DISORDER2))))
 				{
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 						ttl_orig,fooling_orig,0,0,
@@ -898,7 +935,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 					// this mode is final, no other options available
 					return VERDICT_DROP;
 				}
-				desync_mode = params.desync_mode2;
 		}
 
 		if (b)
@@ -916,12 +952,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 			desync_mode = params.desync_mode2;
 		}
 
-		size_t split_pos=len_payload>params.desync_split_pos ? params.desync_split_pos : 1;
 		pkt1_len = sizeof(pkt1);
 		switch(desync_mode)
 		{
 			case DESYNC_DISORDER:
 			case DESYNC_DISORDER2:
+				if (split_pos)
 				{
 					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100];
 					size_t fakeseg_len;
@@ -976,6 +1012,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 				break;
 			case DESYNC_SPLIT:
 			case DESYNC_SPLIT2:
+				if (split_pos)
 				{
 					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100];
 					size_t fakeseg_len;
@@ -1028,6 +1065,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, uint32_t fwmark, const ch
 				}
 				break;
 			case DESYNC_IPFRAG2:
+				if (!reasm_offset)
 				{
 					verdict_tcp_csum_fix(verdict, tcphdr, transport_len, ip, ip6hdr);
 
@@ -1091,9 +1129,12 @@ static bool quic_reasm_cancel(t_ctrack *ctrack, const char *reason)
 	}
 }
 
-static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
+static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
 {
 	uint8_t verdict=VERDICT_PASS;
+
+	// no need to desync middle packets in reasm session
+	if (reasm_offset) return verdict;
 
 	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
@@ -1207,9 +1248,9 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, uint32_t fwmark, const ch
 						if (!ReasmIsEmpty(&ctrack->reasm_orig))
 						{
 							verdict_udp_csum_fix(verdict, udphdr, transport_len, ip, ip6hdr);
-							if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, data_pkt, *len_pkt))
+							if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, data_pkt, *len_pkt, len_payload))
 							{
-								DLOG("DELAY desync until reasm is complete (%u)\n", rawpacket_queue_count(&ctrack->delayed));
+								DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
 							}
 							else
 							{
@@ -1512,7 +1553,7 @@ static void packet_debug(bool replay, uint8_t proto, const struct ip *ip, const 
 }
 
 
-static uint8_t dpi_desync_packet_play(bool replay, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
+static uint8_t dpi_desync_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
 	struct ip *ip;
 	struct ip6_hdr *ip6hdr;
@@ -1532,14 +1573,14 @@ static uint8_t dpi_desync_packet_play(bool replay, uint32_t fwmark, const char *
 			case IPPROTO_TCP:
 				if (tcphdr)
 				{
-					verdict = dpi_desync_tcp_packet_play(replay, fwmark, ifout, data_pkt, len_pkt, ip, ip6hdr, tcphdr, transport_len, data_payload, len_payload);
+					verdict = dpi_desync_tcp_packet_play(replay, reasm_offset, fwmark, ifout, data_pkt, len_pkt, ip, ip6hdr, tcphdr, transport_len, data_payload, len_payload);
 					verdict_tcp_csum_fix(verdict, tcphdr, transport_len, ip, ip6hdr);
 				}
 				break;
 			case IPPROTO_UDP:
 				if (udphdr)
 				{
-					verdict = dpi_desync_udp_packet_play(replay, fwmark, ifout, data_pkt, len_pkt, ip, ip6hdr, udphdr, transport_len, data_payload, len_payload);
+					verdict = dpi_desync_udp_packet_play(replay, reasm_offset, fwmark, ifout, data_pkt, len_pkt, ip, ip6hdr, udphdr, transport_len, data_payload, len_payload);
 					verdict_udp_csum_fix(verdict, udphdr, transport_len, ip, ip6hdr);
 				}
 				break;
@@ -1549,37 +1590,35 @@ static uint8_t dpi_desync_packet_play(bool replay, uint32_t fwmark, const char *
 }
 uint8_t dpi_desync_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
-	return dpi_desync_packet_play(false, fwmark, ifout, data_pkt, len_pkt);
+	return dpi_desync_packet_play(false, 0, fwmark, ifout, data_pkt, len_pkt);
 }
 
 
 
 static bool replay_queue(struct rawpacket_tailhead *q)
 {
-	struct rawpacket *rp = rawpacket_dequeue(q);
-	if (rp)
+	struct rawpacket *rp;
+	size_t offset;
+	unsigned int i;
+	bool b = true;
+	for (i=1,offset=0 ; (rp=rawpacket_dequeue(q)) ; offset+=rp->len_payload, rawpacket_free(rp), i++)
 	{
-		DLOG("REPLAYING first delayed packet\n")
-		bool b = true;
-		uint8_t verdict = dpi_desync_packet_play(true, rp->fwmark, rp->ifout, rp->packet, &rp->len);
+		DLOG("REPLAYING delayed packet #%u offset %zu\n",i,offset)
+		uint8_t verdict = dpi_desync_packet_play(true, offset, rp->fwmark, rp->ifout, rp->packet, &rp->len);
 		switch(verdict & VERDICT_MASK)
 		{
 			case VERDICT_MODIFY:
-				DLOG("SENDING first delayed packet modified\n")
+				DLOG("SENDING delayed packet #%u modified\n", i)
 				b &= rawsend_rp(rp);
 				break;
 			case VERDICT_PASS:
-				DLOG("SENDING first delayed packet unmodified\n")
+				DLOG("SENDING delayed packet #%u unmodified\n", i)
 				b &= rawsend_rp(rp);
 				break;
 			case VERDICT_DROP:
-				DLOG("DROPPING first delayed packet\n")
+				DLOG("DROPPING delayed packet #%u\n", i)
 				break;
 		}
-		rawpacket_free(rp);
-		DLOG("SENDING %u remaining delayed packets\n", rawpacket_queue_count(q))
-		b &= rawsend_queue(q);
-		return b;
 	}
-	return false;
+	return b;
 }

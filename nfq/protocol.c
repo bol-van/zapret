@@ -8,7 +8,7 @@
 #include <string.h>
 
 const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
-bool IsHttp(const uint8_t *data, size_t len)
+const char *HttpMethod(const uint8_t *data, size_t len)
 {
 	const char **method;
 	size_t method_len;
@@ -16,10 +16,34 @@ bool IsHttp(const uint8_t *data, size_t len)
 	{
 		method_len = strlen(*method);
 		if (method_len <= len && !memcmp(data, *method, method_len))
-			return true;
+			return *method;
 	}
-	return false;
+	return NULL;
 }
+bool IsHttp(const uint8_t *data, size_t len)
+{
+	return !!HttpMethod(data,len);
+}
+// pHost points to "Host: ..."
+bool HttpFindHost(uint8_t **pHost,uint8_t *buf,size_t bs)
+{
+	if (!*pHost)
+	{
+		*pHost = memmem(buf, bs, "\nHost:", 6);
+		if (*pHost) (*pHost)++;
+	}
+	return !!*pHost;
+}
+bool HttpFindHostConst(const uint8_t **pHost,const uint8_t *buf,size_t bs)
+{
+	if (!*pHost)
+	{
+		*pHost = memmem(buf, bs, "\nHost:", 6);
+		if (*pHost) (*pHost)++;
+	}
+	return !!*pHost;
+}
+
 bool IsHttpReply(const uint8_t *data, size_t len)
 {
 	// HTTP/1.x 200\r\n
@@ -105,6 +129,37 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 	const char *drhost = HttpFind2ndLevelDomain(redirect_host);
 	
 	return strcasecmp(dhost, drhost)!=0;
+}
+size_t HttpPos(enum httpreqpos tpos_type, size_t hpos_pos, const uint8_t *http, size_t sz)
+{
+	const uint8_t *method, *host;
+	int i;
+	
+	switch(tpos_type)
+	{
+		case httpreqpos_method:
+			// recognize some tpws pre-applied hacks
+			method=http;
+			if (sz<10) break;
+			if (*method=='\n' || *method=='\r') method++;
+			if (*method=='\n' || *method=='\r') method++;
+			for (i=0;i<7;i++) if (*method>='A' && *method<='Z') method++;
+			if (i<3 || *method!=' ') break;
+			return method-http-1;
+		case httpreqpos_host:
+			if (HttpFindHostConst(&host,http,sz) && (host-http+7)<sz)
+			{
+				host+=5;
+				if (*host==' ') host++;
+				return host-http;
+			}
+			break;
+		case httpreqpos_pos:
+			break;
+		default:
+			return 0;
+	}
+	return hpos_pos<sz ? hpos_pos : 0;
 }
 
 
@@ -249,6 +304,23 @@ bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *hos
 
 	if (!TLSFindExtInHandshake(data, len, 0, &ext, &elen, bPartialIsOK)) return false;
 	return TLSExtractHostFromExt(ext, elen, host, len_host);
+}
+size_t TLSPos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls, size_t sz, uint8_t type)
+{
+	size_t elen;
+	const uint8_t *ext;
+	switch(tpos_type)
+	{
+		case tlspos_sni:
+		case tlspos_sniext:
+			if (TLSFindExt(tls,sz,0,&ext,&elen,false))
+				return (tpos_type==tlspos_sni) ? ext-tls+6 : ext-tls+1;
+			// fall through
+		case tlspos_pos:
+			return tpos_pos<sz ? tpos_pos : 0;
+		default:
+			return 0;
+	}
 }
 
 
