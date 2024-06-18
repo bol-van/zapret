@@ -287,3 +287,10 @@ nfqws: --qnum is mandatory, no more default queue 0
 v58
 
 winws
+
+v59
+
+tpws: --split-tls
+tpws: --tlsrec=sniext
+nfqws: --dpi-desync-split-http-req, --dpi-desync-split-tls. multi segment TLS support for split.
+blockcheck: mdig dns cache

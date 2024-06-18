@@ -178,6 +178,8 @@ nfqws takes the following parameters:
  --dpi-desync-repeats=<N>                       ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1                    ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
  --dpi-desync-split-pos=<1..9216>               ; data payload split position
+ --dpi-desync-split-http-req=method|host        ; split at specified logical part of plain http request
+ --dpi-desync-split-tls=sni|sniext              ; split at specified logical part of TLS ClientHello
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-badseq-increment=<int|0xHEX>      ; badseq fooling seq signed increment. default -10000
@@ -467,6 +469,12 @@ If nfqws receives a partial ClientHello it begins reassemble session. Packets ar
 Then the first packet goes through desync using fully reassembled message. Other packets are sent
 without desync. On any error reassemble is cancelled and all delayed packets are sent immediately without desync.
 
+There is special support for all tcp split options for multi segment TLS. Split position is treated
+as message-oriented, not packet oriented. For example, if your client sends TLS ClientHello with size 2000
+and SNI is at 1700, desync mode is fake,split2, then fake is sent first, then original first segment
+and the last splitted segment. 3 segments total.
+
+
 ### UDP support
 
 UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
@@ -587,6 +595,7 @@ tpws is transparent proxy.
  --hostlist-auto-debug=<logfile>       	; debug auto hostlist positives
 
  --split-http-req=method|host	; split http request at specified logical position.
+ --split-tls=sni|sniext         ; split at specified logical part of TLS ClientHello
  --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
  --split-any-protocol		; split not only http and https
  --disorder[=http|tls]          ; when splitting simulate sending second fragment first
@@ -602,7 +611,7 @@ tpws is transparent proxy.
  --methodspace                  ; add extra space after method
  --methodeol                    ; add end-of-line before method
  --unixeol                      ; replace 0D0A to 0A
- --tlsrec=sni                   ; make 2 TLS records. split at SNI. don't split if SNI is not present.
+ --tlsrec=sni|sniext            ; make 2 TLS records. split at specified logical part. don't split if SNI is not present.
  --tlsrec-pos=<pos>             ; make 2 TLS records. split at specified pos
  --mss=<int>                    ; set client MSS. forces server to split messages but significantly decreases speed !
  --mss-pf=[~]port1[-port2]      ; MSS port filter. ~ means negation
