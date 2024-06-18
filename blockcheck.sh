@@ -882,7 +882,28 @@ pktws_check_domain_http_bypass_()
 		ok=1
 	}
 	[ "$ret" != 0 -o "$SCANLEVEL" = force ] && {
-		[ "$sec" = 0 ] && pktws_curl_test_update $1 $3 $s --hostcase && [ "$SCANLEVEL" = quick ] && return
+		[ "$sec" = 0 ] && {
+			pktws_curl_test_update $1 $3 $s --hostcase && {
+				[ "$SCANLEVEL" = quick ] && return
+				ok=1
+			}
+			for pos in method host; do
+				for hostcase in '' '--hostcase'; do
+					pktws_curl_test_update $1 $3 $s --dpi-desync-split-http-req=$pos $hostcase && {
+						[ "$SCANLEVEL" = quick ] && return
+						ok=1
+					}
+				done
+			done
+		}
+		[ "$sec" = 1 ] && {
+			for pos in sni sniext; do
+				pktws_curl_test_update $1 $3 $s --dpi-desync-split-tls=$pos && {
+					[ "$SCANLEVEL" = quick ] && return
+					ok=1
+				}
+			done
+		}
 		for pos in 1 3 4 5 10 50; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
 			if pktws_curl_test_update $1 $3 $s; then
@@ -1047,6 +1068,13 @@ tpws_check_domain_http_bypass_()
 		for mss in '' 88; do
 			s3=${mss:+--mss=$mss --mss-pf=$HTTPS_PORT}
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
+				for pos in sni sniext; do
+					s="--split-tls=$pos"
+					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
+						[ "$SCANLEVEL" = quick ] && return
+						break
+					}
+				done
 				for pos in 1 2 3 4 5 10 50; do
 					s="--split-pos=$pos"
 					tpws_curl_test_update $1 $3 $s $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
@@ -1055,8 +1083,8 @@ tpws_check_domain_http_bypass_()
 					}
 				done
 			done
-			for s2 in '--tlsrec=sni' '--tlsrec=sni --split-pos=10' '--tlsrec=sni --split-pos=10 --oob' \
-					'--tlsrec=sni --split-pos=10 --disorder' '--tlsrec=sni --split-pos=10 --oob --disorder' \
+			for s2 in '--tlsrec=sni' '--tlsrec=sni --split-tls=sni' '--tlsrec=sni --split-tls=sni --oob' \
+					'--tlsrec=sni --split-tls=sni --disorder' '--tlsrec=sni --split-tls=sni --oob --disorder' \
 					'--tlsrec=sni --split-pos=1' '--tlsrec=sni --split-pos=1 --oob' '--tlsrec=sni --split-pos=1 --disorder' \
 					'--tlsrec=sni --split-pos=1 --oob --disorder'; do
 				tpws_curl_test_update $1 $3 $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
