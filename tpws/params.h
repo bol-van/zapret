@@ -9,12 +9,11 @@
 #include "tpws.h"
 #include "pools.h"
 #include "helpers.h"
+#include "protocol.h"
 
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
-enum httpreqpos { httpreqpos_none = 0, httpreqpos_method, httpreqpos_host };
-enum tlspos { tlspos_none = 0, tlspos_sni, tlspos_sniext, tlspos_pos };
 enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32

@@ -8,48 +8,13 @@
 #include <string.h>
 #include <stdio.h>
 
-// pHost points to "Host: ..."
-static bool find_host(uint8_t **pHost,uint8_t *buf,size_t bs)
-{
-	if (!*pHost)
-	{
-		*pHost = memmem(buf, bs, "\nHost:", 6);
-		if (*pHost)
-		{
-			(*pHost)++;
-			VPRINT("Found Host: at pos %td",*pHost - buf)
-		}
-	}
-	return !!*pHost;
-}
-
-static size_t tls_pos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls, size_t sz, uint8_t type)
-{
-	size_t elen;
-	const uint8_t *ext;
-	switch(tpos_type)
-	{
-		case tlspos_sni:
-		case tlspos_sniext:
-			if (TLSFindExt(tls,sz,0,&ext,&elen,false))
-				return (tpos_type==tlspos_sni) ? ext-tls+6 : ext-tls+1;
-			// fall through
-		case tlspos_pos:
-			return tpos_pos;
-		default:
-			return 0;
-	}
-}
-
-
-static const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 // segment buffer has at least 5 extra bytes to extend data block
 void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos, uint8_t *split_flags)
 {
 	uint8_t *p, *pp, *pHost = NULL;
 	size_t method_len = 0, pos;
-	const char **method;
-	bool bIsHttp = false, bBypass = false, bHaveHost = false, bHostExcluded = false;
+	const char *method;
+	bool bBypass = false, bHaveHost = false, bHostExcluded = false;
 	char bRemovedHostSpace = 0;
 	char *pc, Host[256];
 	
@@ -58,22 +23,13 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	*split_pos=0;
 	*split_flags=0;
 
-	for (method = http_methods; *method; method++)
+	if ((method = HttpMethod(segment,*size)))
 	{
-		method_len = strlen(*method);
-		if (method_len <= *size && !memcmp(segment, *method, method_len))
-		{
-			bIsHttp = true;
-			method_len -= 2; // "GET /" => "GET"
-			break;
-		}
-	}
-	if (bIsHttp)
-	{
-		VPRINT("Data block looks like http request start : %s", *method)
+		method_len = strlen(method)-2;
+		VPRINT("Data block looks like http request start : %s", method)
 		if (!ctrack->l7proto) ctrack->l7proto=HTTP;
 		// cpu saving : we search host only if and when required. we do not research host every time we need its position
-		if ((params.hostlist || params.hostlist_exclude) && find_host(&pHost,segment,*size))
+		if ((params.hostlist || params.hostlist_exclude) && HttpFindHost(&pHost,segment,*size))
 		{
 			p = pHost + 5;
 			while (p < (segment + *size) && (*p == ' ' || *p == '\t')) p++;
@@ -135,7 +91,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				(*size)++; // block will grow by 1 byte
 				if (pHost) pHost++; // Host: position will move by 1 byte
 			}
-			if ((params.hostdot || params.hosttab) && *size<segment_buffer_size && find_host(&pHost,segment,*size))
+			if ((params.hostdot || params.hosttab) && *size<segment_buffer_size && HttpFindHost(&pHost,segment,*size))
 			{
 				p = pHost + 5;
 				while (p < (segment + *size) && *p != '\r' && *p != '\n') p++;
@@ -148,7 +104,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 					(*size)++; // block will grow by 1 byte
 				}
 			}
-			if (params.domcase && find_host(&pHost,segment,*size))
+			if (params.domcase && HttpFindHost(&pHost,segment,*size))
 			{
 				p = pHost + 5;
 				pos = p - segment;
@@ -156,7 +112,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				for (; p < (segment + *size) && *p != '\r' && *p != '\n'; p++)
 					*p = (((size_t)p) & 1) ? tolower(*p) : toupper(*p);
 			}
-			if (params.hostnospace && find_host(&pHost,segment,*size) && (pHost+5)<(segment+*size) && pHost[5] == ' ')
+			if (params.hostnospace && HttpFindHost(&pHost,segment,*size) && (pHost+5)<(segment+*size) && pHost[5] == ' ')
 			{
 				p = pHost + 6;
 				pos = p - segment;
@@ -165,12 +121,12 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				(*size)--; // block will shrink by 1 byte
 				bRemovedHostSpace = 1;
 			}
-			if (params.hostcase && find_host(&pHost,segment,*size))
+			if (params.hostcase && HttpFindHost(&pHost,segment,*size))
 			{
 				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment)
 				memcpy(pHost, params.hostspell, 4);
 			}
-			if (params.hostpad && find_host(&pHost,segment,*size))
+			if (params.hostpad && HttpFindHost(&pHost,segment,*size))
 			{
 				//  add :  XXXXX: <padding?[\r\n|\n]
 				char s[8];
@@ -217,18 +173,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 					pHost = NULL; // invalidate
 				}
 			}
-			switch (params.split_http_req)
-			{
-				case httpreqpos_method:
-					*split_pos = method_len - 1 + params.methodeol + (params.methodeol && !params.unixeol);
-					break;
-				case httpreqpos_host:
-					if (find_host(&pHost,segment,*size))
-						*split_pos = pHost + 6 - bRemovedHostSpace - segment;
-					break;
-				default:
-					if (params.split_pos < *size) *split_pos = params.split_pos;
-			}
+			*split_pos = HttpPos(params.split_http_req, params.split_pos, segment, *size);
 			if (params.disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
 			if (params.oob_http) *split_flags |= SPLIT_FLAG_OOB;
 		}
@@ -258,11 +203,11 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		}
 		else
 		{
-			spos = tls_pos(params.split_tls, params.split_pos, segment, *size, 0);
+			spos = TLSPos(params.split_tls, params.split_pos, segment, *size, 0);
 
 			if ((5+*size)<=segment_buffer_size)
 			{
-				tpos = tls_pos(params.tlsrec, params.tlsrec_pos+5, segment, *size, 0);
+				tpos = TLSPos(params.tlsrec, params.tlsrec_pos+5, segment, *size, 0);
 				if (tpos>5)
 				{
 					// construct 2 TLS records from one

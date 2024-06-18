@@ -829,6 +829,7 @@ void parse_params(int argc, char *argv[])
 	}
 	if (!params.resolver_threads) params.resolver_threads = 5 + params.maxconn/50;
 	if (params.split_tls==tlspos_none && params.split_pos) params.split_tls=tlspos_pos;
+	if (params.split_http_req==httpreqpos_none && params.split_pos) params.split_http_req=httpreqpos_pos;
 
 	if (*params.hostlist_auto_filename) params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
 	if (!LoadIncludeHostLists())
