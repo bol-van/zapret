@@ -103,12 +103,20 @@ zzexist()
 {
  [ -f "$1.gz" ] || [ -f "$1" ]
 }
+zztest()
+{
+ gzip -t "$1" 2>/dev/null
+}
 zzcat()
 {
  if [ -f "$1.gz" ]; then
  	gunzip -c "$1.gz"
  elif [ -f "$1" ]; then
- 	cat "$1"
+	if zztest "$1"; then
+ 		gunzip -c "$1"
+	else
+	 	cat "$1"
+	fi
  fi
 }
 zz()

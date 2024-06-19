@@ -19,7 +19,7 @@ dl_checked()
   # $3 - minsize
   # $4 - maxsize
   # $5 - maxtime
-  curl -H "Accept-Encoding: gzip" -k --fail --max-time $5 --connect-timeout 10 --retry 4 --max-filesize $4 "$1" | gunzip - >"$2" ||
+  curl -k --fail --max-time $5 --connect-timeout 10 --retry 4 --max-filesize $4 -o "$2" "$1" ||
   {
    echo list download failed : $1
    return 2

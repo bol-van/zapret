@@ -19,7 +19,7 @@ dl()
   # $2 - file
   # $3 - minsize
   # $4 - maxsize
-  curl -H "Accept-Encoding: gzip" -k --fail --max-time 120 --connect-timeout 10 --retry 4 --max-filesize $4 "$1" | gunzip - >"$TMPLIST" ||
+  curl -H "Accept-Encoding: gzip" -k --fail --max-time 120 --connect-timeout 10 --retry 4 --max-filesize $4 -o "$TMPLIST" "$1" ||
   {
    echo list download failed : $1
    exit 2
@@ -29,7 +29,7 @@ dl()
    echo list is too small : $dlsize bytes. can be bad.
    exit 2
   fi
-  zz "$2" <"$TMPLIST"
+  zzcat "$TMPLIST" | zz "$2"
   rm -f "$TMPLIST"
 }
 
