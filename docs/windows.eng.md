@@ -61,6 +61,7 @@ If you can't find index this way use `winws --debug` to see index there. Subinte
 Multiple `winws` processes are allowed. However, it's discouraged to intersect their filters.
 
 `--ssid-filter` allows to enable `winws` only if specified wifi networks are connected. `winws` auto detects SSID appearance and disappearance.
+SSID names must be written in the same case as the system sees them.
 
 `Cygwin` shell does not run binaries if their directory has it's own copy of `cygwin1.dll`.
 That's why exists separate standalone version in `binaries/win64/zapret-tpws`.
