@@ -49,6 +49,7 @@ Task of `iptables` is done inside `winws` through `windivert` filters. `Windiver
  --wf-udp=[~]port1[-port2]                      ; UDP port filter. ~ means negation. multiple comma separated values allowed.
  --wf-raw=<filter>|@<filename>                  ; raw windivert filter string or filename
  --wf-save=<filename>                           ; save windivert filter string to a file and exit
+ --ssid-filter=ssid1[,ssid2,ssid3,...]          ; enable winws only if any of specified wifi SSIDs connected
 ```
 
 `--wf-l3`, `--wf-tcp`, `--wf-udp` can take multiple comma separated arguments.
@@ -58,6 +59,8 @@ Interface indexes can be discovered using this command : `netsh int ip show int`
 If you can't find index this way use `winws --debug` to see index there. Subinterface index is almost always 0 and you can omit it.
 
 Multiple `winws` processes are allowed. However, it's discouraged to intersect their filters.
+
+`--ssid-filter` allows to enable `winws` only if specified wifi networks are connected. `winws` auto detects SSID appearance and disappearance.
 
 `Cygwin` shell does not run binaries if their directory has it's own copy of `cygwin1.dll`.
 That's why exists separate standalone version in `binaries/win64/zapret-tpws`.

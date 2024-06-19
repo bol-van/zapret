@@ -28,8 +28,8 @@
 
 #include <string.h>
 
-#define ENCRYPT         1       // specify whether we're encrypting
-#define DECRYPT         0       // or decrypting
+#define AES_ENCRYPT         1       // specify whether we're encrypting
+#define AES_DECRYPT         0       // or decrypting
 
 #if defined(_MSC_VER)
 #include <basetsd.h>

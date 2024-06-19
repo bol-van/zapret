@@ -14,6 +14,9 @@
 #include "params.h"
 #include "nfqws.h"
 
+#ifdef __CYGWIN__
+#include <wlanapi.h>
+#endif
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
@@ -959,7 +962,82 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 static HANDLE w_filter = NULL;
 static OVERLAPPED ovl = { .hEvent = NULL };
+static const struct str_list_head *wlan_filter_ssid = NULL;
+static DWORD wlan_filter_tick=0;
 uint32_t w_win32_error=0;
+
+bool wlan_filter_match(const struct str_list_head *ssid_list)
+{
+	DWORD dwCurVersion;
+	HANDLE hClient = NULL;
+	PWLAN_INTERFACE_INFO_LIST pIfList = NULL;
+	PWLAN_INTERFACE_INFO pIfInfo;
+	PWLAN_CONNECTION_ATTRIBUTES pConnectInfo;
+	DWORD connectInfoSize, k;
+	bool bRes;
+	struct str_list *ssid;
+	size_t len;
+
+	// no filter given. always matches.
+	if (!ssid_list || LIST_EMPTY(ssid_list))
+	{
+		w_win32_error = 0;
+		return true;
+	}
+
+	w_win32_error = WlanOpenHandle(2, NULL, &dwCurVersion, &hClient);
+	if (w_win32_error != ERROR_SUCCESS) goto fail;
+	w_win32_error = WlanEnumInterfaces(hClient, NULL, &pIfList);
+	if (w_win32_error != ERROR_SUCCESS) goto fail;
+	for (k = 0; k < pIfList->dwNumberOfItems; k++)
+	{
+		pIfInfo = pIfList->InterfaceInfo + k;
+		if (pIfInfo->isState == wlan_interface_state_connected)
+		{
+			w_win32_error = WlanQueryInterface(hClient,
+				&pIfInfo->InterfaceGuid,
+				wlan_intf_opcode_current_connection,
+				NULL,
+				&connectInfoSize,
+				(PVOID *)&pConnectInfo,
+				NULL);
+			if (w_win32_error != ERROR_SUCCESS) goto fail;
+
+//			printf("%s\n", pConnectInfo->wlanAssociationAttributes.dot11Ssid.ucSSID);
+
+			LIST_FOREACH(ssid, ssid_list, next)
+			{
+				len = strlen(ssid->str);
+				if (len==pConnectInfo->wlanAssociationAttributes.dot11Ssid.uSSIDLength && !memcmp(ssid->str,pConnectInfo->wlanAssociationAttributes.dot11Ssid.ucSSID,len))
+				{	
+					WlanFreeMemory(pConnectInfo);
+					goto found;
+				}
+			}
+
+			WlanFreeMemory(pConnectInfo);
+		}
+	}
+	w_win32_error = 0;
+fail:
+	bRes = false;
+ex:
+	if (pIfList) WlanFreeMemory(pIfList);
+	if (hClient) WlanCloseHandle(hClient, 0);
+	return bRes;
+found:
+	w_win32_error = 0;
+	bRes = true;
+	goto ex;
+}
+
+static bool wlan_filter_match_rate_limited(void)
+{
+	DWORD dwTick = GetTickCount() / 1000;
+	if (wlan_filter_tick == dwTick) return true;
+	wlan_filter_tick = dwTick;
+	return wlan_filter_match(wlan_filter_ssid);
+}
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
@@ -1006,8 +1084,9 @@ void rawsend_cleanup(void)
 		CloseHandle(ovl.hEvent);
 		ovl.hEvent=NULL;
 	}
+	wlan_filter_ssid = NULL;
 }
-bool windivert_init(const char *filter)
+bool windivert_init(const char *filter, const struct str_list_head *ssid_filter)
 {
 	rawsend_cleanup();
 	w_filter = windivert_init_filter(filter, 0);
@@ -1020,6 +1099,7 @@ bool windivert_init(const char *filter)
 			rawsend_cleanup();
 			return false;
 		}
+		wlan_filter_ssid = ssid_filter;
 		return true;
 	}
 	return false;
@@ -1035,6 +1115,11 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 	if (bQuit)
 	{
 		errno=EINTR;
+		return false;
+	}
+	if (!wlan_filter_match_rate_limited())
+	{
+		errno=ENODEV;
 		return false;
 	}
 	usleep(0);
@@ -1055,6 +1140,11 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 					if (bQuit)
 					{
 						errno=EINTR;
+						return false;
+					}
+					if (!wlan_filter_match_rate_limited())
+					{
+						errno=ENODEV;
 						return false;
 					}
 					usleep(0);

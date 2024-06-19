@@ -65,7 +65,9 @@ struct params_s
 	size_t fake_http_size,fake_tls_size,fake_quic_size,fake_wg_size,fake_dht_size,fake_unknown_size,fake_syndata_size,fake_unknown_udp_size;
 	int udplen_increment;
 
-#ifndef __CYGWIN__
+#ifdef __CYGWIN__
+	struct str_list_head ssid_filter;
+#else
 	bool droproot;
 	uid_t uid;
 	gid_t gid;

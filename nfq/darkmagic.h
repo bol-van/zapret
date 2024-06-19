@@ -18,6 +18,7 @@
 #endif
 
 #include "packet_queue.h"
+#include "pools.h"
 
 #ifndef IPPROTO_DIVERT
 #define IPPROTO_DIVERT 258
@@ -151,9 +152,10 @@ bool tcp_has_fastopen(const struct tcphdr *tcp);
 #ifdef __CYGWIN__
 extern uint32_t w_win32_error;
 
-bool windivert_init(const char *filter);
+bool windivert_init(const char *filter, const struct str_list_head *ssid_filter);
 bool windivert_recv(uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa);
 bool windivert_send(const uint8_t *packet, size_t len, const WINDIVERT_ADDRESS *wa);
+bool wlan_filter_match(const struct str_list_head *ssid_list);
 #else
 // should pre-do it if dropping privileges. otherwise its not necessary
 bool rawsend_preinit(bool bind_fix4, bool bind_fix6);

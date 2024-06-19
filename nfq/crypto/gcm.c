@@ -186,7 +186,7 @@ int gcm_setkey(gcm_context *ctx,   // pointer to caller-provided gcm context
 
 	// encrypt the null 128-bit block to generate a key-based value
 	// which is then used to initialize our GHASH lookup tables
-	if ((ret = aes_setkey(&ctx->aes_ctx, ENCRYPT, key, keysize)) != 0)
+	if ((ret = aes_setkey(&ctx->aes_ctx, AES_ENCRYPT, key, keysize)) != 0)
 		return(ret);
 	if ((ret = aes_cipher(&ctx->aes_ctx, h, h)) != 0)
 		return(ret);
@@ -266,7 +266,7 @@ int gcm_start(gcm_context *ctx,    // pointer to user-provided GCM context
 	ctx->add_len = 0;
 
 	ctx->mode = mode;               // set the GCM encryption/decryption mode
-	ctx->aes_ctx.mode = ENCRYPT;    // GCM *always* runs AES in ENCRYPTION mode
+	ctx->aes_ctx.mode = AES_ENCRYPT;    // GCM *always* runs AES in ENCRYPTION mode
 
 	if (iv_len == 12) {                // GCM natively uses a 12-byte, 96-bit IV
 		memcpy(ctx->y, iv, iv_len);   // copy the IV to the top of the 'y' buff
@@ -338,7 +338,7 @@ int gcm_update(gcm_context *ctx,       // pointer to user-provided GCM context
 			return(ret);
 
 		// encrypt or decrypt the input to the output
-		if (ctx->mode == ENCRYPT)
+		if (ctx->mode == AES_ENCRYPT)
 		{
 			for (i = 0; i < use_len; i++) {
 				// XOR the cipher's ouptut vector (ectr) with our input
@@ -481,7 +481,7 @@ int gcm_auth_decrypt(
 	   (which is an identical XORing to reverse the previous one)
 	   and also to re-generate the matching authentication tag
 	*/
-	gcm_crypt_and_tag(ctx, DECRYPT, iv, iv_len, add, add_len,
+	gcm_crypt_and_tag(ctx, AES_DECRYPT, iv, iv_len, add, add_len,
 		input, output, length, check_tag, tag_len);
 
 	// now we verify the authentication tag in 'constant time'

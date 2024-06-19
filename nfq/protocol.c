@@ -600,7 +600,7 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	header[0] = packet0;
 	for(uint8_t i = 0; i < pkn_len; i++) header[header_len - 1 - i] = (uint8_t)(pkn >> (8 * i));
 
-	if (aes_gcm_crypt(DECRYPT, clean, decrypt_begin, cryptlen, aeskey, sizeof(aeskey), aesiv, sizeof(aesiv), header, header_len, atag, sizeof(atag)))
+	if (aes_gcm_crypt(AES_DECRYPT, clean, decrypt_begin, cryptlen, aeskey, sizeof(aeskey), aesiv, sizeof(aesiv), header, header_len, atag, sizeof(atag)))
 		return false;
 
 	// check if message was decrypted correctly : good keys , no data corruption

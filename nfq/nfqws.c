@@ -410,72 +410,99 @@ static int win_main(const char *windivert_filter)
 	WINDIVERT_ADDRESS wa;
 	char ifout[22];
 
-	if (!windivert_init(windivert_filter))
-		return w_win32_error;
-
-	printf("windivert initialized. capture is started.\n");
-
 	pre_desync();
 
-	// cygwin auto flush fails when piping
-	fflush(stdout);
-	fflush(stderr);
-
-	for (id=0;;id++)
+	for(;;)
 	{
-		len = sizeof(packet);
-		if (!windivert_recv(packet, &len, &wa))
+		if (!wlan_filter_match(&params.ssid_filter))
 		{
-			if (errno==ENOBUFS)
+			printf("logical network is not present. waiting it to appear.\n");
+			fflush(stdout);
+			do
 			{
-				DLOG("windivert: ignoring too large packet\n")
-				continue; // too large packet
+				if (bQuit)
+				{
+					DLOG("QUIT requested\n")
+					return 0;
+				}
+				usleep(500000);
 			}
-			else if (errno==EINTR)
-			{
-				DLOG("QUIT requested\n")
-				break;
-			}
-			fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
+			while (!wlan_filter_match(&params.ssid_filter));
+			printf("logical network now present\n");
+			fflush(stdout);
+		}
+
+		if (!windivert_init(windivert_filter, &params.ssid_filter))
 			return w_win32_error;
-		}
-		*ifout=0;
-		if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
-		DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx)
-		if (wa.Impostor)
-		{
-			DLOG("windivert: passing impostor packet\n")
-			verdict = VERDICT_PASS;
-		}
-		else if (wa.Loopback)
-		{
-			DLOG("windivert: passing loopback packet\n")
-			verdict = VERDICT_PASS;
-		}
-		else
-		{
-			mark=0;
-			// pseudo interface id IfIdx.SubIfIdx
-			verdict = processPacketData(&mark, ifout, packet, &len);
-		}
-		switch (verdict & VERDICT_MASK)
-		{
-			case VERDICT_PASS:
-			case VERDICT_MODIFY:
-				if ((verdict & VERDICT_MASK)==VERDICT_PASS)
-					DLOG("packet: id=%u reinject unmodified\n", id)
-				else
-					DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
-				if (!windivert_send(packet, len, &wa))
-					fprintf(stderr,"windivert: reinject of packet id=%u failed\n", id);
-				break;
-			default:
-				DLOG("packet: id=%u drop\n", id);
-		}
+
+		printf("windivert initialized. capture is started.\n");
 
 		// cygwin auto flush fails when piping
 		fflush(stdout);
 		fflush(stderr);
+
+		for (id=0;;id++)
+		{
+			len = sizeof(packet);
+			if (!windivert_recv(packet, &len, &wa))
+			{
+				if (errno==ENOBUFS)
+				{
+					DLOG("windivert: ignoring too large packet\n")
+					continue; // too large packet
+				}
+				else if (errno==ENODEV)
+				{
+					printf("logical network disappeared. deinitializing windivert.\n");
+					rawsend_cleanup();
+					break;
+				}
+				else if (errno==EINTR)
+				{
+					DLOG("QUIT requested\n")
+					return 0;
+				}
+				fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
+				return w_win32_error;
+			}
+			*ifout=0;
+			if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
+			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx)
+			if (wa.Impostor)
+			{
+				DLOG("windivert: passing impostor packet\n")
+				verdict = VERDICT_PASS;
+			}
+			else if (wa.Loopback)
+			{
+				DLOG("windivert: passing loopback packet\n")
+				verdict = VERDICT_PASS;
+			}
+			else
+			{
+				mark=0;
+				// pseudo interface id IfIdx.SubIfIdx
+				verdict = processPacketData(&mark, ifout, packet, &len);
+			}
+			switch (verdict & VERDICT_MASK)
+			{
+				case VERDICT_PASS:
+				case VERDICT_MODIFY:
+					if ((verdict & VERDICT_MASK)==VERDICT_PASS)
+						DLOG("packet: id=%u reinject unmodified\n", id)
+					else
+						DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
+					if (!windivert_send(packet, len, &wa))
+						fprintf(stderr,"windivert: reinject of packet id=%u failed\n", id);
+					break;
+				default:
+					DLOG("packet: id=%u drop\n", id);
+			}
+	
+			// cygwin auto flush fails when piping
+			fflush(stdout);
+			fflush(stderr);
+		}
 	}
 	return 0;
 }
@@ -521,6 +548,9 @@ static void cleanup_params(void)
 	StrPoolDestroy(&params.hostlist_exclude);
 	StrPoolDestroy(&params.hostlist);
 	HostFailPoolDestroy(&params.hostlist_auto_fail_counters);
+#ifdef __CYGWIN__
+	strlist_destroy(&params.ssid_filter);
+#endif
 }
 static void exit_clean(int code)
 {
@@ -760,6 +790,8 @@ static void exithelp(void)
 		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
 		" --wf-raw=<filter>|@<filename>\t\t\t; raw windivert filter string or filename\n"
 		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
+		"\nLOGICAL NETWORK FILTER:\n"
+		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t; enable winws only if any of specified wifi SSIDs connected\n"
 #endif
 		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
@@ -915,7 +947,9 @@ int main(int argc, char **argv)
 	LIST_INIT(&params.hostlist_files);
 	LIST_INIT(&params.hostlist_exclude_files);
 
-#ifndef __CYGWIN__
+#ifdef __CYGWIN__
+	LIST_INIT(&params.ssid_filter);
+#else
 	if (can_drop_root()) // are we root ?
 	{
 		params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
@@ -1002,6 +1036,7 @@ int main(int argc, char **argv)
 		{"wf-udp",required_argument,0,0},	// optidx=53
 		{"wf-raw",required_argument,0,0},	// optidx=54
 		{"wf-save",required_argument,0,0},	// optidx=55
+		{"ssid-filter",required_argument,0,0},	// optidx=56
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1499,6 +1534,24 @@ int main(int argc, char **argv)
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
+		case 56: /* ssid-filter */
+			{
+				char *e,*p = optarg;
+				while (p)
+				{
+					e = strchr(p,',');
+					if (e) *e++=0;
+					if (*p && !strlist_add(&params.ssid_filter, p))
+					{
+						fprintf(stderr, "strlist_add failed\n");
+						exit_clean(1);
+					}
+					p = e;
+
+				}
+			}
+			break;
+
 #endif
 		}
 	}
