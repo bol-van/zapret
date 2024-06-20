@@ -32,6 +32,8 @@ USER_AGENT=${USER_AGENT:-Mozilla}
 HTTP_PORT=${HTTP_PORT:-80}
 HTTPS_PORT=${HTTPS_PORT:-443}
 QUIC_PORT=${QUIC_PORT:-443}
+UNBLOCKED_DOM=${UNBLOCKED_DOM:-iana.org}
+[ "$CURL_VERBOSE" = 1 ] && CURL_CMD=1
 
 HDRTEMP=/tmp/zapret-hdr.txt
 
@@ -187,23 +189,23 @@ nft_has_nfq()
 	}
 	return $res
 }
-
-mdig_resolve()
+mdig_vars()
 {
 	# $1 - ip version 4/6
 	# $2 - hostname
 
-	local hostvar=$(echo $2 | sed -e 's/[\.-]/_/g')
-	local cachevar=DNSCACHE_${hostvar}_$1
-	local countvar=${cachevar}_COUNT
-	local count n ip ips
+	hostvar=$(echo $2 | sed -e 's/[\.-]/_/g')
+	cachevar=DNSCACHE_${hostvar}_$1
+	countvar=${cachevar}_COUNT
 	eval count=\$${countvar}
-	if [ -n "$count" ]; then
-		n=$(random 0 $(($count-1)))
-		eval ip=\$${cachevar}_$n
-		echo $ip
-		return 0
-	else
+}
+mdig_cache()
+{
+	# $1 - ip version 4/6
+	# $2 - hostname
+	local hostvar cachevar countvar count ip ips
+	mdig_vars "$@"
+	[ -n "$count" ] || {
 		# windows version of mdig outputs 0D0A line ending. remove 0D.
 		ips="$(echo $2 | "$MDIG" --family=$1 | tr -d '\r' | xargs)"
 		[ -n "$ips" ] || return 1
@@ -213,8 +215,76 @@ mdig_resolve()
 			count=$(($count+1))
 		done
 		eval $countvar=$count
-		mdig_resolve "$@"
+	}
+	return 0
+}
+mdig_resolve()
+{
+	# $1 - ip version 4/6
+	# $2 - hostname
+
+	local hostvar cachevar countvar count ip n
+	mdig_vars "$@"
+	if [ -n "$count" ]; then
+		n=$(random 0 $(($count-1)))
+		eval ip=\$${cachevar}_$n
+		echo $ip
+		return 0
+	else
+		mdig_cache "$@" && mdig_resolve "$@"
 	fi
+}
+mdig_resolve_all()
+{
+	# $1 - ip version 4/6
+	# $2 - hostname
+
+	local hostvar cachevar countvar count ip ips n
+	mdig_vars "$@"
+	if [ -n "$count" ]; then
+		n=0
+		while [ "$n" -le $count ]; do
+			eval ip=\$${cachevar}_$n
+			if [ -n "$ips" ]; then
+				ips="$ips $ip"
+			else
+				ips="$ip"
+			fi
+			n=$(($n + 1))
+		done
+		echo "$ips"
+		return 0
+	else
+		mdig_cache "$@" && mdig_resolve_all "$@"
+	fi
+}
+
+netcat_setup()
+{
+	[ -n "$NCAT" ] || {
+		if exists ncat; then
+			NCAT=ncat
+		elif exists nc; then
+			# busybox netcat does not support any required options
+			is_linked_to_busybox nc && return 1
+			NCAT=nc
+		else
+			return 1
+		fi
+	}
+	return 0
+	
+}
+netcat_test()
+{
+	# $1 - ip
+	# $2 - port
+	local cmd
+	netcat_setup && {
+		cmd="$NCAT -z -w 1 $1 $2"
+		echo $cmd
+		$cmd
+	}
 }
 
 check_system()
@@ -458,13 +528,17 @@ hdrfile_location()
 	tr -d '\015' <"$1" | sed -nre 's/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[ 	]*([^ 	]*)[ 	]*$/\1/p'
 }
 
-curl_connect_to()
+curl_with_subst_ip()
 {
-	# $1 - ip version : 4/6
-	# $2 - domain name
-	# $3 - port
-	local ip=$(mdig_resolve $1 $2)
-	[ -n "$ip" ] && echo "--connect-to $2::[$ip]${3:+:$3}"
+	# $1 - domain
+	# $2 - port
+	# $3 - ip
+	# $4+ - curl params
+	local connect_to="--connect-to $1::[$3]${2:+:$2}" arg
+	shift ; shift ; shift
+	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
+	[ "$CURL_CMD" = 1 ] && echo curl ${arg:+$arg }$connect_to "$@"
+	ALL_PROXY="$ALL_PROXY" curl ${arg:+$arg }$connect_to "$@"
 }
 curl_with_dig()
 {
@@ -472,22 +546,37 @@ curl_with_dig()
 	# $2 - domain name
 	# $3 - port
 	# $4+ - curl params
-	local connect_to="$(curl_connect_to $1 $2 $3)"
-	[ -n "$connect_to" ] || {
-		echo "could not resolve ipv$1 $2"
-		return 6
-	}
+	local dom=$2 port=$3
+	local ip=$(mdig_resolve $1 $dom)
 	shift ; shift ; shift
-
-	ALL_PROXY="$ALL_PROXY" curl $connect_to "$@"
+	if [ -n "$ip" ]; then
+		curl_with_subst_ip $dom $port $ip "$@"
+	else
+		return 6
+	fi
 }
-
+curl_probe()
+{
+	# $1 - ip version : 4/6
+	# $2 - domain name
+	# $3 - port
+	# $4 - subst ip
+	# $5+ - curl params
+	local ipv=$1 dom=$2 port=$3 subst=$4
+	shift; shift; shift; shift
+	if [ -n "$subst" ]; then
+		curl_with_subst_ip $dom $port $subst "$@"
+	else
+		curl_with_dig $ipv $dom $port "$@"
+	fi
+}
 curl_test_http()
 {
 	# $1 - ip version : 4/6
 	# $2 - domain name
+	# $3 - subst ip
 	local code loc
-	curl_with_dig $1 $2 $HTTP_PORT -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
+	curl_probe $1 $2 $HTTP_PORT "$3" -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
 		code=$?
 		rm -f "$HDRTEMP"
 		return $code
@@ -514,17 +603,19 @@ curl_test_https_tls12()
 {
 	# $1 - ip version : 4/6
 	# $2 - domain name
+	# $3 - subst ip
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl_with_dig $1 $2 $HTTPS_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
+	curl_probe $1 $2 $HTTPS_PORT "$3" -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
 }
 curl_test_https_tls13()
 {
 	# $1 - ip version : 4/6
 	# $2 - domain name
+	# $3 - subst ip
 
 	# force TLS1.3 mode
-	curl_with_dig $1 $2 $HTTPS_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
+	curl_probe $1 $2 $HTTPS_PORT "$3" -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
 }
 
 curl_test_http3()
@@ -699,16 +790,42 @@ ws_kill()
 	}
 }
 
+check_domain_port_block()
+{
+	# $1 - domain
+	# $2 - port
+	local ip ips
+	echo
+	echo \* port block tests ipv$IPV $1:$2
+	if netcat_setup; then
+		ips=$(mdig_resolve_all $IPV $1)
+		if [ -n "$ips" ]; then
+			for ip in $ips; do
+				if netcat_test $ip $2; then
+					echo $ip connects
+				else
+					echo $ip does not connect. netcat code $?
+				fi
+			done
+		else
+			echo "ipv${IPV} $1 does not resolve"
+		fi
+	else
+		echo suitable netcat not found. busybox nc is not supported. pls install nmap ncat or openbsd netcat.
+	fi
+}
+
 curl_test()
 {
 	# $1 - test function
 	# $2 - domain
+	# $3 - subst ip
 	local code=0 n=0
 
 	while [ $n -lt $REPEATS ]; do
 		n=$(($n+1))
 		[ $REPEATS -gt 1 ] && printf "[attempt $n] "
-		if $1 "$IPV" $2 ; then
+		if $1 "$IPV" $2 $3 ; then
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 		else
 			code=$?
@@ -865,7 +982,7 @@ pktws_check_domain_http_bypass_()
 	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
-	local tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta
+	local tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta hostcase
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -1108,6 +1225,32 @@ tpws_check_domain_http_bypass()
 	report_strategy $1 $3 tpws
 }
 
+check_dpi_ip_block()
+{
+	# $1 - test function
+	# $2 - domain
+	# $3 - port
+
+	local blocked_ip blocked_ips
+
+	echo 
+	echo "- IP block tests (requires manual interpretation)"
+
+	unblocked_ip=$(mdig_resolve $IPV $UNBLOCKED_DOM)
+	[ -n "$unblocked_ip" ] || {
+		echo $UNBLOCKED_DOM does not resolve. tests not possible.
+		return 1
+	}
+
+	echo "testing $2 on $unblocked_ip ($UNBLOCKED_DOM)"
+	curl_test $1 $2 $unblocked_ip
+
+	blocked_ips=$(mdig_resolve_all $IPV $2)
+	for blocked_ip in $blocked_ips; do
+		echo "testing $UNBLOCKED_DOM on $blocked_ip ($2)"
+		curl_test $1 $UNBLOCKED_DOM $blocked_ip
+	done
+}
 
 curl_has_reason_to_continue()
 {
@@ -1153,6 +1296,8 @@ check_domain_http_tcp()
 	ws_kill
 
 	check_domain_prolog $1 $2 $4 || return
+
+	check_dpi_ip_block $1 $4 $2
 
 	[ "$SKIP_TPWS" = 1 ] || {
 		echo
@@ -1620,7 +1765,11 @@ trap sigpipe PIPE
 for dom in $DOMAINS; do
 	for IPV in $IPVS; do
 		configure_ip_version
-		[ "$ENABLE_HTTP" = 1 ] && check_domain_http $dom
+		[ "$ENABLE_HTTP" = 1 ] && {
+			check_domain_port_block $dom $HTTP_PORT
+			check_domain_http $dom
+		}
+		[ "$ENABLE_HTTPS_TLS12" = 1 -o "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_port_block $dom $HTTPS_PORT
 		[ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $dom
 		[ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $dom
 		[ "$ENABLE_HTTP3" = 1 ] && check_domain_http3 $dom

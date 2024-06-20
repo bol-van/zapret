@@ -293,7 +293,7 @@ random()
 		rs="$RANDOM$RANDOM$(date)"
 	fi
 	# shells use signed int64
-	r=1$(echo $rs | $MD5 | sed 's/[^0-9]//g' | head -c 17)
+	r=1$(echo $rs | $MD5 | sed 's/[^0-9]//g' | cut -c 1-17)
 	echo $(( ($r % ($2-$1+1)) + $1 ))
 }
 
