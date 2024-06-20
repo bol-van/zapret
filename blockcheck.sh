@@ -1236,6 +1236,9 @@ check_dpi_ip_block()
 	echo 
 	echo "- IP block tests (requires manual interpretation)"
 
+	echo "testing $UNBLOCKED_DOM on it's original ip"
+	curl_test $1 $UNBLOCKED_DOM
+
 	unblocked_ip=$(mdig_resolve $IPV $UNBLOCKED_DOM)
 	[ -n "$unblocked_ip" ] || {
 		echo $UNBLOCKED_DOM does not resolve. tests not possible.
