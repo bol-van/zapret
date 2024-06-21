@@ -1229,30 +1229,32 @@ check_dpi_ip_block()
 {
 	# $1 - test function
 	# $2 - domain
-	# $3 - port
 
-	local blocked_ip blocked_ips
+	local blocked_dom=$2
+	local blocked_ip blocked_ips unblocked_ip
 
 	echo 
 	echo "- IP block tests (requires manual interpretation)"
 
 	echo "testing $UNBLOCKED_DOM on it's original ip"
-	curl_test $1 $UNBLOCKED_DOM
+	if curl_test $1 $UNBLOCKED_DOM; then
+		unblocked_ip=$(mdig_resolve $IPV $UNBLOCKED_DOM)
+		[ -n "$unblocked_ip" ] || {
+			echo $UNBLOCKED_DOM does not resolve. tests not possible.
+			return 1
+		}
 
-	unblocked_ip=$(mdig_resolve $IPV $UNBLOCKED_DOM)
-	[ -n "$unblocked_ip" ] || {
-		echo $UNBLOCKED_DOM does not resolve. tests not possible.
-		return 1
-	}
+		echo "testing $blocked_dom on $unblocked_ip ($UNBLOCKED_DOM)"
+		curl_test $1 $blocked_dom $unblocked_ip
 
-	echo "testing $2 on $unblocked_ip ($UNBLOCKED_DOM)"
-	curl_test $1 $2 $unblocked_ip
-
-	blocked_ips=$(mdig_resolve_all $IPV $2)
-	for blocked_ip in $blocked_ips; do
-		echo "testing $UNBLOCKED_DOM on $blocked_ip ($2)"
-		curl_test $1 $UNBLOCKED_DOM $blocked_ip
-	done
+		blocked_ips=$(mdig_resolve_all $IPV $blocked_dom)
+		for blocked_ip in $blocked_ips; do
+			echo "testing $UNBLOCKED_DOM on $blocked_ip ($blocked_dom)"
+			curl_test $1 $UNBLOCKED_DOM $blocked_ip
+		done
+	else
+		echo $UNBLOCKED_DOM is not available. skipping this test.
+	fi
 }
 
 curl_has_reason_to_continue()
@@ -1300,7 +1302,7 @@ check_domain_http_tcp()
 
 	check_domain_prolog $1 $2 $4 || return
 
-	check_dpi_ip_block $1 $4 $2
+	check_dpi_ip_block $1 $4
 
 	[ "$SKIP_TPWS" = 1 ] || {
 		echo
