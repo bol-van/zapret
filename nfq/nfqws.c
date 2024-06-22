@@ -901,6 +901,7 @@ int main(int argc, char **argv)
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
 	bool wf_ipv4=true, wf_ipv6=true;
 	unsigned int IfIdx=0, SubIfIdx=0;
+	unsigned int hash_wf_tcp=0,hash_wf_udp=0,hash_wf_raw=0,hash_ssid_filter=0;
 	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
 #endif
 	
@@ -1502,6 +1503,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 52: /* wf-tcp */
+			HASH_JEN(optarg,strlen(optarg),hash_wf_tcp);
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
 			{
@@ -1510,6 +1512,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 53: /* wf-udp */
+			HASH_JEN(optarg,strlen(optarg),hash_wf_udp);
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
 			{
@@ -1518,6 +1521,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 54: /* wf-raw */
+			HASH_JEN(optarg,strlen(optarg),hash_wf_raw);
 			if (optarg[0]=='@')
 			{
 				size_t sz = sizeof(windivert_filter)-1;
@@ -1535,6 +1539,7 @@ int main(int argc, char **argv)
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
 		case 56: /* ssid-filter */
+			HASH_JEN(optarg,strlen(optarg),hash_ssid_filter);
 			{
 				char *e,*p = optarg;
 				while (p)
@@ -1596,6 +1601,20 @@ int main(int argc, char **argv)
 			exit_clean(1);
 		}
 	}
+	HANDLE hMutexArg;
+	{
+		char mutex_name[128];
+		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_ssid_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
+
+		hMutexArg = CreateMutexA(NULL,TRUE,mutex_name);
+		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)
+		{
+			CloseHandle(hMutexArg);
+			printf("A copy of winws is already running with the same filter\n");
+			goto exiterr;
+		}
+		
+	}
 #endif
 
 	// not specified - use desync_ttl value instead
@@ -1644,6 +1663,13 @@ int main(int argc, char **argv)
 ex:
 	rawsend_cleanup();
 	cleanup_params();
+#ifdef __CYGWIN__
+	if (hMutexArg)
+	{
+		ReleaseMutex(hMutexArg);
+		CloseHandle(hMutexArg);
+	}
+#endif
 	return result;
 exiterr:
 	result = 1;
