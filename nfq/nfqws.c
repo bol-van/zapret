@@ -1609,7 +1609,7 @@ int main(int argc, char **argv)
 		hMutexArg = CreateMutexA(NULL,TRUE,mutex_name);
 		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)
 		{
-			CloseHandle(hMutexArg);
+			CloseHandle(hMutexArg);	hMutexArg = NULL;
 			printf("A copy of winws is already running with the same filter\n");
 			goto exiterr;
 		}
