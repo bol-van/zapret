@@ -1123,6 +1123,79 @@ Blockcheck имеет 3 уровня сканирования.
 standard дает возможность провести исследование как и на что реагирует DPI в плане методов обхода.
 force дает максимум проверок даже в случаях, когда ресурс работает без обхода или с более простыми стратегиями.
 
+СКАН ПОРТОВ
+Если в системе присутствует совместимый netcat (ncat от nmap или openbsd ncat. в openwrt по умолчанию нет.),
+то выполняется сканирование портов http или https всех IP адресов домена.
+Если ни один IP не отвечает, то результат очевиден. Можно останавливать сканирование.
+Автоматически оно не остановится, потому что netcat-ы недостаточно подробно информируют о причинах ошибки.
+Если доступно только часть IP, то можно ожидать хаотичных сбоев, т.к. подключение идет к случайном у адресу
+из списка.
+
+ПРОВЕРКА НА ЧАСТИЧНЫЙ IP block
+Под частичным блоком подразумевается ситуация, когда конект на порты есть, но по определенному прикладному
+протоколу всегда идет реакция DPI вне зависимости от запрашиваемого домена.
+Эта проверка так же не выдаст автоматического вердикта/решения, потому что может быть очень много вариаций.
+Вместо этого анализ происходящего возложен на самого пользователя или тех, кто будет читать лог.
+Суть этой проверки в попытке дернуть неблокированный IP с блокированным доменом и наоборот, анализируя
+при этом реакцию DPI. Реакция DPI обычно проявляется в виде таймаута (зависание запроса), connection reset
+или http redirect на заглушку. Любой другой вариант скорее всего говорит об отсутствии реакции DPI.
+В частности, любые http коды, кроме редиректа, ведущего именно на заглушку, а не куда-то еще.
+На TLS - ошибки handshake без задержек.
+Ошибка сертификата может говорить как о реакции DPI с MiTM атакой (подмена сертификата), так и
+о том, что принимающий сервер неблокированного домена все равно принимает ваш TLS handshake с чужим доменом,
+пытаясь при этом выдать сертификат без запрошенного домена. Требуется дополнительный анализ.
+Если на заблокированный домен есть реакция на всех IP адресах, значит есть блокировака по домену.
+Если на неблокированный домен есть реакция на IP адресах блокированного домена, значит имеет место блок по IP.
+Соответственно, если есть и то, и другое, значит есть и блок по IP, и блок по домену.
+Неблокированный домен первым делом проверяется на доступность на оригинальном адресе.
+При недоступности тест отменяется, поскольку он будет неинформативен.
+
+Если выяснено, что есть частичный блок по IP на DPI, то скорее всего все остальные тесты будут провалены
+вне зависимости от стратегий обхода. Но бывают и некоторые исключения. Например, пробитие через ipv6
+option headers. Или сделать так, чтобы он не мог распознать протокол прикладного уровня.
+Дальнейшие тесты могут быть не лишены смысла.
+
+ПРИМЕРЫ БЛОКИРОВКИ ТОЛЬКО ПО ДОМЕНУ БЕЗ БЛОКА ПО IP
+
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+curl: (28) Operation timed out after 1002 milliseconds with 0 bytes received
+> testing iana.org on 172.67.182.196 (rutracker.org)
+HTTP/1.1 409 Conflict
+> testing iana.org on 104.21.32.39 (rutracker.org)
+HTTP/1.1 409 Conflict
+
+- IP block tests (requires manual interpretation)
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+curl: (28) Connection timed out after 1001 milliseconds
+> testing iana.org on 172.67.182.196 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
+> testing iana.org on 104.21.32.39 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
+
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+HTTP/1.1 307 Temporary Redirect
+Location: https://www.gblnet.net/blocked.php
+> testing iana.org on 172.67.182.196 (rutracker.org)
+HTTP/1.1 409 Conflict
+> testing iana.org on 104.21.32.39 (rutracker.org)
+HTTP/1.1 409 Conflict
+
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+curl: (35) Recv failure: Connection reset by peer
+> testing iana.org on 172.67.182.196 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
+> testing iana.org on 104.21.32.39 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
+
+
 Выбор параметров
 ----------------
 
