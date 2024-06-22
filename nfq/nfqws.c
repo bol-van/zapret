@@ -759,7 +759,7 @@ static bool wf_make_filter(
 	return true;
 }
 
-unsigned int hash_jen(const void *data,unsigned int len)
+static unsigned int hash_jen(const void *data,unsigned int len)
 {
 	unsigned int hash;
 	HASH_JEN(data,len,hash);
