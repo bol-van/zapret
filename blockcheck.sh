@@ -575,22 +575,29 @@ curl_test_http()
 	# $1 - ip version : 4/6
 	# $2 - domain name
 	# $3 - subst ip
+	# $4 - "detail" - detail info
+
 	local code loc
 	curl_probe $1 $2 $HTTP_PORT "$3" -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
 		code=$?
 		rm -f "$HDRTEMP"
 		return $code
 	}
-	code=$(hdrfile_http_code "$HDRTEMP")
-	[ "$code" = 301 -o "$code" = 302 -o "$code" = 307 -o "$code" = 308 ] && {
-		loc=$(hdrfile_location "$HDRTEMP")
-		echo "$loc" | grep -qE "^https?://.*$2(/|$)" ||
-		echo "$loc" | grep -vqE '^https?://' || {
-			echo suspicious redirection $code to : $loc
-			rm -f "$HDRTEMP"
-			return 254
+	if [ "$4" = "detail" ] ; then
+		head -n 1 "$HDRTEMP"
+		grep "^[lL]ocation:" "$HDRTEMP"
+	else
+		code=$(hdrfile_http_code "$HDRTEMP")
+		[ "$code" = 301 -o "$code" = 302 -o "$code" = 307 -o "$code" = 308 ] && {
+			loc=$(hdrfile_location "$HDRTEMP")
+			echo "$loc" | grep -qE "^https?://.*$2(/|$)" ||
+			echo "$loc" | grep -vqE '^https?://' || {
+				echo suspicious redirection $code to : $loc
+				rm -f "$HDRTEMP"
+				return 254
+			}
 		}
-	}
+	fi
 	rm -f "$HDRTEMP"
 	[ "$code" = 400 ] && {
 		# this can often happen if the server receives fake packets it should not receive
@@ -820,25 +827,28 @@ curl_test()
 	# $1 - test function
 	# $2 - domain
 	# $3 - subst ip
+	# $4 - param of test function
 	local code=0 n=0
 
 	while [ $n -lt $REPEATS ]; do
 		n=$(($n+1))
 		[ $REPEATS -gt 1 ] && printf "[attempt $n] "
-		if $1 "$IPV" $2 $3 ; then
+		if $1 "$IPV" $2 $3 "$4" ; then
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 		else
 			code=$?
 			[ "$SCANLEVEL" = quick ] && break
 		fi
 	done
-	if [ $code = 254 ]; then
-		echo "UNAVAILABLE"
-	elif [ $code = 0 ]; then
-		echo '!!!!! AVAILABLE !!!!!'
-	else
-		echo "UNAVAILABLE code=$code"
-	fi
+	[ "$4" = detail ] || {
+		if [ $code = 254 ]; then
+			echo "UNAVAILABLE"
+		elif [ $code = 0 ]; then
+			echo '!!!!! AVAILABLE !!!!!'
+		else
+			echo "UNAVAILABLE code=$code"
+		fi
+	}
 	return $code
 }
 ws_curl_test()
@@ -1236,7 +1246,7 @@ check_dpi_ip_block()
 	echo 
 	echo "- IP block tests (requires manual interpretation)"
 
-	echo "testing $UNBLOCKED_DOM on it's original ip"
+	echo "> testing $UNBLOCKED_DOM on it's original ip"
 	if curl_test $1 $UNBLOCKED_DOM; then
 		unblocked_ip=$(mdig_resolve $IPV $UNBLOCKED_DOM)
 		[ -n "$unblocked_ip" ] || {
@@ -1244,13 +1254,13 @@ check_dpi_ip_block()
 			return 1
 		}
 
-		echo "testing $blocked_dom on $unblocked_ip ($UNBLOCKED_DOM)"
-		curl_test $1 $blocked_dom $unblocked_ip
+		echo "> testing $blocked_dom on $unblocked_ip ($UNBLOCKED_DOM)"
+		curl_test $1 $blocked_dom $unblocked_ip detail
 
 		blocked_ips=$(mdig_resolve_all $IPV $blocked_dom)
 		for blocked_ip in $blocked_ips; do
-			echo "testing $UNBLOCKED_DOM on $blocked_ip ($blocked_dom)"
-			curl_test $1 $UNBLOCKED_DOM $blocked_ip
+			echo "> testing $UNBLOCKED_DOM on $blocked_ip ($blocked_dom)"
+			curl_test $1 $UNBLOCKED_DOM $blocked_ip detail
 		done
 	else
 		echo $UNBLOCKED_DOM is not available. skipping this test.
