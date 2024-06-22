@@ -1166,7 +1166,6 @@ HTTP/1.1 409 Conflict
 > testing iana.org on 104.21.32.39 (rutracker.org)
 HTTP/1.1 409 Conflict
 
-- IP block tests (requires manual interpretation)
 > testing iana.org on it's original ip
 !!!!! AVAILABLE !!!!!
 > testing rutracker.org on 192.0.43.8 (iana.org)
