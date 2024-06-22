@@ -1195,6 +1195,31 @@ curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake f
 curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
 
 
+ПРИМЕР ПОЛНОГО IP БЛОКА ИЛИ БЛОКА TCP ПОРТА ПРИ ОТСУТСТВИИ БЛОКА ПО ДОМЕНУ
+
+* port block tests ipv4 startmail.com:80
+ncat -z -w 1 145.131.90.136 80
+145.131.90.136 does not connect. netcat code 1
+ncat -z -w 1 145.131.90.152 80
+145.131.90.152 does not connect. netcat code 1
+
+* curl_test_http ipv4 startmail.com
+- checking without DPI bypass
+curl: (28) Connection timed out after 2002 milliseconds
+UNAVAILABLE code=28
+
+- IP block tests (requires manual interpretation)
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing startmail.com on 192.0.43.8 (iana.org)
+HTTP/1.1 302 Found
+Location: https://www.iana.org/
+> testing iana.org on 145.131.90.136 (startmail.com)
+curl: (28) Connection timed out after 2002 milliseconds
+> testing iana.org on 145.131.90.152 (startmail.com)
+curl: (28) Connection timed out after 2002 milliseconds
+
+
 Выбор параметров
 ----------------
 
