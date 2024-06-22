@@ -759,6 +759,13 @@ static bool wf_make_filter(
 	return true;
 }
 
+unsigned int hash_jen(const void *data,unsigned int len)
+{
+	unsigned int hash;
+	HASH_JEN(data,len,hash);
+	return hash;
+}
+
 #endif
 
 
@@ -1503,7 +1510,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 52: /* wf-tcp */
-			HASH_JEN(optarg,strlen(optarg),hash_wf_tcp);
+			hash_wf_tcp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
 			{
@@ -1512,7 +1519,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 53: /* wf-udp */
-			HASH_JEN(optarg,strlen(optarg),hash_wf_udp);
+			hash_wf_udp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
 			{
@@ -1521,7 +1528,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 54: /* wf-raw */
-			HASH_JEN(optarg,strlen(optarg),hash_wf_raw);
+			hash_wf_raw=hash_jen(optarg,strlen(optarg));
 			if (optarg[0]=='@')
 			{
 				size_t sz = sizeof(windivert_filter)-1;
@@ -1539,7 +1546,7 @@ int main(int argc, char **argv)
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
 		case 56: /* ssid-filter */
-			HASH_JEN(optarg,strlen(optarg),hash_ssid_filter);
+			hash_ssid_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
 				while (p)
