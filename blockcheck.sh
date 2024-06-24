@@ -1086,20 +1086,7 @@ pktws_check_domain_http_bypass_()
 				pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		}
-		for desync in $tests; do
-			ok=0
-			for delta in 1 2 3 4 5; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e && ok=1
-			done
-			[ "$ok" = 1 ] &&
-			{
-				echo "WARNING ! although autottl worked it requires testing on multiple domains to find out reliable delta"
-				echo "WARNING ! if a reliable delta cannot be found it's a good idea not to use autottl"
-				[ "$SCANLEVEL" = quick ] && return
-			}			
-		done
-
-		for desync in split2 disorder2; do
+		for desync in split2 disorder2 fake,split2 fake,disorder2; do
 			s="--dpi-desync=$desync"
 			if [ "$sec" = 0 ]; then
 				for pos in method host; do
@@ -1113,6 +1100,18 @@ pktws_check_domain_http_bypass_()
 			for pos in 2 3 4 5 10 50; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=$(($pos - 1))  --dpi-desync-split-pos=$pos $e && [ "$SCANLEVEL" = quick ] && return
 			done
+		done
+		for desync in $tests; do
+			ok=0
+			for delta in 1 2 3 4 5; do
+				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=$delta $e && ok=1
+			done
+			[ "$ok" = 1 ] &&
+			{
+				echo "WARNING ! although autottl worked it requires testing on multiple domains to find out reliable delta"
+				echo "WARNING ! if a reliable delta cannot be found it's a good idea not to use autottl"
+				[ "$SCANLEVEL" = quick ] && return
+			}			
 		done
 
 		s="http_iana_org.bin"
