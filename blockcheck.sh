@@ -1117,7 +1117,7 @@ pktws_check_domain_http_bypass_()
 
 		s="http_iana_org.bin"
 		[ "$sec" = 0 ] || s="tls_clienthello_iana_org.bin"
-		for desync in syndata syndata,split2 syndata,disorder2 syndata,split2 syndata,disorder2 ; do
+		for desync in syndata syndata,split2 syndata,disorder2 ; do
 			pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s" $e && [ "$SCANLEVEL" = quick ] && return
 		done
