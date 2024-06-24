@@ -1086,7 +1086,7 @@ pktws_check_domain_http_bypass_()
 				pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		}
-		for desync in split2 disorder2 fake,split2 fake,disorder2; do
+		for desync in split2 disorder2; do
 			s="--dpi-desync=$desync"
 			if [ "$sec" = 0 ]; then
 				for pos in method host; do
@@ -1098,7 +1098,7 @@ pktws_check_domain_http_bypass_()
 				done
 			fi
 			for pos in 2 3 4 5 10 50; do
-				pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=$(($pos - 1))  --dpi-desync-split-pos=$pos $e && [ "$SCANLEVEL" = quick ] && return
+				pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=$(($pos - 1)) --dpi-desync-split-pos=$pos $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		done
 		for desync in $tests; do
