@@ -283,7 +283,7 @@ netcat_test()
 	netcat_setup && {
 		cmd="$NCAT -z -w 1 $1 $2"
 		echo $cmd
-		$cmd
+		$cmd 2>&1
 	}
 }
 
