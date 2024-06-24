@@ -180,6 +180,8 @@ nfqws takes the following parameters:
  --dpi-desync-split-pos=<1..9216>               ; data payload split position
  --dpi-desync-split-http-req=method|host        ; split at specified logical part of plain http request
  --dpi-desync-split-tls=sni|sniext              ; split at specified logical part of TLS ClientHello
+ --dpi-desync-split-seqovl=<int>                ; use sequence overlap before first sent original split segment
+ --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-badseq-increment=<int|0xHEX>      ; badseq fooling seq signed increment. default -10000
@@ -291,6 +293,16 @@ Split mode is very similar to disorder but without segment reordering :
 Mode `split2` disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
 In `disorder2` and 'split2` modes no fake packets are sent, so ttl and fooling options are not required.
+
+`seqovl` adds to the first sent original segment (1st for split, 2nd for disorder) seqovl bytes to the beginning and decreases
+sequence number.
+In `split2` mode this creates partially in-window packet. OS receives only in-window part.
+In `disorder2` mode OS receives fake and real part of the second segment but does not pass received data to the socket until first
+segment is received. First segment overwrites fake part of the second segment. Then OS passes original data to the socket.
+All unix OS preserve last received data. This may not be the case for Windows servers and may not work.
+Disorder requires `seqovl` to be less than `split_pos`. Either statically defined or automatically calculated.
+Otherwise desync is not possible and will not happen.
+Method allows to avoid separate fakes. Fakes and real data are mixed.
 
 `hopbyhop`, `destopt` and `ipfrag1` desync modes (they're not the same as `hopbyhop` fooling !) are ipv6 only. One `hop-by-hop`,
 `destination options` or `fragment` header is added to all desynced packets.

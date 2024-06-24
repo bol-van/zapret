@@ -50,7 +50,7 @@ struct params_s
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
-	unsigned int desync_repeats,desync_split_pos,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
+	unsigned int desync_repeats,desync_split_pos,desync_seqovl,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
 	enum httpreqpos desync_split_http_req;
 	enum tlspos desync_split_tls;
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
@@ -60,7 +60,7 @@ struct params_s
 	uint32_t desync_fooling_mode;
 	uint32_t desync_fwmark; // unused in BSD
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
-	uint8_t fake_http[1460],fake_tls[1460],fake_unknown[1460],fake_syndata[1460];
+	uint8_t fake_http[1460],fake_tls[1460],fake_unknown[1460],fake_syndata[1460],seqovl_pattern[1460];
 	uint8_t fake_unknown_udp[1472],udplen_pattern[1472],fake_quic[1472],fake_wg[1472],fake_dht[1472];
 	size_t fake_http_size,fake_tls_size,fake_quic_size,fake_wg_size,fake_dht_size,fake_unknown_size,fake_syndata_size,fake_unknown_udp_size;
 	int udplen_increment;

@@ -294,3 +294,8 @@ tpws: --split-tls
 tpws: --tlsrec=sniext
 nfqws: --dpi-desync-split-http-req, --dpi-desync-split-tls. multi segment TLS support for split.
 blockcheck: mdig dns cache
+
+v60
+
+blockcheck: port block test, partial ip block test
+nfqws: seqovl split/disorder modes

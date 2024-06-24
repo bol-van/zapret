@@ -959,17 +959,41 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_DISORDER2:
 				if (split_pos)
 				{
-					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100];
-					size_t fakeseg_len;
+					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100], *seg;
+					size_t seg_len;
+
+					if (params.desync_seqovl>=split_pos)
+					{
+						DLOG("seqovl>=split_pos. desync is not possible.\n")
+						return verdict;
+					}
 
 					if (split_pos<len_payload)
 					{
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+						if (params.desync_seqovl)
+						{
+							seg_len = len_payload-split_pos+params.desync_seqovl;
+							if (seg_len>sizeof(fakeseg))
+							{
+								DLOG("seqovl is too large\n")
+								return verdict;
+							}
+							fill_pattern(fakeseg,params.desync_seqovl,params.seqovl_pattern,sizeof(params.seqovl_pattern));
+							memcpy(fakeseg+params.desync_seqovl,data_payload+split_pos,len_payload-split_pos);
+							seg = fakeseg;
+						}
+						else
+						{
+							seg = data_payload+split_pos;
+							seg_len = len_payload-split_pos;
+						}
+
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(net32_add(tcphdr->th_seq,split_pos),-params.desync_seqovl), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 								ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
+								seg, seg_len, pkt1, &pkt1_len))
 							return verdict;
-						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos)
-						hexdump_limited_dlog(data_payload+split_pos,len_payload-split_pos,PKTDATA_MAXDUMP); DLOG("\n")
+						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu seqovl=%u : ",split_pos,len_payload-1, len_payload-split_pos, params.desync_seqovl)
+						hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n")
 						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 							return verdict;
 					}
@@ -977,17 +1001,16 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 					if (desync_mode==DESYNC_DISORDER)
 					{
-						fakeseg_len = sizeof(fakeseg);
+						seg_len = sizeof(fakeseg);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 								ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-								zeropkt, split_pos, fakeseg, &fakeseg_len))
+								zeropkt, split_pos, fakeseg, &seg_len))
 							return verdict;
 						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
 						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
-						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
+						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
 							return verdict;
 					}
-
 
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
@@ -1003,7 +1026,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						DLOG("sending fake(2) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
 						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
-						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
+						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
 							return verdict;
 					}
 
@@ -1014,8 +1037,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_SPLIT2:
 				if (split_pos)
 				{
-					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100];
-					size_t fakeseg_len;
+					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100],ovlseg[DPI_DESYNC_MAX_FAKE_LEN+100], *seg;
+					size_t fakeseg_len,seg_len;
 
 					if (desync_mode==DESYNC_SPLIT)
 					{
@@ -1030,13 +1053,30 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							return verdict;
 					}
 
-					pkt1_len = sizeof(pkt1);
-					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+					if (params.desync_seqovl)
+					{
+						seg_len = split_pos+params.desync_seqovl;
+						if (seg_len>sizeof(ovlseg))
+						{
+							DLOG("seqovl is too large")
+							return verdict;
+						}
+						fill_pattern(ovlseg,params.desync_seqovl,params.seqovl_pattern,sizeof(params.seqovl_pattern));
+						memcpy(ovlseg+params.desync_seqovl,data_payload,split_pos);
+						seg = ovlseg;
+					}
+					else
+					{
+						seg = data_payload;
+						seg_len = split_pos;
+					}
+
+					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,-params.desync_seqovl), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 							ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
-							data_payload, split_pos, pkt1, &pkt1_len))
+							seg, seg_len, pkt1, &pkt1_len))
 						return verdict;
-					DLOG("sending 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos)
-					hexdump_limited_dlog(data_payload,split_pos,PKTDATA_MAXDUMP); DLOG("\n")
+					DLOG("sending 1st tcp segment 0-%zu len=%zu seqovl=%u : ",split_pos-1, split_pos, params.desync_seqovl)
+					hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n")
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return verdict;
 
@@ -1047,7 +1087,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
 							return verdict;
 					}
-
 					if (split_pos<len_payload)
 					{
 						pkt1_len = sizeof(pkt1);

@@ -1009,7 +1009,7 @@ pktws_check_domain_http_bypass_()
 		ok=1
 	}
 	[ "$ret" != 0 -o "$SCANLEVEL" = force ] && {
-		[ "$sec" = 0 ] && {
+		if [ "$sec" = 0 ]; then
 			pktws_curl_test_update $1 $3 $s --hostcase && {
 				[ "$SCANLEVEL" = quick ] && return
 				ok=1
@@ -1022,15 +1022,14 @@ pktws_check_domain_http_bypass_()
 					}
 				done
 			done
-		}
-		[ "$sec" = 1 ] && {
+		else
 			for pos in sni sniext; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-split-tls=$pos && {
 					[ "$SCANLEVEL" = quick ] && return
 					ok=1
 				}
 			done
-		}
+		fi
 		for pos in 1 3 4 5 10 50; do
 			s="--dpi-desync=split2 --dpi-desync-split-pos=$pos"
 			if pktws_curl_test_update $1 $3 $s; then
@@ -1098,6 +1097,22 @@ pktws_check_domain_http_bypass_()
 				echo "WARNING ! if a reliable delta cannot be found it's a good idea not to use autottl"
 				[ "$SCANLEVEL" = quick ] && return
 			}			
+		done
+
+		for desync in split2 disorder2; do
+			s="--dpi-desync=$desync"
+			if [ "$sec" = 0 ]; then
+				for pos in method host; do
+					pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=1 --dpi-desync-split-http-req=$pos $e && [ "$SCANLEVEL" = quick ] && return
+				done
+			else
+				for pos in sni sniext; do
+					pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=1 --dpi-desync-split-tls=$pos $e && [ "$SCANLEVEL" = quick ] && return
+				done
+			fi
+			for pos in 2 3 4 5 10 50; do
+				pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=$(($pos - 1))  --dpi-desync-split-pos=$pos $e && [ "$SCANLEVEL" = quick ] && return
+			done
 		done
 
 		s="http_iana_org.bin"
