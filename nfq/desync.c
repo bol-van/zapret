@@ -7,6 +7,7 @@
 #include "hostlist.h"
 #include "conntrack.h"
 
+#include <unistd.h>
 #include <string.h>
 
 
@@ -1133,14 +1134,14 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!ip_frag(pkt_orig, pkt_orig_len, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
 						return verdict;
 
-					DLOG("sending 1st ip fragment 0-%zu len=%zu : ", ipfrag_pos-1, ipfrag_pos)
+					DLOG("sending 1st ip fragment 0-%zu ip_payload_len=%zu : ", ipfrag_pos-1, ipfrag_pos)
 					hexdump_limited_dlog(pkt1,pkt1_len,IP_MAXDUMP); DLOG("\n")
-					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt2, pkt2_len))
+					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return verdict;
 
-					DLOG("sending 2nd ip fragment %zu-%zu len=%zu : ", ipfrag_pos, transport_len-1, transport_len-ipfrag_pos)
+					DLOG("sending 2nd ip fragment %zu-%zu ip_payload_len=%zu : ", ipfrag_pos, transport_len-1, transport_len-ipfrag_pos)
 					hexdump_limited_dlog(pkt2,pkt2_len,IP_MAXDUMP); DLOG("\n")
-					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt2, pkt2_len))
 						return verdict;
 
 					return VERDICT_DROP;
@@ -1536,14 +1537,14 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!ip_frag(pkt_orig, pkt_orig_len, ipfrag_pos, ident, pkt1, &pkt1_len, pkt2, &pkt2_len))
 						return verdict;
 
-					DLOG("sending 1st ip fragment 0-%zu len=%zu : ", ipfrag_pos-1, ipfrag_pos)
+					DLOG("sending 1st ip fragment 0-%zu ip_payload_len=%zu : ", ipfrag_pos-1, ipfrag_pos)
 					hexdump_limited_dlog(pkt1,pkt1_len,IP_MAXDUMP); DLOG("\n")
-					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt2, pkt2_len))
+					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return verdict;
 
-					DLOG("sending 2nd ip fragment %zu-%zu len=%zu : ", ipfrag_pos, transport_len-1, transport_len-ipfrag_pos)
+					DLOG("sending 2nd ip fragment %zu-%zu ip_payload_len=%zu : ", ipfrag_pos, transport_len-1, transport_len-ipfrag_pos)
 					hexdump_limited_dlog(pkt2,pkt2_len,IP_MAXDUMP); DLOG("\n")
-					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt2, pkt2_len))
 						return verdict;
 
 					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
