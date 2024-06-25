@@ -494,7 +494,7 @@ curl_supports_tls13()
 curl_supports_tlsmax()
 {
 	# supported only in OpenSSL and LibreSSL
-	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS -e quictls || return 1
+	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e BoringSSL -e GnuTLS -e quictls || return 1
 	# supported since curl 7.54
 	curl --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
