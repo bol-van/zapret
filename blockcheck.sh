@@ -494,7 +494,7 @@ curl_supports_tls13()
 curl_supports_tlsmax()
 {
 	# supported only in OpenSSL and LibreSSL
-	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS || return 1
+	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e GnuTLS -e quictls || return 1
 	# supported since curl 7.54
 	curl --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
@@ -1086,6 +1086,7 @@ pktws_check_domain_http_bypass_()
 				pktws_curl_test_update_vary $1 $2 $3 $desync $e && [ "$SCANLEVEL" = quick ] && return
 			done
 		}
+
 		for desync in split2 disorder2; do
 			s="--dpi-desync=$desync"
 			if [ "$sec" = 0 ]; then
@@ -1100,7 +1101,11 @@ pktws_check_domain_http_bypass_()
 			for pos in 2 3 4 5 10 50; do
 				pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=$(($pos - 1)) --dpi-desync-split-pos=$pos $e && [ "$SCANLEVEL" = quick ] && return
 			done
+			[ "$sec" != 0 -a $desync = split2 ] && {
+				pktws_curl_test_update $1 $3 $s --dpi-desync-split-seqovl=336 --dpi-desync-split-seqovl-pattern="$ZAPRET_BASE/files/fake/tls_clienthello_iana_org.bin" $e && [ "$SCANLEVEL" = quick ] && return
+			}
 		done
+
 		for desync in $tests; do
 			ok=0
 			for delta in 1 2 3 4 5; do
