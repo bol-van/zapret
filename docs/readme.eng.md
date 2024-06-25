@@ -299,7 +299,7 @@ sequence number.
 In `split2` mode this creates partially in-window packet. OS receives only in-window part.
 In `disorder2` mode OS receives fake and real part of the second segment but does not pass received data to the socket until first
 segment is received. First segment overwrites fake part of the second segment. Then OS passes original data to the socket.
-All unix OS preserve last received data. This may not be the case for Windows servers and may not work.
+All unix OS except Solaris preserve last received data. This is not the case for Windows servers and `disorder` with `seqovl` will not work.
 Disorder requires `seqovl` to be less than `split_pos`. Either statically defined or automatically calculated.
 Otherwise desync is not possible and will not happen.
 Method allows to avoid separate fakes. Fakes and real data are mixed.
