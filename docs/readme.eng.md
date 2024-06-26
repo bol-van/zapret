@@ -478,8 +478,8 @@ They can consist of multiple packets if kyber crypto is used (default starting f
 Chromium randomizes TLS fingerprint. SNI can be in any packet or in-between.
 Stateful DPIs usually reassemble all packets in the request then apply block decision.
 If nfqws receives a partial ClientHello it begins reassemble session. Packets are delayed until it's finished.
-Then the first packet goes through desync using fully reassembled message. Other packets are sent
-without desync. On any error reassemble is cancelled and all delayed packets are sent immediately without desync.
+Then they go through desync using fully reassembled message.
+On any error reassemble is cancelled and all delayed packets are sent immediately without desync.
 
 There is special support for all tcp split options for multi segment TLS. Split position is treated
 as message-oriented, not packet oriented. For example, if your client sends TLS ClientHello with size 2000
