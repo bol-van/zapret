@@ -1786,7 +1786,7 @@ check_system
 [ "$UNAME" = CYGWIN ] || require_root
 check_prerequisites
 trap sigint_cleanup INT
-check_dns
+[ "$SKIP_DNSCHECK" = 1 ] || check_dns
 check_virt
 ask_params
 trap - INT
