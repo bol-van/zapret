@@ -16,6 +16,7 @@
 
 #ifdef __CYGWIN__
 #include <wlanapi.h>
+#include <netlistmgr.h>
 #endif
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
@@ -963,10 +964,204 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 static HANDLE w_filter = NULL;
 static OVERLAPPED ovl = { .hEvent = NULL };
 static const struct str_list_head *wlan_filter_ssid = NULL;
-static DWORD wlan_filter_tick=0;
+static const struct str_list_head *nlm_filter_net = NULL;
+static DWORD logical_net_filter_tick=0;
 uint32_t w_win32_error=0;
+INetworkListManager* pNetworkListManager=NULL;
 
-bool wlan_filter_match(const struct str_list_head *ssid_list)
+static void guid2str(const GUID *guid, char *str)
+{
+	snprintf(str,37, "%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X", guid->Data1, guid->Data2, guid->Data3, guid->Data4[0], guid->Data4[1], guid->Data4[2], guid->Data4[3], guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
+}
+static bool str2guid(const char* str, GUID *guid)
+{
+	unsigned int u[11],k;
+
+	if (11 != sscanf(str, "%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X", u+0, u+1, u+2, u+3, u+4, u+5, u+6, u+7, u+8, u+9, u+10))
+		return false;
+	guid->Data1 = u[0];
+	if ((u[1] & 0xFFFF0000) || (u[2] & 0xFFFF0000)) return false;
+	guid->Data2 = (USHORT)u[1];
+	guid->Data3 = (USHORT)u[2];
+	for (k = 0; k < 8; k++)
+	{
+		if (u[k+3] & 0xFFFFFF00) return false;
+		guid->Data4[k] = (UCHAR)u[k+3];
+	}
+	return true;
+}
+
+bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_list_head *nlm_filter)
+{
+	win_dark_deinit();
+	wlan_filter_ssid = LIST_EMPTY(ssid_filter) ? NULL : ssid_filter;
+	nlm_filter_net = LIST_EMPTY(nlm_filter) ? NULL : nlm_filter;
+	if (nlm_filter_net)
+	{
+		if (SUCCEEDED(w_win32_error = CoInitialize(NULL)))
+		{
+			if (FAILED(w_win32_error = CoCreateInstance(&CLSID_NetworkListManager, NULL, CLSCTX_ALL, &IID_INetworkListManager, (LPVOID*)&pNetworkListManager)))
+			{
+				win_dark_deinit();
+				return false;
+			}
+		}
+	}
+	return true;
+}
+bool win_dark_deinit(void)
+{
+	if (pNetworkListManager)
+	{
+		pNetworkListManager->lpVtbl->Release(pNetworkListManager);
+		pNetworkListManager = NULL;
+	}
+	if (nlm_filter_net) CoUninitialize();
+	wlan_filter_ssid = nlm_filter_net = NULL;
+}
+
+
+bool nlm_list(bool bAll)
+{
+	bool bRet = true;
+
+	if (SUCCEEDED(w_win32_error = CoInitialize(NULL)))
+	{
+		INetworkListManager* pNetworkListManager;
+		if (SUCCEEDED(w_win32_error = CoCreateInstance(&CLSID_NetworkListManager, NULL, CLSCTX_ALL, &IID_INetworkListManager, (LPVOID*)&pNetworkListManager)))
+		{
+			IEnumNetworks* pEnum;
+			if (SUCCEEDED(w_win32_error = pNetworkListManager->lpVtbl->GetNetworks(pNetworkListManager, NLM_ENUM_NETWORK_ALL, &pEnum)))
+			{
+				INetwork* pNet;
+				VARIANT_BOOL bIsConnected, bIsConnectedInet;
+				GUID idNet;
+				BSTR bstrName;
+				char Name[128];
+				int connected;
+				for (connected = 1; connected >= !bAll; connected--)
+				{
+					for (;;)
+					{
+						if (FAILED(w_win32_error = pEnum->lpVtbl->Next(pEnum, 1, &pNet, NULL)))
+						{
+							bRet = false;
+							break;
+						}
+						if (!pNet) break;
+						if (SUCCEEDED(w_win32_error = pNet->lpVtbl->get_IsConnected(pNet, &bIsConnected)) &&
+							SUCCEEDED(w_win32_error = pNet->lpVtbl->get_IsConnectedToInternet(pNet, &bIsConnectedInet)) &&
+							SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkId(pNet, &idNet)) &&
+							SUCCEEDED(w_win32_error = pNet->lpVtbl->GetName(pNet, &bstrName)))
+						{
+							if (!!bIsConnected == connected)
+							{
+								if (WideCharToMultiByte(CP_UTF8, 0, bstrName, -1, Name, sizeof(Name), NULL, NULL))
+								{
+									printf("Name  : %s", Name);
+									if (bIsConnected) printf(" (connected)");
+									if (bIsConnectedInet) printf(" (inet)");
+									printf("\n");
+									guid2str(&idNet, Name);
+									printf("NetID : %s\n", Name);
+									printf("\n");
+								}
+								else
+								{
+									w_win32_error = HRESULT_FROM_WIN32(GetLastError());
+									bRet = false;
+								}
+							}
+							SysFreeString(bstrName);
+						}
+						else
+							bRet = false;
+						pNet->lpVtbl->Release(pNet);
+						if (!bRet) break;
+					}
+					if (!bRet) break;
+					pEnum->lpVtbl->Reset(pEnum);
+				}
+				pEnum->lpVtbl->Release(pEnum);
+			}
+			else
+				bRet = false;
+			pNetworkListManager->lpVtbl->Release(pNetworkListManager);
+		}
+		else
+			bRet = false;
+	}
+	else
+		bRet = false;
+
+	CoUninitialize();
+	return bRet;
+}
+
+static bool nlm_filter_match(const struct str_list_head *nlm_list)
+{
+	// no filter given. always matches.
+	if (!nlm_list || LIST_EMPTY(nlm_list))
+	{
+		w_win32_error = 0;
+		return true;
+	}
+
+	bool bRet = true, bMatch = false;
+	IEnumNetworks* pEnum;
+
+	if (SUCCEEDED(w_win32_error = pNetworkListManager->lpVtbl->GetNetworks(pNetworkListManager, NLM_ENUM_NETWORK_ALL, &pEnum)))
+	{
+		INetwork* pNet;
+		VARIANT_BOOL bIsConnected;
+		GUID idNet,g;
+		BSTR bstrName;
+		char Name[128];
+		struct str_list *nlm;
+		for (;;)
+		{
+			if (FAILED(w_win32_error = pEnum->lpVtbl->Next(pEnum, 1, &pNet, NULL)))
+			{
+				bRet = false;
+				break;
+			}
+			if (!pNet) break;
+			if (SUCCEEDED(w_win32_error = pNet->lpVtbl->get_IsConnected(pNet, &bIsConnected)) &&
+				SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkId(pNet, &idNet)) &&
+				SUCCEEDED(w_win32_error = pNet->lpVtbl->GetName(pNet, &bstrName)))
+			{
+				if (bIsConnected)
+				{
+					if (WideCharToMultiByte(CP_UTF8, 0, bstrName, -1, Name, sizeof(Name), NULL, NULL))
+					{
+						LIST_FOREACH(nlm, nlm_list, next)
+						{
+							bMatch = !strcmp(Name,nlm->str) || str2guid(nlm->str,&g) && !memcmp(&idNet,&g,sizeof(GUID));
+							if (bMatch) break;
+						}
+					}
+					else
+					{
+						w_win32_error = HRESULT_FROM_WIN32(GetLastError());
+						bRet = false;
+					}
+
+				}
+				SysFreeString(bstrName);
+			}
+			else
+				bRet = false;
+			pNet->lpVtbl->Release(pNet);
+			if (!bRet || bMatch) break;
+		}
+		pEnum->lpVtbl->Release(pEnum);
+	}
+	else
+		bRet = false;
+	return bRet && bMatch;
+}
+
+static bool wlan_filter_match(const struct str_list_head *ssid_list)
 {
 	DWORD dwCurVersion;
 	HANDLE hClient = NULL;
@@ -1031,12 +1226,17 @@ found:
 	goto ex;
 }
 
-static bool wlan_filter_match_rate_limited(void)
+bool logical_net_filter_match(void)
+{
+	return wlan_filter_match(wlan_filter_ssid) && nlm_filter_match(nlm_filter_net);
+}
+
+static bool logical_net_filter_match_rate_limited(void)
 {
 	DWORD dwTick = GetTickCount() / 1000;
-	if (wlan_filter_tick == dwTick) return true;
-	wlan_filter_tick = dwTick;
-	return wlan_filter_match(wlan_filter_ssid);
+	if (logical_net_filter_tick == dwTick) return true;
+	logical_net_filter_tick = dwTick;
+	return logical_net_filter_match();
 }
 
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
@@ -1084,9 +1284,8 @@ void rawsend_cleanup(void)
 		CloseHandle(ovl.hEvent);
 		ovl.hEvent=NULL;
 	}
-	wlan_filter_ssid = NULL;
 }
-bool windivert_init(const char *filter, const struct str_list_head *ssid_filter)
+bool windivert_init(const char *filter)
 {
 	rawsend_cleanup();
 	w_filter = windivert_init_filter(filter, 0);
@@ -1099,7 +1298,6 @@ bool windivert_init(const char *filter, const struct str_list_head *ssid_filter)
 			rawsend_cleanup();
 			return false;
 		}
-		wlan_filter_ssid = ssid_filter;
 		return true;
 	}
 	return false;
@@ -1117,7 +1315,7 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 		errno=EINTR;
 		return false;
 	}
-	if (!wlan_filter_match_rate_limited())
+	if (!logical_net_filter_match_rate_limited())
 	{
 		errno=ENODEV;
 		return false;
@@ -1142,7 +1340,7 @@ static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, 
 						errno=EINTR;
 						return false;
 					}
-					if (!wlan_filter_match_rate_limited())
+					if (!logical_net_filter_match_rate_limited())
 					{
 						errno=ENODEV;
 						return false;

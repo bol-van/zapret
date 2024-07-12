@@ -50,6 +50,8 @@ Task of `iptables` is done inside `winws` through `windivert` filters. `Windiver
  --wf-raw=<filter>|@<filename>                  ; raw windivert filter string or filename
  --wf-save=<filename>                           ; save windivert filter string to a file and exit
  --ssid-filter=ssid1[,ssid2,ssid3,...]          ; enable winws only if any of specified wifi SSIDs connected
+ --nlm-filter=net1[,net2,net3,...]              ; enable winws only if any of specified NLM network is connected. names and GUIDs are accepted.
+ --nlm-list[=all]                               ; list Network List Manager (NLM) networks. connected only or all.                           
 ```
 
 `--wf-l3`, `--wf-tcp`, `--wf-udp` can take multiple comma separated arguments.
@@ -63,6 +65,10 @@ Multiple `winws` processes are allowed. However, it's discouraged to intersect t
 `--ssid-filter` allows to enable `winws` only if specified wifi networks are connected. `winws` auto detects SSID appearance and disappearance.
 SSID names must be written in the same case as the system sees them. This option does not analyze routing and does not detect where traffic actually goes.
 If multiple connections are available, the only thing that triggers `winws` operation is wifi connection presence. That's why it's a good idea to add also `--wf-iface` filter to not break ethernet, for example.
+
+`--nlm-filter` is like `--ssid-filter` but works with names or GUIDs from Network List Manager. NLM names are those you see in Control Panel "Network and Sharing Center".
+NLM networks are adapter independent. Usually MAC address of the default router is used to distinugish networks. NLM works with any type of adapters : ethernet, wifi, vpn and others.
+That's why NLM is more universal than `ssid-filter`.
 
 `Cygwin` shell does not run binaries if their directory has it's own copy of `cygwin1.dll`.
 That's why exists separate standalone version in `binaries/win64/zapret-tpws`.

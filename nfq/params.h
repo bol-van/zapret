@@ -66,7 +66,7 @@ struct params_s
 	int udplen_increment;
 
 #ifdef __CYGWIN__
-	struct str_list_head ssid_filter;
+	struct str_list_head ssid_filter,nlm_filter;
 #else
 	bool droproot;
 	uid_t uid;

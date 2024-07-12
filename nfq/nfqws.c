@@ -412,9 +412,15 @@ static int win_main(const char *windivert_filter)
 
 	pre_desync();
 
+	if (!win_dark_init(&params.ssid_filter, &params.nlm_filter))
+	{
+		fprintf(stderr, "win_dark_init failed. win32 error %u (0x%08X)\n", w_win32_error, w_win32_error);
+		return w_win32_error;
+	}
+
 	for(;;)
 	{
-		if (!wlan_filter_match(&params.ssid_filter))
+		if (!logical_net_filter_match())
 		{
 			printf("logical network is not present. waiting it to appear.\n");
 			fflush(stdout);
@@ -423,17 +429,21 @@ static int win_main(const char *windivert_filter)
 				if (bQuit)
 				{
 					DLOG("QUIT requested\n")
+					win_dark_deinit();
 					return 0;
 				}
 				usleep(500000);
 			}
-			while (!wlan_filter_match(&params.ssid_filter));
+			while (!logical_net_filter_match());
 			printf("logical network now present\n");
 			fflush(stdout);
 		}
 
-		if (!windivert_init(windivert_filter, &params.ssid_filter))
+		if (!windivert_init(windivert_filter))
+		{
+			win_dark_deinit();
 			return w_win32_error;
+		}
 
 		printf("windivert initialized. capture is started.\n");
 
@@ -460,9 +470,11 @@ static int win_main(const char *windivert_filter)
 				else if (errno==EINTR)
 				{
 					DLOG("QUIT requested\n")
+					win_dark_deinit();
 					return 0;
 				}
 				fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
+				win_dark_deinit();
 				return w_win32_error;
 			}
 			*ifout=0;
@@ -504,6 +516,7 @@ static int win_main(const char *windivert_filter)
 			fflush(stderr);
 		}
 	}
+	win_dark_deinit();
 	return 0;
 }
 
@@ -550,6 +563,7 @@ static void cleanup_params(void)
 	HostFailPoolDestroy(&params.hostlist_auto_fail_counters);
 #ifdef __CYGWIN__
 	strlist_destroy(&params.ssid_filter);
+	strlist_destroy(&params.nlm_filter);
 #endif
 }
 static void exit_clean(int code)
@@ -799,6 +813,8 @@ static void exithelp(void)
 		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
 		"\nLOGICAL NETWORK FILTER:\n"
 		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t; enable winws only if any of specified wifi SSIDs connected\n"
+		" --nlm-filter=net1[,net2,net3,...]\t\t; enable winws only if any of specified NLM network is connected. names and GUIDs are accepted.\n"
+		" --nlm-list[=all]\t\t\t\t; list Network List Manager (NLM) networks. connected only or all.\n"
 #endif
 		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
@@ -910,7 +926,7 @@ int main(int argc, char **argv)
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
 	bool wf_ipv4=true, wf_ipv6=true;
 	unsigned int IfIdx=0, SubIfIdx=0;
-	unsigned int hash_wf_tcp=0,hash_wf_udp=0,hash_wf_raw=0,hash_ssid_filter=0;
+	unsigned int hash_wf_tcp=0,hash_wf_udp=0,hash_wf_raw=0,hash_ssid_filter=0,hash_nlm_filter=0;
 	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
 #endif
 	
@@ -959,6 +975,7 @@ int main(int argc, char **argv)
 
 #ifdef __CYGWIN__
 	LIST_INIT(&params.ssid_filter);
+	LIST_INIT(&params.nlm_filter);
 #else
 	if (can_drop_root()) // are we root ?
 	{
@@ -1049,6 +1066,8 @@ int main(int argc, char **argv)
 		{"wf-raw",required_argument,0,0},	// optidx=56
 		{"wf-save",required_argument,0,0},	// optidx=57
 		{"ssid-filter",required_argument,0,0},	// optidx=58
+		{"nlm-filter",required_argument,0,0},	// optidx=59
+		{"nlm-list",optional_argument,0,0},	// optidx=60
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1582,6 +1601,31 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
+		case 59: /* nlm-filter */
+			hash_nlm_filter=hash_jen(optarg,strlen(optarg));
+			{
+				char *e,*p = optarg;
+				while (p)
+				{
+					e = strchr(p,',');
+					if (e) *e++=0;
+					if (*p && !strlist_add(&params.nlm_filter, p))
+					{
+						fprintf(stderr, "strlist_add failed\n");
+						exit_clean(1);
+					}
+					p = e;
+
+				}
+			}
+			break;
+		case 60: /* nlm-list */
+			if (!nlm_list(optarg && !strcmp(optarg,"all")))
+			{
+				fprintf(stderr, "could not get list of NLM networks\n");
+				exit_clean(1);
+			}
+			exit_clean(0);
 
 #endif
 		}
@@ -1630,7 +1674,7 @@ int main(int argc, char **argv)
 	HANDLE hMutexArg;
 	{
 		char mutex_name[128];
-		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_ssid_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
+		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_ssid_filter,hash_nlm_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
 
 		hMutexArg = CreateMutexA(NULL,TRUE,mutex_name);
 		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)

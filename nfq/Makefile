@@ -5,7 +5,7 @@ CFLAGS_MAC = -mmacosx-version-min=10.8
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
-LIBS_CYGWIN = -lz -Lwindivert -lwindivert -lwlanapi
+LIBS_CYGWIN = -lz -Lwindivert -lwindivert -lwlanapi -lole32 -loleaut32 -luuid
 SRC_FILES = *.c crypto/*.c
 
 all: nfqws

@@ -7,7 +7,6 @@
 #include "hostlist.h"
 #include "conntrack.h"
 
-#include <unistd.h>
 #include <string.h>
 
 
