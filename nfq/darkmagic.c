@@ -1114,7 +1114,6 @@ static bool nlm_filter_match(const struct str_list_head *nlm_list)
 	{
 		INetwork* pNet;
 		GUID idNet,g;
-		bool bIsGuid;
 		BSTR bstrName;
 		char Name[128];
 		struct str_list *nlm;
