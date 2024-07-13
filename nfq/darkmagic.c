@@ -977,7 +977,7 @@ static bool str2guid(const char* str, GUID *guid)
 {
 	unsigned int u[11],k;
 
-	if (11 != sscanf(str, "%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X", u+0, u+1, u+2, u+3, u+4, u+5, u+6, u+7, u+8, u+9, u+10))
+	if (36 != strlen(str) || 11 != sscanf(str, "%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X", u+0, u+1, u+2, u+3, u+4, u+5, u+6, u+7, u+8, u+9, u+10))
 		return false;
 	guid->Data1 = u[0];
 	if ((u[1] & 0xFFFF0000) || (u[2] & 0xFFFF0000)) return false;
@@ -1110,11 +1110,11 @@ static bool nlm_filter_match(const struct str_list_head *nlm_list)
 	bool bRet = true, bMatch = false;
 	IEnumNetworks* pEnum;
 
-	if (SUCCEEDED(w_win32_error = pNetworkListManager->lpVtbl->GetNetworks(pNetworkListManager, NLM_ENUM_NETWORK_ALL, &pEnum)))
+	if (SUCCEEDED(w_win32_error = pNetworkListManager->lpVtbl->GetNetworks(pNetworkListManager, NLM_ENUM_NETWORK_CONNECTED, &pEnum)))
 	{
 		INetwork* pNet;
-		VARIANT_BOOL bIsConnected;
 		GUID idNet,g;
+		bool bIsGuid;
 		BSTR bstrName;
 		char Name[128];
 		struct str_list *nlm;
@@ -1126,26 +1126,21 @@ static bool nlm_filter_match(const struct str_list_head *nlm_list)
 				break;
 			}
 			if (!pNet) break;
-			if (SUCCEEDED(w_win32_error = pNet->lpVtbl->get_IsConnected(pNet, &bIsConnected)) &&
-				SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkId(pNet, &idNet)) &&
+			if (SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkId(pNet, &idNet)) &&
 				SUCCEEDED(w_win32_error = pNet->lpVtbl->GetName(pNet, &bstrName)))
 			{
-				if (bIsConnected)
+				if (WideCharToMultiByte(CP_UTF8, 0, bstrName, -1, Name, sizeof(Name), NULL, NULL))
 				{
-					if (WideCharToMultiByte(CP_UTF8, 0, bstrName, -1, Name, sizeof(Name), NULL, NULL))
+					LIST_FOREACH(nlm, nlm_list, next)
 					{
-						LIST_FOREACH(nlm, nlm_list, next)
-						{
-							bMatch = !strcmp(Name,nlm->str) || str2guid(nlm->str,&g) && !memcmp(&idNet,&g,sizeof(GUID));
-							if (bMatch) break;
-						}
+						bMatch = !strcmp(Name,nlm->str) || str2guid(nlm->str,&g) && !memcmp(&idNet,&g,sizeof(GUID));
+						if (bMatch) break;
 					}
-					else
-					{
-						w_win32_error = HRESULT_FROM_WIN32(GetLastError());
-						bRet = false;
-					}
-
+				}
+				else
+				{
+					w_win32_error = HRESULT_FROM_WIN32(GetLastError());
+					bRet = false;
 				}
 				SysFreeString(bstrName);
 			}
