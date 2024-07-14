@@ -963,8 +963,7 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 static HANDLE w_filter = NULL;
 static OVERLAPPED ovl = { .hEvent = NULL };
-static const struct str_list_head *wlan_filter_ssid = NULL;
-static const struct str_list_head *nlm_filter_net = NULL;
+static const struct str_list_head *wlan_filter_ssid = NULL, *nlm_filter_net = NULL;
 static DWORD logical_net_filter_tick=0;
 uint32_t w_win32_error=0;
 INetworkListManager* pNetworkListManager=NULL;
@@ -991,22 +990,81 @@ static bool str2guid(const char* str, GUID *guid)
 	return true;
 }
 
+static const char *sNetworkCards="SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkCards";
+// get adapter name from guid string
+static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
+{
+	char sguid[39],sidx[32],val[256];
+	HKEY hkNetworkCards,hkCard;
+	DWORD dwIndex,dwLen;
+	bool bRet = false;
+
+	if (name_len<2) return false;
+
+	if ((w_win32_error = RegOpenKeyExA(HKEY_LOCAL_MACHINE,sNetworkCards,0,KEY_ENUMERATE_SUB_KEYS,&hkNetworkCards)) == ERROR_SUCCESS)
+	{
+		for (dwIndex=0;;dwIndex++)
+		{
+			dwLen=sizeof(sidx)-1;
+			w_win32_error = RegEnumKeyExA(hkNetworkCards,dwIndex,sidx,&dwLen,NULL,NULL,NULL,NULL);
+			if (w_win32_error == ERROR_SUCCESS)
+			{
+				sidx[dwLen]='\0';
+
+				guid2str(guid, sguid+1);
+				sguid[0]='{';
+				sguid[37]='}';
+				sguid[38]='\0';
+
+				if ((w_win32_error = RegOpenKeyExA(hkNetworkCards,sidx,0,KEY_QUERY_VALUE,&hkCard)) == ERROR_SUCCESS)
+				{
+					dwLen=sizeof(val)-1;
+					if ((w_win32_error = RegQueryValueExA(hkCard,"ServiceName",NULL,NULL,val,&dwLen)) == ERROR_SUCCESS)
+					{
+						val[dwLen]='\0';
+						if (!strcmp(val,sguid))
+						{
+							name_len--;
+							if ((w_win32_error = RegQueryValueExA(hkCard,"Description",NULL,NULL,name,&name_len)) == ERROR_SUCCESS)
+							{
+								name[name_len]='\0';
+								bRet = true;
+							}
+						}
+					}
+					RegCloseKey(hkCard);
+				}
+				if (bRet) break;
+			}
+			else
+				break;
+		}
+		RegCloseKey(hkNetworkCards);
+	}
+
+	return bRet;
+}
+
 bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_list_head *nlm_filter)
 {
 	win_dark_deinit();
-	wlan_filter_ssid = LIST_EMPTY(ssid_filter) ? NULL : ssid_filter;
-	nlm_filter_net = LIST_EMPTY(nlm_filter) ? NULL : nlm_filter;
-	if (nlm_filter_net)
+	if (LIST_EMPTY(ssid_filter)) ssid_filter=NULL;
+	if (LIST_EMPTY(nlm_filter)) nlm_filter=NULL;
+	if (nlm_filter)
 	{
 		if (SUCCEEDED(w_win32_error = CoInitialize(NULL)))
 		{
 			if (FAILED(w_win32_error = CoCreateInstance(&CLSID_NetworkListManager, NULL, CLSCTX_ALL, &IID_INetworkListManager, (LPVOID*)&pNetworkListManager)))
 			{
-				win_dark_deinit();
+				CoUninitialize();
 				return false;
 			}
 		}
+		else
+			return false;
 	}
+	nlm_filter_net = nlm_filter;
+	wlan_filter_ssid = ssid_filter;
 	return true;
 }
 bool win_dark_deinit(void)
@@ -1030,40 +1088,64 @@ bool nlm_list(bool bAll)
 		INetworkListManager* pNetworkListManager;
 		if (SUCCEEDED(w_win32_error = CoCreateInstance(&CLSID_NetworkListManager, NULL, CLSCTX_ALL, &IID_INetworkListManager, (LPVOID*)&pNetworkListManager)))
 		{
-			IEnumNetworks* pEnum;
-			if (SUCCEEDED(w_win32_error = pNetworkListManager->lpVtbl->GetNetworks(pNetworkListManager, NLM_ENUM_NETWORK_ALL, &pEnum)))
+			IEnumNetworks* pEnumNetworks;
+			if (SUCCEEDED(w_win32_error = pNetworkListManager->lpVtbl->GetNetworks(pNetworkListManager, NLM_ENUM_NETWORK_ALL, &pEnumNetworks)))
 			{
-				INetwork* pNet;
+				INetwork *pNet;
+				INetworkConnection *pConn;
+				IEnumNetworkConnections *pEnumConnections;
 				VARIANT_BOOL bIsConnected, bIsConnectedInet;
-				GUID idNet;
+				NLM_NETWORK_CATEGORY category;
+				GUID idNet, idAdapter, idConn;
 				BSTR bstrName;
-				char Name[128];
+				char Name[128],Name2[128];
 				int connected;
 				for (connected = 1; connected >= !bAll; connected--)
 				{
 					for (;;)
 					{
-						if (FAILED(w_win32_error = pEnum->lpVtbl->Next(pEnum, 1, &pNet, NULL)))
+						if (FAILED(w_win32_error = pEnumNetworks->lpVtbl->Next(pEnumNetworks, 1, &pNet, NULL)))
 						{
 							bRet = false;
 							break;
 						}
-						if (!pNet) break;
+						if (w_win32_error != S_OK) break;
 						if (SUCCEEDED(w_win32_error = pNet->lpVtbl->get_IsConnected(pNet, &bIsConnected)) &&
 							SUCCEEDED(w_win32_error = pNet->lpVtbl->get_IsConnectedToInternet(pNet, &bIsConnectedInet)) &&
 							SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkId(pNet, &idNet)) &&
+							SUCCEEDED(w_win32_error = pNet->lpVtbl->GetCategory(pNet, &category)) &&
 							SUCCEEDED(w_win32_error = pNet->lpVtbl->GetName(pNet, &bstrName)))
 						{
 							if (!!bIsConnected == connected)
 							{
 								if (WideCharToMultiByte(CP_UTF8, 0, bstrName, -1, Name, sizeof(Name), NULL, NULL))
 								{
-									printf("Name  : %s", Name);
+									printf("Name    : %s", Name);
 									if (bIsConnected) printf(" (connected)");
 									if (bIsConnectedInet) printf(" (inet)");
-									printf("\n");
+									printf(" (%s)\n",
+										category==NLM_NETWORK_CATEGORY_PUBLIC ? "public" :
+										category==NLM_NETWORK_CATEGORY_PRIVATE ? "private" :
+										category==NLM_NETWORK_CATEGORY_DOMAIN_AUTHENTICATED ? "domain" :
+										"unknown");
 									guid2str(&idNet, Name);
-									printf("NetID : %s\n", Name);
+									printf("NetID   : %s\n", Name);	
+									if (connected && SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkConnections(pNet, &pEnumConnections)))
+									{
+										while ((w_win32_error = pEnumConnections->lpVtbl->Next(pEnumConnections, 1, &pConn, NULL))==S_OK)
+										{
+											if (SUCCEEDED(w_win32_error = pConn->lpVtbl->GetAdapterId(pConn,&idAdapter)))
+											{
+												guid2str(&idAdapter, Name);
+												if (AdapterID2Name(&idAdapter,Name2,sizeof(Name2)))
+													printf("Adapter : %s (%s)\n", Name2, Name);
+												else
+													printf("Adapter : %s\n", Name);
+											}
+											pConn->lpVtbl->Release(pConn);
+										}
+										pEnumConnections->lpVtbl->Release(pEnumConnections);
+									}
 									printf("\n");
 								}
 								else
@@ -1080,9 +1162,9 @@ bool nlm_list(bool bAll)
 						if (!bRet) break;
 					}
 					if (!bRet) break;
-					pEnum->lpVtbl->Reset(pEnum);
+					pEnumNetworks->lpVtbl->Reset(pEnumNetworks);
 				}
-				pEnum->lpVtbl->Release(pEnum);
+				pEnumNetworks->lpVtbl->Release(pEnumNetworks);
 			}
 			else
 				bRet = false;
@@ -1124,7 +1206,7 @@ static bool nlm_filter_match(const struct str_list_head *nlm_list)
 				bRet = false;
 				break;
 			}
-			if (!pNet) break;
+			if (w_win32_error != S_OK) break;
 			if (SUCCEEDED(w_win32_error = pNet->lpVtbl->GetNetworkId(pNet, &idNet)) &&
 				SUCCEEDED(w_win32_error = pNet->lpVtbl->GetName(pNet, &bstrName)))
 			{
