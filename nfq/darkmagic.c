@@ -1003,6 +1003,11 @@ static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
 
 	if ((w_win32_error = RegOpenKeyExA(HKEY_LOCAL_MACHINE,sNetworkCards,0,KEY_ENUMERATE_SUB_KEYS,&hkNetworkCards)) == ERROR_SUCCESS)
 	{
+		guid2str(guid, sguid+1);
+		sguid[0]='{';
+		sguid[37]='}';
+		sguid[38]='\0';
+
 		for (dwIndex=0;;dwIndex++)
 		{
 			dwLen=sizeof(sidx)-1;
@@ -1010,11 +1015,6 @@ static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
 			if (w_win32_error == ERROR_SUCCESS)
 			{
 				sidx[dwLen]='\0';
-
-				guid2str(guid, sguid+1);
-				sguid[0]='{';
-				sguid[37]='}';
-				sguid[38]='\0';
 
 				if ((w_win32_error = RegOpenKeyExA(hkNetworkCards,sidx,0,KEY_QUERY_VALUE,&hkCard)) == ERROR_SUCCESS)
 				{
