@@ -1096,7 +1096,7 @@ bool nlm_list(bool bAll)
 				IEnumNetworkConnections *pEnumConnections;
 				VARIANT_BOOL bIsConnected, bIsConnectedInet;
 				NLM_NETWORK_CATEGORY category;
-				GUID idNet, idAdapter;
+				GUID idNet, idAdapter, idConn;
 				BSTR bstrName;
 				char Name[128],Name2[128];
 				int connected;

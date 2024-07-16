@@ -174,6 +174,22 @@ static void ctrack_stop_retrans_counter(t_ctrack *ctrack)
 	}
 }
 
+static void auto_hostlist_reset_fail_counter(const char *hostname)
+{
+	if (hostname)
+	{
+		hostfail_pool *fail_counter;
+	
+		fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+		if (fail_counter)
+		{
+			HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
+			DLOG("auto hostlist : %s : fail counter reset. website is working.\n", hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : fail counter reset. website is working.", hostname);
+		}
+	}
+}
+
 // return true if retrans trigger fires
 static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold)
 {
@@ -187,6 +203,7 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 			{
 				DLOG("req retrans : tcp seq %u not within the req range %u-%u. stop tracking.\n", ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end);
 				ctrack_stop_retrans_counter(ctrack);
+				auto_hostlist_reset_fail_counter(ctrack->hostname);
 				return false;
 			}
 		}
@@ -540,7 +557,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
 						}
 						else
+						{
 							DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n")
+							auto_hostlist_reset_fail_counter(ctrack->hostname);
+						}
 					}
 					else
 					{
