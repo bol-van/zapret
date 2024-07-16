@@ -557,10 +557,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
 						}
 						else
-						{
 							DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n")
-							auto_hostlist_reset_fail_counter(ctrack->hostname);
-						}
 					}
 					else
 					{
@@ -570,6 +567,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				}
 				if (bFail)
 					auto_hostlist_failed(ctrack->hostname);
+				else
+					if (len_payload)
+						auto_hostlist_reset_fail_counter(ctrack->hostname);
 				if (tcphdr->th_flags & TH_RST)
 					ConntrackClearHostname(ctrack); // do not react to further dup RSTs
 			}
