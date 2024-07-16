@@ -253,6 +253,21 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	if (params.oob) *split_flags |= SPLIT_FLAG_OOB;
 }
 
+static void auto_hostlist_reset_fail_counter(const char *hostname)
+{
+	if (hostname)
+	{
+		hostfail_pool *fail_counter;
+	
+		fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+		if (fail_counter)
+		{
+			HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
+			VPRINT("auto hostlist : %s : fail counter reset. website is working.", hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : fail counter reset. website is working.", hostname);
+		}
+	}
+}
 
 static void auto_hostlist_failed(const char *hostname)
 {
@@ -331,10 +346,11 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 				// received not http reply. do not monitor this connection anymore
 				VPRINT("incoming unknown HTTP data detected for hostname %s", ctrack->hostname);
 			}
-			if (bFail)
-				auto_hostlist_failed(ctrack->hostname);
+			if (bFail) auto_hostlist_failed(ctrack->hostname);
 
-		}	
+		}
+		if (!bFail) auto_hostlist_reset_fail_counter(ctrack->hostname);
+
 	}
 	ctrack->bTamperInCutoff = true;
 }
