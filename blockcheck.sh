@@ -1773,7 +1773,7 @@ sigint_cleanup()
 	cleanup
 	exit 1
 }
-sigpipe()
+sigsilent()
 {
 	# must not write anything here to stdout
 	unprepare_all
@@ -1795,7 +1795,8 @@ PID=
 NREPORT=
 unset WF
 trap sigint INT
-trap sigpipe PIPE
+trap sigsilent PIPE
+trap sigsilent HUP
 for dom in $DOMAINS; do
 	for IPV in $IPVS; do
 		configure_ip_version
@@ -1809,6 +1810,7 @@ for dom in $DOMAINS; do
 		[ "$ENABLE_HTTP3" = 1 ] && check_domain_http3 $dom
 	done
 done
+trap - HUP
 trap - PIPE
 trap - INT
 
