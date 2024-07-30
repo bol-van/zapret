@@ -21,6 +21,9 @@
 АЛЬТЕРНАТИВА : make -C /opt/zapret. Получите динамические бинарики под вашу ось.
 Для сборки требуются dev пакеты : zlib1g-dev libcap-dev libnetfilter-queue-dev
 
+Создать конфиг по умолчанию :
+ cp /opt/zapret/config.default /opt/zapret/config
+
 Настроить параметры согласно разделу "Выбор параметров".
 
 Создать ссылку на service unit в systemd :
@@ -208,6 +211,9 @@ curl можно выкинуть, если для получения ip лист
  ln -fs /opt/zapret/init.d/openwrt/zapret /etc/init.d
 Создать ссылку на скрипт события поднятия интерфейса :
  ln -fs /opt/zapret/init.d/openwrt/90-zapret /etc/hotplug.d/iface
+
+Создать конфиг по умолчанию :
+ cp /opt/zapret/config.default /opt/zapret/config
 
 Настроить параметры согласно разделу "Выбор параметров".
 

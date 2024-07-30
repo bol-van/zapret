@@ -8,6 +8,7 @@ IPSET_DIR="$EXEDIR/ipset"
 ZAPRET_CONFIG="$EXEDIR/config"
 ZAPRET_BASE="$EXEDIR"
 
+[ -f "$ZAPRET_CONFIG" ] || cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
 . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/elevate.sh"
@@ -377,8 +378,13 @@ select_mode_iface()
 
 copy_all()
 {
+	local dir
+
 	cp -R "$1" "$2"
 	[ -d "$2/tmp" ] || mkdir "$2/tmp"
+	for dir in openwrt sysv macos; do
+		[ -f "$2/init.d/$dir/custom" ] || cp "$2/init.d/$dir/custom.default" "$2/init.d/$dir/custom"
+	done
 }
 copy_openwrt()
 {
@@ -391,7 +397,8 @@ copy_openwrt()
 	cp -R "$1/files/fake" "$2/files"
 	cp -R "$1/common" "$1/ipset" "$2"
 	cp -R "$1/init.d/openwrt" "$2/init.d"
-	cp "$1/config" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$1/install_prereq.sh" "$1/blockcheck.sh" "$2"
+	[ -f "$2/init.d/openwrt/custom" ] || cp "$2/init.d/openwrt/custom.default" "$2/init.d/openwrt/custom"
+	cp "$1/config" "$1/config.default" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$1/install_prereq.sh" "$1/blockcheck.sh" "$2"
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
 
