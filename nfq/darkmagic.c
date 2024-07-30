@@ -998,6 +998,8 @@ static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
 	HKEY hkNetworkCards,hkCard;
 	DWORD dwIndex,dwLen;
 	bool bRet = false;
+	WCHAR namew[128];
+	DWORD namew_len;
 
 	if (name_len<2) return false;
 
@@ -1024,11 +1026,12 @@ static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
 						val[dwLen]='\0';
 						if (!strcmp(val,sguid))
 						{
-							name_len--;
-							if ((w_win32_error = RegQueryValueExA(hkCard,"Description",NULL,NULL,name,&name_len)) == ERROR_SUCCESS)
+							namew_len = sizeof(namew)-1;
+							if ((w_win32_error = RegQueryValueExW(hkCard,L"Description",NULL,NULL,(LPBYTE)namew,&namew_len)) == ERROR_SUCCESS)
 							{
-								name[name_len]='\0';
-								bRet = true;
+								namew[namew_len]='\0';
+								if (WideCharToMultiByte(CP_UTF8, 0, namew, -1, name, name_len, NULL, NULL))
+									bRet = true;
 							}
 						}
 					}
@@ -1096,7 +1099,7 @@ bool nlm_list(bool bAll)
 				IEnumNetworkConnections *pEnumConnections;
 				VARIANT_BOOL bIsConnected, bIsConnectedInet;
 				NLM_NETWORK_CATEGORY category;
-				GUID idNet, idAdapter;
+				GUID idNet, idAdapter, idConn;
 				BSTR bstrName;
 				char Name[128],Name2[128];
 				int connected;
