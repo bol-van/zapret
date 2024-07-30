@@ -5,7 +5,9 @@ EXEDIR="$(cd "$EXEDIR"; pwd)"
 ZAPRET_CONFIG="$EXEDIR/config"
 ZAPRET_BASE="$EXEDIR"
 
-[ -f "$ZAPRET_CONFIG" ] || [ -f "${ZAPRET_CONFIG}.default" ] && cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
+[ -f "$ZAPRET_CONFIG" ] || {
+	[ -f "${ZAPRET_CONFIG}.default" ] && cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
+}
 [ -f "$ZAPRET_CONFIG" ] && . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/dialog.sh"
