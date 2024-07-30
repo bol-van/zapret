@@ -26,6 +26,11 @@
 
 Настроить параметры согласно разделу "Выбор параметров".
 
+Создать user листы по умолчанию :
+ cp /opt/zapret/ipset/zapret-hosts-user-exclude.txt.default /opt/zapret/ipset/zapret-hosts-user-exclude.txt
+ echo nonexistent.domain >/opt/zapret/ipset/zapret-hosts-user.txt
+ touch /opt/zapret/ipset/zapret-hosts-user-ipban.txt
+
 Создать ссылку на service unit в systemd :
  ln -fs /opt/zapret/init.d/systemd/zapret.service /lib/systemd/system
 
@@ -216,6 +221,11 @@ curl можно выкинуть, если для получения ip лист
  cp /opt/zapret/config.default /opt/zapret/config
 
 Настроить параметры согласно разделу "Выбор параметров".
+
+Создать user листы по умолчанию :
+ cp /opt/zapret/ipset/zapret-hosts-user-exclude.txt.default /opt/zapret/ipset/zapret-hosts-user-exclude.txt
+ echo nonexistent.domain >/opt/zapret/ipset/zapret-hosts-user.txt
+ touch /opt/zapret/ipset/zapret-hosts-user-ipban.txt
 
 Удалить старые листы, если они были созданы ранее :
  /opt/zapret/ipset/clear_lists.sh

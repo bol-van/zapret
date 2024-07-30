@@ -376,6 +376,13 @@ select_mode_iface()
 	esac
 }
 
+ipset_default_files()
+{
+	[ -f "$1/ipset/$file/zapret-hosts-user-exclude.txt" ] || cp "$1/ipset/$file/zapret-hosts-user-exclude.txt.default" "$1/ipset/$file/zapret-hosts-user-exclude.txt"
+	[ -f "$1/ipset/$file/zapret-hosts-user.txt" ] || echo nonexistent.domain >> "$1/ipset/$file/zapret-hosts-user.txt"
+	[ -f "$1/ipset/$file/zapret-hosts-user-ipban.txt" ] || touch "$1/ipset/$file/zapret-hosts-user-ipban.txt"
+}
+
 copy_all()
 {
 	local dir
@@ -385,11 +392,13 @@ copy_all()
 	for dir in openwrt sysv macos; do
 		[ -f "$2/init.d/$dir/custom" ] || cp "$2/init.d/$dir/custom.default" "$2/init.d/$dir/custom"
 	done
+	ipset_default_files "$2"
 }
 copy_openwrt()
 {
 	local ARCH="$(get_bin_arch)"
 	local BINDIR="$1/binaries/$ARCH"
+	local file
 	
 	[ -d "$2" ] || mkdir -p "$2"
 
@@ -398,6 +407,7 @@ copy_openwrt()
 	cp -R "$1/common" "$1/ipset" "$2"
 	cp -R "$1/init.d/openwrt" "$2/init.d"
 	[ -f "$2/init.d/openwrt/custom" ] || cp "$2/init.d/openwrt/custom.default" "$2/init.d/openwrt/custom"
+	ipset_default_files "$2"
 	cp "$1/config" "$1/config.default" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$1/install_prereq.sh" "$1/blockcheck.sh" "$2"
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
