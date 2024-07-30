@@ -1026,10 +1026,10 @@ static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
 						val[dwLen]='\0';
 						if (!strcmp(val,sguid))
 						{
-							namew_len = sizeof(namew)-1;
+							namew_len = sizeof(namew)-sizeof(WCHAR);
 							if ((w_win32_error = RegQueryValueExW(hkCard,L"Description",NULL,NULL,(LPBYTE)namew,&namew_len)) == ERROR_SUCCESS)
 							{
-								namew[namew_len]='\0';
+								namew[namew_len/sizeof(WCHAR)]=L'\0';
 								if (WideCharToMultiByte(CP_UTF8, 0, namew, -1, name, name_len, NULL, NULL))
 									bRet = true;
 							}
