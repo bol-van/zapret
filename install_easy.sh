@@ -376,23 +376,23 @@ select_mode_iface()
 	esac
 }
 
-ipset_default_files()
+default_files()
 {
 	[ -f "$1/ipset/$file/zapret-hosts-user-exclude.txt" ] || cp "$1/ipset/$file/zapret-hosts-user-exclude.txt.default" "$1/ipset/$file/zapret-hosts-user-exclude.txt"
 	[ -f "$1/ipset/$file/zapret-hosts-user.txt" ] || echo nonexistent.domain >> "$1/ipset/$file/zapret-hosts-user.txt"
 	[ -f "$1/ipset/$file/zapret-hosts-user-ipban.txt" ] || touch "$1/ipset/$file/zapret-hosts-user-ipban.txt"
+	for dir in openwrt sysv macos; do
+		[ -d "$1/init.d/$dir" ] && {
+			[ -f "$1/init.d/$dir/custom" ] || cp "$1/init.d/$dir/custom.default" "$1/init.d/$dir/custom"
+		}
+	done
 }
-
 copy_all()
 {
 	local dir
 
 	cp -R "$1" "$2"
 	[ -d "$2/tmp" ] || mkdir "$2/tmp"
-	for dir in openwrt sysv macos; do
-		[ -f "$2/init.d/$dir/custom" ] || cp "$2/init.d/$dir/custom.default" "$2/init.d/$dir/custom"
-	done
-	ipset_default_files "$2"
 }
 copy_openwrt()
 {
@@ -406,8 +406,6 @@ copy_openwrt()
 	cp -R "$1/files/fake" "$2/files"
 	cp -R "$1/common" "$1/ipset" "$2"
 	cp -R "$1/init.d/openwrt" "$2/init.d"
-	[ -f "$2/init.d/openwrt/custom" ] || cp "$2/init.d/openwrt/custom.default" "$2/init.d/openwrt/custom"
-	ipset_default_files "$2"
 	cp "$1/config" "$1/config.default" "$1/install_easy.sh" "$1/uninstall_easy.sh" "$1/install_bin.sh" "$1/install_prereq.sh" "$1/blockcheck.sh" "$2"
 	cp "$BINDIR/tpws" "$BINDIR/nfqws" "$BINDIR/ip2net" "$BINDIR/mdig" "$2/binaries/$ARCH"
 }
@@ -494,7 +492,9 @@ check_location()
 	echo \* checking location
 
 	# use inodes in case something is linked
-	[ -d "$ZAPRET_TARGET" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_TARGET") ] || {
+	if [ -d "$ZAPRET_TARGET" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_TARGET") ]; then
+		default_files "$ZAPRET_TARGET"
+	else
 		echo
 		echo easy install is supported only from default location : $ZAPRET_TARGET
 		echo currently its run from $EXEDIR
@@ -525,7 +525,7 @@ check_location()
 			echo copying aborted. exiting
 			exitp 3
 		fi
-	}
+	fi
 	echo running from $EXEDIR
 }
 
