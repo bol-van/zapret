@@ -8,6 +8,7 @@ ZAPRET_CONFIG="$EXEDIR/config"
 ZAPRET_BASE="$EXEDIR"
 
 [ -f "$ZAPRET_CONFIG" ] || cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
+. "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/elevate.sh"
 . "$ZAPRET_BASE/common/fwtype.sh"
