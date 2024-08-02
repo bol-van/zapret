@@ -239,7 +239,7 @@ void phton64(uint8_t *p, uint64_t v)
 
 bool seq_within(uint32_t s, uint32_t s1, uint32_t s2)
 {
-	return s2>=s1 && s>=s1 && s<=s2 || s2<s1 && (s<=s2 || s>=s1);
+	return (s2>=s1 && s>=s1 && s<=s2) || (s2<s1 && (s<=s2 || s>=s1));
 }
 
 bool ipv6_addr_is_zero(const struct in6_addr *a)
@@ -313,7 +313,7 @@ time_t file_mod_time(const char *filename)
 
 bool pf_in_range(uint16_t port, const port_filter *pf)
 {
-	return port && ((!pf->from && !pf->to || port>=pf->from && port<=pf->to) ^ pf->neg);
+	return port && (((!pf->from && !pf->to) || (port>=pf->from && port<=pf->to)) ^ pf->neg);
 }
 bool pf_parse(const char *s, port_filter *pf)
 {

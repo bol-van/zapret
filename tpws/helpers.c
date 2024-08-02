@@ -140,10 +140,10 @@ bool samappedcmp(const struct sockaddr_in *sa1,const struct sockaddr_in6 *sa2)
 }
 bool sacmp(const struct sockaddr *sa1,const struct sockaddr *sa2)
 {
-	return sa1->sa_family==AF_INET && sa2->sa_family==AF_INET && !memcmp(&((struct sockaddr_in*)sa1)->sin_addr,&((struct sockaddr_in*)sa2)->sin_addr,sizeof(struct in_addr)) ||
-		sa1->sa_family==AF_INET6 && sa2->sa_family==AF_INET6 && !memcmp(&((struct sockaddr_in6*)sa1)->sin6_addr,&((struct sockaddr_in6*)sa2)->sin6_addr,sizeof(struct in6_addr)) ||
-		sa1->sa_family==AF_INET && sa2->sa_family==AF_INET6 && samappedcmp((struct sockaddr_in*)sa1,(struct sockaddr_in6*)sa2) ||
-		sa1->sa_family==AF_INET6 && sa2->sa_family==AF_INET && samappedcmp((struct sockaddr_in*)sa2,(struct sockaddr_in6*)sa1);
+	return (sa1->sa_family==AF_INET && sa2->sa_family==AF_INET && !memcmp(&((struct sockaddr_in*)sa1)->sin_addr,&((struct sockaddr_in*)sa2)->sin_addr,sizeof(struct in_addr))) ||
+		(sa1->sa_family==AF_INET6 && sa2->sa_family==AF_INET6 && !memcmp(&((struct sockaddr_in6*)sa1)->sin6_addr,&((struct sockaddr_in6*)sa2)->sin6_addr,sizeof(struct in6_addr))) ||
+		(sa1->sa_family==AF_INET && sa2->sa_family==AF_INET6 && samappedcmp((struct sockaddr_in*)sa1,(struct sockaddr_in6*)sa2)) ||
+		(sa1->sa_family==AF_INET6 && sa2->sa_family==AF_INET && samappedcmp((struct sockaddr_in*)sa2,(struct sockaddr_in6*)sa1));
 }
 uint16_t saport(const struct sockaddr *sa)
 {
@@ -236,7 +236,7 @@ time_t file_mod_time(const char *filename)
 
 bool pf_in_range(uint16_t port, const port_filter *pf)
 {
-	return port && ((!pf->from && !pf->to || port>=pf->from && port<=pf->to) ^ pf->neg);
+	return port && (((!pf->from && !pf->to) || (port>=pf->from && port<=pf->to)) ^ pf->neg);
 }
 bool pf_parse(const char *s, port_filter *pf)
 {
