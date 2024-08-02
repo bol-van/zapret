@@ -141,7 +141,9 @@ windivert 2.2.2-A, который идет в поставке zapret.
 Этот вариант проверен и должен работать. Тем не менее патч 10 летней давности, который включает SHA256
 сигнатуры, все еще необходим.
 
-2) Взломать ESU : https://hackandpwn.com/windows-7-esu-patching/
+2) Взломать ESU :
+https://hackandpwn.com/windows-7-esu-patching/
+http://www.bifido.net/tweaks-and-scripts/8-extended-security-updates-installer.html
 и обновить систему
 
 3) Использовать UpdatePack7R2 от simplix : https://blog.simplix.info
