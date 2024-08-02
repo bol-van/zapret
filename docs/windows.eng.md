@@ -94,7 +94,7 @@ x64 emulation requires `windows 11` and not supported in `windows 10`.
 Requirements for windows driver signing have changed in 2021.
 Official free updates of windows 7 ended in 2020.
 After 2020 for the years paid updates were available (ESU).
-On of the updates from ESU enables signatures used in windivert 2.2.2-A.
+One of the updates from ESU enables signatures used in windivert 2.2.2-A.
 There are several options :
 
 1. Take `windivert64.sys` and `windivert.dll` version `2.2.0-C` or `2.2.0-D` from [here](https://reqrypt.org/download).
