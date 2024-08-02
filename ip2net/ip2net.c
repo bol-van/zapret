@@ -178,7 +178,7 @@ static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct i
 #if defined(__GNUC__) && !defined(__llvm__)
 __attribute__((optimize ("no-strict-aliasing")))
 #endif
-static void ip6_and(const struct in6_addr *a, const struct in6_addr *b, struct in6_addr *result)
+static void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result)
 {
 #ifdef __SIZEOF_INT128__
 	// gcc and clang have 128 bit int types on some 64-bit archs. take some advantage
