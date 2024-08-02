@@ -652,6 +652,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						return verdict;
 					verdict = ct_new_postnat_fix_tcp(ctrack, ip, ip6hdr, tcphdr);
 					break;
+				default:
+					break;
 			}
 			// can do nothing else with SYN packet
 			return verdict;
@@ -955,6 +957,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					// this mode is final, no other options available
 					return VERDICT_DROP;
 				}
+			default:
+				break;
 		}
 
 		if (b)
@@ -1165,6 +1169,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 					return VERDICT_DROP;
 				}
+			default:
+				break;
 		}
 	
 	}
@@ -1467,6 +1473,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				}
 				desync_mode = params.desync_mode2;
 				break;
+			default:
+				break;
 		}
 
 		if (b)
@@ -1568,6 +1576,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 
 					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 				}
+			default:
+				break;
 		}
 
 	}
