@@ -280,7 +280,7 @@ static void parse_params(int argc, char *argv[])
 			break;
 		}
 	}
-	if (plen1 != -1 && (!params.ipv6 && (plen1>31 || plen2>31) || params.ipv6 && (plen1>127 || plen2>127)))
+	if (plen1 != -1 && ((!params.ipv6 && (plen1>31 || plen2>31)) || (params.ipv6 && (plen1>127 || plen2>127))))
 	{
 		fprintf(stderr, "invalid parameter for prefix-length\n");
 		exit(1);

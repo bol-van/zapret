@@ -78,7 +78,7 @@ bool dom_valid(char *dom)
 {
 	if (!dom || *dom=='.') return false;
 	for (; *dom; dom++)
-		if (*dom < 0x20 || *dom>0x7F || !(*dom == '.' || *dom == '-' || *dom == '_' || *dom >= '0' && *dom <= '9' || *dom >= 'a' && *dom <= 'z' || *dom >= 'A' && *dom <= 'Z'))
+		if (*dom < 0x20 || *dom>0x7F || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
 			return false;
 	return true;
 }
@@ -213,7 +213,7 @@ static void *t_resolver(void *arg)
 			family = GetAddrFamily(s_ip);
 			if (family)
 			{
-				if (family == AF_INET && (glob.family & FAMILY4) || family == AF_INET6 && (glob.family & FAMILY6))
+				if ((family == AF_INET && (glob.family & FAMILY4)) || (family == AF_INET6 && (glob.family & FAMILY6)))
 				{
 					unsigned int mask;
 					bool mask_needed = false;

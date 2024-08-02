@@ -104,7 +104,7 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 	
 	code = HttpReplyCode(data,len);
 	
-	if (code!=302 && code!=307 || !HttpExtractHeader(data,len,"\nLocation:",loc,sizeof(loc))) return false;
+	if ((code!=302 && code!=307) || !HttpExtractHeader(data,len,"\nLocation:",loc,sizeof(loc))) return false;
 
 	// something like : https://censor.net/badpage.php?reason=denied&source=RKN
 		

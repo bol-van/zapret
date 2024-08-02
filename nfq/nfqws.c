@@ -579,7 +579,7 @@ static bool parse_cutoff(const char *opt, unsigned int *value, char *mode)
 }
 static bool parse_badseq_increment(const char *opt, uint32_t *value)
 {
-	if ((opt[0]=='0' && opt[1]=='x' || opt[0]=='-' && opt[1]=='0' && opt[2]=='x') && sscanf(opt+2+(opt[0]=='-'), "%X", (int32_t*)value)>0)
+	if (((opt[0]=='0' && opt[1]=='x') || (opt[0]=='-' && opt[1]=='0' && opt[2]=='x')) && sscanf(opt+2+(opt[0]=='-'), "%X", (int32_t*)value)>0)
 	{
 		if (opt[0]=='-') params.desync_badseq_increment = -params.desync_badseq_increment;
 		return true;
@@ -621,10 +621,10 @@ bool parse_autottl(const char *s, autottl *t)
 		switch (sscanf(s,"%u:%u-%u",&delta,&min,&max))
 		{
 			case 3:
-				if (delta && !max || max>255) return false;
+				if ((delta && !max) || max>255) return false;
 				t->max=(uint8_t)max;
 			case 2:
-				if (delta && !min || min>255 || min>max) return false;
+				if ((delta && !min) || min>255 || min>max) return false;
 				t->min=(uint8_t)min;
 			case 1:
 				if (delta>255) return false;

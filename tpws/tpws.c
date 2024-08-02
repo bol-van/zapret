@@ -876,13 +876,13 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 				// ipv6 links locals are fe80::/10
 				else if (a->ifa_addr->sa_family==AF_INET6
 				          &&
-				         (!*bindiface && (bindll==prefer || bindll==force) ||
-				          *bindiface && bind_if6 && !strcmp(a->ifa_name, bindiface))
+				         ((!*bindiface && (bindll==prefer || bindll==force)) ||
+				          (*bindiface && bind_if6 && !strcmp(a->ifa_name, bindiface)))
 				          &&
-					 (bindll==force && is_linklocal((struct sockaddr_in6*)a->ifa_addr) ||
-					  bindll==prefer && (pass==0 && is_linklocal((struct sockaddr_in6*)a->ifa_addr) || pass==1 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==2) ||
-					  bindll==no &&	(pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr)) ||
-					  bindll==unwanted && (pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr) || pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr) || pass==2))
+					 ((bindll==force && is_linklocal((struct sockaddr_in6*)a->ifa_addr)) ||
+					  (bindll==prefer && ((pass==0 && is_linklocal((struct sockaddr_in6*)a->ifa_addr)) || (pass==1 && is_private6((struct sockaddr_in6*)a->ifa_addr)) || pass==2)) ||
+					  (bindll==no && ((pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr)) || (pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr)))) ||
+					  (bindll==unwanted && ((pass==0 && is_private6((struct sockaddr_in6*)a->ifa_addr)) || (pass==1 && !is_linklocal((struct sockaddr_in6*)a->ifa_addr)) || pass==2)))
 					)
 				{
 					salisten->ss_family = AF_INET6;

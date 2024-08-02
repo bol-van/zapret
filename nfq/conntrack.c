@@ -250,7 +250,7 @@ static bool ConntrackPoolFeedPool(t_conntrack_pool **pp, const struct ip *ip, co
 		}
 	}
 	b_rev = tcphdr && tcp_synack_segment(tcphdr);
-	if (tcphdr && tcp_syn_segment(tcphdr) || b_rev || udphdr)
+	if ((tcphdr && tcp_syn_segment(tcphdr)) || b_rev || udphdr)
 	{
 		if ((ctr=ConntrackNew(pp, b_rev ? &connswp : &conn)))
 		{
@@ -298,12 +298,12 @@ void ConntrackPoolPurge(t_conntrack *p)
 		HASH_ITER(hh, p->pool , t, tmp) {
 			tidle = tnow - t->track.t_last;
 			if (	t->track.b_cutoff ||
-				t->conn.l4proto==IPPROTO_TCP && (
-					t->track.state==SYN && tidle>=p->timeout_syn ||
-					t->track.state==ESTABLISHED && tidle>=p->timeout_established ||
-					t->track.state==FIN && tidle>=p->timeout_fin) ||
-				t->conn.l4proto==IPPROTO_UDP &&
-					tidle>=p->timeout_udp)
+				(t->conn.l4proto==IPPROTO_TCP && (
+					(t->track.state==SYN && tidle>=p->timeout_syn) ||
+					(t->track.state==ESTABLISHED && tidle>=p->timeout_established) ||
+					(t->track.state==FIN && tidle>=p->timeout_fin))
+				) || (t->conn.l4proto==IPPROTO_UDP && tidle>=p->timeout_udp)
+			)
 			{
 				HASH_DEL(p->pool, t); ConntrackFreeElem(t); 
 			}
