@@ -189,7 +189,7 @@ static void *t_resolver(void *arg)
 {
 	int tid = (int)(size_t)arg;
 	int i, r;
-	char dom[256], is_ok;
+	char dom[256], is_ok = 0;
 	struct addrinfo hints;
 	struct addrinfo *result;
 

@@ -484,8 +484,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	struct sockaddr_storage src, dst;
 	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
 	size_t pkt1_len, pkt2_len;
-	uint8_t ttl_orig,ttl_fake,flags_orig,scale_factor;
-	uint32_t *timestamps;
+	uint8_t ttl_orig,ttl_fake = 0, flags_orig = 0,scale_factor = 0;
+	uint32_t *timestamps = NULL;
 
 	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;

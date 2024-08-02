@@ -132,7 +132,7 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 }
 size_t HttpPos(enum httpreqpos tpos_type, size_t hpos_pos, const uint8_t *http, size_t sz)
 {
-	const uint8_t *method, *host;
+	const uint8_t *method, *host = NULL;
 	int i;
 	
 	switch(tpos_type)
@@ -352,7 +352,7 @@ static uint8_t tvb_get_size(uint8_t tvb)
 bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, size_t *hello_len)
 {
 	size_t offset = 1;
-	uint64_t coff, clen;
+	uint64_t coff = 0, clen = 0;
 	if (len < 3 || *data != 6) return false;
 	if ((offset+tvb_get_size(data[offset])) >= len) return false;
 	offset += tvb_get_varint(data + offset, &coff);
@@ -557,7 +557,7 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 		return false;
 	}
 
-	uint64_t payload_len,token_len;
+	uint64_t payload_len, token_len = 0;
 	size_t pn_offset;
 	pn_offset = 1 + 4 + 1 + data[5];
 	if (pn_offset >= data_len) return false;
@@ -618,7 +618,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 	size_t defrag_data_len = *defrag_len-10;
 
 	uint8_t ft;
-	uint64_t offset,sz,szmax=0,zeropos=0,pos=0;
+	uint64_t offset=0,sz=0,szmax=0,zeropos=0,pos=0;
 	bool found=false;
 
 	while(pos<clean_len)
@@ -699,7 +699,7 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	// quic v2 : initial packets are 01b
 	if ((data[0] & 0x30) != (is_quic_v2(ver) ? 0x10 : 0x00)) return false;
 
-	uint64_t offset=5, sz;
+	uint64_t offset=5, sz=0;
 
 	// DCID. must be present
 	if (!data[offset] || data[offset] > QUIC_MAX_CID_LENGTH) return false;
