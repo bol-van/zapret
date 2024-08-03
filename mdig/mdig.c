@@ -74,7 +74,7 @@ static const char* eai_str(int r)
 	}
 }
 
-bool dom_valid(char *dom)
+bool dom_valid(uint8_t *dom)
 {
 	if (!dom || *dom=='.') return false;
 	for (; *dom; dom++)
@@ -82,7 +82,7 @@ bool dom_valid(char *dom)
 			return false;
 	return true;
 }
-void invalid_domain_beautify(char *dom)
+void invalid_domain_beautify(uint8_t *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
 		if (*dom < 0x20 || *dom>0x7F) *dom = '?';
@@ -238,7 +238,7 @@ static void *t_resolver(void *arg)
 				else
 					VLOG("wrong address family %s", s_ip);
 			}
-			else if (dom_valid(dom))
+			else if (dom_valid((uint8_t *)dom))
 			{
 				VLOG("resolving %s", dom);
 				for (i = 0; i < RESOLVER_EAGAIN_ATTEMPTS; i++)
@@ -261,7 +261,7 @@ static void *t_resolver(void *arg)
 			{
 				char dom2[sizeof(dom)];
 				strcpy(dom2,dom);
-				invalid_domain_beautify(dom2);
+				invalid_domain_beautify((uint8_t *)dom2);
 				VLOG("invalid domain : %s", dom2);
 			}
 			interlocked_fprintf(is_ok ? glob.F_log_resolved : glob.F_log_failed,"%s\n",dom);
