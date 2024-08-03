@@ -483,7 +483,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 	struct sockaddr_storage src, dst;
 	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
-	size_t pkt1_len, pkt2_len;
+	size_t pkt1_len = sizeof(pkt1), pkt2_len;
+	memset (pkt1, 0, pkt1_len);
+
 	uint8_t ttl_orig,ttl_fake = 0, flags_orig = 0,scale_factor = 0;
 	uint32_t *timestamps = NULL;
 
@@ -617,7 +619,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			switch (params.desync_mode0)
 			{
 				case DESYNC_SYNACK:
-					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 						ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 						NULL, 0, pkt1, &pkt1_len))
@@ -640,7 +641,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						DLOG("received SYN with data payload. syndata desync is not applied.\n");
 						break;
 					}
-					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 						ttl_orig,0,0,0, params.fake_syndata,params.fake_syndata_size, pkt1,&pkt1_len))
 					{
@@ -897,7 +897,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		uint32_t fooling_orig = FOOL_NONE;
 		bool b;
 
-		pkt1_len = sizeof(pkt1);
 		b = false;
 		switch(desync_mode)
 		{
@@ -976,7 +975,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			desync_mode = params.desync_mode2;
 		}
 
-		pkt1_len = sizeof(pkt1);
 		switch(desync_mode)
 		{
 			case DESYNC_DISORDER:
@@ -1036,7 +1034,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							return verdict;
 					}
 
-					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 							ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 							data_payload, split_pos, pkt1, &pkt1_len))
@@ -1113,7 +1110,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					if (split_pos<len_payload)
 					{
-						pkt1_len = sizeof(pkt1);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
 								ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
 								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
@@ -1138,7 +1134,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					size_t ipfrag_pos = (params.desync_ipfrag_pos_tcp && params.desync_ipfrag_pos_tcp<transport_len) ? params.desync_ipfrag_pos_tcp : 24;
 					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 
-					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
 					if (ip6hdr && (fooling_orig==FOOL_HOPBYHOP || fooling_orig==FOOL_DESTOPT))
@@ -1205,8 +1200,10 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	bool bReverse=false;
 
 	struct sockaddr_storage src, dst;
-	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
-	size_t pkt1_len, pkt2_len;
+        uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
+        size_t pkt1_len = sizeof(pkt1), pkt2_len;
+        memset (pkt1, 0, pkt1_len);
+
 	uint8_t ttl_orig,ttl_fake;
 	
 	if (replay)
@@ -1433,7 +1430,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			printf("\n");
 		}
 
-		pkt1_len = sizeof(pkt1);
 		b = false;
 		switch(desync_mode)
 		{
@@ -1493,7 +1489,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		switch(desync_mode)
 		{
 			case DESYNC_UDPLEN:
-				pkt1_len = sizeof(pkt1);
 				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, params.udplen_pattern, sizeof(params.udplen_pattern), params.udplen_increment, data_payload, len_payload, pkt1, &pkt1_len))
 				{
 					DLOG("could not construct packet with modified length. too large ?\n");
@@ -1518,7 +1513,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					memcpy(pkt2+pkt2_len,data_payload+1,szcopy);
 					pkt2_len+=szcopy;
-					pkt1_len = sizeof(pkt1);
 					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, NULL, 0 , 0, pkt2, pkt2_len, pkt1, &pkt1_len))
 					{
 						DLOG("could not construct packet with modified length. too large ?\n");
@@ -1545,7 +1539,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					// freebsd do not set ip.id
 					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 
-					pkt1_len = sizeof(pkt1);
 					pkt2_len = sizeof(pkt2);
 
 					if (ip6hdr && (fooling_orig==FOOL_HOPBYHOP || fooling_orig==FOOL_DESTOPT))
