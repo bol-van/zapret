@@ -1236,9 +1236,14 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	if (!replay && !process_desync_interval(ctrack)) return verdict;
 
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
-	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-	if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
-	else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+
+	if (ip6hdr) {
+		ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
+		ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
+	} else {
+		ttl_orig = ip ? ip->ip_ttl : 0;
+		ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
+	}
 	extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
 	
 	if (len_payload)

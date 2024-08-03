@@ -277,7 +277,7 @@ static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, s
 	// u16	data+0 - name list length
 	// u8	data+2 - server name type. 0=host_name
 	// u16	data+3 - server name length
-	if (elen < 5 || ext[2] != 0) return false;
+	if (elen < 5 || (ext && ext[2] != 0)) return false;
 	size_t slen = pntoh16(ext + 3);
 	ext += 5; elen -= 5;
 	if (slen < elen) return false;
