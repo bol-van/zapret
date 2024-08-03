@@ -226,7 +226,7 @@ static int nfq_main(void)
 		while ((rv = recv(fd, buf, sizeof(buf), 0)) > 0)
 		{
 			dohup();
-			int r = nfq_handle_packet(h, buf, rv);
+			int r = nfq_handle_packet(h, (char *)buf, rv);
 			if (r) fprintf(stderr, "nfq_handle_packet error %d\n", r);
 		}
 		fprintf(stderr, "recv: errno %d\n",errno);
