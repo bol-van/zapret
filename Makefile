@@ -2,6 +2,7 @@ DIRS := nfq tpws ip2net mdig
 DIRS_MAC := tpws ip2net mdig
 TGT := binaries/my
 
+
 all:	clean
 	@mkdir -p "$(TGT)"; \
 	for dir in $(DIRS); do \
