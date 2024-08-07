@@ -11,7 +11,8 @@
 ```keenetic```
 
 Обновляем opkg пакеты:
-```opkg update```
+```opkg update
+```
 
 Устанавливаем пакеты:
 opkg install coreutils-sort curl git-http grep gzip ipset iptables kmod_ndms nano xtables-addons_legacy
