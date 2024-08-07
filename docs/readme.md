@@ -1,7 +1,7 @@
 Настройка zapret от bol-van на Keentic
 Инструкция от @nik_pushistov. 07.08.2024
 
-Установка системы пакетов репозитория Entware на Keenetic в USB-накопитель
+[Установка системы пакетов репозитория Entware на Keenetic в USB-накопитель]([https://github.com/NameLessJedi](https://help.keenetic.com/hc/ru/articles/360021214160-%D0%A3%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0-%D1%81%D0%B8%D1%81%D1%82%D0%B5%D0%BC%D1%8B-%D0%BF%D0%B0%D0%BA%D0%B5%D1%82%D0%BE%D0%B2-%D1%80%D0%B5%D0%BF%D0%BE%D0%B7%D0%B8%D1%82%D0%BE%D1%80%D0%B8%D1%8F-Entware-%D0%BD%D0%B0-USB-%D0%BD%D0%B0%D0%BA%D0%BE%D0%BF%D0%B8%D1%82%D0%B5%D0%BB%D1%8C))
 
 Подключение по SSH к роутеру через "putty", 192.168.1.1:22.
 
