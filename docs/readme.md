@@ -63,7 +63,9 @@ n
 ```
 
 Далее заменяем верхнюю строку нажав Y на этот, а после нажимаем CTRL+X подтверждаем сохранение Y затем enter:
+```
 --dpi-desync=fake,split2 --dpi-desync-ttl=6 --dpi-desync-fooling=badsum
+```
 
 Далее нас еще раз спрашивают, на сей раз N:
 ```
@@ -88,31 +90,46 @@ rm -rf /opt/tmp/zapret
 ```
 
 Теперь сделаем, что бы запрет стартовал при запуски Keenetic.
+```
 ln -fs /opt/zapret/init.d/sysv/zapret /opt/etc/init.d/S90-zapret
+```
 
 Правим стартовый скрипт
+```
 nano /opt/zapret/init.d/sysv/zapret
+```
 
 Добавляем PATH и WS_USER под словами END INIT INFO
+```
 PATH=/opt/sbin:/opt/bin:/opt/usr/sbin:/opt/usr/bin:/usr/sbin:/usr/bin:/sbin:/bin
 WS_USER=nobody
+```
 
 Создаем небольшой скрипт, чтобы Keenetic не забывал правила
+```
 nano /opt/etc/ndm/netfilter.d/000-zapret.sh
+```
 
 Вставляем весь текст
+```
 #!/bin/sh
 [ "$type" == "ip6tables" ] && exit 0
 [ "$table" != "mangle" ] && exit 0
 /opt/zapret/init.d/sysv/zapret restart-fw
+```
 
 Исполняем
+```
 chmod +x /opt/etc/ndm/netfilter.d/000-zapret.sh
+```
 
 Переводим net.netfilter.nf_conntrack_checksum в 0.
+```
 nano /opt/etc/init.d/S00fix
+```
 
 Вставляем весь текст
+```
 #!/bin/sh
 start() {
     echo 0 > /proc/sys/net/netfilter/nf_conntrack_checksum
@@ -133,18 +150,26 @@ case "$1" in
         ;;
 esac
 exit 0
+```
 
 Исполняем
+```
 chmod +x /opt/etc/init.d/S00fix
+```
 
 Ну вот и все. Перезагружаем и проверяем.
+```
 reboot
+```
 
 P.S.:
 Поправить конфиг zapret'а:
+```
 nano /opt/zapret/config
+```
 
 Заменяем весь текст если будут проблемы
+```
 MODE_HTTP=1
 MODE_HTTP_KEEPALIVE=0
 MODE_HTTPS=1
@@ -152,32 +177,47 @@ MODE_QUIC=1
 MODE_FILTER=hostlist
 NFQWS_OPT_DESYNC="--dpi-desync=fake,disorder2 --dpi-desync-ttl=3 --dpi-desync-fooling=badsum"
 NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
+```
 
 Обход замедления ютуб:
 Хост лист (zapret-hosts-user.txt)
+```
 nano /opt/zapret/ipset/zapret-hosts-user.txt
+```
 
 Автоконфиг:
+```
 nano /opt/zapret/ipset/zapret-hosts-auto.txt
+```
 
 Вставить домены ниже
+```
 www.youtube.com
 youtu.be
 googlevideo.com
 ytimg.com
 nhacmp3youtube.com
+```
 
 Соответственно, после добавления нужно запустить следующие скрипты:
+```
 /opt/zapret/ipset/clear_lists.sh
+```
 
+```
 /opt/zapret/ipset/get_user.sh
 /opt/zapret/ipset/get_config.sh
+```
 
 И можно перезапустить Zapret
+```
 /opt/zapret/init.d/sysv/zapret restart_daemons
+```
 
 Или есть еще такая команда
+```
 /opt/etc/init.d/S90-zapret restart
+```
 
 Ниже описаны принципы работы ПО от разработчика
 
