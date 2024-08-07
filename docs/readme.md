@@ -11,7 +11,8 @@
 ```keenetic```
 
 Обновляем opkg пакеты:
-```opkg update
+```
+opkg update
 ```
 
 Устанавливаем пакеты:
