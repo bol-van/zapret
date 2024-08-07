@@ -6,9 +6,9 @@
 Подключение по SSH к роутеру через "putty", 192.168.1.1:22.
 
 Логин: 
-root
+```root```
 Пароль: 
-keenetic
+```keenetic```
 
 Обновляем opkg пакеты:
 opkg update
