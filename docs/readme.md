@@ -6,9 +6,14 @@
 Подключение по SSH к роутеру через "putty", 192.168.1.1:22.
 
 Логин: 
-```root```
+```
+root
+```
+
 Пароль: 
-```keenetic```
+```
+keenetic
+```
 
 Обновляем opkg пакеты:
 ```
@@ -16,46 +21,71 @@ opkg update
 ```
 
 Устанавливаем пакеты:
+
+```
 opkg install coreutils-sort curl git-http grep gzip ipset iptables kmod_ndms nano xtables-addons_legacy
+```
 
 Переходим в tmp:
+```
 cd /opt/tmp
+```
 
 Скачиваем zapret:
+```
 git clone --depth=1 https://github.com/bol-van/zapret.git
+```
 
 Переходим в каталог zapret и выполняем скрипт:
+```
 cd zapret
 ./install_easy.sh
+```
 
 Далее (будут спрашивать, 3 раза отвечаем Y затем enter, после каждого раза):
+```
 y
+```
 
 Далее "select firewall type:" (Выбираем 1)
+```
 1
+```
 
 Далее "enable ipv6 support?:" (Без разницы, либо N)
+```
 n
+```
 
 Далее "select mode:" (Выбираем 3)
+```
 3
+```
 
 Далее заменяем верхнюю строку нажав Y на этот, а после нажимаем CTRL+X подтверждаем сохранение Y затем enter:
 --dpi-desync=fake,split2 --dpi-desync-ttl=6 --dpi-desync-fooling=badsum
 
 Далее нас еще раз спрашивают, на сей раз N:
+```
 n
+```
 
 Далее выбираем "wan interface:" (На keenetic giga это 18:ppp0)
+```
 18
+```
 
 Дальше жмем Enter 2 раза
 
 На вопрос включить quic соглашаемся
+```
 y
+```
 
 Удаляем ненужное.
+```
 rm -rf /opt/tmp/zapret
+```
 
 Теперь сделаем, что бы запрет стартовал при запуски Keenetic.
 ln -fs /opt/zapret/init.d/sysv/zapret /opt/etc/init.d/S90-zapret
