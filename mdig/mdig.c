@@ -74,15 +74,15 @@ static const char* eai_str(int r)
 	}
 }
 
-bool dom_valid(char *dom)
+bool dom_valid(uint8_t *dom)
 {
 	if (!dom || *dom=='.') return false;
 	for (; *dom; dom++)
-		if (*dom < 0x20 || *dom>0x7F || !(*dom == '.' || *dom == '-' || *dom == '_' || *dom >= '0' && *dom <= '9' || *dom >= 'a' && *dom <= 'z' || *dom >= 'A' && *dom <= 'Z'))
+		if (*dom < 0x20 || *dom>0x7F || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
 			return false;
 	return true;
 }
-void invalid_domain_beautify(char *dom)
+void invalid_domain_beautify(uint8_t *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
 		if (*dom < 0x20 || *dom>0x7F) *dom = '?';
@@ -189,7 +189,7 @@ static void *t_resolver(void *arg)
 {
 	int tid = (int)(size_t)arg;
 	int i, r;
-	char dom[256], is_ok;
+	char dom[256], is_ok = 0;
 	struct addrinfo hints;
 	struct addrinfo *result;
 
@@ -213,7 +213,7 @@ static void *t_resolver(void *arg)
 			family = GetAddrFamily(s_ip);
 			if (family)
 			{
-				if (family == AF_INET && (glob.family & FAMILY4) || family == AF_INET6 && (glob.family & FAMILY6))
+				if ((family == AF_INET && (glob.family & FAMILY4)) || (family == AF_INET6 && (glob.family & FAMILY6)))
 				{
 					unsigned int mask;
 					bool mask_needed = false;
@@ -238,7 +238,7 @@ static void *t_resolver(void *arg)
 				else
 					VLOG("wrong address family %s", s_ip);
 			}
-			else if (dom_valid(dom))
+			else if (dom_valid((uint8_t *)dom))
 			{
 				VLOG("resolving %s", dom);
 				for (i = 0; i < RESOLVER_EAGAIN_ATTEMPTS; i++)
@@ -261,7 +261,7 @@ static void *t_resolver(void *arg)
 			{
 				char dom2[sizeof(dom)];
 				strcpy(dom2,dom);
-				invalid_domain_beautify(dom2);
+				invalid_domain_beautify((uint8_t *)dom2);
 				VLOG("invalid domain : %s", dom2);
 			}
 			interlocked_fprintf(is_ok ? glob.F_log_resolved : glob.F_log_failed,"%s\n",dom);
