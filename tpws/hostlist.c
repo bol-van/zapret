@@ -51,6 +51,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 			e = zbuf + zsize;
 			while(p<e)
 			{
+				if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
 				if (!addpool(hostlist,&p,e))
 				{
 					fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
@@ -74,6 +75,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 		while (fgets(s, 256, F))
 		{
 			p = s;
+			if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
 			if (!addpool(hostlist,&p,p+strlen(p)))
 			{
 				fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
