@@ -156,7 +156,7 @@ static int nfq_main(void)
 	struct nfq_handle *h = NULL;
 	struct nfq_q_handle *qh = NULL;
 	int fd,rv;
-	uint8_t buf[16384] __attribute__((aligned));
+	char buf[16384] __attribute__((aligned));
 
 	printf("opening library handle\n");
 	h = nfq_open();
