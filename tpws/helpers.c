@@ -155,7 +155,7 @@ bool saconvmapped(struct sockaddr_storage *a)
 {
 	if ((a->ss_family == AF_INET6) && saismapped((struct sockaddr_in6*)a))
 	{
-		uint32_t ip4 = *(uint32_t*)(((struct sockaddr_in6*)a)->sin6_addr.s6_addr+12);
+		uint32_t ip4 = IN6_EXTRACT_MAP4(((struct sockaddr_in6*)a)->sin6_addr.s6_addr);
 		uint16_t port = ((struct sockaddr_in6*)a)->sin6_port;
 		a->ss_family = AF_INET;
 		((struct sockaddr_in*)a)->sin_addr.s_addr = ip4;
