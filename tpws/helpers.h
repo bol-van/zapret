@@ -55,3 +55,16 @@ typedef struct
 } port_filter;
 bool pf_in_range(uint16_t port, const port_filter *pf);
 bool pf_parse(const char *s, port_filter *pf);
+
+#ifndef IN_LOOPBACK
+#define IN_LOOPBACK(a)          ((((uint32_t) (a)) & 0xff000000) == 0x7f000000)
+#endif
+
+#ifdef __GNUC__
+#define IN6_EXTRACT_MAP4(a) \
+  (__extension__                                                              \
+   ({ const struct in6_addr *__a = (const struct in6_addr *) (a);             \
+      (((const uint32_t *) (__a))[3]); }))
+#else
+#define IN6_EXTRACT_MAP4(a)	(((const uint32_t *) (a))[3])
+#endif
