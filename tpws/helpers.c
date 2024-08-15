@@ -10,6 +10,7 @@
 #include <ifaddrs.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <netinet/in.h>
 
 char *strncasestr(const char *s,const char *find, size_t slen)
 {
@@ -132,7 +133,7 @@ void print_addrinfo(const struct addrinfo *ai)
 bool saismapped(const struct sockaddr_in6 *sa)
 {
 	// ::ffff:1.2.3.4
-	return !memcmp(sa->sin6_addr.s6_addr,"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff",12);
+	return IN6_IS_ADDR_V4MAPPED(sa->sin6_addr.s6_addr);
 }
 bool samappedcmp(const struct sockaddr_in *sa1,const struct sockaddr_in6 *sa2)
 {
@@ -166,14 +167,14 @@ bool saconvmapped(struct sockaddr_storage *a)
 
 bool is_localnet(const struct sockaddr *a)
 {
-	// 0.0.0.0, ::ffff:0.0.0.0 = localhost in linux
-	return (a->sa_family==AF_INET && (*(char*)&((struct sockaddr_in *)a)->sin_addr.s_addr==127 || !((struct sockaddr_in *)a)->sin_addr.s_addr)) ||
-		(a->sa_family==AF_INET6 && saismapped((struct sockaddr_in6 *)a) && (((struct sockaddr_in6 *)a)->sin6_addr.s6_addr[12]==127 || !*(uint32_t*)(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr+12)));
+	// 127.0.0.0/8, ::1 = localhost
+	return (a->sa_family==AF_INET && IN_LOOPBACK(((struct sockaddr_in *)a)->sin_addr.s_addr)) ||
+		(a->sa_family==AF_INET6 && IN6_IS_ADDR_LOOPBACK(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr));
 }
 bool is_linklocal(const struct sockaddr_in6 *a)
 {
 	// fe80::/10
-	return a->sin6_addr.s6_addr[0]==0xFE && (a->sin6_addr.s6_addr[1] & 0xC0)==0x80;
+	return IN6_IS_ADDR_LINKLOCAL(a->sin6_addr.s6_addr);
 }
 bool is_private6(const struct sockaddr_in6* a)
 {
