@@ -850,7 +850,6 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 {
 	struct ifaddrs *addrs,*a;
 	bool found=false;
-	bool bindll_want = bindll==prefer || bindll==force;
     
 	if (getifaddrs(&addrs)<0)
 		return false;

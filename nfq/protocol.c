@@ -210,7 +210,7 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 	//	<CompressionMethods>
 	// u16	ExtensionsLength
 
-	size_t l, ll;
+	size_t l;
 
 	if (!bPartialIsOK && !IsTLSHandshakeFull(data,len)) return false;
 

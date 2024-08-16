@@ -876,10 +876,7 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 								break;
 							case S5_ATYP_DOM:
 								{
-									struct addrinfo *ai,hints;
-									int r;
 									uint16_t port;
-									char sport[6];
 
 									if (params.no_resolve)
 									{

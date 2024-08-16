@@ -15,7 +15,6 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	size_t method_len = 0, pos;
 	const char *method;
 	bool bBypass = false, bHaveHost = false, bHostExcluded = false;
-	char bRemovedHostSpace = 0;
 	char *pc, Host[256];
 	
 	DBGPRINT("tamper_out")
@@ -119,7 +118,6 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				VPRINT("Removing space before host name at pos %zu", pos)
 				memmove(p - 1, p, *size - pos);
 				(*size)--; // block will shrink by 1 byte
-				bRemovedHostSpace = 1;
 			}
 			if (params.hostcase && HttpFindHost(&pHost,segment,*size))
 			{

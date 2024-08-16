@@ -1261,7 +1261,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 
 			uint8_t clean[16384], *pclean;
 			size_t clean_len;
-			bool bIsHello = false;
 
 			if (replay)
 			{
