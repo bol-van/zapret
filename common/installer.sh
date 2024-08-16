@@ -39,7 +39,7 @@ edit_file()
 	# $1 - file name
 	local ed="$EDITOR"
 	[ -n "$ed" ] || {
-		for e in mcedit nano vi; do
+		for e in mcedit nano vim vi; do
 			exists "$e" && {
 				ed="$e"
 				break

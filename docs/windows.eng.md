@@ -37,7 +37,7 @@ In *nix it's done by `iptables`, `nftables`, `pf`, `ipfw`.
 
 Windows does not have part 1. No `iptables` exist. That's why 3rd party packet redirector is used.
 It's called `windivert`. It works starting from `windows 7`. Kernel driver is signed but it may require to disable secure boot
-or update windows 7.
+or update windows 7. Read below for windows 7 windivert signing info.
 
 Task of `iptables` is done inside `winws` through `windivert` filters. `Windivert` has it's own [filter language](https://reqrypt.org/windivert-doc.html#filter_language).
 `winws` can automate filter construction using simple ip version and port filter. Raw filters are also supported.
@@ -88,6 +88,24 @@ It's possible to build x86 32-bit version but this version is not shipped. You h
 There's no `arm64` signed `windivert` driver and no `cygwin`.
 But it's possible to use unsigned driver version in test mode and user mode components with x64 emulation.
 x64 emulation requires `windows 11` and not supported in `windows 10`.
+
+### windows 7 windivert signing
+
+Requirements for windows driver signing have changed in 2021.
+Official free updates of windows 7 ended in 2020.
+After 2020 for the years paid updates were available (ESU).
+One of the updates from ESU enables signatures used in windivert 2.2.2-A.
+There are several options :
+
+1. Take `windivert64.sys` and `windivert.dll` version `2.2.0-C` or `2.2.0-D` from [here](https://reqrypt.org/download).
+Replace these 2 files in every location they are present.
+In `zapret-win-bundle` they are in `zapret-winws` и `blockcheck/zapret/nfq` folders.
+However this option still requires 10+ year old patch that enables SHA256 signatures.
+
+2. [Hack ESU](https://hackandpwn.com/windows-7-esu-patching)
+
+3. Use `UpdatePack7R2` from simplix : https://blog.simplix.info
+If you are in Russia or Belarus temporary change region in Control Panel.
 
 ### blockcheck
 
