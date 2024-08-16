@@ -167,9 +167,13 @@ bool saconvmapped(struct sockaddr_storage *a)
 
 bool is_localnet(const struct sockaddr *a)
 {
-	// 127.0.0.0/8, ::1 = localhost
-	return (a->sa_family==AF_INET && IN_LOOPBACK(((struct sockaddr_in *)a)->sin_addr.s_addr)) ||
-		(a->sa_family==AF_INET6 && IN6_IS_ADDR_LOOPBACK(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr));
+	// match 127.0.0.0/8, 0.0.0.0, ::1, ::0, :ffff:127.0.0.0/104, :ffff:0.0.0.0
+	return (a->sa_family==AF_INET && (IN_LOOPBACK(((struct sockaddr_in *)a)->sin_addr.s_addr) ||
+					    INADDR_ANY == (((struct sockaddr_in *)a)->sin_addr.s_addr))) ||
+		(a->sa_family==AF_INET6 && ((IN6_IS_ADDR_LOOPBACK(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr)) ||
+					    IN6_IS_ADDR_UNSPECIFIED((((struct sockaddr_in6 *)a)->sin6_addr.s6_addr)) ||
+					    (saismapped((struct sockaddr_in6 *)a) && (IN_LOOPBACK(IN6_EXTRACT_MAP4(((struct sockaddr_in6*)a)->sin6_addr.s6_addr)) ||
+										INADDR_ANY == IN6_EXTRACT_MAP4(((struct sockaddr_in6*)a)->sin6_addr.s6_addr)))));
 }
 bool is_linklocal(const struct sockaddr_in6 *a)
 {
