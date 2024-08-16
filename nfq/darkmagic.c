@@ -121,8 +121,8 @@ static void fill_tcphdr(
 		tcpopt[t] = 8; // kind
 		tcpopt[t+1] = 10; // len
 		// forge only TSecr if orig timestamp is present
-		*(uint32_t*)(tcpopt+t+2) = timestamps ? timestamps[0] : -1;
-		*(uint32_t*)(tcpopt+t+6) = (timestamps && !(fooling & FOOL_TS)) ? timestamps[1] : -1;
+		*(uint32_t*)(tcpopt+t+2) = timestamps ? timestamps[0] : 0xFFFFFFFF;
+		*(uint32_t*)(tcpopt+t+6) = (timestamps && !(fooling & FOOL_TS)) ? timestamps[1] : 0xFFFFFFFF;
 		t+=10;
 	}
 	if (scale_factor!=SCALE_NONE)
