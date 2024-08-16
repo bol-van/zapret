@@ -172,7 +172,7 @@ bool is_localnet(const struct sockaddr *a)
 		(a->sa_family==AF_INET6 && (IN6_IS_ADDR_LOOPBACK(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr) ||
 					    IN6_IS_ADDR_UNSPECIFIED(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr) ||
 					    (IN6_IS_ADDR_V4MAPPED(((struct sockaddr_in6 *)a)->sin6_addr.s6_addr) && (IN_LOOPBACK(IN6_EXTRACT_MAP4(((struct sockaddr_in6*)a)->sin6_addr.s6_addr)) ||
-										INADDR_ANY == IN6_EXTRACT_MAP4(((struct sockaddr_in6*)a)->sin6_addr.s6_addr)))));
+					    INADDR_ANY == IN6_EXTRACT_MAP4(((struct sockaddr_in6*)a)->sin6_addr.s6_addr)))));
 }
 bool is_linklocal(const struct sockaddr_in6 *a)
 {
