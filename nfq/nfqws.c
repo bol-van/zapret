@@ -741,7 +741,7 @@ static bool wf_make_filter(
 	const char *pf_tcp_src, const char *pf_tcp_dst,
 	const char *pf_udp_src, const char *pf_udp_dst)
 {
-	char pf_src_buf[512],pf_dst_buf[512],iface[64];
+	char pf_dst_buf[512],iface[64];
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? *params.hostlist_auto_filename ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
 

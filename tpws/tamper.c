@@ -185,7 +185,6 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	else if (IsTLSClientHello(segment,*size,false))
 	{
 		size_t tpos=0,spos=0;
-		const uint8_t *ext;
 		
 		if (!ctrack->l7proto) ctrack->l7proto=TLS;
 
