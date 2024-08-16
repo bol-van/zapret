@@ -1610,7 +1610,6 @@ static bool set_socket_fwmark(int sock, uint32_t fwmark)
 
 static int rawsend_socket(sa_family_t family)
 {
-	int yes=1;
 	int *sock = rawsend_family_sock(family);
 	if (!sock) return -1;
 	
