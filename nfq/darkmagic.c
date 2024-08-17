@@ -1321,7 +1321,6 @@ static bool logical_net_filter_match_rate_limited(void)
 static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 {
 	LPSTR errormessage = NULL;
-	DWORD errorcode = 0;
 	HANDLE h, hMutex;
 	const char *mutex_name = "Global\\winws_windivert_mutex";
 
