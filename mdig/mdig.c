@@ -74,15 +74,16 @@ static const char* eai_str(int r)
 	}
 }
 
-bool dom_valid(char *dom)
+static bool dom_valid(char *dom)
 {
-	if (!dom || *dom=='.') return false;
-	for (; *dom; dom++)
-		if (*dom < 0x20 || *dom>0x7F || !(*dom == '.' || *dom == '-' || *dom == '_' || *dom >= '0' && *dom <= '9' || *dom >= 'a' && *dom <= 'z' || *dom >= 'A' && *dom <= 'Z'))
-			return false;
-	return true;
+    if (!dom || *dom=='.') return false;
+    for (; *dom; dom++)
+	if (*dom < 0x20 || (*dom & 0x80) || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
+	    return false;
+    return true;
 }
-void invalid_domain_beautify(char *dom)
+
+static void invalid_domain_beautify(char *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
 		if (*dom < 0x20 || *dom>0x7F) *dom = '?';
@@ -159,14 +160,14 @@ static void stat_print(int ct, int ct_ok)
 	}
 }
 
-static void stat_plus(char is_ok)
+static void stat_plus(bool is_ok)
 {
 	int ct, ct_ok;
 	if (glob.stats_every > 0)
 	{
 		pthread_mutex_lock(&glob.slock);
 		ct = ++glob.stats_ct;
-		ct_ok = glob.stats_ct_ok += !!is_ok;
+		ct_ok = glob.stats_ct_ok += is_ok;
 		pthread_mutex_unlock(&glob.slock);
 
 		if (!(ct % glob.stats_every)) stat_print(ct, ct_ok);
@@ -189,7 +190,8 @@ static void *t_resolver(void *arg)
 {
 	int tid = (int)(size_t)arg;
 	int i, r;
-	char dom[256], is_ok;
+	char dom[256];
+	bool is_ok;
 	struct addrinfo hints;
 	struct addrinfo *result;
 
@@ -201,9 +203,9 @@ static void *t_resolver(void *arg)
 
 	while (interlocked_get_dom(dom, sizeof(dom)))
 	{
+		is_ok = false;
 		if (*dom)
 		{
-			is_ok = 0;
 			uint16_t family;
 			char *s_mask, s_ip[sizeof(dom)];
 
@@ -213,7 +215,7 @@ static void *t_resolver(void *arg)
 			family = GetAddrFamily(s_ip);
 			if (family)
 			{
-				if (family == AF_INET && (glob.family & FAMILY4) || family == AF_INET6 && (glob.family & FAMILY6))
+				if ((family == AF_INET && (glob.family & FAMILY4)) || (family == AF_INET6 && (glob.family & FAMILY6)))
 				{
 					unsigned int mask;
 					bool mask_needed = false;
@@ -229,7 +231,7 @@ static void *t_resolver(void *arg)
 						}
 					}
 					else
-						is_ok = 1;
+						is_ok = true;
 					if (is_ok)
 						interlocked_fprintf(stdout, mask_needed ? "%s/%u\n" : "%s\n", s_ip, mask);
 					else
@@ -252,7 +254,7 @@ static void *t_resolver(void *arg)
 					{
 						print_addrinfo(result);
 						freeaddrinfo(result);
-						is_ok = 1;
+						is_ok = true;
 					}
 					break;
 				}

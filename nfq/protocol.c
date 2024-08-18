@@ -281,7 +281,7 @@ static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, s
 	size_t slen = pntoh16(ext + 3);
 	ext += 5; elen -= 5;
 	if (slen < elen) return false;
-	if (ext && len_host)
+	if (host && len_host)
 	{
 		if (slen >= len_host) slen = len_host - 1;
 		for (size_t i = 0; i < slen; i++) host[i] = tolower(ext[i]);
@@ -342,6 +342,8 @@ static uint8_t tvb_get_varint(const uint8_t *tvb, uint64_t *value)
 		if (value) *value = pntoh64(tvb) & 0x3FFFFFFFFFFFFFFF;
 		return 8;
 	}
+	// impossible case
+	if (*value) *value = 0;
 	return 0;
 }
 static uint8_t tvb_get_size(uint8_t tvb)

@@ -271,7 +271,7 @@ static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, s
 	size_t slen = pntoh16(ext + 3);
 	ext += 5; elen -= 5;
 	if (slen < elen) return false;
-	if (ext && len_host)
+	if (host && len_host)
 	{
 		if (slen >= len_host) slen = len_host - 1;
 		for (size_t i = 0; i < slen; i++) host[i] = tolower(ext[i]);

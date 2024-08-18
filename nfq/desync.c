@@ -478,6 +478,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 {
 	uint8_t verdict=VERDICT_PASS;
 
+	// additional safety check
+	if (!!ip != !!ip6hdr) return verdict;
+
 	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
 
@@ -600,15 +603,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		}
 	} // !replay
 
-	if (params.desync_mode0!=DESYNC_NONE || params.desync_mode!=DESYNC_NONE) // save some cpu
-	{
-		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (params.desync_ttl6 ? params.desync_ttl6 : ttl_orig) : (params.desync_ttl ? params.desync_ttl : ttl_orig));
-		flags_orig = *((uint8_t*)tcphdr+13);
-		scale_factor = tcp_find_scale_factor(tcphdr);
-		timestamps = tcp_find_timestamps(tcphdr);
+	ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (params.desync_ttl6 ? params.desync_ttl6 : ttl_orig) : (params.desync_ttl ? params.desync_ttl : ttl_orig));
+	flags_orig = *((uint8_t*)tcphdr+13);
+	scale_factor = tcp_find_scale_factor(tcphdr);
+	timestamps = tcp_find_timestamps(tcphdr);
 
-		extract_endpoints(ip, ip6hdr, tcphdr, NULL, &src, &dst);
-	}
+	extract_endpoints(ip, ip6hdr, tcphdr, NULL, &src, &dst);
 
 	if (!replay)
 	{
@@ -955,6 +955,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					// this mode is final, no other options available
 					return VERDICT_DROP;
 				}
+			default:
+				// fix code analyzer warning
+				pkt1_len=0;
+				break;
 		}
 
 		if (b)
@@ -1191,6 +1195,9 @@ static bool quic_reasm_cancel(t_ctrack *ctrack, const char *reason)
 static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct udphdr *udphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
 {
 	uint8_t verdict=VERDICT_PASS;
+
+	// additional safety check
+	if (!!ip != !!ip6hdr) return verdict;
 
 	// no need to desync middle packets in reasm session
 	if (reasm_offset) return verdict;
@@ -1466,6 +1473,10 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 				}
 				desync_mode = params.desync_mode2;
+				break;
+			default:
+				// fix code analyzer warning
+				pkt1_len=0;
 				break;
 		}
 
