@@ -479,7 +479,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	uint8_t verdict=VERDICT_PASS;
 
 	// additional safety check
-	if (!!ip != !!ip6hdr) return verdict;
+	if (!!ip == !!ip6hdr) return verdict;
 
 	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
@@ -1197,7 +1197,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	uint8_t verdict=VERDICT_PASS;
 
 	// additional safety check
-	if (!!ip != !!ip6hdr) return verdict;
+	if (!!ip == !!ip6hdr) return verdict;
 
 	// no need to desync middle packets in reasm session
 	if (reasm_offset) return verdict;
