@@ -76,11 +76,11 @@ static const char* eai_str(int r)
 
 static bool dom_valid(char *dom)
 {
-    if (!dom || *dom=='.') return false;
-    for (; *dom; dom++)
+	if (!dom || *dom=='.') return false;
+	for (; *dom; dom++)
 	if (*dom < 0x20 || (*dom & 0x80) || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
-	    return false;
-    return true;
+		return false;
+	return true;
 }
 
 static void invalid_domain_beautify(char *dom)
