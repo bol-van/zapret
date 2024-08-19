@@ -1,6 +1,6 @@
-ip2net/
-mdig/
-nfq/
-tpws/
+ip2net/ip2net
+mdig/mdig
+nfq/nfqws
+tpws/tpws
 config
 
