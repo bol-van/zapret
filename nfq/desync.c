@@ -367,9 +367,9 @@ static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct 
 		if (proto==IPPROTO_UDP && udp && len_pkt)
 		{
 			// make malformed udp packet with zero length and invalid checksum
-			udp->len = 0; // invalid length. must be >=8
+			udp->uh_ulen = 0; // invalid length. must be >=8
 			udp_fix_checksum(udp,sizeof(struct udphdr),ip,ip6);
-			udp->check ^= htons(0xBEAF);
+			udp->uh_sum ^= htons(0xBEAF);
 			// truncate packet
 			*len_pkt = (uint8_t*)udp - (ip ? (uint8_t*)ip : (uint8_t*)ip6) + sizeof(struct udphdr);
 			if (ip)
