@@ -177,7 +177,7 @@ bool IsTLSRecordFull(const uint8_t *data, size_t len)
 }
 bool IsTLSClientHello(const uint8_t *data, size_t len, bool bPartialIsOK)
 {
-	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
+	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
 }
 
 size_t TLSHandshakeLen(const uint8_t *data)
