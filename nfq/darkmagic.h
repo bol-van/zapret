@@ -17,6 +17,10 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
+#ifndef IPV6_FREEBIND
+#define IPV6_FREEBIND           78
+#endif
+
 #ifdef __CYGWIN__
 #include "windivert/windivert.h"
 #endif
