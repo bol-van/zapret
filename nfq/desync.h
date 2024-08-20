@@ -1,5 +1,7 @@
 #pragma once
 
+#define __FAVOR_BSD
+
 #include "darkmagic.h"
 
 #include <stdint.h>

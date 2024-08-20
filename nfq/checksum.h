@@ -1,5 +1,7 @@
 #pragma once
 
+#define __FAVOR_BSD
+
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>

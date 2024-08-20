@@ -1,5 +1,7 @@
 #pragma once
 
+#define __FAVOR_BSD
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>

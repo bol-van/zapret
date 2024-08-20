@@ -1,5 +1,7 @@
 #pragma once
 
+#define __FAVOR_BSD
+
 // this conntrack is not bullet-proof
 // its designed to satisfy dpi desync needs only
 
