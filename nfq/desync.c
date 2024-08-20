@@ -1477,11 +1477,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				desync_mode = params.desync_mode2;
 				break;
 			default:
-<<<<<<< HEAD
-				// fix code analyzer warning
 				pkt1_len=0;
-=======
->>>>>>> 44ecef0 (fix compiler warnings: -Wswitch)
 				break;
 		}
 
