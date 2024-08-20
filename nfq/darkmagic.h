@@ -1,26 +1,25 @@
 #pragma once
 
-#define __FAVOR_BSD
+#include "checksum.h"
+#include "packet_queue.h"
+#include "pools.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/param.h>
 #include <netinet/in.h>
+
+#define __FAVOR_BSD
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <sys/socket.h>
-#include <sys/param.h>
-
-#include "checksum.h"
 
 #ifdef __CYGWIN__
 #include "windivert/windivert.h"
 #endif
-
-#include "packet_queue.h"
-#include "pools.h"
 
 #ifndef IPPROTO_DIVERT
 #define IPPROTO_DIVERT 258

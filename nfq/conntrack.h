@@ -1,9 +1,10 @@
 #pragma once
 
-#define __FAVOR_BSD
 
 // this conntrack is not bullet-proof
 // its designed to satisfy dpi desync needs only
+
+#include "packet_queue.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -11,12 +12,13 @@
 #include <sys/types.h>
 #include <time.h>
 #include <netinet/in.h>
+
+#define __FAVOR_BSD
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
-#include "packet_queue.h"
 
 //#define HASH_BLOOM 20
 #define HASH_NONFATAL_OOM 1
