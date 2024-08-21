@@ -1,5 +1,5 @@
 CC ?= cc
-CFLAGS += -std=gnu99 -s -O3 -Wno-address-of-packed-member -Wno-logical-op-parentheses -Wno-switch
+CFLAGS += -std=gnu99 -s -O3 -Wno-address-of-packed-member
 LIBS = -lz
 SRC_FILES = *.c crypto/*.c
 

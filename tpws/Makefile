@@ -1,6 +1,6 @@
 CC ?= gcc
-CFLAGS += -std=gnu99 -Wno-logical-op-parentheses -O3
-CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
+CFLAGS += -std=gnu99 -O3
+CFLAGS_BSD = -Wno-address-of-packed-member
 LIBS = -lz -lpthread
 SRC_FILES = *.c
 

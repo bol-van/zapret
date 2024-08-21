@@ -1,5 +1,5 @@
 CC ?= cc
-CFLAGS += -std=gnu99 -s -O3 -Wno-logical-op-parentheses
+CFLAGS += -std=gnu99 -s -O3
 LIBS = -lz -lpthread
 SRC_FILES = *.c
 
