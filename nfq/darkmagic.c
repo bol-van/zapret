@@ -1621,7 +1621,7 @@ static int rawsend_socket(sa_family_t family)
 		// IPPROTO_RAW with ipv6 in FreeBSD always returns EACCES on sendto.
 		// must use IPPROTO_TCP for ipv6. IPPROTO_RAW works for ipv4
 		// divert sockets are always v4 but accept both v4 and v6
-		*sock = (family==AF_INET) ? rawsend_socket_raw(family, IPPROTO_TCP) : rawsend_socket_divert(AF_INET);
+		*sock = rawsend_socket_divert(AF_INET);
 #elif defined(__OpenBSD__) || defined (__APPLE__)
 		// OpenBSD does not allow sending TCP frames through raw sockets
 		// I dont know about macos. They have dropped ipfw in recent versions and their PF does not support divert-packet
@@ -1634,16 +1634,6 @@ static int rawsend_socket(sa_family_t family)
 			perror("rawsend: socket()");
 			return -1;
 		}
-#ifdef BSD
-#if !(defined(__OpenBSD__) || defined (__APPLE__))
-		// HDRINCL not supported for ipv6 in any BSD
-		if (family==AF_INET && setsockopt(*sock,IPPROTO_IP,IP_HDRINCL,&yes,sizeof(yes)) == -1)
-		{
-			perror("rawsend: setsockopt(IP_HDRINCL)");
-			goto exiterr;
-		}
-#endif
-#endif
 #ifdef __linux__
 		if (setsockopt(*sock, SOL_SOCKET, SO_PRIORITY, &pri, sizeof(pri)) == -1)
 		{
@@ -1691,51 +1681,19 @@ bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const 
 	memcpy(&dst2,dst,salen);
 	if (dst->sa_family==AF_INET6)
 		((struct sockaddr_in6 *)&dst2)->sin6_port = 0; // or will be EINVAL in linux
-#ifdef BSD
-/*
-		// this works only for local connections and not working for transit : cant spoof source addr
-		if (len>=sizeof(struct ip6_hdr))
-		{
-			// BSD ipv6 raw socks are limited. cannot pass the whole packet with ip6 header.
-			struct sockaddr_storage sa_src;
-			int v;
-			extract_endpoints(NULL,(struct ip6_hdr *)data,NULL,NULL, &sa_src, NULL);
-			v = ((struct ip6_hdr *)data)->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-			if (setsockopt(sock, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &v, sizeof(v)) == -1)
-				perror("rawsend: setsockopt(IPV6_HOPLIMIT)");
-			// the only way to control source address is bind. make it equal to ip6_hdr
-			if (bind(sock, (struct sockaddr*)&sa_src, salen) < 0)
-				perror("rawsend bind: ");
-			//printf("BSD v6 RAWSEND "); print_sockaddr((struct sockaddr*)&sa_src); printf(" -> "); print_sockaddr((struct sockaddr*)&dst2); printf("\n");
-			proto_skip_ipv6((uint8_t**)&data, &len, NULL);
-		}
-*/
 
-#if !(defined(__OpenBSD__) || defined (__APPLE__))
-	// OpenBSD doesnt allow rawsending tcp frames. always use divert socket
-	if (dst->sa_family==AF_INET6)
-#endif
+#if defined(BSD)
+	bytes = rawsend_sendto_divert(dst->sa_family,sock,data,len);
+	if (bytes==-1)
 	{
-		ssize_t bytes = rawsend_sendto_divert(dst->sa_family,sock,data,len);
-		if (bytes==-1)
-		{
-			perror("rawsend: sendto_divert");
-			return false;
-		}
-		return true;
+		perror("rawsend: sendto_divert");
+		return false;
 	}
-#endif
+	return true;
 
-#if defined(__FreeBSD__) && __FreeBSD__<=10
-	// old FreeBSD requires some fields in host byte order
-	if (dst->sa_family==AF_INET && len>=sizeof(struct ip))
-	{
-		((struct ip*)data)->ip_len = htons(((struct ip*)data)->ip_len);
-		((struct ip*)data)->ip_off = htons(((struct ip*)data)->ip_off);
-	}
-#endif
+#else
 
-#if defined(__linux__)
+#ifdef __linux__
 	struct sockaddr_storage sa_src;
 	switch(dst->sa_family)
 	{
@@ -1774,20 +1732,13 @@ nofix:
 
 	// normal raw socket sendto
 	bytes = sendto(sock, data, len, 0, (struct sockaddr*)&dst2, salen);
-#if defined(__FreeBSD) && __FreeBSD__<=10
-	// restore byte order
-	if (dst->sa_family==AF_INET && len>=sizeof(struct ip))
-	{
-		((struct ip*)data)->ip_len = htons(((struct ip*)data)->ip_len);
-		((struct ip*)data)->ip_off = htons(((struct ip*)data)->ip_off);
-	}
-#endif
 	if (bytes==-1)
 	{
 		perror("rawsend: sendto");
 		return false;
 	}
 	return true;
+#endif
 }
 
 #endif // not CYGWIN
