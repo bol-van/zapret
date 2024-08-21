@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -O3
-CFLAGS_BSD = -Wno-address-of-packed-member -Wno-switch
+CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_WIN = -static
 LIBS = -lpthread
 LIBS_WIN = -lws2_32
