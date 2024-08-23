@@ -17,7 +17,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	bool bBypass = false, bHaveHost = false, bHostExcluded = false;
 	char *pc, Host[256];
 	
-	DBGPRINT("tamper_out")
+	DBGPRINT("tamper_out\n");
 
 	*split_pos=0;
 	*split_flags=0;
@@ -25,7 +25,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	if ((method = HttpMethod(segment,*size)))
 	{
 		method_len = strlen(method)-2;
-		VPRINT("Data block looks like http request start : %s", method)
+		VPRINT("Data block looks like http request start : %s\n", method);
 		if (!ctrack->l7proto) ctrack->l7proto=HTTP;
 		// cpu saving : we search host only if and when required. we do not research host every time we need its position
 		if ((params.hostlist || params.hostlist_exclude) && HttpFindHost(&pHost,segment,*size))
@@ -37,7 +37,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			memcpy(Host, p, pp - p);
 			Host[pp - p] = '\0';
 			bHaveHost = true;
-			VPRINT("Requested Host is : %s", Host)
+			VPRINT("Requested Host is : %s\n", Host);
 			for(pc = Host; *pc; pc++) *pc=tolower(*pc);
 			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
@@ -54,7 +54,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 					if (pp == (p - 1))
 					{
 						// probably end of http headers
-						VPRINT("Found double EOL at pos %td. Stop replacing.", pp - segment)
+						VPRINT("Found double EOL at pos %td. Stop replacing.\n", pp - segment);
 						break;
 					}
 					pp = p;
@@ -63,7 +63,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			}
 			if (params.methodeol && (*size+1+!params.unixeol)<=segment_buffer_size)
 			{
-				VPRINT("Adding EOL before method")
+				VPRINT("Adding EOL before method\n");
 				if (params.unixeol)
 				{
 					memmove(segment + 1, segment, *size);
@@ -82,7 +82,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			if (params.methodspace && *size<segment_buffer_size)
 			{
 				// we only work with data blocks looking as HTTP query, so method is at the beginning
-				VPRINT("Adding extra space after method")
+				VPRINT("Adding extra space after method\n");
 				p = segment + method_len + 1;
 				pos = method_len + 1;
 				memmove(p + 1, p, *size - pos);
@@ -97,7 +97,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				if (p < (segment + *size))
 				{
 					pos = p - segment;
-					VPRINT("Adding %s to host name at pos %zu", params.hostdot ? "dot" : "tab", pos)
+					VPRINT("Adding %s to host name at pos %zu\n", params.hostdot ? "dot" : "tab", pos);
 					memmove(p + 1, p, *size - pos);
 					*p = params.hostdot ? '.' : '\t'; // insert dot or tab
 					(*size)++; // block will grow by 1 byte
@@ -107,7 +107,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			{
 				p = pHost + 5;
 				pos = p - segment;
-				VPRINT("Mixing domain case at pos %zu",pos)
+				VPRINT("Mixing domain case at pos %zu\n",pos);
 				for (; p < (segment + *size) && *p != '\r' && *p != '\n'; p++)
 					*p = (((size_t)p) & 1) ? tolower(*p) : toupper(*p);
 			}
@@ -115,13 +115,13 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			{
 				p = pHost + 6;
 				pos = p - segment;
-				VPRINT("Removing space before host name at pos %zu", pos)
+				VPRINT("Removing space before host name at pos %zu\n", pos);
 				memmove(p - 1, p, *size - pos);
 				(*size)--; // block will shrink by 1 byte
 			}
 			if (params.hostcase && HttpFindHost(&pHost,segment,*size))
 			{
-				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment)
+				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment);
 				memcpy(pHost, params.hostspell, 4);
 			}
 			if (params.hostpad && HttpFindHost(&pHost,segment,*size))
@@ -132,16 +132,16 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				size_t hostpad = params.hostpad<hsize ? hsize : params.hostpad;
 
 				if ((hsize+*size)>segment_buffer_size)
-					VPRINT("could not add host padding : buffer too small")
+					VPRINT("could not add host padding : buffer too small\n");
 				else
 				{
 					if ((hostpad+*size)>segment_buffer_size)
 					{
 						hostpad=segment_buffer_size-*size;
-						VPRINT("host padding reduced to %zu bytes : buffer too small", hostpad)
+						VPRINT("host padding reduced to %zu bytes : buffer too small\n", hostpad);
 					}
 					else
-						VPRINT("host padding with %zu bytes", hostpad)
+						VPRINT("host padding with %zu bytes\n", hostpad);
 					
 					p = pHost;
 					pos = p - segment;
@@ -177,7 +177,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		}
 		else
 		{
-			VPRINT("Not acting on this request")
+			VPRINT("Not acting on this request\n");
 		}
 	}
 	else if (IsTLSClientHello(segment,*size,false))
@@ -186,17 +186,17 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		
 		if (!ctrack->l7proto) ctrack->l7proto=TLS;
 
-		VPRINT("packet contains TLS ClientHello")
+		VPRINT("packet contains TLS ClientHello\n");
 		// we need host only if hostlist is present
 		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false))
 		{
-			VPRINT("hostname: %s",Host)
+			VPRINT("hostname: %s\n",Host);
 			bHaveHost = true;
 			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
 		if (bBypass)
 		{
-			VPRINT("Not acting on this request")
+			VPRINT("Not acting on this request\n");
 		}
 		else
 		{
@@ -213,7 +213,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 					{
 						// length is checked in IsTLSClientHello and cannot exceed buffer size
 						if ((tpos-5)>=l) tpos=5+1;
-						VPRINT("making 2 TLS records at pos %zu",tpos)
+						VPRINT("making 2 TLS records at pos %zu\n",tpos);
 						memmove(segment+tpos+5,segment+tpos,*size-tpos);
 						segment[tpos] = segment[0];
 						segment[tpos+1] = segment[1];
@@ -229,7 +229,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 
 			if (spos && spos < *size)
 			{
-				VPRINT("split pos %zu",spos);
+				VPRINT("split pos %zu\n",spos);
 				*split_pos = spos;
 			}
 
@@ -242,7 +242,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		
 	if (bHaveHost && bBypass && !bHostExcluded && *params.hostlist_auto_filename)
 	{
-		DBGPRINT("tamper_out put hostname : %s", Host)
+		DBGPRINT("tamper_out put hostname : %s\n", Host);
 		if (ctrack->hostname) free(ctrack->hostname);
 		ctrack->hostname=strdup(Host);
 	}
@@ -260,7 +260,7 @@ static void auto_hostlist_reset_fail_counter(const char *hostname)
 		if (fail_counter)
 		{
 			HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
-			VPRINT("auto hostlist : %s : fail counter reset. website is working.", hostname);
+			VPRINT("auto hostlist : %s : fail counter reset. website is working.\n", hostname);
 			HOSTLIST_DEBUGLOG_APPEND("%s : fail counter reset. website is working.", hostname);
 		}
 	}
@@ -276,39 +276,39 @@ static void auto_hostlist_failed(const char *hostname)
 		fail_counter = HostFailPoolAdd(&params.hostlist_auto_fail_counters, hostname, params.hostlist_auto_fail_time);
 		if (!fail_counter)
 		{
-			fprintf(stderr, "HostFailPoolAdd: out of memory\n");
+			DLOG_ERR("HostFailPoolAdd: out of memory\n");
 			return;
 		}
 	}
 	fail_counter->counter++;
-	VPRINT("auto hostlist : %s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
+	VPRINT("auto hostlist : %s : fail counter %d/%d\n", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
 	HOSTLIST_DEBUGLOG_APPEND("%s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
 	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
 	{
-		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist", hostname);
+		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist\n", hostname);
 		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
 		
-		VPRINT("auto hostlist : rechecking %s to avoid duplicates", hostname);
+		VPRINT("auto hostlist : rechecking %s to avoid duplicates\n", hostname);
 		bool bExcluded=false;
 		if (!HostlistCheck(hostname, &bExcluded) && !bExcluded)
 		{
-			VPRINT("auto hostlist : adding %s", hostname);
+			VPRINT("auto hostlist : adding %s\n", hostname);
 			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
 			if (!StrPoolAddStr(&params.hostlist, hostname))
 			{
-				fprintf(stderr, "StrPoolAddStr out of memory\n");
+				DLOG_ERR("StrPoolAddStr out of memory\n");
 				return;
 			}
 			if (!append_to_list_file(params.hostlist_auto_filename, hostname))
 			{
-				perror("write to auto hostlist:");
+				DLOG_PERROR("write to auto hostlist:");
 				return;
 			}
 			params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
 		}
 		else
 		{
-			VPRINT("auto hostlist : NOT adding %s", hostname);
+			VPRINT("auto hostlist : NOT adding %s\n", hostname);
 			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
 		}
 	}
@@ -318,7 +318,7 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 {
 	bool bFail=false;
 
-	DBGPRINT("tamper_in hostname=%s", ctrack->hostname)
+	DBGPRINT("tamper_in hostname=%s\n", ctrack->hostname);
 
 	if (*params.hostlist_auto_filename)
 	{
@@ -328,20 +328,20 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 		{
 			if (IsHttpReply(segment,*size))
 			{
-				VPRINT("incoming HTTP reply detected for hostname %s", ctrack->hostname);
+				VPRINT("incoming HTTP reply detected for hostname %s\n", ctrack->hostname);
 				bFail = HttpReplyLooksLikeDPIRedirect(segment, *size, ctrack->hostname);
 				if (bFail)
 				{
-					VPRINT("redirect to another domain detected. possibly DPI redirect.")
+					VPRINT("redirect to another domain detected. possibly DPI redirect.\n");
 					HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
 				}
 				else
-					VPRINT("local or in-domain redirect detected. it's not a DPI redirect.")
+					VPRINT("local or in-domain redirect detected. it's not a DPI redirect.\n");
 			}
 			else
 			{
 				// received not http reply. do not monitor this connection anymore
-				VPRINT("incoming unknown HTTP data detected for hostname %s", ctrack->hostname);
+				VPRINT("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
 			}
 			if (bFail) auto_hostlist_failed(ctrack->hostname);
 
@@ -354,7 +354,7 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 
 void rst_in(t_ctrack *ctrack)
 {
-	DBGPRINT("rst_in hostname=%s", ctrack->hostname)
+	DBGPRINT("rst_in hostname=%s\n", ctrack->hostname);
 
 	if (!*params.hostlist_auto_filename) return;
 
@@ -362,14 +362,14 @@ void rst_in(t_ctrack *ctrack)
 
 	if (!ctrack->bTamperInCutoff && ctrack->hostname)
 	{
-		VPRINT("incoming RST detected for hostname %s", ctrack->hostname);
+		VPRINT("incoming RST detected for hostname %s\n", ctrack->hostname);
 		HOSTLIST_DEBUGLOG_APPEND("%s : incoming RST", ctrack->hostname);
 		auto_hostlist_failed(ctrack->hostname);
 	}
 }
 void hup_out(t_ctrack *ctrack)
 {
-	DBGPRINT("hup_out hostname=%s", ctrack->hostname)
+	DBGPRINT("hup_out hostname=%s\n", ctrack->hostname);
 
 	if (!*params.hostlist_auto_filename) return;
 
@@ -378,7 +378,7 @@ void hup_out(t_ctrack *ctrack)
 	if (!ctrack->bTamperInCutoff && ctrack->hostname)
 	{
 		// local leg dropped connection after first request. probably due to timeout.
-		VPRINT("local leg closed connection after first request (timeout ?). hostname: %s", ctrack->hostname);
+		VPRINT("local leg closed connection after first request (timeout ?). hostname: %s\n", ctrack->hostname);
 		HOSTLIST_DEBUGLOG_APPEND("%s : client closed connection without server reply", ctrack->hostname);
 		auto_hostlist_failed(ctrack->hostname);
 	}

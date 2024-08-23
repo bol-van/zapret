@@ -25,6 +25,8 @@ struct bind_s
 	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 };
 
+enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
+
 struct params_s
 {
 	struct bind_s binds[MAX_BINDS];
@@ -77,6 +79,8 @@ struct params_s
 	char connect_bind6_ifname[IF_NAMESIZE];
 
 	int debug;
+	enum log_target debug_target;
+	char debug_logfile[PATH_MAX];
 
 #if defined(BSD)
 	bool pf_enable;
@@ -88,18 +92,11 @@ struct params_s
 
 extern struct params_s params;
 
-#define _DBGPRINT(format, level, ...) { if (params.debug>=level) printf(format "\n", ##__VA_ARGS__); }
-#define VPRINT(format, ...) _DBGPRINT(format,1,##__VA_ARGS__)
-#define DBGPRINT(format, ...) _DBGPRINT(format,2,##__VA_ARGS__)
+int DLOG(const char *format, int level, ...);
+int DLOG_CONDUP(const char *format, ...);
+int DLOG_ERR(const char *format, ...);
+int DLOG_PERROR(const char *s);
+int HOSTLIST_DEBUGLOG_APPEND(const char *format, ...);
 
-#define LOG_APPEND(filename, format, ...) \
-{ \
-	FILE *F = fopen(filename,"at"); \
-	if (F) \
-	{ \
-		fprint_localtime(F); \
-		fprintf(F, " : " format "\n", ##__VA_ARGS__); \
-		fclose(F); \
-	} \
-}
-#define HOSTLIST_DEBUGLOG_APPEND(format, ...) if (*params.hostlist_auto_debuglog) LOG_APPEND(params.hostlist_auto_debuglog, format, ##__VA_ARGS__)
+#define VPRINT(format, ...) DLOG(format, 1, ##__VA_ARGS__)
+#define DBGPRINT(format, ...) DLOG(format, 2, ##__VA_ARGS__)

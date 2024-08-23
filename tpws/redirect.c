@@ -31,7 +31,7 @@ void redir_close(void)
 	{
 		close(redirector_fd);
 		redirector_fd = -1;
-		DBGPRINT("closed redirector");
+		DBGPRINT("closed redirector\n");
 	}
 }
 static bool redir_open_private(const char *fname, int flags)
@@ -40,10 +40,10 @@ static bool redir_open_private(const char *fname, int flags)
 	redirector_fd = open(fname, flags);
 	if (redirector_fd < 0)
 	{
-		perror("redir_openv_private");
+		DLOG_PERROR("redir_openv_private");
 		return false;
 	}
-	DBGPRINT("opened redirector %s",fname);
+	DBGPRINT("opened redirector %s\n",fname);
 	return true;
 }
 bool redir_init(void)
@@ -63,7 +63,7 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 		char s[48],s2[48];
 		*s=0; ntop46_port(accept_sa, s, sizeof(s));
 		*s2=0; ntop46_port((struct sockaddr *)orig_dst, s2, sizeof(s2));
-		DBGPRINT("destination_from_pf %s %s",s,s2);
+		DBGPRINT("destination_from_pf %s %s\n",s,s2);
 	}
 
 	saconvmapped(orig_dst);
@@ -79,12 +79,12 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 		char s[48],s2[48];
 		*s=0; ntop46_port(accept_sa, s, sizeof(s));
 		*s2=0; ntop46_port((struct sockaddr *)orig_dst, s2, sizeof(s2));
-		DBGPRINT("destination_from_pf (saconvmapped) %s %s",s,s2);
+		DBGPRINT("destination_from_pf (saconvmapped) %s %s\n",s,s2);
 	}
 
 	if (accept_sa->sa_family!=orig_dst->ss_family)
 	{
-		DBGPRINT("accept_sa and orig_dst sa_family mismatch : %d %d", accept_sa->sa_family, orig_dst->ss_family);
+		DBGPRINT("accept_sa and orig_dst sa_family mismatch : %d %d\n", accept_sa->sa_family, orig_dst->ss_family);
 		return false;
 	}
 
@@ -123,16 +123,16 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 		}
 		break;
 	default:
-		DBGPRINT("destination_from_pf : unexpected address family %d",orig_dst->ss_family);
+		DBGPRINT("destination_from_pf : unexpected address family %d\n",orig_dst->ss_family);
 		return false;
 	}
 
 	if (ioctl(redirector_fd, DIOCNATLOOK, &nl) < 0)
 	{
-		DBGPRINT("ioctl(DIOCNATLOOK) failed: %s",strerror(errno));
+		DLOG_PERROR("ioctl(DIOCNATLOOK) failed");
 		return false;
 	}
-	DBGPRINT("destination_from_pf : got orig dest addr from pf");
+	DBGPRINT("destination_from_pf : got orig dest addr from pf\n");
 
 	switch(nl.af)
 	{
@@ -155,7 +155,7 @@ static bool destination_from_pf(const struct sockaddr *accept_sa, struct sockadd
 		((struct sockaddr_in6*)orig_dst)->sin6_addr = nl.rdaddr.v6;
 		break;
 	default:
-		DBGPRINT("destination_from_pf : DIOCNATLOOK returned unexpected address family %d",nl.af);
+		DBGPRINT("destination_from_pf : DIOCNATLOOK returned unexpected address family %d\n",nl.af);
 		return false;
 	}
 
@@ -192,38 +192,38 @@ bool get_dest_addr(int sockfd, const struct sockaddr *accept_sa, struct sockaddr
 		r = getsockopt(sockfd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, (struct sockaddr*) orig_dst, &addrlen);
 	if (r<0)
 	{
-		DBGPRINT("both SO_ORIGINAL_DST and IP6T_SO_ORIGINAL_DST failed !");
+		DBGPRINT("both SO_ORIGINAL_DST and IP6T_SO_ORIGINAL_DST failed !\n");
 #endif
 		// TPROXY : socket is bound to original destination
 		r=getsockname(sockfd, (struct sockaddr*) orig_dst, &addrlen);
 		if (r<0)
 		{
-			perror("getsockname");
+			DLOG_PERROR("getsockname");
 			return false;
 		}
 		if (orig_dst->ss_family==AF_INET6)
 			((struct sockaddr_in6*)orig_dst)->sin6_scope_id=0; // or MacOS will not connect()
 #ifdef BSD
 		if (params.pf_enable && !destination_from_pf(accept_sa, orig_dst))
-			DBGPRINT("pf filter destination_from_pf failed");
+			DBGPRINT("pf filter destination_from_pf failed\n");
 #endif
 #ifdef __linux__
 	}
 #endif
 	if (saconvmapped(orig_dst))
-		DBGPRINT("Original destination : converted ipv6 mapped address to ipv4");
+		DBGPRINT("Original destination : converted ipv6 mapped address to ipv4\n");
 
 	if (params.debug)
 	{
 		if (orig_dst->ss_family == AF_INET)
 		{
 			inet_ntop(AF_INET, &(((struct sockaddr_in*) orig_dst)->sin_addr), orig_dst_str, INET_ADDRSTRLEN);
-			VPRINT("Original destination for socket fd=%d : %s:%d", sockfd,orig_dst_str, htons(((struct sockaddr_in*) orig_dst)->sin_port))
+			VPRINT("Original destination for socket fd=%d : %s:%d\n", sockfd,orig_dst_str, htons(((struct sockaddr_in*) orig_dst)->sin_port));
 		}
 		else if (orig_dst->ss_family == AF_INET6)
 		{
 			inet_ntop(AF_INET6,&(((struct sockaddr_in6*) orig_dst)->sin6_addr), orig_dst_str, INET6_ADDRSTRLEN);
-			VPRINT("Original destination for socket fd=%d : [%s]:%d", sockfd,orig_dst_str, htons(((struct sockaddr_in6*) orig_dst)->sin6_port))
+			VPRINT("Original destination for socket fd=%d : [%s]:%d\n", sockfd,orig_dst_str, htons(((struct sockaddr_in6*) orig_dst)->sin6_port));
 		}
 	}
 	return true;

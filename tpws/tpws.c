@@ -23,6 +23,7 @@
 #include <pwd.h>
 #include <sys/resource.h>
 #include <time.h>
+#include <syslog.h>
 
 #include "tpws.h"
 
@@ -78,17 +79,17 @@ static int8_t block_sigpipe(void)
 
 	//Get the old sigset, add SIGPIPE and update sigset
 	if (sigprocmask(SIG_BLOCK, NULL, &sigset) == -1) {
-		perror("sigprocmask (get)");
+		DLOG_PERROR("sigprocmask (get)");
 		return -1;
 	}
 
 	if (sigaddset(&sigset, SIGPIPE) == -1) {
-		perror("sigaddset");
+		DLOG_PERROR("sigaddset");
 		return -1;
 	}
 
 	if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
-		perror("sigprocmask (set)");
+		DLOG_PERROR("sigprocmask (set)");
 		return -1;
 	}
 
@@ -163,7 +164,8 @@ static void exithelp(void)
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
-		" --debug=0|1|2\t\t\t\t; 0(default)=silent 1=verbose 2=debug\n"
+		" --debug=0|1|2|syslog|@<filename>\t\t1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
+		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		"\nFILTER:\n"
 		" --hostlist=<filename>\t\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-exclude=<filename>\t\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
@@ -228,7 +230,7 @@ static void nextbind_clean(void)
 	params.binds_last++;
 	if (params.binds_last>=MAX_BINDS)
 	{
-		fprintf(stderr,"maximum of %d binds are supported\n",MAX_BINDS);
+		DLOG_ERR("maximum of %d binds are supported\n",MAX_BINDS);
 		exit_clean(1);
 	}
 }
@@ -236,7 +238,7 @@ static void checkbind_clean(void)
 {
 	if (params.binds_last<0)
 	{
-		fprintf(stderr,"start new bind with --bind-addr,--bind-iface*\n");
+		DLOG_ERR("start new bind with --bind-addr,--bind-iface*\n");
 		exit_clean(1);
 	}
 }
@@ -249,7 +251,7 @@ void save_default_ttl(void)
     	    params.ttl_default = get_default_ttl();
 	    if (!params.ttl_default)
 	    {
-		    fprintf(stderr, "could not get default ttl\n");
+		    DLOG_ERR("could not get default ttl\n");
 		    exit_clean(1);
 	    }
 	}
@@ -346,24 +348,25 @@ void parse_params(int argc, char *argv[])
 		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=41
 		{ "pidfile",required_argument,0,0 },// optidx=42
 		{ "debug",optional_argument,0,0 },// optidx=43
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=44
-		{ "local-sndbuf",required_argument,0,0 },// optidx=45
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=46
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=47
-		{ "socks",no_argument,0,0 },// optidx=48
-		{ "no-resolve",no_argument,0,0 },// optidx=49
-		{ "resolver-threads",required_argument,0,0 },// optidx=50
-		{ "skip-nodelay",no_argument,0,0 },// optidx=51
-		{ "tamper-start",required_argument,0,0 },// optidx=52
-		{ "tamper-cutoff",required_argument,0,0 },// optidx=53
-		{ "connect-bind-addr",required_argument,0,0 },// optidx=54
+		{ "debug-level",required_argument,0,0 },// optidx=44
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=45
+		{ "local-sndbuf",required_argument,0,0 },// optidx=46
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=47
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=48
+		{ "socks",no_argument,0,0 },// optidx=40
+		{ "no-resolve",no_argument,0,0 },// optidx=50
+		{ "resolver-threads",required_argument,0,0 },// optidx=51
+		{ "skip-nodelay",no_argument,0,0 },// optidx=52
+		{ "tamper-start",required_argument,0,0 },// optidx=53
+		{ "tamper-cutoff",required_argument,0,0 },// optidx=54
+		{ "connect-bind-addr",required_argument,0,0 },// optidx=55
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		{ "enable-pf",no_argument,0,0 },// optidx=55
+		{ "enable-pf",no_argument,0,0 },// optidx=56
 #elif defined(__linux__)
-		{ "mss",required_argument,0,0 },// optidx=55
-		{ "mss-pf",required_argument,0,0 },// optidx=56
+		{ "mss",required_argument,0,0 },// optidx=56
+		{ "mss-pf",required_argument,0,0 },// optidx=57
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },// optidx=57
+		{ "nosplice",no_argument,0,0 },// optidx=58
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -416,7 +419,7 @@ void parse_params(int argc, char *argv[])
 				params.binds[params.binds_last].bindll=unwanted;
 			else
 			{
-				fprintf(stderr, "invalid parameter in bind-linklocal : %s\n",optarg);
+				DLOG_ERR("invalid parameter in bind-linklocal : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
@@ -439,7 +442,7 @@ void parse_params(int argc, char *argv[])
 			i = atoi(optarg);
 			if (i <= 0 || i > 65535)
 			{
-				fprintf(stderr, "bad port number\n");
+				DLOG_ERR("bad port number\n");
 				exit_clean(1);
 			}
 			params.port = (uint16_t)i;
@@ -452,7 +455,7 @@ void parse_params(int argc, char *argv[])
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
 			{
-				fprintf(stderr, "non-existent username supplied\n");
+				DLOG_ERR("non-existent username supplied\n");
 				exit_clean(1);
 			}
 			params.uid = pwd->pw_uid;
@@ -465,7 +468,7 @@ void parse_params(int argc, char *argv[])
 			params.droproot = true;
 			if (sscanf(optarg,"%u:%u",&params.uid,&params.gid)<1)
 			{
-				fprintf(stderr, "--uid should be : uid[:gid]\n");
+				DLOG_ERR("--uid should be : uid[:gid]\n");
 				exit_clean(1);
 			}
 			break;
@@ -473,7 +476,7 @@ void parse_params(int argc, char *argv[])
 			params.maxconn = atoi(optarg);
 			if (params.maxconn <= 0 || params.maxconn > 10000)
 			{
-				fprintf(stderr, "bad maxconn\n");
+				DLOG_ERR("bad maxconn\n");
 				exit_clean(1);
 			}
 			break;
@@ -481,7 +484,7 @@ void parse_params(int argc, char *argv[])
 			params.maxfiles = atoi(optarg);
 			if (params.maxfiles < 0)
 			{
-				fprintf(stderr, "bad maxfiles\n");
+				DLOG_ERR("bad maxfiles\n");
 				exit_clean(1);
 			}
 			break;
@@ -489,7 +492,7 @@ void parse_params(int argc, char *argv[])
 			params.max_orphan_time = atoi(optarg);
 			if (params.max_orphan_time < 0)
 			{
-				fprintf(stderr, "bad max_orphan_time\n");
+				DLOG_ERR("bad max_orphan_time\n");
 				exit_clean(1);
 			}
 			break;
@@ -500,7 +503,7 @@ void parse_params(int argc, char *argv[])
 		case 18: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
-				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
+				DLOG_ERR("hostspell must be exactly 4 chars long\n");
 				exit_clean(1);
 			}
 			params.hostcase = true;
@@ -526,7 +529,7 @@ void parse_params(int argc, char *argv[])
 		case 23: /* split-http-req */
 			if (!parse_httpreqpos(optarg, &params.split_http_req))
 			{
-				fprintf(stderr, "Invalid argument for split-http-req\n");
+				DLOG_ERR("Invalid argument for split-http-req\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -534,7 +537,7 @@ void parse_params(int argc, char *argv[])
 		case 24: /* split-tls */
 			if (!parse_tlspos(optarg, &params.split_tls))
 			{
-				fprintf(stderr, "Invalid argument for split-tls\n");
+				DLOG_ERR("Invalid argument for split-tls\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -545,7 +548,7 @@ void parse_params(int argc, char *argv[])
 				params.split_pos = i;
 			else
 			{
-				fprintf(stderr, "Invalid argument for split-pos\n");
+				DLOG_ERR("Invalid argument for split-pos\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -560,7 +563,7 @@ void parse_params(int argc, char *argv[])
 				else if (!strcmp(optarg,"tls")) params.disorder_tls=true;
 				else
 				{
-					fprintf(stderr, "Invalid argument for disorder\n");
+					DLOG_ERR("Invalid argument for disorder\n");
 					exit_clean(1);
 				}
 			}
@@ -575,7 +578,7 @@ void parse_params(int argc, char *argv[])
 				else if (!strcmp(optarg,"tls")) params.oob_tls=true;
 				else
 				{
-					fprintf(stderr, "Invalid argument for oob\n");
+					DLOG_ERR("Invalid argument for oob\n");
 					exit_clean(1);
 				}
 			}
@@ -589,7 +592,7 @@ void parse_params(int argc, char *argv[])
 				if (l==1) params.oob_byte = (uint8_t)*optarg;
 				else if (l!=4 || sscanf(optarg,"0x%02X",&bt)!=1)
 				{
-					fprintf(stderr, "Invalid argument for oob-data\n");
+					DLOG_ERR("Invalid argument for oob-data\n");
 					exit_clean(1);
 				}
 				else params.oob_byte = (uint8_t)bt;
@@ -614,7 +617,7 @@ void parse_params(int argc, char *argv[])
 		case 34: /* tlsrec */
 			if (!parse_tlspos(optarg, &params.tlsrec))
 			{
-				fprintf(stderr, "Invalid argument for tlsrec\n");
+				DLOG_ERR("Invalid argument for tlsrec\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -624,7 +627,7 @@ void parse_params(int argc, char *argv[])
 				params.tlsrec = tlspos_pos;
 			else
 			{
-				fprintf(stderr, "Invalid argument for tlsrec-pos\n");
+				DLOG_ERR("Invalid argument for tlsrec-pos\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -632,7 +635,7 @@ void parse_params(int argc, char *argv[])
 		case 36: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
-				fprintf(stderr, "strlist_add failed\n");
+				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -640,7 +643,7 @@ void parse_params(int argc, char *argv[])
 		case 37: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
-				fprintf(stderr, "strlist_add failed\n");
+				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -648,29 +651,29 @@ void parse_params(int argc, char *argv[])
 		case 38: /* hostlist-auto */
 			if (*params.hostlist_auto_filename)
 			{
-				fprintf(stderr, "only one auto hostlist is supported\n");
+				DLOG_ERR("only one auto hostlist is supported\n");
 				exit_clean(1);
 			}
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
 				{
-					fprintf(stderr, "cannot create %s\n", optarg);
+					DLOG_ERR("cannot create %s\n", optarg);
 					exit_clean(1);
 				}
 				bool bGzip = is_gzip(F);
 				fclose(F);
 				if (bGzip)
 				{
-					fprintf(stderr, "gzipped auto hostlists are not supported\n");
+					DLOG_ERR("gzipped auto hostlists are not supported\n");
 					exit_clean(1);
 				}
 				if (params.droproot && chown(optarg, params.uid, -1))
-					fprintf(stderr, "could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
+					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
 			}
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
-				fprintf(stderr, "strlist_add failed\n");
+				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
 			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
@@ -681,7 +684,7 @@ void parse_params(int argc, char *argv[])
 			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
 			{
-				fprintf(stderr, "auto hostlist fail threshold must be within 1..20\n");
+				DLOG_ERR("auto hostlist fail threshold must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
@@ -689,7 +692,7 @@ void parse_params(int argc, char *argv[])
 			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_time<1)
 			{
-				fprintf(stderr, "auto hostlist fail time is not valid\n");
+				DLOG_ERR("auto hostlist fail time is not valid\n");
 				exit_clean(1);
 			}
 			break;
@@ -698,12 +701,12 @@ void parse_params(int argc, char *argv[])
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
 				{
-					fprintf(stderr, "cannot create %s\n", optarg);
+					DLOG_ERR("cannot create %s\n", optarg);
 					exit_clean(1);
 				}
 				fclose(F);
 				if (params.droproot && chown(optarg, params.uid, -1))
-					fprintf(stderr, "could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
+					DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
 				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
@@ -712,55 +715,93 @@ void parse_params(int argc, char *argv[])
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 43:
-			params.debug = optarg ? atoi(optarg) : 1;
+		case 43: /* debug */
+			if (optarg)
+			{
+				if (*optarg=='@')
+				{
+					strncpy(params.debug_logfile,optarg+1,sizeof(params.debug_logfile));
+					params.debug_logfile[sizeof(params.debug_logfile)-1] = 0;
+					FILE *F = fopen(params.debug_logfile,"wt");
+					if (!F)
+					{
+						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
+						exit_clean(1);
+					}
+#ifndef __CYGWIN__
+					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
+						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
+#endif
+					params.debug = 1;
+					params.debug_target = LOG_TARGET_FILE;
+				}
+				else if (!strcmp(optarg,"syslog"))
+				{
+					params.debug = 1;
+					params.debug_target = LOG_TARGET_SYSLOG;
+					openlog("tpws",LOG_PID,LOG_USER);
+				}
+				else
+				{
+					params.debug = atoi(optarg);
+					params.debug_target = LOG_TARGET_CONSOLE;
+				}
+			}
+			else
+			{
+				params.debug = 1;
+				params.debug_target = LOG_TARGET_CONSOLE;
+			}
 			break;
-		case 44: /* local-rcvbuf */
+		case 44: /* debug-level */
+			params.debug = atoi(optarg);
+			break;
+		case 45: /* local-rcvbuf */
 #ifdef __linux__
 			params.local_rcvbuf = atoi(optarg)/2;
 #else
 			params.local_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 45: /* local-sndbuf */
+		case 46: /* local-sndbuf */
 #ifdef __linux__
 			params.local_sndbuf = atoi(optarg)/2;
 #else
 			params.local_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 46: /* remote-rcvbuf */
+		case 47: /* remote-rcvbuf */
 #ifdef __linux__
 			params.remote_rcvbuf = atoi(optarg)/2;
 #else
 			params.remote_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 47: /* remote-sndbuf */
+		case 48: /* remote-sndbuf */
 #ifdef __linux__
 			params.remote_sndbuf = atoi(optarg)/2;
 #else
 			params.remote_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 48: /* socks */
+		case 49: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 49: /* no-resolve */
+		case 50: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 50: /* resolver-threads */
+		case 51: /* resolver-threads */
 			params.resolver_threads = atoi(optarg);
 			if (params.resolver_threads<1 || params.resolver_threads>300)
 			{
-				fprintf(stderr, "resolver-threads must be within 1..300\n");
+				DLOG_ERR("resolver-threads must be within 1..300\n");
 				exit_clean(1);
 			}
 			break;
-		case 51: /* skip-nodelay */
+		case 52: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
-		case 52: /* tamper-start */
+		case 53: /* tamper-start */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -773,7 +814,7 @@ void parse_params(int argc, char *argv[])
 				params.tamper_start = atoi(p);
 			}
 			break;
-		case 53: /* tamper-cutoff */
+		case 54: /* tamper-cutoff */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -786,7 +827,7 @@ void parse_params(int argc, char *argv[])
 				params.tamper_cutoff = atoi(p);
 			}
 			break;
-		case 54: /* connect-bind-addr */
+		case 55: /* connect-bind-addr */
 			{
 				char *p = strchr(optarg,'%');
 				if (p) *p++=0;
@@ -807,34 +848,34 @@ void parse_params(int argc, char *argv[])
 				}
 				else
 				{
-					fprintf(stderr, "bad bind addr : %s\n", optarg);
+					DLOG_ERR("bad bind addr : %s\n", optarg);
 					exit_clean(1);
 				}
 			}
 			break;
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
-		case 55: /* enable-pf */
+		case 56: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__)
-		case 55: /* mss */
+		case 56: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			params.mss = atoi(optarg);
 			if (params.mss<88 || params.mss>32767)
 			{
-				fprintf(stderr, "Invalid value for MSS. Linux accepts MSS 88-32767.\n");
+				DLOG_ERR("Invalid value for MSS. Linux accepts MSS 88-32767.\n");
 				exit_clean(1);
 			}
 			break;
-		case 56: /* mss-pf */
+		case 57: /* mss-pf */
 			if (!pf_parse(optarg,&params.mss_pf))
 			{
-				fprintf(stderr, "Invalid MSS port filter.\n");
+				DLOG_ERR("Invalid MSS port filter.\n");
 				exit_clean(1);
 			}
 			break;
 #ifdef SPLICE_PRESENT
-		case 57: /* nosplice */
+		case 58: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
@@ -843,7 +884,7 @@ void parse_params(int argc, char *argv[])
 	}
 	if (!params.bind_wait_only && !params.port)
 	{
-		fprintf(stderr, "Need port number\n");
+		DLOG_ERR("Need port number\n");
 		exit_clean(1);
 	}
 	if (params.binds_last<=0)
@@ -852,7 +893,7 @@ void parse_params(int argc, char *argv[])
 	}
 	if (params.skip_nodelay && (params.split_http_req || params.split_pos))
 	{
-		fprintf(stderr, "Cannot split with --skip-nodelay\n");
+		DLOG_ERR("Cannot split with --skip-nodelay\n");
 		exit_clean(1);
 	}
 	if (!params.resolver_threads) params.resolver_threads = 5 + params.maxconn/50;
@@ -862,13 +903,13 @@ void parse_params(int argc, char *argv[])
 	if (*params.hostlist_auto_filename) params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
 	if (!LoadIncludeHostLists())
 	{
-		fprintf(stderr, "Include hostlist load failed\n");
+		DLOG_ERR("Include hostlist load failed\n");
 		exit_clean(1);
 	}
 	if (*params.hostlist_auto_filename) NonEmptyHostlist(&params.hostlist);
 	if (!LoadExcludeHostLists())
 	{
-		fprintf(stderr, "Exclude hostlist load failed\n");
+		DLOG_ERR("Exclude hostlist load failed\n");
 		exit_clean(1);
 	}
 }
@@ -991,24 +1032,24 @@ static bool set_ulimit(void)
 	else
 		fdmax = params.maxfiles;
 	fdmin_system = fdmax + 4096;
-	DBGPRINT("set_ulimit : fdmax=%ju fdmin_system=%ju",(uintmax_t)fdmax,(uintmax_t)fdmin_system)
+	DBGPRINT("set_ulimit : fdmax=%ju fdmin_system=%ju\n",(uintmax_t)fdmax,(uintmax_t)fdmin_system);
 
 	if (!read_system_maxfiles(&cur_lim))
 		return false;
-	DBGPRINT("set_ulimit : current system file-max=%ju",(uintmax_t)cur_lim)
+	DBGPRINT("set_ulimit : current system file-max=%ju\n",(uintmax_t)cur_lim);
 	if (cur_lim<fdmin_system)
 	{
-		DBGPRINT("set_ulimit : system fd limit is too low. trying to increase to %ju",(uintmax_t)fdmin_system)
+		DBGPRINT("set_ulimit : system fd limit is too low. trying to increase to %ju\n",(uintmax_t)fdmin_system);
 		if (!write_system_maxfiles(fdmin_system))
 		{
-			fprintf(stderr,"could not set system-wide max file descriptors\n");
+			DLOG_ERR("could not set system-wide max file descriptors\n");
 			return false;
 		}
 	}
 
 	struct rlimit rlim = {fdmax,fdmax};
 	n=setrlimit(RLIMIT_NOFILE, &rlim);
-	if (n==-1) perror("setrlimit");
+	if (n==-1) DLOG_PERROR("setrlimit");
 	return n!=-1;
 }
 
@@ -1033,7 +1074,7 @@ int main(int argc, char *argv[])
 
 	if (*params.pidfile && !writepid(params.pidfile))
 	{
-		fprintf(stderr,"could not write pidfile\n");
+		DLOG_ERR("could not write pidfile\n");
 		goto exiterr;
 	}
 
@@ -1042,7 +1083,7 @@ int main(int argc, char *argv[])
 
 	for(i=0;i<=params.binds_last;i++)
 	{
-		VPRINT("Prepare bind %d : addr=%s iface=%s v6=%u link_local=%s wait_ifup=%d wait_ip=%d wait_ip_ll=%d",i,
+		VPRINT("Prepare bind %d : addr=%s iface=%s v6=%u link_local=%s wait_ifup=%d wait_ip=%d wait_ip_ll=%d\n",i,
 			params.binds[i].bindaddr,params.binds[i].bindiface,params.binds[i].bind_if6,bindll_s[params.binds[i].bindll],
 			params.binds[i].bind_wait_ifup,params.binds[i].bind_wait_ip,params.binds[i].bind_wait_ip_ll);
 		if_index=0;
@@ -1053,7 +1094,7 @@ int main(int argc, char *argv[])
 				int sec=0;
 				if (!is_interface_online(params.binds[i].bindiface))
 				{
-					printf("waiting for ifup of %s for up to %d second(s)...\n",params.binds[i].bindiface,params.binds[i].bind_wait_ifup);
+					DLOG_CONDUP("waiting for ifup of %s for up to %d second(s)...\n",params.binds[i].bindiface,params.binds[i].bind_wait_ifup);
 					do
 					{
 						sleep(1);
@@ -1062,14 +1103,14 @@ int main(int argc, char *argv[])
 					while (!is_interface_online(params.binds[i].bindiface) && sec<params.binds[i].bind_wait_ifup);
 					if (sec>=params.binds[i].bind_wait_ifup)
 					{
-						printf("wait timed out\n");
+						DLOG_CONDUP("wait timed out\n");
 						goto exiterr;
 					}
 				}
 			}
 			if (!(if_index = if_nametoindex(params.binds[i].bindiface)) && params.binds[i].bind_wait_ip<=0)
 			{
-				printf("bad iface %s\n",params.binds[i].bindiface);
+				DLOG_CONDUP("bad iface %s\n",params.binds[i].bindiface);
 				goto exiterr;
 			}
 		}
@@ -1087,7 +1128,7 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				printf("bad bind addr : %s\n", params.binds[i].bindaddr);
+				DLOG_CONDUP("bad bind addr : %s\n", params.binds[i].bindaddr);
 				goto exiterr;
 			}
 		}
@@ -1101,13 +1142,13 @@ int main(int argc, char *argv[])
 
 				if (params.binds[i].bind_wait_ip > 0)
 				{
-					printf("waiting for ip on %s for up to %d second(s)...\n", *params.binds[i].bindiface ? params.binds[i].bindiface : "<any>", params.binds[i].bind_wait_ip);
+					DLOG_CONDUP("waiting for ip on %s for up to %d second(s)...\n", *params.binds[i].bindiface ? params.binds[i].bindiface : "<any>", params.binds[i].bind_wait_ip);
 					if (params.binds[i].bind_wait_ip_ll>0)
 					{
 						if (params.binds[i].bindll==prefer)
-							printf("during the first %d second(s) accepting only link locals...\n", params.binds[i].bind_wait_ip_ll);
+							DLOG_CONDUP("during the first %d second(s) accepting only link locals...\n", params.binds[i].bind_wait_ip_ll);
 						else if (params.binds[i].bindll==unwanted)
-							printf("during the first %d second(s) accepting only ipv6 globals...\n", params.binds[i].bind_wait_ip_ll);
+							DLOG_CONDUP("during the first %d second(s) accepting only ipv6 globals...\n", params.binds[i].bind_wait_ip_ll);
 					}
 				}
 
@@ -1120,9 +1161,9 @@ int main(int argc, char *argv[])
 					if (sec && sec==params.binds[i].bind_wait_ip_ll)
 					{
 						if (params.binds[i].bindll==prefer)
-							printf("link local address wait timeout. now accepting globals\n");
+							DLOG_CONDUP("link local address wait timeout. now accepting globals\n");
 						else if (params.binds[i].bindll==unwanted)
-							printf("global ipv6 address wait timeout. now accepting link locals\n");
+							DLOG_CONDUP("global ipv6 address wait timeout. now accepting link locals\n");
 					}
 					found = find_listen_addr(&list[i].salisten,params.binds[i].bindiface,params.binds[i].bind_if6,bindll_1,&if_index);
 					if (found) break;
@@ -1136,7 +1177,7 @@ int main(int argc, char *argv[])
 
 				if (!found)
 				{
-					printf("suitable ip address not found\n");
+					DLOG_CONDUP("suitable ip address not found\n");
 					goto exiterr;
 				}
 				list[i].bind_wait_ip_left = params.binds[i].bind_wait_ip - sec;
@@ -1164,14 +1205,14 @@ int main(int argc, char *argv[])
 
 	if (params.bind_wait_only)
 	{
-		printf("bind wait condition satisfied\n");
+		DLOG_CONDUP("bind wait condition satisfied\n");
 		exit_v = 0;
 		goto exiterr;
 	}
 
 	if (params.proxy_type==CONN_TYPE_TRANSPARENT && !redir_init())
 	{
-		fprintf(stderr,"could not initialize redirector !!!\n");
+		DLOG_ERR("could not initialize redirector !!!\n");
 		goto exiterr;
 	}
 
@@ -1180,11 +1221,11 @@ int main(int argc, char *argv[])
 		if (params.debug)
 		{
 			ntop46_port((struct sockaddr *)&list[i].salisten, ip_port, sizeof(ip_port));
-			VPRINT("Binding %d to %s",i,ip_port);
+			VPRINT("Binding %d to %s\n",i,ip_port);
 		}
 
 		if ((listen_fd[i] = socket(list[i].salisten.ss_family, SOCK_STREAM, 0)) == -1) {
-			perror("socket");
+			DLOG_PERROR("socket");
 			goto exiterr;
 		}
 
@@ -1192,14 +1233,14 @@ int main(int argc, char *argv[])
 // in OpenBSD always IPV6_ONLY for wildcard sockets
 		if ((list[i].salisten.ss_family == AF_INET6) && setsockopt(listen_fd[i], IPPROTO_IPV6, IPV6_V6ONLY, &list[i].ipv6_only, sizeof(int)) == -1)
 		{
-			perror("setsockopt (IPV6_ONLY)");
+			DLOG_PERROR("setsockopt (IPV6_ONLY)");
 			goto exiterr;
 		}
 #endif
 
 		if (setsockopt(listen_fd[i], SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
 		{
-			perror("setsockopt (SO_REUSEADDR)");
+			DLOG_PERROR("setsockopt (SO_REUSEADDR)");
 			goto exiterr;
 		}
 	
@@ -1210,13 +1251,13 @@ int main(int argc, char *argv[])
 		#ifdef __linux__
 			if (setsockopt(listen_fd[i], SOL_IP, IP_TRANSPARENT, &yes, sizeof(yes)) == -1)
 			{
-				perror("setsockopt (IP_TRANSPARENT)");
+				DLOG_PERROR("setsockopt (IP_TRANSPARENT)");
 				goto exiterr;
 			}
 		#elif defined(BSD) && defined(SO_BINDANY)
 			if (setsockopt(listen_fd[i], SOL_SOCKET, SO_BINDANY, &yes, sizeof(yes)) == -1)
 			{
-				perror("setsockopt (SO_BINDANY)");
+				DLOG_PERROR("setsockopt (SO_BINDANY)");
 				goto exiterr;
 			}
 		#endif
@@ -1249,21 +1290,21 @@ int main(int argc, char *argv[])
 					if (!bBindBug)
 					{
 						ntop46_port((struct sockaddr *)&list[i].salisten, ip_port, sizeof(ip_port));
-						printf("address %s is not available. will retry for %d sec\n",ip_port,list[i].bind_wait_ip_left);
+						DLOG_CONDUP("address %s is not available. will retry for %d sec\n",ip_port,list[i].bind_wait_ip_left);
 						bBindBug=true;
 					}
 					sleep(1);
 					list[i].bind_wait_ip_left--;
 					continue;
 				}
-				perror("bind");
+				DLOG_PERROR("bind");
 				goto exiterr;
 			}
 			break;
 		}
 		if (listen(listen_fd[i], BACKLOG) == -1)
 		{
-			perror("listen");
+			DLOG_PERROR("listen");
 			goto exiterr;
 		}
 	}
@@ -1278,19 +1319,19 @@ int main(int argc, char *argv[])
 	//example a socket) is closed during splice(). I would rather have splice()
 	//fail and return -1, so blocking SIGPIPE.
 	if (block_sigpipe() == -1) {
-		fprintf(stderr, "Could not block SIGPIPE signal\n");
+		DLOG_ERR("Could not block SIGPIPE signal\n");
 		goto exiterr;
 	}
 
-	printf(params.proxy_type==CONN_TYPE_SOCKS ? "socks mode\n" : "transparent proxy mode\n");
-	if (!params.tamper) printf("TCP proxy mode (no tampering)\n");
+	DLOG_CONDUP(params.proxy_type==CONN_TYPE_SOCKS ? "socks mode\n" : "transparent proxy mode\n");
+	if (!params.tamper) DLOG_CONDUP("TCP proxy mode (no tampering)\n");
 
 	signal(SIGHUP, onhup); 
 	signal(SIGUSR2, onusr2);
 
 	retval = event_loop(listen_fd,params.binds_last+1);
 	exit_v = retval < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
-	printf("Exiting\n");
+	DLOG_CONDUP("Exiting\n");
 	
 exiterr:
 	redir_close();

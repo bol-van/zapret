@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 
 #include "resolver.h"
+#include "params.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -74,7 +76,7 @@ static void *resolver_thread(void *arg)
 		{
 			if (errno!=EINTR)
 			{
-				perror("sem_wait (resolver_thread)");
+				DLOG_PERROR("sem_wait (resolver_thread)");
 				break; // fatal err
 			}
 		}
@@ -112,13 +114,13 @@ static void *resolver_thread(void *arg)
 				if (wr<0)
 				{
 					free(ri);
-					perror("write resolve_pipe");
+					DLOG_PERROR("write resolve_pipe");
 				}
 				else if (wr!=sizeof(void*))
 				{
 					// partial pointer write is FATAL. in any case it will cause pointer corruption and coredump
 					free(ri);
-					fprintf(stderr,"write resolve_pipe : not full write\n");
+					DLOG_ERR("write resolve_pipe : not full write\n");
 					exit(1000);
 				}
 				pthread_sigmask(SIG_UNBLOCK, &signal_mask, NULL);
@@ -181,7 +183,7 @@ bool resolver_init(int threads, int fd_signal_pipe)
 	resolver.sem = sem_open(sn,O_CREAT,0600,0);
 	if (resolver.sem==SEM_FAILED)
 	{
-		perror("sem_open");
+		DLOG_PERROR("sem_open");
 		goto ex;
 	}
 	// unlink immediately to remove tails
@@ -189,7 +191,7 @@ bool resolver_init(int threads, int fd_signal_pipe)
 #else
 	if (sem_init(&resolver._sem,0,0)==-1)
 	{	
-		perror("sem_init");
+		DLOG_PERROR("sem_init");
 		goto ex;
 	}
 	resolver.sem = &resolver._sem;
@@ -252,7 +254,7 @@ struct resolve_item *resolver_queue(const char *dom, uint16_t port, void *ptr)
 	rlist_unlock;
 	if (sem_post(resolver.sem)<0)
 	{
-		perror("resolver_queue sem_post");
+		DLOG_PERROR("resolver_queue sem_post");
 		free(ri);
 		return NULL;
 	}

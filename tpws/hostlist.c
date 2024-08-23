@@ -31,11 +31,11 @@ bool AppendHostList(strpool **hostlist, char *filename)
 	FILE *F;
 	int r;
 
-	printf("Loading hostlist %s\n",filename);
+	DLOG_CONDUP("Loading hostlist %s\n",filename);
 
 	if (!(F = fopen(filename, "rb")))
 	{
-		fprintf(stderr, "Could not open %s\n", filename);
+		DLOG_ERR("Could not open %s\n", filename);
 		return false;
 	}
 
@@ -45,7 +45,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 		fclose(F);
 		if (r==Z_OK)
 		{
-			printf("zlib compression detected. uncompressed size : %zu\n", zsize);
+			DLOG_CONDUP("zlib compression detected. uncompressed size : %zu\n", zsize);
 			
 			p = zbuf;
 			e = zbuf + zsize;
@@ -54,7 +54,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 				if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
 				if (!addpool(hostlist,&p,e))
 				{
-					fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
+					DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 					free(zbuf);
 					return false;
 				}
@@ -64,13 +64,13 @@ bool AppendHostList(strpool **hostlist, char *filename)
 		}
 		else
 		{
-			fprintf(stderr, "zlib decompression failed : result %d\n",r);
+			DLOG_ERR("zlib decompression failed : result %d\n",r);
 			return false;
 		}
 	}
 	else
 	{
-		printf("loading plain text list\n");
+		DLOG_CONDUP("loading plain text list\n");
 		
 		while (fgets(s, 256, F))
 		{
@@ -78,7 +78,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 			if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
 			if (!addpool(hostlist,&p,p+strlen(p)))
 			{
-				fprintf(stderr, "Not enough memory to store host list : %s\n", filename);
+				DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 				fclose(F);
 				return false;
 			}
@@ -87,7 +87,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 		fclose(F);
 	}
 
-	printf("Loaded %d hosts from %s\n", ct, filename);
+	DLOG_CONDUP("Loaded %d hosts from %s\n", ct, filename);
 	return true;
 }
 
@@ -124,7 +124,7 @@ bool SearchHostList(strpool *hostlist, const char *host)
 		while (p)
 		{
 			bInHostList = StrPoolCheckStr(hostlist, p);
-			if (params.debug) printf("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
+			VPRINT("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
 			if (bInHostList) return true;
 			p = strchr(p, '.');
 			if (p) p++;
@@ -139,7 +139,7 @@ static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const c
 	if (excluded) *excluded = false;
 	if (hostlist_exclude)
 	{
-		if (params.debug) printf("Checking exclude hostlist\n");
+		VPRINT("Checking exclude hostlist\n");
 		if (SearchHostList(hostlist_exclude, host))
 		{
 			if (excluded) *excluded = true;
@@ -148,7 +148,7 @@ static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const c
 	}
 	if (hostlist)
 	{
-		if (params.debug) printf("Checking include hostlist\n");
+		VPRINT("Checking include hostlist\n");
 		return SearchHostList(hostlist, host);
 	}
 	return true;
@@ -162,7 +162,7 @@ bool HostlistCheck(const char *host, bool *excluded)
 		time_t t = file_mod_time(params.hostlist_auto_filename);
 		if (t!=params.hostlist_auto_mod_time)
 		{
-			printf("Autohostlist was modified by another process. Reloading include hostslist.\n");
+			DLOG_CONDUP("Autohostlist was modified by another process. Reloading include hostslist.\n");
 			if (!LoadIncludeHostLists())
 			{
 				// what will we do without hostlist ?? sure, gonna die

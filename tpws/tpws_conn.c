@@ -40,7 +40,7 @@ static void count_legs(struct tailhead *conn_list)
 */
 static void print_legs(void)
 {
-	VPRINT("Legs : local:%d remote:%d", legs_local, legs_remote)
+	VPRINT("Legs : local:%d remote:%d\n", legs_local, legs_remote);
 }
 
 
@@ -99,17 +99,17 @@ ssize_t send_with_ttl(int fd, const void *buf, size_t len, int flags, int ttl)
 
 	if (ttl)
 	{
-		DBGPRINT("send_with_ttl %d fd=%d",ttl,fd);
+		DBGPRINT("send_with_ttl %d fd=%d\n",ttl,fd);
 		if (!set_ttl_hl(fd, ttl))
-			//fprintf(stderr,"could not set ttl %d to fd=%d\n",ttl,fd);
-			fprintf(stderr,"could not set ttl %d to fd=%d\n",ttl,fd);
+			//DLOG_ERR("could not set ttl %d to fd=%d\n",ttl,fd);
+			DLOG_ERR("could not set ttl %d to fd=%d\n",ttl,fd);
 	}
 	wr = send(fd, buf, len, flags);
 	if (ttl)
 	{
 		int e=errno;
 		if (!set_ttl_hl(fd, params.ttl_default))
-			fprintf(stderr,"could not set ttl %d to fd=%d\n",params.ttl_default,fd);
+			DLOG_ERR("could not set ttl %d to fd=%d\n",params.ttl_default,fd);
 		errno=e;
 	}
 	return wr;
@@ -120,13 +120,13 @@ static bool send_buffer_create(send_buffer_t *sb, const void *data, size_t len, 
 {
 	if (sb->data)
 	{
-		fprintf(stderr,"FATAL : send_buffer_create but buffer is not empty\n");
+		DLOG_ERR("FATAL : send_buffer_create but buffer is not empty\n");
 		exit(1);
 	}
 	sb->data = malloc(len + extra_bytes);
 	if (!sb->data)
 	{
-		DBGPRINT("send_buffer_create failed. errno=%d",errno)
+		DBGPRINT("send_buffer_create failed\n");
 		return false;
 	}
 	if (data) memcpy(sb->data,data,len);
@@ -144,12 +144,12 @@ static bool send_buffer_realloc(send_buffer_t *sb, size_t extra_bytes)
 		if (p)
 		{
 			sb->data = p;
-			DBGPRINT("reallocated send_buffer from %zd to %zd", sb->len, sb->len + extra_bytes)
+			DBGPRINT("reallocated send_buffer from %zd to %zd\n", sb->len, sb->len + extra_bytes);
 			return true;
 		}
 		else
 		{
-			DBGPRINT("failed to realloc send_buffer from %zd to %zd", sb->len, sb->len + extra_bytes)
+			DBGPRINT("failed to realloc send_buffer from %zd to %zd\n", sb->len, sb->len + extra_bytes);
 		}
 	}
 	return false;
@@ -188,7 +188,7 @@ static ssize_t send_buffer_send(send_buffer_t *sb, int fd)
 	ssize_t wr;
 
 	wr = send_with_ttl(fd, sb->data + sb->pos, sb->len - sb->pos, sb->flags, sb->ttl);
-	DBGPRINT("send_buffer_send len=%zu pos=%zu wr=%zd err=%d",sb->len,sb->pos,wr,errno)
+	DBGPRINT("send_buffer_send len=%zu pos=%zu wr=%zd err=%d\n",sb->len,sb->pos,wr,errno);
 	if (wr>0)
 	{
 		sb->pos += wr;
@@ -210,7 +210,7 @@ static ssize_t send_buffers_send(send_buffer_t *sb_array, int count, int fd, siz
 		if (send_buffer_present(sb_array+i))
 		{
 			wr = send_buffer_send(sb_array+i, fd);
-			DBGPRINT("send_buffers_send(%d) wr=%zd err=%d",i,wr,errno)
+			DBGPRINT("send_buffers_send(%d) wr=%zd err=%d\n",i,wr,errno);
 			if (wr<0)
 			{
 				if (real_wr) *real_wr = twr;
@@ -285,25 +285,25 @@ static void dbgprint_socket_buffers(int fd)
 		socklen_t sz;
 		sz=sizeof(int);
 		if (!getsockopt(fd,SOL_SOCKET,SO_RCVBUF,&v,&sz))
-			DBGPRINT("fd=%d SO_RCVBUF=%d",fd,v)
+			DBGPRINT("fd=%d SO_RCVBUF=%d\n",fd,v);
 		sz=sizeof(int);
 		if (!getsockopt(fd,SOL_SOCKET,SO_SNDBUF,&v,&sz))
-			DBGPRINT("fd=%d SO_SNDBUF=%d",fd,v)
+			DBGPRINT("fd=%d SO_SNDBUF=%d\n",fd,v);
 	}
 }
 
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
 {
-	DBGPRINT("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d",fd,rcvbuf,sndbuf)
+	DBGPRINT("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n",fd,rcvbuf,sndbuf);
 	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_RCVBUF)");
+		DLOG_PERROR("setsockopt (SO_RCVBUF)");
 		close(fd);
 		return false;
 	}
 	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) <0)
 	{
-		perror("setsockopt (SO_SNDBUF)");
+		DLOG_PERROR("setsockopt (SO_SNDBUF)");
 		close(fd);
 		return false;
 	}
@@ -324,7 +324,7 @@ static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)
 			{
 				conn->partner->socks_state=S_TCP;
 				bres = socks_send_rep_errno(conn->partner->socks_ver,conn->partner->fd,sock_err);
-				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d",bres,sock_err,conn->fd,conn->partner->fd)
+				DBGPRINT("socks connection acknowledgement. bres=%d remote_errn=%d remote_fd=%d local_fd=%d\n",bres,sock_err,conn->fd,conn->partner->fd);
 			}
 			break;
 	}
@@ -341,20 +341,20 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 	
  	if((remote_fd = socket(remote_addr->sa_family, SOCK_STREAM, 0)) < 0)
  	{
-		perror("socket (connect_remote)");
+		DLOG_PERROR("socket (connect_remote)");
 		return -1;
 	}
 	// Use NONBLOCK to avoid slow connects affecting the performance of other connections
 	// separate fcntl call to comply with macos
 	if (fcntl(remote_fd, F_SETFL, O_NONBLOCK)<0)
 	{
-		perror("socket set O_NONBLOCK (connect_remote)");
+		DLOG_PERROR("socket set O_NONBLOCK (connect_remote)");
 		close(remote_fd);
 		return -1;
 	}
 	if (setsockopt(remote_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
 	{
-		perror("setsockopt (SO_REUSEADDR, connect_remote)");
+		DLOG_PERROR("setsockopt (SO_REUSEADDR, connect_remote)");
 		close(remote_fd);
 		return -1;
 	}
@@ -362,13 +362,13 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 		return -1;
 	if (!set_keepalive(remote_fd))
 	{
-		perror("set_keepalive");
+		DLOG_PERROR("set_keepalive");
 		close(remote_fd);
 		return -1;
 	}
 	if (setsockopt(remote_fd, IPPROTO_TCP, TCP_NODELAY, params.skip_nodelay ? &no : &yes, sizeof(int)) <0)
 	{
-		perror("setsockopt (TCP_NODELAY, connect_remote)");
+		DLOG_PERROR("setsockopt (TCP_NODELAY, connect_remote)");
 		close(remote_fd);
 		return -1;
 	}
@@ -377,17 +377,17 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 		uint16_t port = saport(remote_addr);
 		if (pf_in_range(port,&params.mss_pf))
 		{
-			VPRINT("Setting MSS %d",params.mss)
+			VPRINT("Setting MSS %d\n",params.mss);
 			if (setsockopt(remote_fd, IPPROTO_TCP, TCP_MAXSEG, &params.mss, sizeof(int)) <0)
 			{
-				perror("setsockopt (TCP_MAXSEG, connect_remote)");
+				DLOG_PERROR("setsockopt (TCP_MAXSEG, connect_remote)");
 				close(remote_fd);
 				return -1;
 			}
 		}
 		else
 		{
-			VPRINT("Not setting MSS. Port %u is out of MSS port range.",port)
+			VPRINT("Not setting MSS. Port %u is out of MSS port range.\n",port);
 		}
 	}
 
@@ -396,7 +396,7 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 	{
 		if (bind(remote_fd, (struct sockaddr *)&params.connect_bind4, sizeof(struct sockaddr_in)) == -1)
 		{
-			perror("bind on connect");
+			DLOG_PERROR("bind on connect");
 			close(remote_fd);
 			return -1;
 		}
@@ -408,7 +408,7 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 			params.connect_bind6.sin6_scope_id=if_nametoindex(params.connect_bind6_ifname);
 			if (!params.connect_bind6.sin6_scope_id)
 			{
-				fprintf(stderr, "interface name not found : %s\n", params.connect_bind6_ifname);
+				DLOG_ERR("interface name not found : %s\n", params.connect_bind6_ifname);
 				close(remote_fd);
 				return -1;
 			}
@@ -416,7 +416,7 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 
 		if (bind(remote_fd, (struct sockaddr *)&params.connect_bind6, sizeof(struct sockaddr_in6)) == -1)
 		{
-			perror("bind on connect");
+			DLOG_PERROR("bind on connect");
 			close(remote_fd);
 			return -1;
 		}
@@ -426,12 +426,12 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 	{
 		if(errno != EINPROGRESS)
 		{
-			perror("connect (connect_remote)");
+			DLOG_PERROR("connect (connect_remote)");
 			close(remote_fd);
 			return -1;
 		}
 	}
-	DBGPRINT("Connecting remote fd=%d",remote_fd)
+	DBGPRINT("Connecting remote fd=%d\n",remote_fd);
 
 	return remote_fd;
 }
@@ -460,7 +460,7 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 	//Create connection object and fill in information
 	if((conn = (tproxy_conn_t*) malloc(sizeof(tproxy_conn_t))) == NULL)
 	{
-		fprintf(stderr, "Could not allocate memory for connection\n");
+		DLOG_ERR("Could not allocate memory for connection\n");
 		return NULL;
 	}
 
@@ -474,7 +474,7 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 	// otherwise create pipe only in local leg
 	if (!params.nosplice && ( !remote || !params.tamper || params.tamper_start || params.tamper_cutoff ) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
 	{
-		fprintf(stderr, "Could not create the splice pipe\n");
+		DLOG_ERR("Could not create the splice pipe\n");
 		free_conn(conn);
 		return NULL;
 	}
@@ -490,11 +490,11 @@ static bool epoll_set(tproxy_conn_t *conn, uint32_t events)
 	memset(&ev, 0, sizeof(ev));
 	ev.events = events;
 	ev.data.ptr = (void*) conn;
-	DBGPRINT("epoll_set fd=%d events=%08X",conn->fd,events);
+	DBGPRINT("epoll_set fd=%d events=%08X\n",conn->fd,events);
 	if(epoll_ctl(conn->efd, EPOLL_CTL_MOD, conn->fd, &ev)==-1 &&
 	   epoll_ctl(conn->efd, EPOLL_CTL_ADD, conn->fd, &ev)==-1)
 	{
-		perror("epoll_ctl (add/mod)");
+		DLOG_PERROR("epoll_ctl (add/mod)");
 		return false;
 	}
 	return true;
@@ -505,10 +505,10 @@ static bool epoll_del(tproxy_conn_t *conn)
 
 	memset(&ev, 0, sizeof(ev));
 
-	DBGPRINT("epoll_del fd=%d",conn->fd);
+	DBGPRINT("epoll_del fd=%d\n",conn->fd);
 	if(epoll_ctl(conn->efd, EPOLL_CTL_DEL, conn->fd, &ev)==-1)
 	{
-		perror("epoll_ctl (del)");
+		DLOG_PERROR("epoll_ctl (del)");
 		return false;
 	}
 	return true;
@@ -521,7 +521,7 @@ static bool epoll_update_flow(tproxy_conn_t *conn)
 	uint32_t evtmask = (conn->state==CONN_RDHUP ? 0 : EPOLLRDHUP)|(conn->bFlowIn?EPOLLIN:0)|(conn->bFlowOut?EPOLLOUT:0);
 	if (!epoll_set(conn, evtmask))
 		return false;
-	DBGPRINT("SET FLOW fd=%d to in=%d out=%d state_rdhup=%d",conn->fd,conn->bFlowIn,conn->bFlowOut,conn->state==CONN_RDHUP)
+	DBGPRINT("SET FLOW fd=%d to in=%d out=%d state_rdhup=%d\n",conn->fd,conn->bFlowIn,conn->bFlowOut,conn->state==CONN_RDHUP);
 	conn->bFlowInPrev = conn->bFlowIn;
 	conn->bFlowOutPrev = conn->bFlowOut;
 	conn->bPrevRdhup = (conn->state==CONN_RDHUP);
@@ -546,13 +546,13 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 	{
 		if(!get_dest_addr(local_fd, accept_sa, &orig_dst))
 		{
-			fprintf(stderr, "Could not get destination address\n");
+			DLOG_ERR("Could not get destination address\n");
 			close(local_fd);
 			return NULL;
 		}
 		if (check_local_ip((struct sockaddr*)&orig_dst) && saport((struct sockaddr*)&orig_dst)==listen_port)
 		{
-			VPRINT("Dropping connection to local address to the same port to avoid loop")
+			VPRINT("Dropping connection to local address to the same port to avoid loop\n");
 			close(local_fd);
 			return NULL;
 		}
@@ -563,7 +563,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 
 	if(!set_keepalive(local_fd))
 	{
-		perror("set_keepalive");
+		DLOG_PERROR("set_keepalive");
 		close(local_fd);
 		return 0;
 	}
@@ -572,7 +572,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 	{
 		if ((remote_fd = connect_remote((struct sockaddr *)&orig_dst, true)) < 0)
 		{
-			fprintf(stderr, "Failed to connect\n");
+			DLOG_ERR("Failed to connect\n");
 			close(local_fd);
 			return NULL;
 		}
@@ -651,12 +651,23 @@ static bool check_connection_attempt(tproxy_conn_t *conn, int efd)
 	// check the connection was sucessfull. it means its not in in SO_ERROR state
 	if(getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &errn, &optlen) == -1)
 	{
-		perror("getsockopt (SO_ERROR)");
+		DLOG_PERROR("getsockopt (SO_ERROR)");
 		return false;
 	}
 	if (!errn)
 	{
-		VPRINT("Socket fd=%d (remote) connected", conn->fd)
+		if (params.debug>=1)
+		{
+			struct sockaddr_storage sa;
+			socklen_t salen=sizeof(sa);
+			char ip_port[48];
+
+			if (getsockname(conn->fd,(struct sockaddr *)&sa,&salen))
+				*ip_port=0;
+			else
+				ntop46_port((struct sockaddr*)&sa,ip_port,sizeof(ip_port));
+			VPRINT("Socket fd=%d (remote) connected from : %s\n", conn->fd, ip_port);
+		}
 		if (!epoll_set_flow(conn, true, false) || (conn_partner_alive(conn) && !epoll_set_flow(conn->partner, true, false)))
 		{
 			return false;
@@ -675,8 +686,8 @@ static bool epoll_set_flow_pair(tproxy_conn_t *conn)
 	bool bHasUnsent = conn_has_unsent(conn);
 	bool bHasUnsentPartner = conn_partner_alive(conn) ? conn_has_unsent(conn->partner) : false;
 
-	DBGPRINT("epoll_set_flow_pair fd=%d remote=%d partner_fd=%d bHasUnsent=%d bHasUnsentPartner=%d state_rdhup=%d", 
-			conn->fd , conn->remote, conn_partner_alive(conn) ? conn->partner->fd : 0, bHasUnsent, bHasUnsentPartner, conn->state==CONN_RDHUP)
+	DBGPRINT("epoll_set_flow_pair fd=%d remote=%d partner_fd=%d bHasUnsent=%d bHasUnsentPartner=%d state_rdhup=%d\n", 
+			conn->fd , conn->remote, conn_partner_alive(conn) ? conn->partner->fd : 0, bHasUnsent, bHasUnsentPartner, conn->state==CONN_RDHUP);
 	if (!epoll_set_flow(conn, !bHasUnsentPartner && (conn->state!=CONN_RDHUP), bHasUnsent || conn->state==CONN_RDHUP))
 		return false;
 	if (conn_partner_alive(conn))
@@ -691,13 +702,13 @@ static bool handle_unsent(tproxy_conn_t *conn)
 {
 	ssize_t wr;
 
-	DBGPRINT("+handle_unsent, fd=%d has_unsent=%d has_unsent_partner=%d",conn->fd,conn_has_unsent(conn),conn_partner_alive(conn) ? conn_has_unsent(conn->partner) : false)
+	DBGPRINT("+handle_unsent, fd=%d has_unsent=%d has_unsent_partner=%d\n",conn->fd,conn_has_unsent(conn),conn_partner_alive(conn) ? conn_has_unsent(conn->partner) : false);
 	
 #ifdef SPLICE_PRESENT
 	if (!params.nosplice && conn->wr_unsent)
 	{
 		wr = splice(conn->splice_pipe[0], NULL, conn->fd, NULL, conn->wr_unsent, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-		DBGPRINT("splice unsent=%zd wr=%zd err=%d",conn->wr_unsent,wr,errno)
+		DBGPRINT("splice unsent=%zd wr=%zd err=%d\n",conn->wr_unsent,wr,errno);
 		if (wr<0)
 		{
 			if (errno==EAGAIN) wr=0;
@@ -710,7 +721,7 @@ static bool handle_unsent(tproxy_conn_t *conn)
 	if (!conn->wr_unsent && conn_buffers_present(conn))
 	{
 		wr=conn_buffers_send(conn);
-		DBGPRINT("conn_buffers_send wr=%zd",wr)
+		DBGPRINT("conn_buffers_send wr=%zd\n",wr);
 		if (wr<0) return false;
 	}
 	return epoll_set_flow_pair(conn);
@@ -723,13 +734,13 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 
 	if (params.debug>=1)
 	{
-		printf("socks target for fd=%d is : ", conn->fd);
-		print_sockaddr(sa);
-		printf("\n");
+		char ip_port[48];
+		ntop46_port(sa,ip_port,sizeof(ip_port));
+		VPRINT("socks target for fd=%d is : %s\n", conn->fd, ip_port);
 	}
 	if (check_local_ip((struct sockaddr *)sa))
 	{
-		VPRINT("Dropping connection to local address for security reasons")
+		VPRINT("Dropping connection to local address for security reasons\n");
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_NOT_ALLOWED_BY_RULESET);
 		return false;
 	}
@@ -739,19 +750,19 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 	{
 		bConnFooling=HostlistCheck(conn->track.hostname, NULL);
 		if (!bConnFooling)
-			VPRINT("0-phase desync hostlist check negative. not acting on this connection.")
+			VPRINT("0-phase desync hostlist check negative. not acting on this connection.\n");
 	}
 
 	if ((remote_fd = connect_remote(sa, bConnFooling)) < 0)
 	{
-		fprintf(stderr, "socks failed to connect (1) errno=%d\n", errno);
+		DLOG_ERR("socks failed to connect (1) errno=%d\n", errno);
 		socks_send_rep_errno(conn->socks_ver, conn->fd, errno);
 		return false;
 	}
 	if (!(conn->partner = new_conn(remote_fd, true)))
 	{
 		close(remote_fd);
-		fprintf(stderr, "socks out-of-memory (1)\n");
+		DLOG_ERR("socks out-of-memory (1)\n");
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_GENERAL_FAILURE);
 		return false;
 	}
@@ -759,7 +770,7 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 	conn->partner->efd = conn->efd;
 	if (!epoll_set(conn->partner, EPOLLOUT))
 	{
-		fprintf(stderr, "socks epoll_set error %d\n", errno);
+		DLOG_ERR("socks epoll_set error %d\n", errno);
 		free_conn(conn->partner);
 		conn->partner = NULL;
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_GENERAL_FAILURE);
@@ -768,7 +779,7 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 	TAILQ_INSERT_HEAD(conn_list, conn->partner, conn_ptrs);
 	legs_remote++;
 	print_legs();
-	DBGPRINT("S_WAIT_CONNECTION")
+	DBGPRINT("S_WAIT_CONNECTION\n");
 	conn->socks_state = S_WAIT_CONNECTION;
 	return true;
 }
@@ -784,7 +795,7 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 
 	// receive proxy control message
 	rd=recv(conn->fd, buf, sizeof(buf), MSG_DONTWAIT);
-	DBGPRINT("handle_proxy_mode rd=%zd",rd)
+	DBGPRINT("handle_proxy_mode rd=%zd\n",rd);
 	if (rd<1) return false; // hangup
 	switch(conn->conn_type)
 	{
@@ -792,10 +803,10 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 			switch(conn->socks_state)
 			{
 				case S_WAIT_HANDSHAKE:
-					DBGPRINT("S_WAIT_HANDSHAKE")
+					DBGPRINT("S_WAIT_HANDSHAKE\n");
 					if (buf[0] != 5 && buf[0] != 4) return false; // unknown socks version
 					conn->socks_ver = buf[0];
-					DBGPRINT("socks version %u", conn->socks_ver)
+					DBGPRINT("socks version %u\n", conn->socks_ver);
 					if (conn->socks_ver==5)
 					{
 						s5_handshake *m = (s5_handshake*)buf;
@@ -805,26 +816,26 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 						ack.ver=5;
 						if (!S5_REQ_HANDHSHAKE_VALID(m,rd))
 						{
-							DBGPRINT("socks5 proxy handshake invalid")
+							DBGPRINT("socks5 proxy handshake invalid\n");
 							return false;
 						}
 						for (k=0;k<m->nmethods;k++) if (m->methods[k]==S5_AUTH_NONE) break;
 						if (k>=m->nmethods)
 						{
-							DBGPRINT("socks5 client wants authentication but we dont support")
+							DBGPRINT("socks5 client wants authentication but we dont support\n");
 							ack.method=S5_AUTH_UNACCEPTABLE;
 							wr=send(conn->fd,&ack,sizeof(ack),MSG_DONTWAIT);
 							return false;
 						}
-						DBGPRINT("socks5 recv valid handshake")
+						DBGPRINT("socks5 recv valid handshake\n");
 						ack.method=S5_AUTH_NONE;
 						wr=send(conn->fd,&ack,sizeof(ack),MSG_DONTWAIT);
 						if (wr!=sizeof(ack))
 						{
-							DBGPRINT("socks5 handshake ack send error. wr=%zd errno=%d",wr,errno)
+							DBGPRINT("socks5 handshake ack send error. wr=%zd errno=%d\n",wr,errno);
 							return false;
 						}
-						DBGPRINT("socks5 send handshake ack OK")
+						DBGPRINT("socks5 send handshake ack OK\n");
 						conn->socks_state=S_WAIT_REQUEST;
 						return true;
 					}
@@ -835,31 +846,31 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 						s4_req *m = (s4_req*)buf;
 						if (!S4_REQ_HEADER_VALID(m, rd))
 						{
-							DBGPRINT("socks4 request invalid")
+							DBGPRINT("socks4 request invalid\n");
 							return false;
 						}
 						if (m->cmd!=S4_CMD_CONNECT)
 						{
 							// BIND is not supported
-							DBGPRINT("socks4 unsupported command %02X", m->cmd)
+							DBGPRINT("socks4 unsupported command %02X\n", m->cmd);
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
 						if (!S4_REQ_CONNECT_VALID(m, rd))
 						{
-							DBGPRINT("socks4 connect request invalid")
+							DBGPRINT("socks4 connect request invalid\n");
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
 						if (!m->port)
 						{
-							DBGPRINT("socks4 zero port")
+							DBGPRINT("socks4 zero port\n");
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
 						if (m->ip==htonl(1)) // special ip 0.0.0.1
 						{
-							VPRINT("socks4a protocol not supported")
+							VPRINT("socks4a protocol not supported\n");
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
@@ -870,28 +881,28 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 					}
 					break;
 				case S_WAIT_REQUEST:
-					DBGPRINT("S_WAIT_REQUEST")
+					DBGPRINT("S_WAIT_REQUEST\n");
 					{
 						s5_req *m = (s5_req*)buf;
 
 						if (!S5_REQ_HEADER_VALID(m,rd))
 						{
-							DBGPRINT("socks5 request invalid")
+							DBGPRINT("socks5 request invalid\n");
 							return false;
 						}
 						if (m->cmd!=S5_CMD_CONNECT)
 						{
 							// BIND and UDP are not supported
-							DBGPRINT("socks5 unsupported command %02X", m->cmd)
+							DBGPRINT("socks5 unsupported command %02X\n", m->cmd);
 							socks5_send_rep(conn->fd,S5_REP_COMMAND_NOT_SUPPORTED);
 							return false;
 						}
 						if (!S5_REQ_CONNECT_VALID(m,rd))
 						{
-							DBGPRINT("socks5 connect request invalid")
+							DBGPRINT("socks5 connect request invalid\n");
 							return false;
 						}
-						DBGPRINT("socks5 recv valid connect request")
+						DBGPRINT("socks5 recv valid connect request\n");
 						switch(m->atyp)
 						{
 							case S5_ATYP_IP4:
@@ -912,28 +923,28 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 
 									if (params.no_resolve)
 									{
-										VPRINT("socks5 hostname resolving disabled")
+										VPRINT("socks5 hostname resolving disabled\n");
 										socks5_send_rep(conn->fd,S5_REP_NOT_ALLOWED_BY_RULESET);
 										return false;
 									}
 									port=S5_PORT_FROM_DD(m,rd);
 									if (!port)
 									{
-										VPRINT("socks5 no port is given")
+										VPRINT("socks5 no port is given\n");
 										socks5_send_rep(conn->fd,S5_REP_HOST_UNREACHABLE);
 										return false;
 									}
 									m->dd.domport[m->dd.len] = 0;
-									DBGPRINT("socks5 queue resolve hostname '%s' port '%u'",m->dd.domport,port)
+									DBGPRINT("socks5 queue resolve hostname '%s' port '%u'\n",m->dd.domport,port);
 									conn->socks_ri = resolver_queue(m->dd.domport,port,conn);
 									if (!conn->socks_ri)
 									{
-										VPRINT("socks5 could not queue resolve item")
+										VPRINT("socks5 could not queue resolve item\n");
 										socks5_send_rep(conn->fd,S5_REP_GENERAL_FAILURE);
 										return false;
 									}
 									conn->socks_state=S_WAIT_RESOLVE;
-									DBGPRINT("S_WAIT_RESOLVE")
+									DBGPRINT("S_WAIT_RESOLVE\n");
 									return true;
 								}
 								break;
@@ -945,13 +956,13 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 					}
 					break;
 				case S_WAIT_RESOLVE:
-					DBGPRINT("socks received message while in S_WAIT_RESOLVE. hanging up")
+					DBGPRINT("socks received message while in S_WAIT_RESOLVE. hanging up\n");
 					break;
 				case S_WAIT_CONNECTION:
-					DBGPRINT("socks received message while in S_WAIT_CONNECTION. hanging up")
+					DBGPRINT("socks received message while in S_WAIT_CONNECTION. hanging up\n");
 					break;
 				default:
-					DBGPRINT("socks received message while in an unexpected connection state")
+					DBGPRINT("socks received message while in an unexpected connection state\n");
 					break;
 			}
 			break;
@@ -967,7 +978,7 @@ static bool resolve_complete(struct resolve_item *ri, struct tailhead *conn_list
 	{
 		if (conn->socks_state==S_WAIT_RESOLVE)
 		{
-			DBGPRINT("resolve_complete %s. getaddrinfo result %d", ri->dom, ri->ga_res);
+			DBGPRINT("resolve_complete %s. getaddrinfo result %d\n", ri->dom, ri->ga_res);
 			if (ri->ga_res)
 			{
 				socks5_send_rep(conn->fd,S5_REP_HOST_UNREACHABLE);
@@ -977,17 +988,17 @@ static bool resolve_complete(struct resolve_item *ri, struct tailhead *conn_list
 			{
 				if (!conn->track.hostname)
 				{
-					DBGPRINT("resolve_complete put hostname : %s", ri->dom)
+					DBGPRINT("resolve_complete put hostname : %s\n", ri->dom);
 					conn->track.hostname = strdup(ri->dom);
 				}
 				return proxy_mode_connect_remote((struct sockaddr *)&ri->ss,conn,conn_list);
 			}
 		}
 		else
-			fprintf(stderr, "resolve_complete: conn in wrong socks_state !!! (%s)\n", ri->dom);
+			DLOG_ERR("resolve_complete: conn in wrong socks_state !!! (%s)\n", ri->dom);
 	}
 	else
-		DBGPRINT("resolve_complete: orphaned resolve for %s", ri->dom);
+		DBGPRINT("resolve_complete: orphaned resolve for %s\n", ri->dom);
 
 	return true;
 }
@@ -1014,11 +1025,11 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 		else
 		{
 			bool in_range = in_tamper_out_range(conn);
-			DBGPRINT("tamper_out stream pos %" PRIu64 "(n%" PRIu64 "). tamper range %s%u-%s%u (%s)",
+			DBGPRINT("tamper_out stream pos %" PRIu64 "(n%" PRIu64 "). tamper range %s%u-%s%u (%s)\n",
 				conn->trd, conn->tnrd+1,
 				params.tamper_start_n ? "n" : "" , params.tamper_start,
 				params.tamper_cutoff_n ? "n" : "" , params.tamper_cutoff,
-				in_range ? "IN RANGE" : "OUT OF RANGE")
+				in_range ? "IN RANGE" : "OUT OF RANGE");
 			if (in_range) tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos,split_flags);
 		}
 	}
@@ -1030,7 +1041,7 @@ static ssize_t send_or_buffer_oob(send_buffer_t *sb, int fd, uint8_t *buf, size_
 	ssize_t wr;
 	if (oob)
 	{
-		VPRINT("Sending OOB byte %02X", params.oob_byte)
+		VPRINT("Sending OOB byte %02X\n", params.oob_byte);
 		uint8_t oob_save;
 		oob_save = buf[len];
 		buf[len] = params.oob_byte;
@@ -1052,7 +1063,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	size_t bs;
 
 
-	DBGPRINT("+handle_epoll")
+	DBGPRINT("+handle_epoll\n");
 
 	if (!conn_in_tcp_mode(conn))
 	{
@@ -1080,7 +1091,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			trd+=rd;
 			conn->trd+=rd;
 		}
-		DBGPRINT("wasted recv=%zd all_rd=%" PRIu64 " err=%d",rd,trd,errno)
+		DBGPRINT("wasted recv=%zd all_rd=%" PRIu64 " err=%d\n",rd,trd,errno);
 		return true;
 	}
 
@@ -1091,10 +1102,10 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 	bool oom=false;
 
 	numbytes=conn_bytes_unread(conn);
-	DBGPRINT("numbytes=%d",numbytes)
+	DBGPRINT("numbytes=%d\n",numbytes);
 	if (numbytes>0)
 	{
-		DBGPRINT("%s leg fd=%d stream pos : %" PRIu64 "(n%" PRIu64 ")/%" PRIu64, conn->remote ? "remote" : "local", conn->fd, conn->trd,conn->tnrd+1,conn->twr)
+		DBGPRINT("%s leg fd=%d stream pos : %" PRIu64 "(n%" PRIu64 ")/%" PRIu64 "\n", conn->remote ? "remote" : "local", conn->fd, conn->trd,conn->tnrd+1,conn->twr);
 #ifdef SPLICE_PRESENT
 		if (!params.nosplice && (!params.tamper || (conn->remote && conn->partner->track.bTamperInCutoff) || (!conn->remote && !in_tamper_out_range(conn))))
 		{
@@ -1103,7 +1114,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			// if we dont tamper - splice both legs
 
 			rd = splice(conn->fd, NULL, conn->partner->splice_pipe[1], NULL, SPLICE_LEN, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-			DBGPRINT("splice fd=%d remote=%d len=%d rd=%zd err=%d",conn->fd,conn->remote,SPLICE_LEN,rd,errno)
+			DBGPRINT("splice fd=%d remote=%d len=%d rd=%zd err=%d\n",conn->fd,conn->remote,SPLICE_LEN,rd,errno);
 			if (rd<0 && errno==EAGAIN) rd=0;
 			if (rd>0)
 			{
@@ -1111,7 +1122,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				conn->trd += rd;
 				conn->partner->wr_unsent += rd;
 				wr = splice(conn->partner->splice_pipe[0], NULL, conn->partner->fd, NULL, conn->partner->wr_unsent, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-				DBGPRINT("splice fd=%d remote=%d wr=%zd err=%d",conn->partner->fd,conn->partner->remote,wr,errno)
+				DBGPRINT("splice fd=%d remote=%d wr=%zd err=%d\n",conn->partner->fd,conn->partner->remote,wr,errno);
 				if (wr<0 && errno==EAGAIN) wr=0;
 				if (wr>0)
 				{
@@ -1127,7 +1138,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			uint8_t buf[RD_BLOCK_SIZE + 5];
 
 			rd = recv(conn->fd, buf, RD_BLOCK_SIZE, MSG_DONTWAIT);
-			DBGPRINT("recv fd=%d rd=%zd err=%d",conn->fd, rd,errno)
+			DBGPRINT("recv fd=%d rd=%zd err=%d\n",conn->fd, rd,errno);
 			if (rd<0 && errno==EAGAIN) rd=0;
 			if (rd>0)
 			{
@@ -1144,22 +1155,22 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 
 				if (split_pos && bs<sizeof(buf) && split_pos<sizeof(buf))
 				{
-					VPRINT("Splitting at pos %zu%s", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "")
+					VPRINT("Splitting at pos %zu%s\n", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "");
 
 					wr = send_or_buffer_oob(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, !!(split_flags & SPLIT_FLAG_DISORDER), !!(split_flags & SPLIT_FLAG_OOB));
-					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
+					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d\n",conn->partner->fd,wr,errno);
 					if (wr >= 0)
 					{
 						conn->partner->twr += wr;
 						wr = send_or_buffer(conn->partner->wr_buf + 1, conn->partner->fd, buf + split_pos, bs - split_pos, 0, 0);
-						DBGPRINT("send_or_buffer(2) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
+						DBGPRINT("send_or_buffer(2) fd=%d wr=%zd err=%d\n",conn->partner->fd,wr,errno);
 						if (wr>0) conn->partner->twr += wr;
 					}
 				}
 				else
 				{
 					wr = send_or_buffer(conn->partner->wr_buf, conn->partner->fd, buf, bs, 0, 0);
-					DBGPRINT("send_or_buffer(3) fd=%d wr=%zd err=%d",conn->partner->fd,wr,errno)
+					DBGPRINT("send_or_buffer(3) fd=%d wr=%zd err=%d\n",conn->partner->fd,wr,errno);
 					if (wr>0) conn->partner->twr += wr;
 				}
 				if (wr<0 && errno==ENOMEM) oom=true;
@@ -1170,8 +1181,8 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 			return false;
 	}
 	
-	DBGPRINT("-handle_epoll rd=%zd wr=%zd",rd,wr)
-	if (oom) DBGPRINT("handle_epoll: OUT_OF_MEMORY")
+	DBGPRINT("-handle_epoll rd=%zd wr=%zd\n",rd,wr);
+	if (oom) DBGPRINT("handle_epoll: OUT_OF_MEMORY\n");
 
 	// do not fail if partner fails.
 	// if partner fails there will be another epoll event with EPOLLHUP or EPOLLERR
@@ -1189,8 +1200,8 @@ static bool remove_closed_connections(int efd, struct tailhead *close_list)
 
 		shutdown(conn->fd,SHUT_RDWR);
 		epoll_del(conn);
-		VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) closed, connection removed. total_read=%" PRIu64 " total_write=%" PRIu64 " event_count=%u",
-			conn->fd, conn->partner ? conn->partner->fd : 0, conn->remote, conn->trd, conn->twr, conn->event_count)
+		VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) closed, connection removed. total_read=%" PRIu64 " total_write=%" PRIu64 " event_count=%u\n",
+			conn->fd, conn->partner ? conn->partner->fd : 0, conn->remote, conn->trd, conn->twr, conn->event_count);
 		if (conn->remote) legs_remote--; else legs_local--;
 		free_conn(conn);
 		bRemoved = true;
@@ -1215,7 +1226,7 @@ static bool read_all_and_buffer(tproxy_conn_t *conn, int buffer_number)
 	if (conn_partner_alive(conn))
 	{
 		int numbytes=conn_bytes_unread(conn);
-		DBGPRINT("read_all_and_buffer(%d) numbytes=%d",buffer_number,numbytes)
+		DBGPRINT("read_all_and_buffer(%d) numbytes=%d\n",buffer_number,numbytes);
 		if (numbytes>0)
 		{
 			if (send_buffer_create(conn->partner->wr_buf+buffer_number, NULL, numbytes, 5, 0, 0))
@@ -1259,7 +1270,7 @@ static void conn_close_timed_out(struct tailhead *conn_list, struct tailhead *cl
 {
 	tproxy_conn_t *c,*cnext = NULL;
 
-	DBGPRINT("conn_close_timed_out")
+	DBGPRINT("conn_close_timed_out\n");
 
 	c = TAILQ_FIRST(conn_list);
 	while(c)
@@ -1267,7 +1278,7 @@ static void conn_close_timed_out(struct tailhead *conn_list, struct tailhead *cl
 		cnext = TAILQ_NEXT(c,conn_ptrs);
 		if (conn_timed_out(c))
 		{
-			DBGPRINT("closing timed out connection: fd=%d remote=%d",c->fd,c->remote)
+			DBGPRINT("closing timed out connection: fd=%d remote=%d\n",c->fd,c->remote);
 			close_tcp_conn(conn_list,close_list,c);
 		}
 		c = cnext;
@@ -1301,13 +1312,13 @@ static bool handle_resolve_pipe(tproxy_conn_t **conn, struct tailhead *conn_list
 	rd = read(fd,&ri,sizeof(void*));
 	if (rd<0)
 	{
-		perror("resolve_pipe read");
+		DLOG_PERROR("resolve_pipe read");
 		return false;
 	}
 	else if (rd!=sizeof(void*))
 	{
 		// partial pointer read is FATAL. in any case it will cause pointer corruption and coredump
-		fprintf(stderr,"resolve_pipe not full read %zu\n",rd);
+		DLOG_ERR("resolve_pipe not full read %zu\n",rd);
 		exit(1000);
 	}
 	b = resolve_complete(ri, conn_list);
@@ -1342,13 +1353,13 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 	TAILQ_INIT(&close_list);
 
 	if ((efd = epoll_create(1)) == -1) {
-		perror("epoll_create");
+		DLOG_PERROR("epoll_create");
 		return -1;
 	}
 
 	if (!(listen_conn=calloc(listen_fd_ct,sizeof(*listen_conn))))
 	{
-		perror("calloc listen_conn");
+		DLOG_PERROR("calloc listen_conn");
 		return -1;
 	}
 	
@@ -1361,7 +1372,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 		listen_conn[sct].fd = listen_fd[sct];
 		ev.data.ptr = listen_conn + sct;
 		if (epoll_ctl(efd, EPOLL_CTL_ADD, listen_conn[sct].fd, &ev) == -1) {
-			perror("epoll_ctl (listen socket)");
+			DLOG_PERROR("epoll_ctl (listen socket)");
 			retval = -1;
 			goto ex;
 		}
@@ -1370,39 +1381,39 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 	{
 		if (pipe(resolve_pipe)==-1)
 		{
-			perror("pipe (resolve_pipe)");
+			DLOG_PERROR("pipe (resolve_pipe)");
 			retval = -1;
 			goto ex;
 		}
 		if (fcntl(resolve_pipe[0], F_SETFL, O_NONBLOCK) < 0)
 		{
-			perror("resolve_pipe set O_NONBLOCK");
+			DLOG_PERROR("resolve_pipe set O_NONBLOCK");
 			retval = -1;
 			goto ex;
 		}
 		ev.data.ptr = NULL;
 		if (epoll_ctl(efd, EPOLL_CTL_ADD, resolve_pipe[0], &ev) == -1) {
-			perror("epoll_ctl (listen socket)");
+			DLOG_PERROR("epoll_ctl (listen socket)");
 			retval = -1;
 			goto ex;
 		}
 		if (!resolver_init(params.resolver_threads,resolve_pipe[1]))
 		{
-			fprintf(stderr,"could not initialize multithreaded resolver\n");
+			DLOG_ERR("could not initialize multithreaded resolver\n");
 			retval = -1;
 			goto ex;
 		}
-		VPRINT("initialized multi threaded resolver with %d threads",resolver_thread_count());
+		VPRINT("initialized multi threaded resolver with %d threads\n",resolver_thread_count());
 	}
 
 	for(;;)
 	{
-		DBGPRINT("epoll_wait")
+		DBGPRINT("epoll_wait\n");
 
 		if ((num_events = epoll_wait(efd, events, MAX_EPOLL_EVENTS, -1)) == -1)
 		{
 			if (errno == EINTR) continue; // system call was interrupted
-			perror("epoll_wait");
+			DLOG_PERROR("epoll_wait");
 			retval = -1;
 			break;
 		}
@@ -1414,13 +1425,13 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 			conn = (tproxy_conn_t*)events[i].data.ptr;
 			if (!conn)
 			{
-				DBGPRINT("\nEVENT mask %08X resolve_pipe",events[i].events)
+				DBGPRINT("\nEVENT mask %08X resolve_pipe\n",events[i].events);
 				if (events[i].events & EPOLLIN)
 				{
-					DBGPRINT("EPOLLIN")
+					DBGPRINT("EPOLLIN\n");
 					if (!handle_resolve_pipe(&conn, &conn_list, resolve_pipe[0]))
 					{
-						DBGPRINT("handle_resolve_pipe false")
+						DBGPRINT("handle_resolve_pipe false\n");
 						if (conn) close_tcp_conn(&conn_list,&close_list,conn);
 					}
 				}
@@ -1429,7 +1440,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 			conn->event_count++;
 			if (conn->listener)
 			{
-				DBGPRINT("\nEVENT mask %08X fd=%d accept",events[i].events,conn->fd)
+				DBGPRINT("\nEVENT mask %08X fd=%d accept\n",events[i].events,conn->fd);
 
 				accept_salen = sizeof(accept_sa);
 				//Accept new connection
@@ -1441,35 +1452,35 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 #endif
 				if (tmp_fd < 0)
 				{
-					perror("Failed to accept connection");
+					DLOG_PERROR("Failed to accept connection");
 				}
 				else if (legs_local >= params.maxconn) // each connection has 2 legs - local and remote
 				{
 					close(tmp_fd);
-					VPRINT("Too many local legs : %d", legs_local)
+					VPRINT("Too many local legs : %d\n", legs_local);
 				}
 #if defined (__APPLE__)
 				// separate fcntl call to comply with macos
 				else if (fcntl(tmp_fd, F_SETFL, O_NONBLOCK) < 0)
 				{
-					perror("socket set O_NONBLOCK (accept)");
+					DLOG_PERROR("socket set O_NONBLOCK (accept)");
 					close(tmp_fd);
 				}
 #endif
 				else if (!(conn=add_tcp_connection(efd, &conn_list, tmp_fd, (struct sockaddr*)&accept_sa, params.port, params.proxy_type)))
 				{
 					// add_tcp_connection closes fd in case of failure
-					VPRINT("Failed to add connection");
+					VPRINT("Failed to add connection\n");
 				}
 				else
 				{	
 					print_legs();
-					VPRINT("Socket fd=%d (local) connected", conn->fd)
+					VPRINT("Socket fd=%d (local) connected\n", conn->fd);
 				}
 			}
 			else
 			{
-				DBGPRINT("\nEVENT mask %08X fd=%d remote=%d fd_partner=%d",events[i].events,conn->fd,conn->remote,conn_partner_alive(conn) ? conn->partner->fd : 0)
+				DBGPRINT("\nEVENT mask %08X fd=%d remote=%d fd_partner=%d\n",events[i].events,conn->fd,conn->remote,conn_partner_alive(conn) ? conn->partner->fd : 0);
 
 				if (conn->state != CONN_CLOSED)
 				{
@@ -1484,7 +1495,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 							case EPOLLHUP|EPOLLERR: se="EPOLLERR EPOLLHUP"; break;
 							default: se=NULL;
 						}
-						VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) %s so_error=%d (%s)",conn->fd,conn->partner ? conn->partner->fd : 0,conn->remote,se,errn,strerror(errn));
+						VPRINT("Socket fd=%d (partner_fd=%d, remote=%d) %s so_error=%d (%s)\n",conn->fd,conn->partner ? conn->partner->fd : 0,conn->remote,se,errn,strerror(errn));
 						proxy_remote_conn_ack(conn,errn);
 						read_all_and_buffer(conn,3);
 						if (errn==ECONNRESET && conn->remote && params.tamper && conn_partner_alive(conn)) rst_in(&conn->partner->track);
@@ -1496,26 +1507,26 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 					{
 						if (!check_connection_attempt(conn, efd))
 						{
-							VPRINT("Connection attempt failed for fd=%d", conn->fd)
+							VPRINT("Connection attempt failed for fd=%d\n", conn->fd);
 							conn_close_both(&conn_list,&close_list,conn);
 							continue;
 						}
 					}
 					if (events[i].events & EPOLLRDHUP)
 					{
-						DBGPRINT("EPOLLRDHUP")
+						DBGPRINT("EPOLLRDHUP\n");
 						read_all_and_buffer(conn,2);
 						if (!conn->remote && params.tamper) hup_out(&conn->track);
 
 						if (conn_has_unsent(conn))
 						{
-							DBGPRINT("conn fd=%d has unsent, not closing", conn->fd)
+							DBGPRINT("conn fd=%d has unsent, not closing\n", conn->fd);
 							conn->state = CONN_RDHUP; // only writes
 							epoll_set_flow(conn,false,true);
 						}
 						else
 						{
-							DBGPRINT("conn fd=%d has no unsent, closing", conn->fd)
+							DBGPRINT("conn fd=%d has no unsent, closing\n", conn->fd);
 							conn_close_with_partner_check(&conn_list,&close_list,conn);
 						}
 						continue;
@@ -1526,7 +1537,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						// will not receive this until successful check_connection_attempt()
 						if (!handle_epoll(conn, &conn_list, events[i].events))
 						{
-							DBGPRINT("handle_epoll false")
+							DBGPRINT("handle_epoll false\n");
 							conn_close_with_partner_check(&conn_list,&close_list,conn);
 							continue;
 						}
