@@ -797,7 +797,13 @@ void parse_params(int argc, char *argv[])
 				else if (inet_pton(AF_INET6, optarg, &params.connect_bind6.sin6_addr))
 				{
 					params.connect_bind6.sin6_family = AF_INET6;
-					if (p && *p) params.connect_bind6.sin6_scope_id=if_nametoindex(p);
+					if (p && *p)
+					{
+						// copy interface name for delayed resolution
+						strncpy(params.connect_bind6_ifname,p,sizeof(params.connect_bind6_ifname));
+						params.connect_bind6_ifname[sizeof(params.connect_bind6_ifname)-1]=0;
+					}
+
 				}
 				else
 				{

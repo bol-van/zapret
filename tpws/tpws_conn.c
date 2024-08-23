@@ -403,6 +403,17 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 	}
 	else if(remote_addr->sa_family == params.connect_bind6.sin6_family)
 	{
+		if (*params.connect_bind6_ifname && !params.connect_bind6.sin6_scope_id)
+		{
+			params.connect_bind6.sin6_scope_id=if_nametoindex(params.connect_bind6_ifname);
+			if (!params.connect_bind6.sin6_scope_id)
+			{
+				fprintf(stderr, "interface name not found : %s\n", params.connect_bind6_ifname);
+				close(remote_fd);
+				return -1;
+			}
+		}
+
 		if (bind(remote_fd, (struct sockaddr *)&params.connect_bind6, sizeof(struct sockaddr_in6)) == -1)
 		{
 			perror("bind on connect");

@@ -74,6 +74,7 @@ struct params_s
 
 	struct sockaddr_in connect_bind4;
 	struct sockaddr_in6 connect_bind6;
+	char connect_bind6_ifname[IF_NAMESIZE];
 
 	int debug;
 
