@@ -164,7 +164,7 @@ static void exithelp(void)
 #if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
-		" --debug=0|1|2|syslog|@<filename>\t\t1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
+		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		"\nFILTER:\n"
 		" --hostlist=<filename>\t\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
