@@ -1102,6 +1102,7 @@ int main(int argc, char **argv)
 				{
 					params.debug = true;
 					params.debug_target = LOG_TARGET_SYSLOG;
+					openlog(progname,LOG_PID,LOG_USER);
 				}
 				else
 				{
@@ -1665,9 +1666,6 @@ int main(int argc, char **argv)
 #endif
 		}
 	}
-
-	if (params.debug && params.debug_target==LOG_TARGET_SYSLOG)
-		openlog(progname,LOG_PID,LOG_USER);
 
 #ifdef __linux__
 	if (params.qnum<0)
