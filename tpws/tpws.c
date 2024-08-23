@@ -136,9 +136,9 @@ static void exithelp(void)
 		" --bind-wait-ip-linklocal=<sec>\t\t; (prefer) accept only LL first N seconds then any  (unwanted) accept only globals first N seconds then LL\n"
 		" --bind-wait-only\t\t\t; wait for bind conditions satisfaction then exit. return code 0 if success.\n"
 		" * multiple binds are supported. each bind-addr, bind-iface* start new bind\n"
+		" --connect-bind-addr=<v4_addr>|<v6_addr> ; address for outbound connections. for v6 link locals append %%interface_name\n"
 		" --port=<port>\t\t\t\t; only one port number for all binds is supported\n"
 		" --socks\t\t\t\t; implement socks4/5 proxy instead of transparent proxy\n"
-		" --connect-bind-addr=<v4_addr>|<v6_addr> ; address for outbound connections\n"
 		" --no-resolve\t\t\t\t; disable socks5 remote dns ability\n"
 		" --resolver-threads=<int>\t\t; number of resolver worker threads\n"
 		" --local-rcvbuf=<bytes>\n"
@@ -788,6 +788,8 @@ void parse_params(int argc, char *argv[])
 			break;
 		case 54: /* connect-bind-addr */
 			{
+				char *p = strchr(optarg,'%');
+				if (p) *p++=0;
 				if (inet_pton(AF_INET, optarg, &params.connect_bind4.sin_addr))
 				{
 					params.connect_bind4.sin_family = AF_INET;
@@ -795,6 +797,7 @@ void parse_params(int argc, char *argv[])
 				else if (inet_pton(AF_INET6, optarg, &params.connect_bind6.sin6_addr))
 				{
 					params.connect_bind6.sin6_family = AF_INET6;
+					if (p && *p) params.connect_bind6.sin6_scope_id=if_nametoindex(p);
 				}
 				else
 				{
