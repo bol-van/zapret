@@ -728,10 +728,8 @@ void parse_params(int argc, char *argv[])
 						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
 						exit_clean(1);
 					}
-#ifndef __CYGWIN__
 					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
 						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
-#endif
 					params.debug = 1;
 					params.debug_target = LOG_TARGET_FILE;
 				}
