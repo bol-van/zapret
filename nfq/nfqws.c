@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
+#include <syslog.h>
 
 #ifdef __CYGWIN__
 #include "win.h"
@@ -99,7 +100,7 @@ static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *dat
 #ifdef __linux__
 	if (*mark & params.desync_fwmark)
 	{
-		DLOG("ignoring generated packet\n")
+		DLOG("ignoring generated packet\n");
 		return VERDICT_PASS;
 	}
 #endif
@@ -129,11 +130,11 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 		ifidx = nfq_get_outdev(nfa);
 		if (ifidx) if_indextoname(ifidx,ifout);
 
-		DLOG("packet: id=%d len=%d mark=%08X ifout=%s(%u)\n", id, ilen, mark, ifout, ifidx)
+		DLOG("packet: id=%d len=%d mark=%08X ifout=%s(%u)\n", id, ilen, mark, ifout, ifidx);
 	}
 	else
 		// save some syscalls
-		DLOG("packet: id=%d len=%d mark=%08X\n", id, ilen, mark)
+		DLOG("packet: id=%d len=%d mark=%08X\n", id, ilen, mark);
 	if (ilen >= 0)
 	{
 		len = ilen;
@@ -158,49 +159,49 @@ static int nfq_main(void)
 	int fd,rv;
 	uint8_t buf[16384] __attribute__((aligned));
 
-	printf("opening library handle\n");
+	DLOG_CONDUP("opening library handle\n");
 	h = nfq_open();
 	if (!h) {
-		perror("nfq_open()");
+		DLOG_PERROR("nfq_open()");
 		goto exiterr;
 	}
 
-	printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
+	DLOG_CONDUP("unbinding existing nf_queue handler for AF_INET (if any)\n");
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
-		perror("nfq_unbind_pf()");
+		DLOG_PERROR("nfq_unbind_pf()");
 		goto exiterr;
 	}
 
-	printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
+	DLOG_CONDUP("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(h, AF_INET) < 0) {
-		perror("nfq_bind_pf()");
+		DLOG_PERROR("nfq_bind_pf()");
 		goto exiterr;
 	}
 
-	printf("binding this socket to queue '%u'\n", params.qnum);
+	DLOG_CONDUP("binding this socket to queue '%u'\n", params.qnum);
 	qh = nfq_create_queue(h, params.qnum, &nfq_cb, &params);
 	if (!qh) {
-		perror("nfq_create_queue()");
+		DLOG_PERROR("nfq_create_queue()");
 		goto exiterr;
 	}
 
-	printf("setting copy_packet mode\n");
+	DLOG_CONDUP("setting copy_packet mode\n");
 	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-		perror("can't set packet_copy mode");
+		DLOG_PERROR("can't set packet_copy mode");
 		goto exiterr;
 	}
 	if (nfq_set_queue_maxlen(qh, Q_MAXLEN) < 0) {
-		perror("can't set queue maxlen");
+		DLOG_PERROR("can't set queue maxlen");
 		goto exiterr;
 	}
 	// accept packets if they cant be handled
 	if (nfq_set_queue_flags(qh, NFQA_CFG_F_FAIL_OPEN , NFQA_CFG_F_FAIL_OPEN))
 	{
-		fprintf(stderr, "can't set queue flags. its OK on linux <3.6\n");
+		DLOG_ERR("can't set queue flags. its OK on linux <3.6\n");
 		// dot not fail. not supported on old linuxes <3.6 
 	}
 
-	printf("initializing raw sockets bind-fix4=%u bind-fix6=%u\n",params.bind_fix4,params.bind_fix6);
+	DLOG_CONDUP("initializing raw sockets bind-fix4=%u bind-fix6=%u\n",params.bind_fix4,params.bind_fix6);
 	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
 		goto exiterr;
 
@@ -227,24 +228,24 @@ static int nfq_main(void)
 		{
 			dohup();
 			int r = nfq_handle_packet(h, (char *)buf, rv);
-			if (r) fprintf(stderr, "nfq_handle_packet error %d\n", r);
+			if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
 		}
-		fprintf(stderr, "recv: errno %d\n",errno);
-		perror("recv");
+		DLOG_ERR("recv: errno %d\n",errno);
+		DLOG_PERROR("recv");
 		// do not fail on ENOBUFS
 	} while(errno==ENOBUFS);
 
-	printf("unbinding from queue %u\n", params.qnum);
+	DLOG_CONDUP("unbinding from queue %u\n", params.qnum);
 	nfq_destroy_queue(qh);
 
 #ifdef INSANE
 	/* normally, applications SHOULD NOT issue this command, since
 	 * it detaches other programs/sockets from AF_INET, too ! */
-	printf("unbinding from AF_INET\n");
+	DLOG_CONDUP("unbinding from AF_INET\n");
 	nfq_unbind_pf(h, AF_INET);
 #endif
 
-	printf("closing library handle\n");
+	DLOG_CONDUP("closing library handle\n");
 	nfq_close(h);
 	return 0;
 
@@ -273,16 +274,16 @@ static int dvt_main(void)
 		bp4.sin_port = htons(params.port);
 		bp4.sin_addr.s_addr = INADDR_ANY;
 	
-		printf("creating divert4 socket\n");
+		DLOG_CONDUP("creating divert4 socket\n");
 		fd[0] = socket_divert(AF_INET);
 		if (fd[0] == -1) {
-				perror("socket (DIVERT4)");
+			DLOG_PERROR("socket (DIVERT4)");
 			goto exiterr;
 		}
-		printf("binding divert4 socket\n");
+		DLOG_CONDUP("binding divert4 socket\n");
 		if (bind(fd[0], (struct sockaddr*)&bp4, sizeof(bp4)) < 0)
 		{
-			perror("bind (DIVERT4)");
+			DLOG_PERROR("bind (DIVERT4)");
 			goto exiterr;
 		}
 		if (!set_socket_buffers(fd[0],Q_RCVBUF,Q_SNDBUF))
@@ -298,16 +299,16 @@ static int dvt_main(void)
 		bp6.sin6_family = AF_INET6;
 		bp6.sin6_port = htons(params.port);
 	
-		printf("creating divert6 socket\n");
+		DLOG_CONDUP("creating divert6 socket\n");
 		fd[1] = socket_divert(AF_INET6);
 		if (fd[1] == -1) {
-			perror("socket (DIVERT6)");
+			DLOG_PERROR("socket (DIVERT6)");
 			goto exiterr;
 		}
-		printf("binding divert6 socket\n");
+		DLOG_CONDUP("binding divert6 socket\n");
 		if (bind(fd[1], (struct sockaddr*)&bp6, sizeof(bp6)) < 0)
 		{
-			perror("bind (DIVERT6)");
+			DLOG_PERROR("bind (DIVERT6)");
 			goto exiterr;
 		}
 		fdct++;
@@ -317,7 +318,7 @@ static int dvt_main(void)
 #endif
 	fdmax = (fd[0]>fd[1] ? fd[0] : fd[1]) + 1;
 
-	printf("initializing raw sockets\n");
+	DLOG_CONDUP("initializing raw sockets\n");
 	if (!rawsend_preinit(false,false))
 		goto exiterr;
 
@@ -340,7 +341,7 @@ static int dvt_main(void)
 				dohup();
 				continue;
 			}
-			perror("select");
+			DLOG_PERROR("select");
 			goto exiterr;
 		}
 		for(i=0;i<fdct;i++)
@@ -351,7 +352,7 @@ static int dvt_main(void)
 				rd = recvfrom(fd[i], buf, sizeof(buf), 0, (struct sockaddr*)&sa_from, &socklen);
 				if (rd<0)
 				{
-					perror("recvfrom");
+					DLOG_PERROR("recvfrom");
 					goto exiterr;
 				}
 				else if (rd>0)
@@ -360,21 +361,21 @@ static int dvt_main(void)
 					uint8_t verdict;
 					size_t len = rd;
 
-					DLOG("packet: id=%u len=%zu\n", id, len)
+					DLOG("packet: id=%u len=%zu\n", id, len);
 					verdict = processPacketData(&mark, NULL, buf, &len);
 					switch (verdict & VERDICT_MASK)
 					{
 					case VERDICT_PASS:
 					case VERDICT_MODIFY:
 						if ((verdict & VERDICT_MASK)==VERDICT_PASS)
-							DLOG("packet: id=%u reinject unmodified\n", id)
+							DLOG("packet: id=%u reinject unmodified\n", id);
 						else
-							DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
+							DLOG("packet: id=%u reinject modified len=%zu\n", id, len);
 						wr = sendto(fd[i], buf, len, 0, (struct sockaddr*)&sa_from, socklen);
 						if (wr<0)
-							perror("reinject sendto");
+							DLOG_PERROR("reinject sendto");
 						else if (wr!=len)
-							fprintf(stderr,"reinject sendto: not all data was reinjected. received %zu, sent %zd\n", len, wr);
+							DLOG_ERR("reinject sendto: not all data was reinjected. received %zu, sent %zd\n", len, wr);
 						break;
 					default:
 						DLOG("packet: id=%u drop\n", id);
@@ -383,7 +384,7 @@ static int dvt_main(void)
 				}
 				else
 				{
-					DLOG("unexpected zero size recvfrom\n")
+					DLOG("unexpected zero size recvfrom\n");
 				}
 			}
 		}
@@ -414,7 +415,7 @@ static int win_main(const char *windivert_filter)
 
 	if (!win_dark_init(&params.ssid_filter, &params.nlm_filter))
 	{
-		fprintf(stderr, "win_dark_init failed. win32 error %u (0x%08X)\n", w_win32_error, w_win32_error);
+		DLOG_ERR("win_dark_init failed. win32 error %u (0x%08X)\n", w_win32_error, w_win32_error);
 		return w_win32_error;
 	}
 
@@ -422,20 +423,20 @@ static int win_main(const char *windivert_filter)
 	{
 		if (!logical_net_filter_match())
 		{
-			printf("logical network is not present. waiting it to appear.\n");
+			DLOG_CONDUP("logical network is not present. waiting it to appear.\n");
 			fflush(stdout);
 			do
 			{
 				if (bQuit)
 				{
-					DLOG("QUIT requested\n")
+					DLOG("QUIT requested\n");
 					win_dark_deinit();
 					return 0;
 				}
 				usleep(500000);
 			}
 			while (!logical_net_filter_match());
-			printf("logical network now present\n");
+			DLOG_CONDUP("logical network now present\n");
 			fflush(stdout);
 		}
 
@@ -445,7 +446,7 @@ static int win_main(const char *windivert_filter)
 			return w_win32_error;
 		}
 
-		printf("windivert initialized. capture is started.\n");
+		DLOG_CONDUP("windivert initialized. capture is started.\n");
 
 		// cygwin auto flush fails when piping
 		fflush(stdout);
@@ -458,36 +459,36 @@ static int win_main(const char *windivert_filter)
 			{
 				if (errno==ENOBUFS)
 				{
-					DLOG("windivert: ignoring too large packet\n")
+					DLOG("windivert: ignoring too large packet\n");
 					continue; // too large packet
 				}
 				else if (errno==ENODEV)
 				{
-					printf("logical network disappeared. deinitializing windivert.\n");
+					DLOG_CONDUP("logical network disappeared. deinitializing windivert.\n");
 					rawsend_cleanup();
 					break;
 				}
 				else if (errno==EINTR)
 				{
-					DLOG("QUIT requested\n")
+					DLOG("QUIT requested\n");
 					win_dark_deinit();
 					return 0;
 				}
-				fprintf(stderr, "windivert: recv failed. errno %d\n", errno);
+				DLOG_ERR("windivert: recv failed. errno %d\n", errno);
 				win_dark_deinit();
 				return w_win32_error;
 			}
 			*ifout=0;
 			if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
-			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx)
+			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx);
 			if (wa.Impostor)
 			{
-				DLOG("windivert: passing impostor packet\n")
+				DLOG("windivert: passing impostor packet\n");
 				verdict = VERDICT_PASS;
 			}
 			else if (wa.Loopback)
 			{
-				DLOG("windivert: passing loopback packet\n")
+				DLOG("windivert: passing loopback packet\n");
 				verdict = VERDICT_PASS;
 			}
 			else
@@ -501,11 +502,11 @@ static int win_main(const char *windivert_filter)
 				case VERDICT_PASS:
 				case VERDICT_MODIFY:
 					if ((verdict & VERDICT_MASK)==VERDICT_PASS)
-						DLOG("packet: id=%u reinject unmodified\n", id)
+						DLOG("packet: id=%u reinject unmodified\n", id);
 					else
-						DLOG("packet: id=%u reinject modified len=%zu\n", id, len)
+						DLOG("packet: id=%u reinject modified len=%zu\n", id, len);
 					if (!windivert_send(packet, len, &wa))
-						fprintf(stderr,"windivert: reinject of packet id=%u failed\n", id);
+						DLOG_ERR("windivert: reinject of packet id=%u failed\n", id);
 					break;
 				default:
 					DLOG("packet: id=%u drop\n", id);
@@ -533,7 +534,7 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 	v = atoi(s);
 	if (v < 0 || v>65535)
 	{
-		fprintf(stderr, "bad wsize\n");
+		DLOG_ERR("bad wsize\n");
 		return false;
 	}
 	*wsize=(uint16_t)v;
@@ -542,7 +543,7 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 		v = atoi(p);
 		if (v < 0 || v>255)
 		{
-			fprintf(stderr, "bad wscale\n");
+			DLOG_ERR("bad wscale\n");
 			return false;
 		}
 		*wscale = (uint8_t)v;
@@ -595,19 +596,19 @@ static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 	{
 		if (!parse_hex_str(filename+2,buf,size) || !*size)
 		{
-			fprintf(stderr, "invalid hex string: %s\n",filename+2);
+			DLOG_ERR("invalid hex string: %s\n",filename+2);
 			exit_clean(1);
 		}
-		DLOG("read %zu bytes from hex string\n",*size)
+		DLOG("read %zu bytes from hex string\n",*size);
 	}
 	else
 	{
 		if (!load_file_nonempty(filename,buf,size))
 		{
-			fprintf(stderr, "could not read %s\n",filename);
+			DLOG_ERR("could not read %s\n",filename);
 			exit_clean(1);
 		}
-		DLOG("read %zu bytes from %s\n",*size,filename)
+		DLOG("read %zu bytes from %s\n",*size,filename);
 	}
 }
 
@@ -786,7 +787,7 @@ static unsigned int hash_jen(const void *data,unsigned int len)
 static void exithelp(void)
 {
 	printf(
-		" --debug=0|1\n"
+		" --debug=0|1|syslog|@<filename>\n"
 #ifdef __linux__
 		" --qnum=<nfqueue_number>\n"
 #elif defined(BSD)
@@ -1078,7 +1079,41 @@ int main(int argc, char **argv)
 		switch (option_index)
 		{
 		case 0: /* debug */
-			params.debug = !optarg || atoi(optarg);
+			if (optarg)
+			{
+				if (*optarg=='@')
+				{
+					strncpy(params.debug_logfile,optarg+1,sizeof(params.debug_logfile));
+					params.debug_logfile[sizeof(params.debug_logfile)-1] = 0;
+					FILE *F = fopen(params.debug_logfile,"wt");
+					if (!F)
+					{
+						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
+						exit_clean(1);
+					}
+#ifndef __CYGWIN__
+					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
+						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
+#endif
+					params.debug = true;
+					params.debug_target = LOG_TARGET_FILE;
+				}
+				else if (!strcmp(optarg,"syslog"))
+				{
+					params.debug = true;
+					params.debug_target = LOG_TARGET_SYSLOG;
+				}
+				else
+				{
+					params.debug = !!atoi(optarg);
+					params.debug_target = LOG_TARGET_CONSOLE;
+				}
+			}
+			else
+			{
+				params.debug = true;
+				params.debug_target = LOG_TARGET_CONSOLE;
+			}
 			break;
 #ifndef __CYGWIN__
 		case 1: /* qnum or port */
@@ -1086,7 +1121,7 @@ int main(int argc, char **argv)
 			params.qnum = atoi(optarg);
 			if (params.qnum < 0 || params.qnum>65535)
 			{
-				fprintf(stderr, "bad qnum\n");
+				DLOG_ERR("bad qnum\n");
 				exit_clean(1);
 			}
 #elif defined(BSD)
@@ -1094,7 +1129,7 @@ int main(int argc, char **argv)
 				int i = atoi(optarg);
 				if (i <= 0 || i > 65535)
 				{
-					fprintf(stderr, "bad port number\n");
+					DLOG_ERR("bad port number\n");
 					exit_clean(1);
 				}
 				params.port = (uint16_t)i;
@@ -1115,7 +1150,7 @@ int main(int argc, char **argv)
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
 			{
-				fprintf(stderr, "non-existent username supplied\n");
+				DLOG_ERR("non-existent username supplied\n");
 				exit_clean(1);
 			}
 			params.uid = pwd->pw_uid;
@@ -1128,7 +1163,7 @@ int main(int argc, char **argv)
 			params.droproot = true;
 			if (sscanf(optarg, "%u:%u", &params.uid, &params.gid)<1)
 			{
-				fprintf(stderr, "--uid should be : uid[:gid]\n");
+				DLOG_ERR("--uid should be : uid[:gid]\n");
 				exit_clean(1);
 			}
 			break;
@@ -1144,14 +1179,14 @@ int main(int argc, char **argv)
 		case 8: /* wssize-cutoff */
 			if (!parse_cutoff(optarg, &params.wssize_cutoff, &params.wssize_cutoff_mode))
 			{
-				fprintf(stderr, "invalid wssize-cutoff value\n");
+				DLOG_ERR("invalid wssize-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
 		case 9: /* ctrack-timeouts */
 			if (sscanf(optarg, "%u:%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin, &params.ctrack_t_udp)<3)
 			{
-				fprintf(stderr, "invalid ctrack-timeouts value\n");
+				DLOG_ERR("invalid ctrack-timeouts value\n");
 				exit_clean(1);
 			}
 			break;
@@ -1161,7 +1196,7 @@ int main(int argc, char **argv)
 		case 11: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
-				fprintf(stderr, "hostspell must be exactly 4 chars long\n");
+				DLOG_ERR("hostspell must be exactly 4 chars long\n");
 				exit_clean(1);
 			}
 			params.hostcase = true;
@@ -1196,23 +1231,23 @@ int main(int argc, char **argv)
 				params.desync_mode2 = desync_mode_from_string(mode2);
 				if (params.desync_mode0==DESYNC_INVALID || params.desync_mode==DESYNC_INVALID || params.desync_mode2==DESYNC_INVALID)
 				{
-					fprintf(stderr, "invalid dpi-desync mode\n");
+					DLOG_ERR("invalid dpi-desync mode\n");
 					exit_clean(1);
 				}
 				if (mode3)
 				{
-					fprintf(stderr, "invalid desync combo : %s+%s+%s\n",mode,mode2,mode3);
+					DLOG_ERR("invalid desync combo : %s+%s+%s\n",mode,mode2,mode3);
 					exit_clean(1);
 				}
 				if (params.desync_mode2 && (desync_only_first_stage(params.desync_mode) || !(desync_valid_first_stage(params.desync_mode) && desync_valid_second_stage(params.desync_mode2))))
 				{
-					fprintf(stderr, "invalid desync combo : %s+%s\n", mode,mode2);
+					DLOG_ERR("invalid desync combo : %s+%s\n", mode,mode2);
 					exit_clean(1);
 				}
 				#if defined(__OpenBSD__)
 				if (params.desync_mode==DESYNC_IPFRAG2 || params.desync_mode2==DESYNC_IPFRAG2)
 				{
-					fprintf(stderr, "OpenBSD has checksum issues with fragmented packets. ipfrag disabled.\n");
+					DLOG_ERR("OpenBSD has checksum issues with fragmented packets. ipfrag disabled.\n");
 					exit_clean(1);
 				}
 				#endif
@@ -1225,11 +1260,11 @@ int main(int argc, char **argv)
 			if (sscanf(optarg, "0x%X", &params.desync_fwmark)<=0) sscanf(optarg, "%u", &params.desync_fwmark);
 			if (!params.desync_fwmark)
 			{
-				fprintf(stderr, "fwmark/sockarg should be decimal or 0xHEX and should not be zero\n");
+				DLOG_ERR("fwmark/sockarg should be decimal or 0xHEX and should not be zero\n");
 				exit_clean(1);
 			}
 #else
-			fprintf(stderr, "fmwark/sockarg not supported in this OS\n");
+			DLOG_ERR("fmwark/sockarg not supported in this OS\n");
 			exit_clean(1);
 #endif
 			break;
@@ -1243,14 +1278,14 @@ int main(int argc, char **argv)
 		case 18: /* dpi-desync-autottl */
 			if (!parse_autottl(optarg, &params.desync_autottl))
 			{
-				fprintf(stderr, "dpi-desync-autottl value error\n");
+				DLOG_ERR("dpi-desync-autottl value error\n");
 				exit_clean(1);
 			}
 			break;
 		case 19: /* dpi-desync-autottl6 */
 			if (!parse_autottl(optarg, &params.desync_autottl6))
 			{
-				fprintf(stderr, "dpi-desync-autottl6 value error\n");
+				DLOG_ERR("dpi-desync-autottl6 value error\n");
 				exit_clean(1);
 			}
 			break;
@@ -1268,7 +1303,7 @@ int main(int argc, char **argv)
 					else if (!strcmp(p,"badsum"))
 					{
 						#ifdef __OpenBSD__
-						printf("\nWARNING !!! OpenBSD may forcibly recompute tcp/udp checksums !!! In this case badsum fooling will not work.\nYou should check tcp checksum correctness in tcpdump manually before using badsum.\n\n");
+						DLOG_CONDUP("\nWARNING !!! OpenBSD may forcibly recompute tcp/udp checksums !!! In this case badsum fooling will not work.\nYou should check tcp checksum correctness in tcpdump manually before using badsum.\n\n");
 						#endif
 						params.desync_fooling_mode |= FOOL_BADSUM;
 					}
@@ -1282,7 +1317,7 @@ int main(int argc, char **argv)
 						params.desync_fooling_mode |= FOOL_HOPBYHOP2;
 					else if (strcmp(p,"none"))
 					{
-						fprintf(stderr, "dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum,datanoack,hopbyhop,hopbyhop2\n");
+						DLOG_ERR("dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum,datanoack,hopbyhop,hopbyhop2\n");
 						exit_clean(1);
 					}
 					p = e;
@@ -1292,7 +1327,7 @@ int main(int argc, char **argv)
 		case 21: /* dpi-desync-repeats */
 			if (sscanf(optarg,"%u",&params.desync_repeats)<1 || !params.desync_repeats || params.desync_repeats>20)
 			{
-				fprintf(stderr, "dpi-desync-repeats must be within 1..20\n");
+				DLOG_ERR("dpi-desync-repeats must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
@@ -1302,28 +1337,28 @@ int main(int argc, char **argv)
 		case 23: /* dpi-desync-split-pos */
 			if (sscanf(optarg,"%u",&params.desync_split_pos)<1 || params.desync_split_pos<1)
 			{
-				fprintf(stderr, "dpi-desync-split-pos is not valid\n");
+				DLOG_ERR("dpi-desync-split-pos is not valid\n");
 				exit_clean(1);
 			}
 			break;
 		case 24: /* dpi-desync-split-http-req */
 			if (!parse_httpreqpos(optarg, &params.desync_split_http_req))
 			{
-				fprintf(stderr, "Invalid argument for dpi-desync-split-http-req\n");
+				DLOG_ERR("Invalid argument for dpi-desync-split-http-req\n");
 				exit_clean(1);
 			}
 			break;
 		case 25: /* dpi-desync-split-tls */
 			if (!parse_tlspos(optarg, &params.desync_split_tls))
 			{
-				fprintf(stderr, "Invalid argument for dpi-desync-split-tls\n");
+				DLOG_ERR("Invalid argument for dpi-desync-split-tls\n");
 				exit_clean(1);
 			}
 			break;
 		case 26: /* dpi-desync-split-seqovl */
 			if (sscanf(optarg,"%u",&params.desync_seqovl)<1)
 			{
-				fprintf(stderr, "dpi-desync-split-seqovl is not valid\n");
+				DLOG_ERR("dpi-desync-split-seqovl is not valid\n");
 				exit_clean(1);
 			}
 			break;
@@ -1338,38 +1373,38 @@ int main(int argc, char **argv)
 		case 28: /* dpi-desync-ipfrag-pos-tcp */
 			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_tcp)<1 || params.desync_ipfrag_pos_tcp<1 || params.desync_ipfrag_pos_tcp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
-				fprintf(stderr, "dpi-desync-ipfrag-pos-tcp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
+				DLOG_ERR("dpi-desync-ipfrag-pos-tcp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
 				exit_clean(1);
 			}
 			if (params.desync_ipfrag_pos_tcp & 7)
 			{
-				fprintf(stderr, "dpi-desync-ipfrag-pos-tcp must be multiple of 8\n");
+				DLOG_ERR("dpi-desync-ipfrag-pos-tcp must be multiple of 8\n");
 				exit_clean(1);
 			}
 			break;
 		case 29: /* dpi-desync-ipfrag-pos-udp */
 			if (sscanf(optarg,"%u",&params.desync_ipfrag_pos_udp)<1 || params.desync_ipfrag_pos_udp<1 || params.desync_ipfrag_pos_udp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
-				fprintf(stderr, "dpi-desync-ipfrag-pos-udp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
+				DLOG_ERR("dpi-desync-ipfrag-pos-udp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
 				exit_clean(1);
 			}
 			if (params.desync_ipfrag_pos_udp & 7)
 			{
-				fprintf(stderr, "dpi-desync-ipfrag-pos-udp must be multiple of 8\n");
+				DLOG_ERR("dpi-desync-ipfrag-pos-udp must be multiple of 8\n");
 				exit_clean(1);
 			}
 			break;
 		case 30: /* dpi-desync-badseq-increments */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_increment))
 			{
-				fprintf(stderr, "dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
+				DLOG_ERR("dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
 		case 31: /* dpi-desync-badack-increment */
 			if (!parse_badseq_increment(optarg,&params.desync_badseq_ack_increment))
 			{
-				fprintf(stderr, "dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
+				DLOG_ERR("dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
@@ -1411,7 +1446,7 @@ int main(int argc, char **argv)
 		case 41: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&params.udplen_increment)<1 || params.udplen_increment>0x7FFF || params.udplen_increment<-0x8000)
 			{
-				fprintf(stderr, "dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
+				DLOG_ERR("dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
 				exit_clean(1);
 			}
 			break;
@@ -1426,59 +1461,59 @@ int main(int argc, char **argv)
 		case 43: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &params.desync_cutoff, &params.desync_cutoff_mode))
 			{
-				fprintf(stderr, "invalid desync-cutoff value\n");
+				DLOG_ERR("invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
 		case 44: /* desync-start */
 			if (!parse_cutoff(optarg, &params.desync_start, &params.desync_start_mode))
 			{
-				fprintf(stderr, "invalid desync-start value\n");
+				DLOG_ERR("invalid desync-start value\n");
 				exit_clean(1);
 			}
 			break;
 		case 45: /* hostlist */
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
-				fprintf(stderr, "strlist_add failed\n");
+				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
 		case 46: /* hostlist-exclude */
 			if (!strlist_add(&params.hostlist_exclude_files, optarg))
 			{
-				fprintf(stderr, "strlist_add failed\n");
+				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
 			break;
 		case 47: /* hostlist-auto */
 			if (*params.hostlist_auto_filename)
 			{
-				fprintf(stderr, "only one auto hostlist is supported\n");
+				DLOG_ERR("only one auto hostlist is supported\n");
 				exit_clean(1);
 			}
 			{
-				FILE *F = fopen(optarg,"a+t");
+				FILE *F = fopen(optarg,"at");
 				if (!F)
 				{
-					fprintf(stderr, "cannot create %s\n", optarg);
+					DLOG_ERR("cannot create %s\n", optarg);
 					exit_clean(1);
 				}
 				bool bGzip = is_gzip(F);
 				fclose(F);
 				if (bGzip)
 				{
-					fprintf(stderr, "gzipped auto hostlists are not supported\n");
+					DLOG_ERR("gzipped auto hostlists are not supported\n");
 					exit_clean(1);
 				}
 #ifndef __CYGWIN__
 				if (params.droproot && chown(optarg, params.uid, -1))
-					fprintf(stderr, "could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
+					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
 #endif
 			}
 			if (!strlist_add(&params.hostlist_files, optarg))
 			{
-				fprintf(stderr, "strlist_add failed\n");
+				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
 			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
@@ -1488,7 +1523,7 @@ int main(int argc, char **argv)
 			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
 			{
-				fprintf(stderr, "auto hostlist fail threshold must be within 1..20\n");
+				DLOG_ERR("auto hostlist fail threshold must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
@@ -1496,7 +1531,7 @@ int main(int argc, char **argv)
 			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_fail_time<1)
 			{
-				fprintf(stderr, "auto hostlist fail time is not valid\n");
+				DLOG_ERR("auto hostlist fail time is not valid\n");
 				exit_clean(1);
 			}
 			break;
@@ -1504,7 +1539,7 @@ int main(int argc, char **argv)
 			params.hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
 			if (params.hostlist_auto_retrans_threshold<2 || params.hostlist_auto_retrans_threshold>10)
 			{
-				fprintf(stderr, "auto hostlist fail threshold must be within 2..10\n");
+				DLOG_ERR("auto hostlist fail threshold must be within 2..10\n");
 				exit_clean(1);
 			}
 			break;
@@ -1513,13 +1548,13 @@ int main(int argc, char **argv)
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
 				{
-					fprintf(stderr, "cannot create %s\n", optarg);
+					DLOG_ERR("cannot create %s\n", optarg);
 					exit_clean(1);
 				}
 				fclose(F);
 #ifndef __CYGWIN__
 				if (params.droproot && chown(optarg, params.uid, -1))
-					fprintf(stderr, "could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
+					DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
 #endif
 				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
@@ -1536,14 +1571,14 @@ int main(int argc, char **argv)
 		case 52: /* wf-iface */
 			if (!sscanf(optarg,"%u.%u",&IfIdx,&SubIfIdx))
 			{
-				fprintf(stderr, "bad value for --wf-iface\n");
+				DLOG_ERR("bad value for --wf-iface\n");
 				exit_clean(1);
 			}
 			break;
 		case 53: /* wf-l3 */
 			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
 			{
-				fprintf(stderr, "bad value for --wf-l3\n");
+				DLOG_ERR("bad value for --wf-l3\n");
 				exit_clean(1);
 			}
 			break;
@@ -1552,7 +1587,7 @@ int main(int argc, char **argv)
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
 			{
-				fprintf(stderr, "bad value for --wf-tcp\n");
+				DLOG_ERR("bad value for --wf-tcp\n");
 				exit_clean(1);
 			}
 			break;
@@ -1561,7 +1596,7 @@ int main(int argc, char **argv)
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
 			{
-				fprintf(stderr, "bad value for --wf-udp\n");
+				DLOG_ERR("bad value for --wf-udp\n");
 				exit_clean(1);
 			}
 			break;
@@ -1593,7 +1628,7 @@ int main(int argc, char **argv)
 					if (e) *e++=0;
 					if (*p && !strlist_add(&params.ssid_filter, p))
 					{
-						fprintf(stderr, "strlist_add failed\n");
+						DLOG_ERR("strlist_add failed\n");
 						exit_clean(1);
 					}
 					p = e;
@@ -1611,7 +1646,7 @@ int main(int argc, char **argv)
 					if (e) *e++=0;
 					if (*p && !strlist_add(&params.nlm_filter, p))
 					{
-						fprintf(stderr, "strlist_add failed\n");
+						DLOG_ERR("strlist_add failed\n");
 						exit_clean(1);
 					}
 					p = e;
@@ -1622,7 +1657,7 @@ int main(int argc, char **argv)
 		case 60: /* nlm-list */
 			if (!nlm_list(optarg && !strcmp(optarg,"all")))
 			{
-				fprintf(stderr, "could not get list of NLM networks\n");
+				DLOG_ERR("could not get list of NLM networks\n");
 				exit_clean(1);
 			}
 			exit_clean(0);
@@ -1631,16 +1666,19 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (params.debug && params.debug_target==LOG_TARGET_SYSLOG)
+		openlog(progname,LOG_PID,LOG_USER);
+
 #ifdef __linux__
 	if (params.qnum<0)
 	{
-		fprintf(stderr, "Need queue number (--qnum)\n");
+		DLOG_ERR("Need queue number (--qnum)\n");
 		exit_clean(1);
 	}
 #elif defined(BSD)
 	if (!params.port)
 	{
-		fprintf(stderr, "Need divert port (--port)\n");
+		DLOG_ERR("Need divert port (--port)\n");
 		exit_clean(1);
 	}
 #elif defined(__CYGWIN__)
@@ -1648,26 +1686,26 @@ int main(int argc, char **argv)
 	{
 		if (!*wf_pf_tcp_src && !*wf_pf_udp_src)
 		{
-			fprintf(stderr, "windivert filter : must specify port filter\n");
+			DLOG_ERR("windivert filter : must specify port filter\n");
 			exit_clean(1);
 		}
 		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), IfIdx, SubIfIdx, wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
 		{
-			fprintf(stderr, "windivert filter : could not make filter\n");
+			DLOG_ERR("windivert filter : could not make filter\n");
 			exit_clean(1);
 		}
 	}
-	DLOG("windivert filter size: %zu\nwindivert filter:\n%s\n",strlen(windivert_filter),windivert_filter)
+	DLOG("windivert filter size: %zu\nwindivert filter:\n%s\n",strlen(windivert_filter),windivert_filter);
 	if (*wf_save_file)
 	{
 		if (save_file(wf_save_file,windivert_filter,strlen(windivert_filter)))
 		{
-			printf("windivert filter: raw filter saved to %s\n", wf_save_file);
+			DLOG_ERR("windivert filter: raw filter saved to %s\n", wf_save_file);
 			exit_clean(0);
 		}
 		else
 		{
-			fprintf(stderr, "windivert filter: could not save raw filter to %s\n", wf_save_file);
+			DLOG_ERR("windivert filter: could not save raw filter to %s\n", wf_save_file);
 			exit_clean(1);
 		}
 	}
@@ -1680,7 +1718,7 @@ int main(int argc, char **argv)
 		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)
 		{
 			CloseHandle(hMutexArg);	hMutexArg = NULL;
-			fprintf(stderr, "A copy of winws is already running with the same filter\n");
+			DLOG_ERR("A copy of winws is already running with the same filter\n");
 			goto exiterr;
 		}
 		
@@ -1691,22 +1729,22 @@ int main(int argc, char **argv)
 	if (params.desync_ttl6 == 0xFF) params.desync_ttl6=params.desync_ttl;
 	if (!AUTOTTL_ENABLED(params.desync_autottl6)) params.desync_autottl6 = params.desync_autottl;
 	if (AUTOTTL_ENABLED(params.desync_autottl))
-		DLOG("autottl ipv4 %u:%u-%u\n",params.desync_autottl.delta,params.desync_autottl.min,params.desync_autottl.max)
+		DLOG("autottl ipv4 %u:%u-%u\n",params.desync_autottl.delta,params.desync_autottl.min,params.desync_autottl.max);
 	if (AUTOTTL_ENABLED(params.desync_autottl6))
-		DLOG("autottl ipv6 %u:%u-%u\n",params.desync_autottl6.delta,params.desync_autottl6.min,params.desync_autottl6.max)
+		DLOG("autottl ipv6 %u:%u-%u\n",params.desync_autottl6.delta,params.desync_autottl6.min,params.desync_autottl6.max);
 	if (params.desync_split_tls==tlspos_none && params.desync_split_pos) params.desync_split_tls=tlspos_pos;
 	if (params.desync_split_http_req==httpreqpos_none && params.desync_split_pos) params.desync_split_http_req=httpreqpos_pos;
 
 	if (!LoadIncludeHostLists())
 	{
-		fprintf(stderr, "Include hostlist load failed\n");
+		DLOG_ERR("Include hostlist load failed\n");
 		exit_clean(1);
 	}
 	if (*params.hostlist_auto_filename)
 		NonEmptyHostlist(&params.hostlist);
 	if (!LoadExcludeHostLists())
 	{
-		fprintf(stderr, "Exclude hostlist load failed\n");
+		DLOG_ERR("Exclude hostlist load failed\n");
 		exit_clean(1);
 	}
 
@@ -1714,11 +1752,11 @@ int main(int argc, char **argv)
 
 	if (*pidfile && !writepid(pidfile))
 	{
-		fprintf(stderr, "could not write pidfile\n");
+		DLOG_ERR("could not write pidfile\n");
 		goto exiterr;
 	}
 
-	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp)
+	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 
 #ifdef __linux__

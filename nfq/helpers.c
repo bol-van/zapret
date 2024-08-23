@@ -189,24 +189,24 @@ void dbgprint_socket_buffers(int fd)
 		socklen_t sz;
 		sz = sizeof(int);
 		if (!getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &v, &sz))
-			DLOG("fd=%d SO_RCVBUF=%d\n", fd, v)
+			DLOG("fd=%d SO_RCVBUF=%d\n", fd, v);
 			sz = sizeof(int);
 		if (!getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &v, &sz))
-			DLOG("fd=%d SO_SNDBUF=%d\n", fd, v)
+			DLOG("fd=%d SO_SNDBUF=%d\n", fd, v);
 	}
 }
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
 {
-	DLOG("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n", fd, rcvbuf, sndbuf)
+	DLOG("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n", fd, rcvbuf, sndbuf);
 	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) < 0)
 	{
-		perror("setsockopt (SO_RCVBUF)");
+		DLOG_PERROR("setsockopt (SO_RCVBUF)");
 		close(fd);
 		return false;
 	}
 	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) < 0)
 	{
-		perror("setsockopt (SO_SNDBUF)");
+		DLOG_PERROR("setsockopt (SO_SNDBUF)");
 		close(fd);
 		return false;
 	}

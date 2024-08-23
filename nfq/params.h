@@ -33,9 +33,14 @@
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
 
+enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
+
 struct params_s
 {
+	enum log_target debug_target;
+	char debug_logfile[PATH_MAX];
 	bool debug;
+
 	uint16_t wsize,wssize;
 	uint8_t wscale,wsscale;
 	char wssize_cutoff_mode; // n - packets, d - data packets, s - relative sequence
@@ -85,17 +90,10 @@ struct params_s
 };
 
 extern struct params_s params;
+extern const char *progname;
 
-#define DLOG(format, ...) {if (params.debug) printf(format, ##__VA_ARGS__);}
-
-#define LOG_APPEND(filename, format, ...) \
-{ \
-	FILE *F = fopen(filename,"at"); \
-	if (F) \
-	{ \
-		fprint_localtime(F); \
-		fprintf(F, " : " format "\n", ##__VA_ARGS__); \
-		fclose(F); \
-	} \
-}
-#define HOSTLIST_DEBUGLOG_APPEND(format, ...) if (*params.hostlist_auto_debuglog) LOG_APPEND(params.hostlist_auto_debuglog, format, ##__VA_ARGS__)
+int DLOG(const char *format, ...);
+int DLOG_ERR(const char *format, ...);
+int DLOG_PERROR(const char *s);
+int DLOG_CONDUP(const char *format, ...);
+int HOSTLIST_DEBUGLOG_APPEND(const char *format, ...);
