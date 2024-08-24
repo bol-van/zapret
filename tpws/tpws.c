@@ -730,12 +730,12 @@ void parse_params(int argc, char *argv[])
 					}
 					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
 						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
-					params.debug = 1;
+					if (!params.debug) params.debug = 1;
 					params.debug_target = LOG_TARGET_FILE;
 				}
 				else if (!strcmp(optarg,"syslog"))
 				{
-					params.debug = 1;
+					if (!params.debug) params.debug = 1;
 					params.debug_target = LOG_TARGET_SYSLOG;
 					openlog("tpws",LOG_PID,LOG_USER);
 				}
