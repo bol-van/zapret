@@ -185,9 +185,9 @@ The setup is similar to OpenBSD, but there are important nuances.
    use it for redirection target.
 3. pf.conf syntax is a bit different from OpenBSD.
 4. How to set maximum table size : sysctl net.pf.request_maxcount=2000000
-5. The word 'divert-packet' is absent in the pfctl binary, divert-packet rules
-   are not working. 'divert-to' is not the same thing. Looks like its not
-   possible to use `dvtws` with PF in FreeBSD.
+5. `divert-to` is broken. Loop avoidance scheme does not work.
+   This makes `dvtws` unusable with pf.
+   Someone posted kernel patch but 14-RELEASE is still broken.
 
 `/etc/pf.conf`:
 ```
@@ -303,6 +303,8 @@ rdr pass on em1 inet6 proto tcp from any to any port = http -> fe80::20c:29ff:5a
 rdr pass on em1 inet6 proto tcp from any to any port = https -> fe80::20c:29ff:5ae3:4821 port 988
 ```
 
+Also there's a way to add redirect in the pfsense UI and start `tpws` from cron using `@reboot` prefix.
+This way avoids modification of pfsense code.
 
 ## OpenBSD
 
@@ -425,8 +427,7 @@ Then write the line:
 
 Initially, the kernel of this OS was based on BSD. That's why it is still BSD
 but a lot was modified by Apple. As usual a mass commercial project priorities
-differ from their free counterparts. Apple guys do what they want. What
-everyone have updated long ago they keep old like a mammoth. But who cares?
+differ from their free counterparts. Apple guys do what they want.
 
 MacOS used to have ipfw but it was removed later and replaced by PF. It looks
 like divert sockets are internally replaced with raw. Its possible to request a

@@ -19,22 +19,16 @@ ipfw add 100 fwd ::1,988 tcp from any to any 80,443 proto ip6 recv em1
 /opt/zapret/tpws/tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
 
 
-; Loop avoidance.
-; FreeBSD artificially ignores sockarg for ipv6 in the kernel.
-; This limitation is coming from the ipv6 early age. Code is still in "testing" state. 10-20 years. Everybody forgot about it.
-; dvtws sends ipv6 forged frames using another divert socket (HACK). they can be filtered out using 'diverted'.
-
-
 ipfw delete 100
-ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
+ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted xmit em0
 ; required for autottl mode
-ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in not diverted not sockarg recv em0
+ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in not diverted recv em0
 ; udp
-ipfw add 100 divert 989 udp from any to any 443 out not diverted not sockarg xmit em0
+ipfw add 100 divert 989 udp from any to any 443 out not diverted xmit em0
 
 ipfw delete 100
 ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
-ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted not sockarg xmit em0
+ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted xmit em0
 
 /opt/zapret/nfq/dvtws --port=989 --debug --dpi-desync=split
 

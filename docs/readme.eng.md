@@ -571,7 +571,8 @@ You need to use nftables instead with hook priority 101 or higher.
 tpws is transparent proxy.
 
 ```
- --debug=0|1|2			; 0(default)=silent 1=verbose 2=debug
+ --debug=0|1|2|syslog|@<filename>  ; 1 and 2 means log to console and set debug level. for other targets use --debug-level.
+ --debug-level=0|1|2               ; specify debug level for syslog and @<filename>
  --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %interface_name : fe80::1%br-lan
  --bind-iface4=<interface_name> ; bind to the first ipv4 addr of interface
  --bind-iface6=<interface_name> ; bind to the first ipv6 addr of interface
@@ -584,6 +585,7 @@ tpws is transparent proxy.
  --bind-wait-ip=<sec>           ; after ifup wait for ip address to appear up to N seconds
  --bind-wait-ip-linklocal=<sec> ; accept only link locals first N seconds then any
  --bind-wait-only		; wait for bind conditions satisfaction then exit. return code 0 if success.
+ --connect-bind-addr=<v4_addr>|<v6_addr> ; address for outbound connections. for v6 link locals append %%interface_name
  --port=<port>			; port number to listen on
  --socks			; implement socks4/5 proxy instead of transparent proxy
  --local-rcvbuf=<bytes>		; SO_RCVBUF for local legs

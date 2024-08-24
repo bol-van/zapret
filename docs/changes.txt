@@ -299,3 +299,13 @@ v60
 
 blockcheck: port block test, partial ip block test
 nfqws: seqovl split/disorder modes
+
+v61
+
+C code cleanups
+dvtws: do not use raw sockets. use divert.
+nfqws,tpws: detect TLS 1.2 ClientHello from very old libraries with SSL 3.0 version in record layer
+nfqws,tpws: debug log to file and syslog
+tpws: --connect-bind-addr option
+tpws: log local endpoint (including source port number) for remote leg
+nfqws,tpws: reduced executable size by several KB by moving logging from macros to functions
