@@ -127,10 +127,16 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	*ifout=0;
 	if (params.bind_fix4 || params.bind_fix6)
 	{
+		char ifin[IFNAMSIZ+1];
+		uint32_t ifidx_in;
+
 		ifidx = nfq_get_outdev(nfa);
 		if (ifidx) if_indextoname(ifidx,ifout);
+		*ifin=0;
+		ifidx_in = nfq_get_indev(nfa);
+		if (ifidx_in) if_indextoname(ifidx_in,ifin);
 
-		DLOG("packet: id=%d len=%d mark=%08X ifout=%s(%u)\n", id, ilen, mark, ifout, ifidx);
+		DLOG("packet: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifin, ifidx_in, ifout, ifidx);
 	}
 	else
 		// save some syscalls
