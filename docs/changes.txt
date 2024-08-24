@@ -308,4 +308,3 @@ nfqws,tpws: detect TLS 1.2 ClientHello from very old libraries with SSL 3.0 vers
 nfqws,tpws: debug log to file and syslog
 tpws: --connect-bind-addr option
 tpws: log local endpoint (including source port number) for remote leg
-nfqws,tpws: reduced executable size by several KB by moving logging from macros to functions
