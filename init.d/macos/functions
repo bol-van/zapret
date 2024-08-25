@@ -1,7 +1,9 @@
 # init script functions library for macos
 
-[ -n "$ZAPRET_BASE" ] || ZAPRET_BASE=/opt/zapret
-. "$ZAPRET_BASE/config"
+ZAPRET_BASE=${ZAPRET_BASE:-/opt/zapret}
+ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+. "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/pf.sh"
 . "$ZAPRET_BASE/common/list.sh"

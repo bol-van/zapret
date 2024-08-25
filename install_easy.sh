@@ -4,11 +4,17 @@
 
 EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
-IPSET_DIR="$EXEDIR/ipset"
-ZAPRET_CONFIG="$EXEDIR/config"
-ZAPRET_BASE="$EXEDIR"
+ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
+ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+ZAPRET_CONFIG_DEFAULT="$ZAPRET_BASE/config.default"
+IPSET_DIR="$ZAPRET_BASE/ipset"
 
-[ -f "$ZAPRET_CONFIG" ] || cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
+[ -f "$ZAPRET_CONFIG" ] || {
+	ZAPRET_CONFIG_DIR="$(dirname "$ZAPRET_CONFIG")"
+	[ -d "$ZAPRET_CONFIG_DIR" ] || mkdir -p "$ZAPRET_CONFIG_DIR"
+	cp "$ZAPRET_CONFIG_DEFAULT" "$ZAPRET_CONFIG"
+}
 . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/elevate.sh"
@@ -19,7 +25,7 @@ ZAPRET_BASE="$EXEDIR"
 . "$ZAPRET_BASE/common/virt.sh"
 
 # install target
-ZAPRET_TARGET=/opt/zapret
+ZAPRET_TARGET=${ZAPRET_TARGET:-/opt/zapret}
 
 GET_LIST="$IPSET_DIR/get_config.sh"
 
@@ -378,12 +384,16 @@ select_mode_iface()
 
 default_files()
 {
-	[ -f "$1/ipset/$file/zapret-hosts-user-exclude.txt" ] || cp "$1/ipset/$file/zapret-hosts-user-exclude.txt.default" "$1/ipset/$file/zapret-hosts-user-exclude.txt"
-	[ -f "$1/ipset/$file/zapret-hosts-user.txt" ] || echo nonexistent.domain >> "$1/ipset/$file/zapret-hosts-user.txt"
-	[ -f "$1/ipset/$file/zapret-hosts-user-ipban.txt" ] || touch "$1/ipset/$file/zapret-hosts-user-ipban.txt"
+	# $1 - ro location
+	# $2 - rw location (can be equal to $1)
+	[ -d "$2/ipset" ] || mkdir -p "$2/ipset"
+	[ -f "$2/ipset/zapret-hosts-user-exclude.txt" ] || cp "$1/ipset/zapret-hosts-user-exclude.txt.default" "$2/ipset/zapret-hosts-user-exclude.txt"
+	[ -f "$2/ipset/zapret-hosts-user.txt" ] || echo nonexistent.domain >> "$2/ipset/zapret-hosts-user.txt"
+	[ -f "$2/ipset/zapret-hosts-user-ipban.txt" ] || touch "$2/ipset/zapret-hosts-user-ipban.txt"
 	for dir in openwrt sysv macos; do
 		[ -d "$1/init.d/$dir" ] && {
-			[ -f "$1/init.d/$dir/custom" ] || cp "$1/init.d/$dir/custom.default" "$1/init.d/$dir/custom"
+			[ -d "$2/init.d/$dir" ] || mkdir -p "$2/init.d/$dir"
+			[ -f "$2/init.d/$dir/custom" ] || cp "$1/init.d/$dir/custom.default" "$2/init.d/$dir/custom"
 		}
 	done
 }
@@ -420,7 +430,15 @@ fix_perms()
 	[ -d "$1" ] || return
 	find "$1" -type d -exec chmod 755 {} \;
 	find "$1" -type f -exec chmod 644 {} \;
-	chown -R root:root "$1"
+	local chow
+	case "$UNAME" in
+		Linux)
+			chow=root:root
+			;;
+		*)
+			chow=root:wheel
+	esac
+	chown -R $chow "$1"
 	find "$1/binaries" '(' -name tpws -o -name dvtws -o -name nfqws -o -name ip2net -o -name mdig ')' -exec chmod 755 {} \;
 	for f in \
 install_bin.sh \
@@ -493,7 +511,7 @@ check_location()
 
 	# use inodes in case something is linked
 	if [ -d "$ZAPRET_TARGET" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_TARGET") ]; then
-		default_files "$ZAPRET_TARGET"
+		default_files "$ZAPRET_TARGET" "$ZAPRET_RW"
 	else
 		echo
 		echo easy install is supported only from default location : $ZAPRET_TARGET
@@ -506,8 +524,10 @@ check_location()
 				echo directory needs to be replaced. config and custom scripts can be kept or replaced with clean version
 				if ask_yes_no N "do you want to delete all files there and copy this version"; then
 					echo
-					ask_yes_no Y "keep config, custom scripts and user lists" && keep=Y
-					[ "$keep" = "Y" ] && backup_restore_settings 1
+					if [ $(get_dir_inode "$ZAPRET_BASE") = $(get_dir_inode "$ZAPRET_RW") ]; then
+						ask_yes_no Y "keep config, custom scripts and user lists" && keep=Y
+						[ "$keep" = "Y" ] && backup_restore_settings 1
+					fi
 					rm -r "$ZAPRET_TARGET"
 				else
 					echo refused to overwrite $ZAPRET_TARGET. exiting
@@ -520,7 +540,7 @@ check_location()
 			fix_perms "$ZAPRET_TARGET"
 			[ "$keep" = "Y" ] && backup_restore_settings 0
 			echo relaunching itself from $ZAPRET_TARGET
-			exec $ZAPRET_TARGET/$(basename $0)
+			exec "$ZAPRET_TARGET/$(basename $0)"
 		else
 			echo copying aborted. exiting
 			exitp 3

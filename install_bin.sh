@@ -5,7 +5,7 @@ EXEDIR="$(cd "$EXEDIR"; pwd)"
 BINS=binaries
 BINDIR="$EXEDIR/$BINS"
 
-ZAPRET_BASE="$EXEDIR"
+ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
 . "$ZAPRET_BASE/common/base.sh"
 
 check_dir()
@@ -42,10 +42,10 @@ check_dir()
 ccp()
 {
 	local F=$(basename $1)
-	[ -d "$EXEDIR/$2" ] || mkdir "$EXEDIR/$2"
-	[ -f "$EXEDIR/$2/$F" ] && rm -f "$EXEDIR/$2/$F"
-	ln -fs "../$BINS/$1" "$EXEDIR/$2" && echo linking : "../$BINS/$1" =\> "$EXEDIR/$2"
-	#cp -f "$BINDIR/$1" "$EXEDIR/$2" && echo copying : "$BINDIR/$1" =\> "$EXEDIR/$2"
+	[ -d "$ZAPRET_BASE/$2" ] || mkdir "$ZAPRET_BASE/$2"
+	[ -f "$ZAPRET_BASE/$2/$F" ] && rm -f "$ZAPRET_BASE/$2/$F"
+	ln -fs "../$BINS/$1" "$ZAPRET_BASE/$2" && echo linking : "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
+	#cp -f "../$BINS/$1" "$ZAPRET_BASE/$2" && echo copying : "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
 }
 
 UNAME=$(uname)

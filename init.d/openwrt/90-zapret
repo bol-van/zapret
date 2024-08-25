@@ -31,7 +31,9 @@ check_need_to_reload_tpws6()
 	else
 		ZAPRET_BASE=/opt/zapret
 	fi
-	. "$ZAPRET_BASE/config"
+	ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+	ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+	. "$ZAPRET_CONFIG"
 
 	check_need_to_reload_tpws6
 	[ -n "$RELOAD_TPWS6" ] && {

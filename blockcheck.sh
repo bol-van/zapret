@@ -2,11 +2,17 @@
 
 EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
-ZAPRET_CONFIG="$EXEDIR/config"
-ZAPRET_BASE="$EXEDIR"
+ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
+ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+ZAPRET_CONFIG_DEFAULT="$ZAPRET_BASE/config.default"
 
 [ -f "$ZAPRET_CONFIG" ] || {
-	[ -f "${ZAPRET_CONFIG}.default" ] && cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
+	[ -f "$ZAPRET_CONFIG_DEFAULT" ] && {
+		ZAPRET_CONFIG_DIR="$(dirname "$ZAPRET_CONFIG")"
+		[ -d "$ZAPRET_CONFIG_DIR" ] || mkdir -p "$ZAPRET_CONFIG_DIR"
+		cp "$ZAPRET_CONFIG_DEFAULT" "$ZAPRET_CONFIG"
+	}
 }
 [ -f "$ZAPRET_CONFIG" ] && . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
