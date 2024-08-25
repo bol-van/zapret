@@ -540,7 +540,7 @@ check_location()
 			fix_perms "$ZAPRET_TARGET"
 			[ "$keep" = "Y" ] && backup_restore_settings 0
 			echo relaunching itself from $ZAPRET_TARGET
-			exec "$ZAPRET_TARGET/$(basename $0)"
+			exec "$ZAPRET_TARGET/$(basename "$0")"
 		else
 			echo copying aborted. exiting
 			exitp 3

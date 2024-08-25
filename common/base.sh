@@ -154,7 +154,7 @@ linux_get_subsys()
 	local INIT="$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)"
 
 	[ -L "$INIT" ] && INIT=$(readlink "$INIT")
-	INIT=$(basename "$INIT")
+	INIT="$(basename "$INIT")"
 	if [ -f "/etc/openwrt_release" ] && [ "$INIT" = "procd" ] ; then
 		SUBSYS=openwrt
 	elif [ -x "/bin/ndm" ] ; then

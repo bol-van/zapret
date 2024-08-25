@@ -89,7 +89,7 @@ check_system()
 		# do not use 'exe' because it requires root
 		local INIT="$(sed 's/\x0/\n/g' /proc/1/cmdline | head -n 1)"
 		[ -L "$INIT" ] && INIT=$(readlink "$INIT")
-		INIT=$(basename "$INIT")
+		INIT="$(basename "$INIT")"
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd

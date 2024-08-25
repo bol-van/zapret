@@ -117,7 +117,7 @@ resolve_lower_devices()
 		{
 			local l lower lowers
 			while read lower; do
-				lower=$(basename "$lower")
+				lower="$(basename "$lower")"
 				l="${lower#lower_*}"
 				[  "$l" != "$lower" ] && append_separator_list lowers ' ' '' "$l"
 			done

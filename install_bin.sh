@@ -41,7 +41,7 @@ check_dir()
 # link or copy executables. uncomment either ln or cp, comment other
 ccp()
 {
-	local F=$(basename $1)
+	local F="$(basename "$1")"
 	[ -d "$ZAPRET_BASE/$2" ] || mkdir "$ZAPRET_BASE/$2"
 	[ -f "$ZAPRET_BASE/$2/$F" ] && rm -f "$ZAPRET_BASE/$2/$F"
 	ln -fs "../$BINS/$1" "$ZAPRET_BASE/$2" && echo linking : "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
