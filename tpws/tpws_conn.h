@@ -69,7 +69,7 @@ struct tproxy_conn
 
 	// these value are used in flow control. we do not use ET (edge triggered) polling
 	// if we dont disable notifications they will come endlessly until condition becomes false and will eat all cpu time
-	bool bFlowIn,bFlowOut, bFlowInPrev,bFlowOutPrev, bPrevRdhup;
+	bool bFlowIn,bFlowOut, bShutdown, bFlowInPrev,bFlowOutPrev, bPrevRdhup;
 
 	// total read,write
 	uint64_t trd,twr, tnrd;
