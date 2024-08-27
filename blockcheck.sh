@@ -50,7 +50,7 @@ HDRTEMP=/tmp/zapret-hdr.txt
 NFT_TABLE=blockcheck
 
 DNSCHECK_DNS=${DNSCHECK_DNS:-8.8.8.8 1.1.1.1 77.88.8.1}
-DNSCHECK_DOM=${DNSCHECK_DOM:-pornhub.com putinhuylo.com rutracker.org www.torproject.org bbc.com}
+DNSCHECK_DOM=${DNSCHECK_DOM:-pornhub.com ntc.party rutracker.org www.torproject.org bbc.com}
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
