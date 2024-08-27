@@ -14,6 +14,8 @@
 #define SPLICE_LEN 65536
 #define DEFAULT_MAX_CONN	512
 #define DEFAULT_MAX_ORPHAN_TIME	5
+#define DEFAULT_TCP_USER_TIMEOUT_LOCAL	10
+#define DEFAULT_TCP_USER_TIMEOUT_REMOTE	20
 
 int event_loop(const int *listen_fd, size_t listen_fd_ct);
 

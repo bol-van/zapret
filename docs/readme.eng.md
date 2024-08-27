@@ -594,6 +594,8 @@ tpws is transparent proxy.
  --remote-sndbuf=<bytes>	; SO_SNDBUF for remote legs
  --nosplice                     ; do not use splice to transfer data between sockets
  --skip-nodelay			; do not set TCP_NODELAY for outgoing connections. incompatible with split.
+ --local-tcp-user-timeout=<seconds>  ; set tcp user timeout for local leg (default : 10, 0 = system default)
+ --remote-tcp-user-timeout=<seconds> ; set tcp user timeout for remote leg (default : 20, 0 = system default)
  --no-resolve			; disable socks5 remote dns
  --resolver-threads=<int>       ; number of resolver worker threads
  --maxconn=<max_connections>	; max number of local legs

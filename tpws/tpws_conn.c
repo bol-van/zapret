@@ -337,6 +337,30 @@ static bool proxy_remote_conn_ack(tproxy_conn_t *conn, int sock_err)
 	return bres;
 }
 
+#if defined(__linux__) || defined(__APPLE__)
+
+static void set_user_timeout(int fd, int timeout)
+{
+#ifdef __linux__
+	if (timeout>0)
+	{
+		int msec = 1000*timeout;
+		if (setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &msec, sizeof(int)) <0)
+			DLOG_PERROR("setsockopt (TCP_USER_TIMEOUT)");
+	}
+#elif defined(__APPLE__)
+	if (timeout>0 && setsockopt(fd, IPPROTO_TCP, TCP_RXT_CONNDROPTIME, &timeout, sizeof(int)) <0)
+		DLOG_PERROR("setsockopt (TCP_RXT_CONNDROPTIME)");
+#endif
+}
+
+#else
+
+#define set_user_timeout(fd,timeout)
+
+#endif
+
+
 //Createas a socket and initiates the connection to the host specified by 
 //remote_addr.
 //Returns -1 if something fails, >0 on success (socket fd).
@@ -427,6 +451,8 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 			return -1;
 		}
 	}
+
+	set_user_timeout(remote_fd, params.tcp_user_timeout_remote);
 
 	if (connect(remote_fd, remote_addr, remote_addr->sa_family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)) < 0)
 	{
@@ -1509,6 +1535,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 
 						VPRINT("Socket fd=%d (local) connected from %s\n", conn->fd, ip_port);
 					}
+					set_user_timeout(conn->fd, params.tcp_user_timeout_local);
 				}
 			}
 			else
@@ -1568,6 +1595,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						}
 						else
 						{
+
 							DBGPRINT("conn fd=%d has no unsent\n", conn->fd);
 							conn->bFlowIn = false;
 							epoll_update_flow(conn);

@@ -43,6 +43,9 @@ struct params_s
 	bool daemon;
 	int maxconn,resolver_threads,maxfiles,max_orphan_time;
 	int local_rcvbuf,local_sndbuf,remote_rcvbuf,remote_sndbuf;
+#if defined(__linux__) || defined(__APPLE__)
+	int tcp_user_timeout_local,tcp_user_timeout_remote;
+#endif
 
 	bool tamper; // any tamper option is set
 	bool hostcase, hostdot, hosttab, hostnospace, methodspace, methodeol, unixeol, domcase;

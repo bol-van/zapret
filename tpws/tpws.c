@@ -150,6 +150,10 @@ static void exithelp(void)
 		" --nosplice\t\t\t\t; do not use splice to transfer data between sockets\n"
 #endif
 		" --skip-nodelay\t\t\t\t; do not set TCP_NODELAY option for outgoing connections (incompatible with split options)\n"
+#if defined(__linux__) || defined(__APPLE__)
+		" --local-tcp-user-timeout=<seconds>\t; set tcp user timeout for local leg (default : %d, 0 = system default)\n"
+		" --remote-tcp-user-timeout=<seconds>\t; set tcp user timeout for remote leg (default : %d, 0 = system default)\n"
+#endif
 		" --maxconn=<max_connections>\n"
 #ifdef SPLICE_PRESENT
 		" --maxfiles=<max_open_files>\t\t; should be at least (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode\n"
@@ -161,7 +165,7 @@ static void exithelp(void)
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
 		" --user=<username>\t\t\t; drop root privs\n"
 		" --uid=uid[:gid]\t\t\t; drop root privs\n"
-#if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
+#if defined(__FreeBSD__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
@@ -203,6 +207,9 @@ static void exithelp(void)
 #endif
 		" --tamper-start=[n]<pos>\t\t; start tampering only from specified outbound stream position. default is 0. 'n' means data block number.\n"
 		" --tamper-cutoff=[n]<pos>\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
+#if defined(__linux__) || defined(__APPLE__)
+		DEFAULT_TCP_USER_TIMEOUT_LOCAL,DEFAULT_TCP_USER_TIMEOUT_REMOTE,
+#endif
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
 	);
 	exit(1);
@@ -291,6 +298,10 @@ void parse_params(int argc, char *argv[])
 	params.binds_last = -1;
 	params.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
 	params.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+#if defined(__linux__) || defined(__APPLE__)
+	params.tcp_user_timeout_local = DEFAULT_TCP_USER_TIMEOUT_LOCAL;
+	params.tcp_user_timeout_remote = DEFAULT_TCP_USER_TIMEOUT_REMOTE;
+#endif
 	LIST_INIT(&params.hostlist_files);
 	LIST_INIT(&params.hostlist_exclude_files);
 
@@ -360,13 +371,18 @@ void parse_params(int argc, char *argv[])
 		{ "tamper-start",required_argument,0,0 },// optidx=53
 		{ "tamper-cutoff",required_argument,0,0 },// optidx=54
 		{ "connect-bind-addr",required_argument,0,0 },// optidx=55
-#if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
+#if defined(__FreeBSD__)
 		{ "enable-pf",no_argument,0,0 },// optidx=56
+#elif defined(__APPLE__)
+		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=56
+		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=57
 #elif defined(__linux__)
-		{ "mss",required_argument,0,0 },// optidx=56
-		{ "mss-pf",required_argument,0,0 },// optidx=57
+		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=56
+		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=57
+		{ "mss",required_argument,0,0 },// optidx=58
+		{ "mss-pf",required_argument,0,0 },// optidx=59
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },// optidx=58
+		{ "nosplice",no_argument,0,0 },// optidx=60
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -851,12 +867,32 @@ void parse_params(int argc, char *argv[])
 				}
 			}
 			break;
-#if defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__)
+
+#if defined(__FreeBSD__)
 		case 56: /* enable-pf */
 			params.pf_enable = true;
 			break;
-#elif defined(__linux__)
-		case 56: /* mss */
+#elif defined(__linux__) || defined(__APPLE__)
+		case 56: /* local-tcp-user-timeout */
+			params.tcp_user_timeout_local = atoi(optarg);
+			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
+			{
+				DLOG_ERR("Invalid argument for tcp user timeout. must be 0..86400\n");
+				exit_clean(1);
+			}
+			break;
+		case 57: /* remote-tcp-user-timeout */
+			params.tcp_user_timeout_remote = atoi(optarg);
+			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
+			{
+				DLOG_ERR("Invalid argument for tcp user timeout. must be 0..86400\n");
+				exit_clean(1);
+			}
+			break;
+#endif
+
+#if defined(__linux__)
+		case 58: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			params.mss = atoi(optarg);
 			if (params.mss<88 || params.mss>32767)
@@ -865,7 +901,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 57: /* mss-pf */
+		case 59: /* mss-pf */
 			if (!pf_parse(optarg,&params.mss_pf))
 			{
 				DLOG_ERR("Invalid MSS port filter.\n");
@@ -873,7 +909,7 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 #ifdef SPLICE_PRESENT
-		case 58: /* nosplice */
+		case 60: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
