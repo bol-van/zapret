@@ -11,7 +11,7 @@ getipban || FAIL=1
 "$IPSET_DIR/create_ipset.sh"
 [ -n "$FAIL" ] && exit
 
-ZURL=https://antizapret.prostovpn.org/domains-export.txt
+ZURL=https://p.thenewone.lol/domains-export.txt
 ZDOM="$TMPDIR/zapret.txt"
 
 
