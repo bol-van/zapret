@@ -235,7 +235,7 @@ nat-anchor "natearly/*" all
 nat-anchor "natrules/*" all
 ...................
 no rdr proto carp all
-rdr-anchor "zapret" all
+rdr-anchor "zapret/*" all
 rdr-anchor "tftp-proxy/*" all
 rdr-anchor "miniupnpd" all
 [root@pfSense /]# pfctl -s nat -a zapret
