@@ -260,11 +260,15 @@ static bool conn_has_unsent_pair(tproxy_conn_t *conn)
 	return conn_has_unsent(conn) || (conn_partner_alive(conn) && conn_has_unsent(conn->partner));
 }
 
-static void conn_shutdown(tproxy_conn_t *conn)
+static bool conn_shutdown(tproxy_conn_t *conn)
 {
-	if (shutdown(conn->fd,SHUT_WR)<0)
-		DLOG_PERROR("shutdown");
 	conn->bShutdown = true;
+	if (shutdown(conn->fd,SHUT_WR)<0)
+	{
+		DLOG_PERROR("shutdown");
+		return false;
+	}
+	return true;
 }
 
 static ssize_t send_or_buffer(send_buffer_t *sb, int fd, const void *buf, size_t len, int flags, int ttl)
@@ -761,7 +765,11 @@ static bool handle_unsent(tproxy_conn_t *conn)
 		if (!conn->bShutdown)
 		{
 			DBGPRINT("fd=%d no more has unsent. partner in RDHUP state. executing delayed shutdown.\n", conn->fd);
-			conn_shutdown(conn);
+			if (!conn_shutdown(conn))
+			{
+				DBGPRINT("emergency connection close due to failed shutdown\n");
+				return false;
+			}
 		}
 		if (conn->state==CONN_RDHUP && !conn_has_unsent(conn->partner))
 		{
@@ -1606,7 +1614,11 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 								else
 								{
 									DBGPRINT("partner has no unsent. shutting down partner.\n");
-									conn_shutdown(conn->partner);
+									if (!conn_shutdown(conn->partner))
+									{
+										DBGPRINT("emergency connection close due to failed shutdown\n");
+										conn_close_with_partner_check(&conn_list,&close_list,conn);
+									}
 									if (conn->partner->state==CONN_RDHUP)
 									{
 										DBGPRINT("both partners are in RDHUP state and have no unsent. closing.\n");
@@ -1644,7 +1656,12 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						if ((conn->state == CONN_RDHUP) && conn_partner_alive(conn) && !conn->partner->bShutdown && !conn_has_unsent(conn))
 						{
 							DBGPRINT("conn fd=%d has no unsent. shutting down partner.\n", conn->fd);
-							conn_shutdown(conn->partner);
+							if (!conn_shutdown(conn->partner))
+							{
+								DBGPRINT("emergency connection close due to failed shutdown\n");
+								conn_close_with_partner_check(&conn_list,&close_list,conn);
+								continue;
+							}
 						}
 
 					}
