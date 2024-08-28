@@ -226,8 +226,8 @@ systems. In this case run `dvtws` as `/opt/zapret/nfq/dvtws`. Or just copy
 present. It's possible to renew lists.
 
 If you dont like poverty of default repos its possible to enable FreeBSD repo.
-Change `no` to `yes` in `/usr/local/etc/pkg/repos/FreeBSD.conf`. Then it
-becomes possible to install all the required software including git to download
+Change `no` to `yes` in `/usr/local/etc/pkg/repos/FreeBSD.conf` and `/usr/local/etc/pkg/repos/pfSense.conf`.
+Then it becomes possible to install all the required software including git to download
 zapret from github directly.
 
 
