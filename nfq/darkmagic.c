@@ -8,6 +8,9 @@
 #include <sys/param.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifdef __linux__
+#include <linux/in.h>
+#endif
 
 #include "darkmagic.h"
 #include "helpers.h"
