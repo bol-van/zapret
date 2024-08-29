@@ -1,0 +1,11 @@
+config
+ip2net/ip2net
+mdig/mdig
+nfq/nfqws
+tpws/tpws
+binaries/my/
+init.d/**/custom
+ipset/zapret-ip*.txt
+ipset/zapret-ip*.gz
+ipset/zapret-hosts*.txt
+ipset/zapret-hosts*.gz
