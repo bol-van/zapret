@@ -8,8 +8,10 @@
 #include <sys/param.h>
 #include <errno.h>
 #include <fcntl.h>
-#ifdef __linux__
-#include <linux/in.h>
+
+#ifndef IP_NODEFRAG
+// for very old toolchains
+#define IP_NODEFRAG     22
 #endif
 
 #include "darkmagic.h"
