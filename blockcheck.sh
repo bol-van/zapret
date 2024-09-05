@@ -549,7 +549,7 @@ curl_with_subst_ip()
 	local connect_to="--connect-to $1::[$3]${2:+:$2}" arg
 	shift ; shift ; shift
 	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
-	[ "$CURL_CMD" = 1 ] && echo curl ${arg:+$arg }$connect_to "$@"
+	[ "$CURL_CMD" = 1 ] && echo $CURL ${arg:+$arg }$connect_to "$@"
 	ALL_PROXY="$ALL_PROXY" $CURL ${arg:+$arg }$connect_to "$@"
 }
 curl_with_dig()
