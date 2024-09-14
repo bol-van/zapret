@@ -156,7 +156,7 @@ static void stat_print(int ct, int ct_ok)
 	if (glob.stats_every > 0)
 	{
 		time_t tm = time(NULL)-glob.start_time;
-		interlocked_fprintf(stderr, "mdig stats : %02u:%02u:%02u : domains=%d success=%d error=%d\n", tm/3600, (tm/60)%60, tm%60, ct, ct_ok, ct - ct_ok);
+		interlocked_fprintf(stderr, "mdig stats : %02u:%02u:%02u : domains=%d success=%d error=%d\n", (unsigned int)(tm/3600), (unsigned int)((tm/60)%60), (unsigned int)(tm%60), ct, ct_ok, ct - ct_ok);
 	}
 }
 
