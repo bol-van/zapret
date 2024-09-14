@@ -259,7 +259,7 @@ nfqws
  --dpi-desync-badack-increment=<int|0xHEX>      ; инкремент ack sequence number для badseq. по умолчанию -66000
  --dpi-desync-any-protocol=0|1                  ; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
  --dpi-desync-fake-http=<filename>|0xHEX	; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному www.iana.org
- --dpi-desync-fake-tls=<filename>|0xHEX	        ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному www.iana.org
+ --dpi-desync-fake-tls=<filename>|0xHEX	        ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному
  --dpi-desync-fake-unknown=<filename>|0xHEX	; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
  --dpi-desync-fake-syndata=<filename>|0xHEX	; файл, содержащий фейковый пейлоад пакета SYN для режима десинхронизации syndata
  --dpi-desync-fake-quic=<filename>|0xHEX        ; файл, содержащий фейковый QUIC Initial
