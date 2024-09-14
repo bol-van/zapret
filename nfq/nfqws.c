@@ -924,7 +924,6 @@ int main(int argc, char **argv)
 		return 0;
 	}
 #endif
-
 	int result, v;
 	int option_index = 0;
 	bool daemon = false;
@@ -954,6 +953,7 @@ int main(int argc, char **argv)
 	params.desync_repeats = 1;
 	params.fake_tls_size = sizeof(fake_tls_clienthello_default);
 	memcpy(params.fake_tls,fake_tls_clienthello_default,params.fake_tls_size);
+	randomize_default_tls_payload(params.fake_tls);
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http,fake_http_request_default,params.fake_http_size);
 	params.fake_quic_size = 620; // must be 601+ for TSPU hack

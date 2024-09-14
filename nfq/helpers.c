@@ -342,3 +342,25 @@ bool pf_parse(const char *s, port_filter *pf)
 		return false;
 	return true;
 }
+
+void fill_random_bytes(uint8_t *p,size_t sz)
+{
+	size_t k,sz16 = sz>>1;
+	for(k=0;k<sz16;k++) ((uint16_t*)p)[k]=(uint16_t)random();
+	if (sz & 1) p[sz-1]=(uint8_t)random();
+}
+void fill_random_az(uint8_t *p,size_t sz)
+{
+	size_t k;
+	for(k=0;k<sz;k++) p[k] = 'a'+(random() % ('z'-'a'));
+}
+void fill_random_az09(uint8_t *p,size_t sz)
+{
+	size_t k;
+	uint8_t rnd;
+	for(k=0;k<sz;k++)
+	{
+		rnd = random() % (10 + 'z'-'a'+1);
+		p[k] = rnd<10 ? rnd+'0' : 'a'+rnd-10;
+	}
+}

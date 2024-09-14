@@ -57,3 +57,7 @@ typedef struct
 } port_filter;
 bool pf_in_range(uint16_t port, const port_filter *pf);
 bool pf_parse(const char *s, port_filter *pf);
+
+void fill_random_bytes(uint8_t *p,size_t sz);
+void fill_random_az(uint8_t *p,size_t sz);
+void fill_random_az09(uint8_t *p,size_t sz);
