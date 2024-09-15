@@ -61,10 +61,18 @@ bool dropcaps(void);
 #  define ARCH_NR	AUDIT_ARCH_MIPS64
 # endif
 #else
-# warning "Platform does not support seccomp filter yet"
-# define REG_SYSCALL	0
-# define ARCH_NR	0
+# error "Unsupported mips abi"
 #endif
+
+#elif defined(__PPC64__)
+
+# define REG_SYSCALL	regs.gpr[0]
+
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define ARCH_NR	AUDIT_ARCH_PPC64LE
+# else
+#  define ARCH_NR	AUDIT_ARCH_PPC64
+# endif
 
 #elif defined(__PPC__)
 
@@ -73,9 +81,7 @@ bool dropcaps(void);
 
 #else
 
-# warning "Platform does not support seccomp filter yet"
-# define REG_SYSCALL	0
-# define ARCH_NR	0
+# error "Platform does not support seccomp filter yet"
 
 #endif
 
