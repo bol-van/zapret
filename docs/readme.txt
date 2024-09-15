@@ -53,7 +53,7 @@ For english version refer to docs/readme.eng.txt
 Существует и более продвинутая магия, направленная на преодоление DPI на пакетном уровне.
 
 Подробнее про DPI :
- https://habr.com/ru/post/335436
+ https://web.archive.org/web/20240908095836/https://habr.com/ru/articles/335436
  https://geneva.cs.umd.edu/papers/geneva_ccs19.pdf
 
 
