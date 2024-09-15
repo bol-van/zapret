@@ -96,7 +96,9 @@ SYS_rename,
 #ifdef SYS_renameat2
 SYS_renameat2,
 #endif
+#ifdef SYS_renameat
 SYS_renameat,
+#endif
 #ifdef SYS_readdir
 SYS_readdir,
 #endif

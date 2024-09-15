@@ -22,17 +22,14 @@ bool dropcaps(void);
 
 #if defined(__aarch64__)
 
-# define REG_SYSCALL	regs.regs[8]
 # define ARCH_NR	AUDIT_ARCH_AARCH64
 
 #elif defined(__amd64__)
 
-# define REG_SYSCALL	REG_RAX
 # define ARCH_NR	AUDIT_ARCH_X86_64
 
 #elif defined(__arm__) && (defined(__ARM_EABI__) || defined(__thumb__))
 
-# define REG_SYSCALL	regs.uregs[7]
 # if __BYTE_ORDER == __LITTLE_ENDIAN
 #  define ARCH_NR	AUDIT_ARCH_ARM
 # else
@@ -41,12 +38,9 @@ bool dropcaps(void);
 
 #elif defined(__i386__)
 
-# define REG_SYSCALL	REG_EAX
 # define ARCH_NR	AUDIT_ARCH_I386
 
 #elif defined(__mips__)
-
-# define REG_SYSCALL	regs[2]
 
 #if _MIPS_SIM == _MIPS_SIM_ABI32
 # if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -66,8 +60,6 @@ bool dropcaps(void);
 
 #elif defined(__PPC64__)
 
-# define REG_SYSCALL	regs.gpr[0]
-
 # if __BYTE_ORDER == __LITTLE_ENDIAN
 #  define ARCH_NR	AUDIT_ARCH_PPC64LE
 # else
@@ -76,8 +68,11 @@ bool dropcaps(void);
 
 #elif defined(__PPC__)
 
-# define REG_SYSCALL	regs.gpr[0]
 # define ARCH_NR	AUDIT_ARCH_PPC
+
+#elif __riscv && __riscv_xlen == 64
+
+# define ARCH_NR	AUDIT_ARCH_RISCV64
 
 #else
 
