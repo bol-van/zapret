@@ -589,6 +589,9 @@ hostname is revealed it's switched to another profile.
 If you use 0-phase desync methods think carefully what can happen during strategy switch.
 Use `--debug` logging to understand better what `nfqws` does.
 
+Profiles are numbered from 1 to N. There's last empty profile in the chain numbered 0.
+It's used when no filter matched.
+
 IMPORTANT : multiple strategies exist only for the case when it's not possible to combine all to one strategy.
 Copy-pasting blockcheck results of different websites to multiple strategies lead to the mess.
 This way you may never unblock all resources and only confuse yourself.

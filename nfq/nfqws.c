@@ -1706,7 +1706,7 @@ int main(int argc, char **argv)
 #endif
 		}
 	}
-
+	
 #ifdef __linux__
 	if (params.qnum<0)
 	{
@@ -1763,7 +1763,15 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	DLOG_CONDUP("we have %d desync profile(s)\n",desync_profile_count);
+	DLOG("adding low-priority default empty desync profile\n");
+	// add default empty profile
+	if (!(dpl = dp_list_add(&params.desync_profiles)))
+	{
+		DLOG_ERR("desync_profile_add: out of memory\n");
+		exit_clean(1);
+	}
+
+	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
 
 	v=0;
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
