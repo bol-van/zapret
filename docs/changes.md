@@ -1,0 +1,315 @@
+# v1
+
+Initial release
+
+# v2
+
+* `nfqws`: command line options change. now using standard getopt.
+* `nfqws`: added options for window size changing and `Host:` case change
+* ISP support: tested on mns.ru and beeline (corbina)
+* init scripts: rewritten init scripts for simple choice of ISP
+* create_ipset: now using `ipset restore`, it works much faster
+* `readme`: updated. now using UTF-8 charset.
+
+# v3
+
+* ``tpws``:
+  * added transparent proxy (supports TPROXY and DNAT).
+  * can help when ISP tracks whole HTTP session, not only the beginning
+* ipset:
+  * added `zapret-hosts-user.txt` which contain user defined host names to be resolved
+  * and added to zapret ip list
+* ISP support: dom.ru support via TPROXY/DNAT
+* ISP support:
+  * successfully tested sknt.ru on 'domru' configuration
+  * other configs will probably also work, but cannot test
+* compile: OpenWrt compile how-to
+
+# v4
+
+* `tpws`: added ability to insert extra space after HTTP method: `GET /` => `GET  /`
+* ISP support: TKT support
+
+# v5
+
+* `nfqws`: IPv6 support in `nfqws`
+
+# v6
+
+* `ipset`: added `get_antizapret.sh`
+
+# v7
+
+* `tpws`: added ability to insert "." after `Host: name`
+
+# v8
+
+* OpenWrt init: removed `hotplug.d/firewall` because of race conditions. now only use `/etc/firewall.user`
+
+# v9
+
+* `ipban`:
+  * added ipban ipset. place domains banned by ip to `zapret-hosts-user-ipban.txt`
+  * these IPs must be soxified for both HTTP and HTTPS
+* ISP support: tiera support
+* ISP support: added DNS filtering to Ubuntu and Debian scripts
+
+# v10
+
+* `tpws`: added `split-pos` option. split every message at specified position
+
+# v11
+
+* `ipset`: scripts optimizations
+
+# v12
+
+* `nfqws`: fix wrong TCP checksum calculation if packet length is odd and platform is big-endian
+
+# v13
+
+* added binaries
+
+# v14
+
+* change `get_antizapret` script to work with https://github.com/zapret-info/z-i/raw/master/dump.csv
+* filter out 192.168.*, 127.*, 10.* from blocked ips
+
+# v15
+
+* added `--hostspell` option to `nfqws` and `tpws`
+* ISP support: beeline now catches "host" but other spellings still work
+* OpenWrt/LEDE: changed init script to work with procd
+* `tpws`, `nfqws`: minor cosmetic fixes
+
+# v16
+
+* `tpws`: `split-http-req=method`: split inside method name, not after
+* ISP support: mns.ru changed split pos to 3 (got redirect page with HEAD req: `curl -I ej.ru`)
+
+# v17
+
+* ISP support: athome moved from `nfqws` to `tpws` because of instability and HTTP request hangs
+* `tpws`: added options `unixeol`,`methodeol`,`hosttab`
+
+# v18
+
+* `tpws`,`nfqws`: added `hostnospace` option
+
+# v19
+
+* `tpws`: added `hostlist` option
+
+# v20
+
+* added `ip2net`. `ip2net` groups ips from iplist into subnets and reduces ipset size twice
+
+# v21
+
+* added `mdig`. `get_reestr.sh` is *real* again
+
+# v22
+
+* total review of init script logic
+* dropped support of older Debian 7 and Ubuntu 12/14 systems
+* `install_bin.sh`: auto binaries preparation
+* `docs`: `readme` review. some new topics added, others deleted
+* `docs`: VPN setup with policy based routing using WireGuard
+* `docs`: WireGuard modding guide
+
+# v23
+
+* major init system rewrite
+* OpenWrt: separate firewall include `/etc/firewall.zapret`
+* `install_easy.sh`: easy setup on OpenWrt, Debian, Ubuntu, CentOS, Fedora, openSUSE
+
+# v24
+
+* separate config from init scripts
+* gzip support in `ipset/*.sh` and `tpws`
+
+# v25
+
+* init: move to native systemd units
+* use links to units, init scripts and firewall includes, no more copying
+
+# v26
+
+* IPv6 support
+* `tpws`: advanced bind options
+
+# v27
+
+* `tpws`: major connection code rewrite. originally it was derived from not top quality example, with many bugs and potential problems.
+* next generation connection code uses nonblocking sockets. now its in EXPERIMENTAL state.
+
+# v28
+
+* `tpws`: added socks5 support
+* `ipset`: major RKN getlist rewrite. added https://antifilter.network support
+
+# v29
+
+* `nfqws`: DPI desync attack
+* ip exclude system
+
+# v30
+
+* `nfqws`: DPI desync attack modes: `fake`, `rst`
+
+# v31
+
+* `nfqws`: DPI desync attack modes: `disorder`, `disorder2`, `split`, `split2`.
+* `nfqws`: DPI desync fooling mode: `badseq`. multiple modes supported
+
+# v32
+
+* `tpws`: multiple binds
+* init scripts: run only one instance of `tpws` in any case
+
+# v33
+
+* OpenWrt: flow offloading support
+* `config`: `MODE` refactoring
+
+# v34
+
+* `nfqws`: `dpi-desync` 2 mode combos
+* `nfqws`: `dpi-desync` without parameter no more supported. previously it meant `fake`
+* `nfqws`: custom fake HTTP request and TLS ClientHello
+
+# v35
+
+* limited FreeBSD and OpenBSD support
+
+# v36
+
+* full FreeBSD and OpenBSD support
+
+# v37
+
+* limited macOS support
+
+# v38
+
+* macOS easy install
+
+# v39
+
+* `nfqws`: `conntrack`, `wssize`
+
+# v40
+
+* init scripts: `IFACE_LAN`, `IFACE_WAN` now accept multiple interfaces
+* init scripts: OpenWrt uses now `OPENWRT_LAN` parameter to override incoming interfaces for `tpws`
+
+# v41
+
+* `install_easy`: openrc support
+
+# v42
+
+* `blockcheck.sh`
+
+# v43
+
+* `nfqws`: UDP desync with conntrack support (any-protocol only for now)
+
+# v44
+
+* `nfqws`: `ipfrag`
+
+# v45
+
+* `nfqws`: `hop-by-hop` - IPv6 desync and fooling
+
+# v46
+
+* big startup script refactoring to support `nftables` and new OpenWrt snapshot builds with `firewall4`
+
+# v47
+
+* `nfqws`: QUIC initial decryption
+* `nfqws`: `udplen`, `fakeknown` dpi desync modes
+
+# v48
+
+* `nfqws`, `tpws`: multiple `--hostlist` and `--hostlist-exclude` support
+* launch system, `ipset`: no more list merging. all lists are passed separately to `nfqws` and `tpws`
+* `nfqws`: `udplen` fooling supports packet shrinking (negative increment value)
+
+# v49
+
+* QUIC support integrated to the main system and setup
+
+# v50
+
+* DHT protocol support.
+* DPI desync mode `tamper` for DHT.
+* HEX string support in addition to binary files.
+
+# v51
+
+* `tpws`: `--tlsrec` attack.
+
+# v52
+
+* `autohostlist` mode
+
+# v53
+
+* `nfqws`: TCP session reassemble for TLS ClientHello
+
+# v54
+
+* `tpws`: out of band send when splitting (`--oob`)
+* `nfqws`: `autottl`
+* `nfqws`: `datanoack` fooling
+* nftables: use POSTNAT path for TCP redirections to allow NAT-breaking strategies. use additional mark bit DESYNC_MARK_POSTNAT.
+
+# v55
+
+* `tpws`:
+  * incompatible `oob` parameter change. it doesn't take oob byte anymore. instead it takes optional protocol filter - HTTP or TLS.
+  * the same is done with `disorder`. oob byte can be specified in parameter `--oob-data`.
+* `blockcheck`: quick mode, strategy order optimizations, QUIC protocol support
+* `nfqws`: `syndata` desync mode
+
+# v56
+
+* `tpws`: `mss` fooling
+* `tpws`: multi thread resolver. eliminates blocks related to hostname resolve.
+
+# v57
+
+* `tpws`: `--nosplice` option
+* `nfqws`: postnat fixes
+* `nfqws`: `--dpi-desync-start` option
+* `nfqws`: packet delay for kyber TLS and QUIC
+* `nfqws`: `--dpi-desync-retrans` obsolete
+* `nfqws`: `--qnum` is mandatory, no more default queue 0
+
+# v58
+
+* `winws`
+
+# v59
+
+* `tpws`: `--split-tls`
+* `tpws`: `--tlsrec=sniext`
+* `nfqws`: `--dpi-desync-split-http-req`, `--dpi-desync-split-tls`. multi segment TLS support for split.
+* `blockcheck`: `mdig` DNS cache
+
+# v60
+
+* `blockcheck`: port block test, partial ip block test
+* `nfqws`: `seqovl` `split`/`disorder` modes
+
+# v61
+
+* C code cleanups
+* `dvtws`: do not use raw sockets. use divert.
+* `nfqws`,`tpws`: detect TLS 1.2 ClientHello from very old libraries with SSL 3.0 version in record layer
+* `nfqws`,``tpws``: debug log to file and syslog
+* ``tpws``: `--connect-bind-addr` option
+* ``tpws``: log local endpoint (including source port number) for remote leg

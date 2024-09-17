@@ -1,11 +1,41 @@
+- [What is it for](#what-is-it-for)
+- [How it works](#how-it-works)
+- [How to put this into practice in the Linux system](#how-to-put-this-into-practice-in-the-linux-system)
+- [ip6tables](#ip6tables)
+- [`nftables`](#nftables)
+- [When it will not work](#when-it-will-not-work)
+- [`nfqws`](#nfqws)
+  - [DPI desync attack](#dpi-desync-attack)
+  - [DPI desync combos](#dpi-desync-combos)
+  - [SYNACK mode](#synack-mode)
+  - [SYNDATA mode](#syndata-mode)
+  - [Virtual Machines](#virtual-machines)
+  - [CONNTRACK](#conntrack)
+  - [Reassemble](#reassemble)
+  - [UDP support](#udp-support)
+  - [IP fragmentation](#ip-fragmentation)
+- [`tpws`](#tpws)
+- [Ways to get a list of blocked IP](#ways-to-get-a-list-of-blocked-ip)
+- [Domain name filtering](#domain-name-filtering)
+- [**autohostlist** mode](#autohostlist-mode)
+- [Choosing parameters](#choosing-parameters)
+- [Screwing to the firewall control system or your launch system](#screwing-to-the-firewall-control-system-or-your-launch-system)
+- [Installation](#installation)
+  - [Checking ISP](#checking-isp)
+  - [desktop Linux system](#desktop-linux-system)
+  - [OpenWrt](#openwrt)
+  - [Android](#android)
+  - [FreeBSD, OpenBSD, macOS](#freebsd-openbsd-macos)
+  - [Windows (WSL)](#windows-wsl)
+  - [Other devices](#other-devices)
+
 ## What is it for
 
 A stand-alone (without 3rd party servers) DPI circumvention tool.
 May allow to bypass http(s) website blocking or speed shaping, resist signature tcp/udp protocol discovery.
 
-The project is mainly aimed at the Russian audience to fight russian regulator named "Roskomnadzor".
-Some features of the project are russian reality specific (such as getting list of sites
-blocked by Roskomnadzor), but most others are common.
+The project is mainly aimed at the Russian audience to fight Russian regulator named "Roskomnadzor".
+Some features of the project are Russian reality specific (such as getting list of sites blocked by Roskomnadzor), but most others are common.
 
 Mainly OpenWRT targeted but also supports traditional Linux, FreeBSD, OpenBSD, Windows, partially MacOS.
 
@@ -13,18 +43,18 @@ Most features are also supported in Windows.
 
 ## How it works
 
-In the simplest case you are dealing with passive DPI. Passive DPI can read passthrough traffic,
-inject its own packets, but cannot drop packets.
+In the simplest case you are dealing with passive DPI.
+Passive DPI can read passthrough traffic, inject its own packets, but cannot drop packets.
 
 If the request is prohibited the passive DPI will inject its own RST packet and optionally http redirect packet.
 
-If fake packets from DPI are only sent to client, you can use iptables commands to drop them if you can write
-correct filter rules. This requires manual in-deep traffic analysis and tuning for specific ISP.
+If fake packets from DPI are only sent to client, you can use `iptables` commands to drop them if you can write correct filter rules.
+This requires manual in-deep traffic analysis and tuning for specific ISP.
 
 This is how we bypass the consequences of a ban trigger.
 
 If the passive DPI sends an RST packet also to the server, there is nothing you can do about it.
-Your task is to prevent ban trigger from firing up. Iptables alone will not work.
+Your task is to prevent ban trigger from firing up. `iptables` alone will not work.
 This project is aimed at preventing the ban rather than eliminating its consequences.
 
 To do that send what DPI does not expect and what breaks its algorithm of recognizing requests and blocking them.
@@ -50,20 +80,28 @@ deal with its consequences.
 2. Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
 3. Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
 
-For options 2 and 3, tpws and nfqws programs are implemented, respectively.
-You need to run them with the necessary parameters and redirect certain traffic with iptables or nftables.
+For options 2 and 3, `tpws` and `nfqws` programs are implemented, respectively.
+You need to run them with the necessary parameters and redirect certain traffic with `iptables` or `nftables`.
 
 To redirect a TCP connection to a transparent proxy, the following commands are used:
 
-forwarded traffic :
-`iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988`
+* forwarded traffic:
 
-outgoing traffic :
-`iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988`
+```sh
+iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988
+```
 
-DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING chain without enabling the route_localnet parameter:
+* outgoing traffic:
 
-`sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1`
+```sh
+iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988
+```
+
+DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING chain without enabling the `route_localnet` parameter:
+
+```sh
+sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1
+```
 
 You can use `-j REDIRECT --to-port 988` instead of DNAT, but in this case the transparent proxy process 
 should listen on the ip address of the incoming interface or on all addresses. Listen all - not good
@@ -78,8 +116,8 @@ iptables -A INPUT ! -i lo -d 127.0.0.127 -j ACCEPT
 iptables -A INPUT ! -i lo -d 127.0.0.0/8 -j DROP
 ```
 
-Owner filter is necessary to prevent recursive redirection of connections from tpws itself.
-tpws must be started under OS user `tpws`.
+Owner filter is necessary to prevent recursive redirection of connections from `tpws` itself.
+`tpws` must be started under OS user `tpws`.
 
 NFQUEUE redirection of the outgoing traffic and forwarded traffic going towards the external interface,
 can be done with the following commands:
@@ -96,7 +134,7 @@ Then we can reduce CPU load, refusing to process unnecessary packets.
 
 `iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
 
-Mark filter does not allow nfqws-generated packets to enter the queue again.
+Mark filter does not allow `nfqws`-generated packets to enter the queue again.
 Its necessary to use this filter when also using `connbytes 1:6`. Without it packet ordering can be changed breaking the whole idea.
 
 Some attacks require redirection of incoming packets :
@@ -121,19 +159,18 @@ In the PREROUTING DNAT chain, it is possible to any global address or to the lin
 the packet came from.
 NFQUEUE works without changes.
 
+## `nftables`
 
-## nftables
-
-nftables are fine except one very big problem.
-nft requires tons of RAM to load large nf sets (ip lists) with subnets/intervals. Most of the home routers can't afford that.
-For example, even a 256 Mb system can't load a 100K ip list. nft process will OOM.
-nf sets do not support overlapping intervals and that's why nft process applies very RAM consuming algorithm to merge intervals so they don't overlap.
-There're equivalents to iptables for all other functions. Interface and protocol anonymous sets allow not to write multiple similar rules.
-Flow offloading is built-in into new linux kernels and nft versions.
+`nftables` are fine except one very big problem.
+`nft` requires tons of RAM to load large nf sets (ip lists) with subnets/intervals. Most of the home routers can't afford that.
+For example, even a 256 Mb system can't load a 100K ip list. `nft` process will OOM.
+nf sets do not support overlapping intervals and that's why `nft` process applies very RAM consuming algorithm to merge intervals so they don't overlap.
+There're equivalents to `iptables` for all other functions. Interface and protocol anonymous sets allow not to write multiple similar rules.
+Flow offloading is built-in into new Linux kernels and `nft` versions.
 
 nft version `1.0.2` or higher is recommended. But the higher is version the better.
 
-Some techniques can be fully used only with nftables. It's not possible to queue packets after NAT in iptables.
+Some techniques can be fully used only with `nftables`. It's not possible to queue packets after NAT in `iptables`.
 This limits techniques that break NAT.
 
 
@@ -145,7 +182,7 @@ when blocked domains are queried. If this is the case change DNS to public ones,
 * If a connection passes through a filter capable of reconstructing a TCP connection, and which
 follows all standards. For example, we are routed to squid. Connection goes through the full OS tcpip stack, fragmentation disappears immediately as a means of circumvention. Squid is correct, it will find everything as it should, it is useless to deceive him. BUT. Only small providers can afford using squid, since it is very resource intensive. Large companies usually use DPI, which is designed for much greater bandwidth.
 
-## nfqws
+## `nfqws`
 
 This program is a packet modifier and a NFQUEUE queue handler.
 For BSD systems there is dvtws. Its built from the same source and has almost the same parameters (see bsd.eng.md).
@@ -333,12 +370,14 @@ Subdomains are applied automatically. gzip lists are supported.
 
 iptables for performing the attack on the first packet :
 
-`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass`
+```sh
+iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+```
 
 This is good if DPI does not track all requests in http keep-alive session.
 If it does, then pass all outgoing packets for http and only first data packet for https :
 
-```
+```sh
 iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
 iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
 ```
@@ -368,14 +407,14 @@ for example : `-A OUTPUT -m state --state INVALID -j DROP`
 In openwrt it's possible to disable the rule for both FORWARD and OUTPUT chains in /etc/config/firewall :
 ```
 config zone
-	option name 'wan'
-	.........
-	option masq_allow_invalid '1'
+        option name 'wan'
+        .........
+        option masq_allow_invalid '1'
 ```
 Unfortunately there's no OUTPUT only switch. It's not desired to remove the rule from the FORWARD chain.
 Add the following lines to `/etc/firewall.user` :
 
-```
+```sh
 iptables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
 ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
 ```
@@ -402,7 +441,7 @@ Set up bridge networking.
 nfqws is equipped with minimalistic connection tracking system (conntrack)
 It's used if some specific DPI circumvention methods are involved and helps to reassemble multi-packet requests.
 
-Conntrack can track connection phase : SYN,ESTABLISHED,FIN , packet counts in both directions , sequence numbers.
+Conntrack can track connection phase: SYN,ESTABLISHED,FIN, packet counts in both directions, sequence numbers.
 
 It can be fed with unidirectional or bidirectional packets.
 
@@ -533,25 +572,27 @@ In openwrt module parameters are specified after module names separated by space
 
 In traditional linux check whether `iptables-legacy` or `iptables-nft` is used. If legacy create the file
 `/etc/modprobe.d/ip6table_raw.conf` with the following content :
-```
+
+```sh
 options ip6table_raw raw_before_defrag=1
 ```
 In some linux distros its possible to change current ip6tables using this command: `update-alternatives --config ip6tables`.
 If you want to stay with `nftables-nft` you need to patch and recompile your version.
 In `nft.c` find :
-```
-			{
-				.name	= "PREROUTING",
-				.type	= "filter",
-				.prio	= -300,	/* NF_IP_PRI_RAW */
-				.hook	= NF_INET_PRE_ROUTING,
-			},
-			{
-				.name	= "OUTPUT",
-				.type	= "filter",
-				.prio	= -300,	/* NF_IP_PRI_RAW */
-				.hook	= NF_INET_LOCAL_OUT,
-			},
+
+```c
+   {
+    .name = "PREROUTING",
+    .type = "filter",
+    .prio = -300, /* NF_IP_PRI_RAW */
+    .hook = NF_INET_PRE_ROUTING,
+   },
+   {
+    .name = "OUTPUT",
+    .type = "filter",
+    .prio = -300, /* NF_IP_PRI_RAW */
+    .hook = NF_INET_LOCAL_OUT,
+   },
 ```
 and replace -300 to -450.
 
@@ -565,8 +606,7 @@ nfqws sees packets with internal network source address. If fragmented NAT does 
 This results in attempt to send packets to internet with internal IP address.
 You need to use nftables instead with hook priority 101 or higher.
 
-
-## tpws
+## `tpws`
 
 tpws is transparent proxy.
 
@@ -681,8 +721,8 @@ To bind to a specific ip when its interface may not be configured yet do : `--bi
 
 It's possible to bind to any nonexistent address in transparent mode but in socks mode address must exist.
 
-In socks proxy mode no additional system privileges are required. Connections to local IPs of the system where tpws runs are prohibited.
-tpws supports remote dns resolving (curl : `--socks5-hostname`  firefox : `socks_remote_dns=true`) , but does it in blocking mode.
+In SOCKS proxy mode no additional system privileges are required. Connections to local IPs of the system where tpws runs are prohibited.
+tpws supports remote DNS resolving (curl: `--socks5-hostname`  firefox: `socks_remote_dns=true`), but does it in blocking mode.
 
 tpws uses async sockets for all activities. Domain names are resolved in multi threaded pool.
 Resolving does not freeze other connections. But if there're too many requests resolving delays may increase.
@@ -729,8 +769,8 @@ At the output, you get `ipset/zapret-ip-user.txt` with IP addresses.
 
 If the variable is not defined, then only lists for ipsets nozapret/nozapret6 are resolved.
 
-So, if you're not russian, the only way for you is to manually add blocked domains.
-Or write your own `ipset/get_iran_blocklist.sh` , if you know where to download this one.
+So, if you're not Russian, the only way for you is to manually add blocked domains.
+Or write your own `ipset/get_iran_blocklist.sh`, if you know where to download this one.
 
 On routers, it is not recommended to call these scripts more than once in 2 days to minimize flash memory writes.
 
@@ -750,7 +790,7 @@ Stored lists are already processed by ip2net. They are error free and ready for 
 `create_ipset.sh` supports loading ip lists from gzip files. First it looks for the filename with the ".gz" extension,
 such as `zapret-ip.txt.gz`, if not found it falls back to the original name `zapret-ip.txt`.
 
-So your own get_iran_blockslist.sh can use "zz" function to produce gz. Study how other russian `get_XXX.sh` work.
+So your own get_iran_blockslist.sh can use "zz" function to produce gz. Study how other Russian `get_XXX.sh` work.
 
 Gzipping helps saving a lot of precious flash space on embedded systems.
 
@@ -911,7 +951,7 @@ Its possible to change manipulation options used by tpws :
 
 nfqws options for DPI desync attack:
 
-```
+```sh
 DESYNC_MARK=0x40000000
 DESYNC_MARK_POSTNAT=0x20000000
 NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
@@ -919,7 +959,7 @@ NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=bads
 
 Separate nfqws options for http and https and ip protocol versions 4,6:
 
-```
+```sh
 NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
 NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
@@ -935,7 +975,7 @@ If a variable is not defined, the value `NFQWS_OPT_DESYNC` is taken.
 
 Separate QUIC options for ip protocol versions :
 
-```
+```sh
 NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
 NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
 ```
@@ -963,7 +1003,7 @@ If not, then the parameter should be commented out.
 You can individually disable ipv4 or ipv6. If the parameter is commented out or not equal to "1",
 use of the protocol is permitted.
 
-```
+```sh
 #DISABLE_IPV4=1
 DISABLE_IPV6=1
 ```
@@ -979,7 +1019,7 @@ TMPDIR=/opt/zapret/tmp
 
 ipset and nfset options :
 
-```
+```sh
 SET_MAXELEM=262144
 IPSET_OPT="hashsize 262144 maxelem 2097152
 ```
@@ -991,14 +1031,14 @@ Do not use too high hashsize. This way you waste your RAM. And dont use too low 
 
 ip2net options. separate for ipv4 and ipv6.
 
-```
+```sh
 IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
 IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
 ```
 
 autohostlist mode tuning.
 
-```
+```sh
 AUTOHOSTLIST_RETRANS_THRESHOLD=3
 AUTOHOSTLIST_FAIL_THRESHOLD=2
 AUTOHOSTLIST_FAIL_TIME=60
@@ -1024,7 +1064,8 @@ To override this behaviour set the following variable :
 
 In openwrt wan interfaces are those having default route. Separately for ipv4 and ipv6.
 This can be redefined :
-```
+
+```sh
 OPENWRT_WAN4="wan4 vpn"
 OPENWRT_WAN6="wan6 vpn6"
 ```
@@ -1037,7 +1078,8 @@ Not applicable to `OpenWRT` if used with `firewall3+iptables`.
 The following settings are not relevant for openwrt :
 
 If your system works as a router, then you need to enter the names of the internal and external interfaces:
-```
+
+```sh
 IFACE_LAN=eth0
 IFACE_WAN=eth1
 IFACE_WAN6="henet ipsec0"
@@ -1057,7 +1099,7 @@ In this case, the rules for iptables should be screwed to your firewall separate
 
 The following calls allow you to apply or remove iptables rules separately:
 
-```
+```sh
  /opt/zapret/init.d/sysv/zapret start_fw
  /opt/zapret/init.d/sysv/zapret stop_fw
  /opt/zapret/init.d/sysv/zapret restart_fw
@@ -1065,7 +1107,7 @@ The following calls allow you to apply or remove iptables rules separately:
 
 And you can start or stop the demons separately from the firewall:
 
-```
+```sh
  /opt/zapret/init.d/sysv/zapret start_daemons
  /opt/zapret/init.d/sysv/zapret stop_daemons
  /opt/zapret/init.d/sysv/zapret restart_daemons
@@ -1078,26 +1120,29 @@ If your system does not touch it everything will likely be OK.
 Some additional nftables-only calls exist :
 
 Lookup `lanif`, `wanif`, `wanif6` and `flow table` interface sets.
-```
+
+```sh
  /opt/zapret/init.d/sysv/zapret list_ifsets
 ```
 
 Renew `lanif`, `wanif`, `wanif6` and `flow table` interface sets.
 Taken from `IFACE_LAN`, `IFACE_WAN` config variables on traditional Linux systems.
-Autoselected on `OpenWRT`. `lanif` can be extended using `OPENWRT_LAN` config variable.
-```
+Autoselected on `OpenWrt`. `lanif` can be extended using `OPENWRT_LAN` config variable.
+
+```sh
  /opt/zapret/init.d/sysv/zapret reload_ifsets
 ```
 
 Calls `nft -t list table inet zapret`.
-```
+
+```sh
  /opt/zapret/init.d/sysv/zapret list_table
 ```
 
 It's also possible to hook with your script to any stage of zapret firewall processing.
 The following settings are available in the zapret config file :
 
-```
+```sh
 INIT_FW_PRE_UP_HOOK="/etc/firewall.zapret.hook.pre_up"
 INIT_FW_POST_UP_HOOK="/etc/firewall.zapret.hook.post_up"
 INIT_FW_PRE_DOWN_HOOK="/etc/firewall.zapret.hook.pre_down"
@@ -1130,8 +1175,8 @@ Run `install_easy.sh` and answer its questions.
 They are mainly about possibly low flash free space.
 Simple install will not work if it has no space to install itself and required packages from the repo.
 
-Another challenge would be to bring zapret to the router. You can download zip from github and use it.
-Install openssh-sftp-server and unzip to openwrt and use sftp to transfer the file.
+Another challenge would be to bring zapret to the router. You can download zip from GitHub and use it.
+Install openssh-sftp-server and unzip to OpenWrt and use sftp to transfer the file.
 It's also not too hard to use 'nc' (netcat) for file transfer.
 
 The best way to start is to put zapret dir to `/tmp` and run `/tmp/zapret/install_easy.sh` from there.
@@ -1172,7 +1217,7 @@ You can't write to `/system`, `/data`, can't run from sd card.
 Selinux prevents running executables in `/data/local/tmp` from apps.
 Use adb and adb shell.
 
-```
+```sh
 mkdir /data/local/tmp/zapret
 adb push tpws /data/local/tmp/zapret
 chmod 755 /data/local/tmp/zapret /data/local/tmp/zapret/tpws
