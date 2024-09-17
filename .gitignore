@@ -4,6 +4,7 @@ mdig/mdig
 nfq/nfqws
 tpws/tpws
 binaries/my/
+binaries/win64/zapret-winws/autohostlist.txt
 init.d/**/custom
 ipset/zapret-ip*.txt
 ipset/zapret-ip*.gz
