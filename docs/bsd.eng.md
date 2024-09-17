@@ -27,7 +27,7 @@ To compile sources:
 
 - FreeBSD: `make`
 - OpenBSD: `make bsd`
-- MacOS: `make mac`
+- macOS: `make mac`
 
 Compile all programs:
 
@@ -66,7 +66,6 @@ It works for the moment but who knows. Such a usage is not very documented.
 
 `mdig` and `ip2net` are fully compatible with BSD.
 
-
 ## FreeBSD
 
 Divert sockets require special kernel module `ipdivert`.
@@ -100,7 +99,7 @@ pkill ^dvtws$
 /opt/zapret/nfq/dvtws --port=989 --daemon --dpi-desync=split2
 ```
 
-To restart firewall and daemons run : `/etc/rc.d/ipfw restart`
+To restart firewall and daemons run: `/etc/rc.d/ipfw restart`
 
 Assume `LAN="em1"`, `WAN="em0"`.
 
@@ -180,6 +179,7 @@ They can be filtered out using 'diverted'. IPv4 frames are filtered using `socka
 ### PF in FreeBSD
 
 The setup is similar to OpenBSD, but there are important nuances.
+
 1. PF support is disabled by default in FreeBSD. Use parameter `--enable-pf`.
 2. It's not possible to redirect to `::1`. Need to redirect to the link-local address of the incoming interface.
     Look for `fe80:...` address in `ifconfig` and use it for redirection target.
@@ -190,6 +190,7 @@ The setup is similar to OpenBSD, but there are important nuances.
    Someone posted kernel patch but 14-RELEASE is still broken.
 
 `/etc/pf.conf`:
+
 ```
 rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::31c:29ff:dee2:1c4d port 988
 rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
@@ -252,6 +253,7 @@ Only PF redirection works. PF does not allow to freely add and delete rules. Onl
 To make an anchor work it must be referred from the main ruleset. But it's managed by pfsense scripts.
 
 One possible solution would be to modify `/etc/inc/filter.inc` as follows:
+
 ```
     .................
     /* MOD */
@@ -264,6 +266,7 @@ One possible solution would be to modify `/etc/inc/filter.inc` as follows:
 ```
 
 Write the anchor code to `/etc/zapret.anchor`:
+
 ```
 rdr pass on em1 inet  proto tcp to port {80,443} -> 127.0.0.1 port 988
 rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::20c:29ff:5ae3:4821 port 988
@@ -280,6 +283,7 @@ tpws --daemon --port=988 --enable-pf --bind-addr=127.0.0.1 --bind-iface6=em1 --b
 ```
 
 After reboot check that anchor is created and referred from the main ruleset:
+
 ```
 [root@pfSense /]# pfctl -s nat
 no nat proto carp all
@@ -309,6 +313,7 @@ Use `--bind-addr=0.0.0.0 --bind-addr=::` to achieve the same default bind as in 
 `tpws` for forwarded traffic only :
 
 `/etc/pf.conf`:
+
 ```
 pass in quick on em1 inet  proto tcp to port {80,443} rdr-to 127.0.0.1 port 988
 pass in quick on em1 inet6 proto tcp to port {80,443} rdr-to ::1 port 988
@@ -327,6 +332,7 @@ rdr-to support is done using `/dev/pf`, that's why transparent mode requires roo
 `dvtws` for all traffic:
 
 `/etc/pf.conf`:
+
 ```
 pass in  quick on em0 proto tcp from port {80,443} flags SA/SA divert-packet port 989 no state
 pass in  quick on em0 proto tcp from port {80,443} no state
@@ -343,6 +349,7 @@ pfctl -f /etc/pf.conf
 `dwtws` only for table zapret with the exception of table nozapret :
 
 `/etc/pf.conf`:
+
 ```
 set limit table-entries 2000000
 table <zapret> file "/opt/zapret/ipset/zapret-ip.txt"
@@ -414,11 +421,12 @@ crontab -e
 ```
 
 Then write the line:
+
 ```
 0 12 */2 * * /opt/zapret/ipset/get_config.sh
 ```
 
-## MacOS
+## macOS
 
 Initially, the kernel of this OS was based on BSD. That's why it is still BSD but a lot was modified by Apple.
 As usual a mass commercial project priorities differ from their free counterparts. Apple guys do what they want.
@@ -463,6 +471,7 @@ If you don't like this solution you can assign an additional static IPv6 address
 `tpws` transparent mode only for outgoing connections.
 
 `/etc/pf.conf`:
+
 ```
 rdr pass on lo0 inet  proto tcp from !127.0.0.0/8 to any port {80,443} -> 127.0.0.1 port 988
 rdr pass on lo0 inet6 proto tcp from !::1 to any port {80,443} -> fe80::1 port 988
@@ -485,6 +494,7 @@ ifconfig en1 | grep fe80
 ```
 
 `/etc/pf.conf`:
+
 ```
 rdr pass on en1 inet  proto tcp from any to any port {80,443} -> 127.0.0.1 port 988
 rdr pass on en1 inet6 proto tcp from any to any port {80,443} -> fe80::bbbb:bbbb:bbbb:bbbb port 988
@@ -501,7 +511,7 @@ pfctl -ef /etc/pf.conf
 /opt/zapret/tpws/tpws --user=root --port=988 --bind-addr=127.0.0.1 --bind-iface6=lo0 --bind-linklocal=force --bind-iface6=en1 --bind-linklocal=force
 ```
 
-Build from source : `make -C /opt/zapret mac`
+Build from source: `make -C /opt/zapret mac`
 
 `ipset/*.sh` scripts work.
 
@@ -571,10 +581,11 @@ Do not ignore it.
 
 In that case you need to manually insert "zapret" anchors to your `pf.conf`
 (keeping the right rule type ordering):
+
 ```
 rdr-anchor "zapret"
 anchor "zapret"
-unistall_easy.sh unpatches pf.conf
+uninstall_easy.sh unpatches pf.conf
 ```
 
 `start-fw` creates 3 anchor files in `/etc/pf.anchors`:

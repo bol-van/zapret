@@ -127,7 +127,7 @@ bool prepare_udp_segment(
 
 bool ip6_insert_simple_hdr(uint8_t type, uint8_t *data_pkt, size_t len_pkt, uint8_t *buf, size_t *buflen);
 
-// ipv4: ident==-1 - copy ip_id from original ipv4 packet
+// IPv4: ident==-1 - copy ip_id from original IPv4 packet
 bool ip_frag4(
 	const uint8_t *pkt, size_t pkt_size,
 	size_t frag_pos, uint32_t ident,

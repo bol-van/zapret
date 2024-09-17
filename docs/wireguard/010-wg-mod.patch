@@ -6,7 +6,7 @@ Index: WireGuard-0.0.20190123/src/cookie.c
  	xchacha20poly1305_encrypt(dst->encrypted_cookie, cookie, COOKIE_LEN,
  				  macs->mac1, COOKIE_LEN, dst->nonce,
  				  checker->cookie_encryption_key);
-+        // MOD : randomize trash
++        // MOD: randomize trash
 +	dst->header.trash = gen_trash();
  }
  
@@ -34,7 +34,7 @@ Index: WireGuard-0.0.20190123/src/messages.h
  };
 +*/
 +
-+// MOD : message type
++// MOD: message type
 +enum message_type {
 +    MESSAGE_INVALID = 0xE319CCD0,
 +    MESSAGE_HANDSHAKE_INITIATION = 0x48ADE198,
@@ -43,7 +43,7 @@ Index: WireGuard-0.0.20190123/src/messages.h
 +    MESSAGE_DATA = 0x391820AA
 +};
 +
-+// MOD : generate fast trash without true RNG
++// MOD: generate fast trash without true RNG
 +__le32 gen_trash(void);
  
  struct message_header {
@@ -63,7 +63,7 @@ Index: WireGuard-0.0.20190123/src/messages.h
 +     * we achieve the same thing, and it makes checking faster.
 +     */
 +
-+    // MOD : trash field to change message size and add 4 byte offset to all fields
++    // MOD: trash field to change message size and add 4 byte offset to all fields
 +    __le32 trash;
 +
 +    __le32 type;
@@ -79,7 +79,7 @@ Index: WireGuard-0.0.20190123/src/noise.c
  #include <crypto/algapi.h>
  
 +
-+// MOD : trash generator
++// MOD: trash generator
 +__le32 gtrash = 0;
 +__le32 gen_trash(void)
 +{
@@ -99,7 +99,7 @@ Index: WireGuard-0.0.20190123/src/noise.c
  
  	handshake->state = HANDSHAKE_CREATED_INITIATION;
 +
-+	// MOD : randomize trash
++	// MOD: randomize trash
 +        dst->header.trash = gen_trash();
 +
  	ret = true;
@@ -110,7 +110,7 @@ Index: WireGuard-0.0.20190123/src/noise.c
  
  	handshake->state = HANDSHAKE_CREATED_RESPONSE;
 +
-+        // MOD : randomize trash
++        // MOD: randomize trash
 +        dst->header.trash = gen_trash();
 +
  	ret = true;
@@ -125,7 +125,7 @@ Index: WireGuard-0.0.20190123/src/send.c
  	header->key_idx = keypair->remote_index;
  	header->counter = cpu_to_le64(PACKET_CB(skb)->nonce);
 +
-+        // MOD : randomize trash
++        // MOD: randomize trash
 +	header->header.trash = gen_trash();
 +
  	pskb_put(skb, trailer, trailer_len);

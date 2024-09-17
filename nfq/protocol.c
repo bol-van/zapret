@@ -797,7 +797,7 @@ bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host
 
 bool IsQUICInitial(const uint8_t *data, size_t len)
 {
-	// too small packets are not likely to be initials with client hello
+	// too small packets are not likely to be initials with ClientHello
 	// long header, fixed bit
 	if (len < 256 || (data[0] & 0xC0) != 0xC0)
 		return false;

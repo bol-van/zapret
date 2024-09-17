@@ -16,7 +16,7 @@ zapret_do_firewall() {
 		;;
 	esac
 
-	# russian DPI sends RST,ACK with wrong ACK.
+	# Russian DPI sends RST,ACK with wrong ACK.
 	# this is sometimes treated by conntrack as invalid and connbytes fw rules do not pass RST packet to nfqws.
 	# switch on liberal mode on zapret firewall start and switch off on zapret firewall stop
 	# this is only required for processing incoming bad RSTs. incoming rules are only applied in autohostlist mode

@@ -1,7 +1,7 @@
 [ -n "$ZAPRET_NFT_TABLE" ] || ZAPRET_NFT_TABLE=zapret
 readonly nft_connbytes="ct original packets"
 
-# required for : nft -f -
+# required for: nft -f -
 create_dev_stdin
 std_ports
 
@@ -100,7 +100,7 @@ nft_create_chains() {
 EOF
 	[ -n "$POSTNAT_ALL" ] && {
 		nft_flush_chain predefrag_nfqws
-		nft_add_rule predefrag_nfqws notrack comment \"do not track nfqws generated packets to avoid nat tampering and defragmentation\"
+		nft_add_rule predefrag_nfqws notrack comment \"do not track nfqws generated packets to avoid NAT tampering and defragmentation\"
 	}
 }
 nft_del_chains() {
@@ -130,12 +130,12 @@ nft_del_flowtable() {
 nft_create_or_update_flowtable() {
 	# $1 = flags ('offload' for hw offload)
 	# $2,$3,$4,... - interfaces
-	# can be called multiple times to add interfaces. interfaces can only be added , not removed
+	# can be called multiple times to add interfaces. interfaces can only be added, not removed
 	local flags=$1 devices makelist
 	shift
 	# warning ! nft versions at least up to 1.0.1 do not allow interface names starting with digit in flowtable and do not allow quoting
-	# warning ! openwrt fixes this in post-21.x snapshots with special nft patch
-	# warning ! in traditional linux distros nft is unpatched and will fail with quoted interface definitions if unfixed
+	# warning ! OpenWrt fixes this in post-21.x snapshots with special nft patch
+	# warning ! in traditional Linux distros nft is unpatched and will fail with quoted interface definitions if unfixed
 	[ -n "$flags" ] && flags="flags $flags;"
 	for makelist in make_quoted_comma_list make_comma_list; do
 		$makelist devices "$@"
@@ -172,7 +172,7 @@ nft_del_firewall() {
 	nft_del_chains
 	nft_del_flowtable
 	nft_flush_link_local
-	# leave ifsets and ipsets because they may be used by custom rules
+	# leave ifsets and IP sets because they may be used by custom rules
 }
 
 nft_add_rule() {
@@ -363,7 +363,7 @@ nft_print_op() {
 _nft_fw_tpws4() {
 	# $1 - filter ipv4
 	# $2 - tpws port
-	# $3 - not-empty if wan interface filtering required
+	# $3 - not-empty if WAN interface filtering required
 
 	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2"
@@ -376,8 +376,8 @@ _nft_fw_tpws4() {
 _nft_fw_tpws6() {
 	# $1 - filter ipv6
 	# $2 - tpws port
-	# $3 - lan interface names space separated
-	# $4 - not-empty if wan interface filtering required
+	# $3 - LAN interface names space separated
+	# $4 - not-empty if WAN interface filtering required
 
 	[ "$DISABLE_IPV6" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2" DNAT6 i
@@ -421,7 +421,7 @@ get_prechain() {
 _nft_fw_nfqws_post4() {
 	# $1 - filter ipv4
 	# $2 - queue number
-	# $3 - not-empty if wan interface filtering required
+	# $3 - not-empty if WAN interface filtering required
 
 	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2" rule chain=$(get_postchain) setmark
@@ -435,7 +435,7 @@ _nft_fw_nfqws_post4() {
 _nft_fw_nfqws_post6() {
 	# $1 - filter ipv6
 	# $2 - queue number
-	# $3 - not-empty if wan interface filtering required
+	# $3 - not-empty if WAN interface filtering required
 
 	[ "$DISABLE_IPV6" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2" rule chain=$(get_postchain) setmark
@@ -458,7 +458,7 @@ nft_fw_nfqws_post() {
 _nft_fw_nfqws_pre4() {
 	# $1 - filter ipv4
 	# $2 - queue number
-	# $3 - not-empty if wan interface filtering required
+	# $3 - not-empty if WAN interface filtering required
 
 	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2" rule
@@ -470,7 +470,7 @@ _nft_fw_nfqws_pre4() {
 _nft_fw_nfqws_pre6() {
 	# $1 - filter ipv6
 	# $2 - queue number
-	# $3 - not-empty if wan interface filtering required
+	# $3 - not-empty if WAN interface filtering required
 
 	[ "$DISABLE_IPV6" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2" rule

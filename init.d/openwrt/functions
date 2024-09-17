@@ -22,7 +22,7 @@ ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 
 TPWS_LOCALHOST4=127.0.0.127
 
-# max wait time for the link local ipv6 on the LAN interface
+# max wait time for the link local IPv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
 
 IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
@@ -38,7 +38,7 @@ apply_unspecified_desync_modes
 # can be multiple IPv6 outgoing interfaces
 # uplink from ISP, tunnelbroker, VPN, ...
 # want them all. who knows what's the real one that blocks sites
-# dont want any manual configuration - want to do it automatically
+# don't want any manual configuration - want to do it automatically
 # standard network_find_wan[6] return only the first
 # we use low level function from network.sh to avoid this limitation
 # it can change theoretically and stop working

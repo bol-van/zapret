@@ -43,7 +43,7 @@ ask_list() {
 		echo $n: "$m"
 		n=$(($n + 1))
 	done
-	printf "your choice (default : $M_DEFAULT) : "
+	printf "your choice (default: $M_DEFAULT): "
 	read m
 	[ -n "$m" ] && M=$(echo "$2" | cut -d ' ' -f"$m" 2>/dev/null)
 	[ -z "$M" ] && M="$M_DEFAULT"

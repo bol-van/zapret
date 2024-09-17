@@ -1,4 +1,4 @@
-// multi thread dns resolver
+// multi thread DNS resolver
 // domain list <stdin
 // ip list >stdout
 // errors, verbose >stderr
@@ -342,7 +342,7 @@ static void exithelp(void)
 {
 	printf(
 		" --threads=<threads_number>\n"
-		" --family=<4|6|46>\t; ipv4, ipv6, ipv4+ipv6\n"
+		" --family=<4|6|46>\t; IPv4, IPv6, IPv4+IPv6\n"
 		" --verbose\t\t; print query progress to stderr\n"
 		" --stats=N\t\t; print resolve stats to stderr every N domains\n"
 		" --log-resolved=<file>\t; log successfully resolved domains to a file\n"

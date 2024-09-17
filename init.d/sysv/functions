@@ -1,4 +1,4 @@
-# init script functions library for desktop linux systems
+# init script functions library for desktop Linux systems
 
 ZAPRET_BASE=${ZAPRET_BASE:-/opt/zapret}
 ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
@@ -81,10 +81,10 @@ TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
 TPWS_OPT_BASE6="--bind-addr=::1"
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
-# first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
+# first wait for LAN to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any IPv6 as the worst case
 TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
 
-# max wait time for the link local ipv6 on the LAN interface
+# max wait time for the link local IPv6 on the LAN interface
 LINKLOCAL_WAIT_SEC=5
 
 CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/sysv/custom"

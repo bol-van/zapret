@@ -58,7 +58,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment, size_t segment_buffer_size, 
 					(*size)--;
 					if (pp == (p - 1))
 					{
-						// probably end of http headers
+						// probably end of HTTP headers
 						VPRINT("Found double EOL at pos %td. Stop replacing.\n", pp - segment);
 						break;
 					}
@@ -360,7 +360,7 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment, size_t segment_buffer_size, s
 			}
 			else
 			{
-				// received not http reply. do not monitor this connection anymore
+				// received not HTTP reply. do not monitor this connection anymore
 				VPRINT("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
 			}
 			if (bFail)

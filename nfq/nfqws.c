@@ -308,7 +308,7 @@ static int dvt_main(void)
 
 #ifdef __OpenBSD__
 	{
-		// in OpenBSD must use separate divert sockets for ipv4 and ipv6
+		// in OpenBSD must use separate divert sockets for IPv4 and IPv6
 		struct sockaddr_in6 bp6;
 		memset(&bp6, 0, sizeof(bp6));
 		bp6.sin6_family = AF_INET6;
@@ -818,12 +818,12 @@ static void exithelp(void)
 		" --daemon\t\t\t\t\t; daemonize\n"
 		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
 #ifndef __CYGWIN__
-		" --user=<username>\t\t\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t\t\t; drop root privs\n"
+		" --user=<username>\t\t\t\t; drop root privileges\n"
+		" --uid=uid[:gid]\t\t\t\t; drop root privileges\n"
 #endif
 #ifdef __linux__
-		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
-		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
+		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated IPv4 packets\n"
+		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated IPv6 packets\n"
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
 #ifdef __CYGWIN__
@@ -835,7 +835,7 @@ static void exithelp(void)
 		" --wf-raw=<filter>|@<filename>\t\t\t; raw windivert filter string or filename\n"
 		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
 		"\nLOGICAL NETWORK FILTER:\n"
-		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t; enable winws only if any of specified wifi SSIDs connected\n"
+		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t; enable winws only if any of specified Wi-Fi SSIDs connected\n"
 		" --nlm-filter=net1[,net2,net3,...]\t\t; enable winws only if any of specified NLM network is connected. names and GUIDs are accepted.\n"
 		" --nlm-list[=all]\t\t\t\t; list Network List Manager (NLM) networks. connected only or all.\n"
 #endif
@@ -844,7 +844,7 @@ static void exithelp(void)
 		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
 		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
-		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t\t; all failed attempts must be within these seconds (default : %d)\n"
 		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
 		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n"
 		"\nTAMPER:\n"
@@ -862,14 +862,14 @@ static void exithelp(void)
 		" --dpi-desync-sockarg=<int|0xHEX>\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
 #endif
 		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for desync packet\n"
-		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
-		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
-		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
+		" --dpi-desync-ttl6=<int>\t\t\t; set IPv6 hop limit for desync packet. by default ttl value is used.\n"
+		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both IPv4 and IPv6. default: %u:%u-%u\n"
+		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for IPv6 only\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
-		" --dpi-desync-split-http-req=method|host\t; split at specified logical part of plain http request\n"
+		" --dpi-desync-split-http-req=method|host\t; split at specified logical part of plain HTTP request\n"
 		" --dpi-desync-split-tls=sni|sniext\t\t; split at specified logical part of TLS ClientHello\n"
 		" --dpi-desync-split-seqovl=<int>\t\t; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
@@ -877,9 +877,9 @@ static void exithelp(void)
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
 		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
-		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
-		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
-		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only HTTP and tls  1=desync any nonempty data packet\n"
+		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake HTTP request\n"
+		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for HTTPS)\n"
 		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
 		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
@@ -972,7 +972,7 @@ int main(int argc, char **argv)
 	params.fake_http_size = strlen(fake_http_request_default);
 	memcpy(params.fake_http, fake_http_request_default, params.fake_http_size);
 	params.fake_quic_size = 620; // must be 601+ for TSPU hack
-	params.fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
+	params.fake_quic[0] = 0x40; // Russian TSPU QUIC short header fake
 	params.fake_wg_size = 64;
 	params.fake_dht_size = 64;
 	params.fake_unknown_size = 256;

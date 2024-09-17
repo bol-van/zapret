@@ -1,6 +1,6 @@
 #!/system/bin/busybox sh
 
-# download hostlist from http(s) (need curl, its absent by default),
+# download hostlist from HTTPS(S) (need curl, its absent by default),
 # feed it to zapret. save flash write cycles
 
 u="https://your.host.com/censorship/hoslist.txt"

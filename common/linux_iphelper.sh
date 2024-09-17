@@ -1,4 +1,4 @@
-# there's no route_localnet for ipv6
+# there's no route_localnet for IPv6
 # the best we can is to route to link local of the incoming interface
 # OUTPUT - can DNAT to ::1
 # PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr

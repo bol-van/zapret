@@ -11,7 +11,7 @@ static uint16_t from64to16(uint64_t x)
 	return (uint16_t)u + (uint16_t)(u >> 16);
 }
 
-// this function preserves data alignment requirements (otherwise it will be damn slow on mips arch)
+// this function preserves data alignment requirements (otherwise it will be damn slow on MIPS arch)
 // and uses 64-bit arithmetics to improve speed
 // taken from Linux source code
 static uint16_t do_csum(const uint8_t *buff, size_t len)

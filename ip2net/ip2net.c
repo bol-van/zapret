@@ -1,7 +1,7 @@
-// group ipv4/ipv6 list from stdout into subnets
-// each line must contain either ip or ip/bitcount
-// valid ip/bitcount and ip1-ip2 are passed through without modification
-// ips are groupped into subnets
+// group IPv4/IPv6 list from stdout into subnets
+// each line must contain either IP or IP/bitcount
+// valid IP/bitcount and IP1-IP2 are passed through without modification
+// IPs are grouped into subnets
 
 // can be compiled in mingw. msvc not supported because of absent getopt
 
@@ -300,7 +300,7 @@ int main(int argc, char **argv)
 
 	parse_params(argc, argv);
 
-	if (params.ipv6) // ipv6
+	if (params.ipv6) // IPv6
 	{
 		char *s;
 		struct in6_addr a, *iplist = NULL, *iplist_new;
@@ -380,7 +380,7 @@ int main(int argc, char **argv)
 					break;
 				if (ip_ct >= params.v6_threshold)
 				{
-					// network found. but is there smaller network with the same ip_ct ? dont do carpet bombing if possible, use smaller subnets
+					// network found. but is there smaller network with the same ip_ct? don't do carpet bombing if possible, use smaller subnets
 					if (!ip_ct_best || ip_ct == ip_ct_best)
 					{
 						ip_ct_best = ip_ct;
@@ -470,7 +470,7 @@ int main(int argc, char **argv)
 					break;
 				if (ip_ct >= (subnet_ct * params.pctmult / params.pctdiv))
 				{
-					// network found. but is there smaller network with the same ip_ct ? dont do carpet bombing if possible, use smaller subnets
+					// network found. but is there smaller network with the same ip_ct? don't do carpet bombing if possible, use smaller subnets
 					if (!ip_ct_best || ip_ct == ip_ct_best)
 					{
 						ip_ct_best = ip_ct;

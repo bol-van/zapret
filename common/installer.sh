@@ -47,7 +47,7 @@ edit_vars() {
 	# $1,$2,... - var names
 	local n=1 var v tmp="/tmp/zvars"
 	rm -f "$tmp"
-	while [ 1=1 ]; do
+	while true; do
 		eval var="\$$n"
 		[ -n "$var" ] || break
 		eval v="\$$var"
@@ -60,7 +60,7 @@ edit_vars() {
 
 openrc_test() {
 	exists rc-update || return 1
-	# some systems do not usse openrc-init but launch openrc from inittab
+	# some systems do not use openrc-init but launch openrc from inittab
 	[ "$INIT" = "openrc-init" ] || grep -qE "sysinit.*openrc" /etc/inittab 2>/dev/null
 }
 check_system() {
@@ -103,9 +103,9 @@ check_system() {
 		elif openrc_test; then
 			SYSTEM=openrc
 		else
-			echo system is not either systemd, openrc or openwrt based
+			echo system is not either systemd, openrc or OpenWrt based
 			echo easy installer can set up config settings but can\'t configure auto start
-			echo you have to do it manually. check readme.txt for manual setup info.
+			echo you have to do it manually. check readme.md for manual setup info.
 			if [ -n "$1" ] || ask_yes_no N "do you want to continue"; then
 				SYSTEM=linux
 			else
@@ -116,7 +116,7 @@ check_system() {
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
 	else
-		echo easy installer only supports Linux and MacOS. check readme.txt for supported systems and manual setup info.
+		echo easy installer only supports Linux and macOS. check readme.md for supported systems and manual setup info.
 		exitp 5
 	fi
 	echo system is based on $SYSTEM
@@ -142,7 +142,7 @@ crontab_del() {
 	CRONTMP=/tmp/cron.tmp
 	crontab -l >$CRONTMP 2>/dev/null
 	if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
-		echo removing following entries from crontab :
+		echo removing following entries from crontab:
 		grep "$GET_LIST_PREFIX" $CRONTMP
 		grep -v "$GET_LIST_PREFIX" $CRONTMP >$CRONTMP.2
 		crontab $CRONTMP.2
@@ -172,7 +172,7 @@ crontab_add() {
 			CRONTMP=/tmp/cron.tmp
 			crontab -l >$CRONTMP 2>/dev/null
 			if grep -q "$GET_LIST_PREFIX" $CRONTMP; then
-				echo some entries already exist in crontab. check if this is corrent :
+				echo some entries already exist in crontab. check if this is corrent:
 				grep "$GET_LIST_PREFIX" $CRONTMP
 			else
 				end_with_newline <"$CRONTMP" || echo >>"$CRONTMP"
@@ -358,7 +358,6 @@ install_openwrt_firewall() {
 		echo should specify MODE in "$ZAPRET_CONFIG"
 		exitp 7
 	}
-
 	echo "linking: $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
 	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"
 
@@ -614,7 +613,7 @@ select_ipv6() {
 	[ "$DISABLE_IPV6" != '1' ] && T=Y
 	local old6=$DISABLE_IPV6
 	echo
-	if ask_yes_no $T "enable ipv6 support"; then
+	if ask_yes_no $T "enable IPv6 support"; then
 		DISABLE_IPV6=0
 	else
 		DISABLE_IPV6=1
@@ -625,7 +624,7 @@ select_fwtype() {
 	echo
 	[ $(get_ram_mb) -le 400 ] && {
 		echo WARNING ! you are running a low RAM system
-		echo WARNING ! nft requires lots of RAM to load huge ip sets, much more than ipsets require
+		echo WARNING ! nft requires lots of RAM to load huge ip sets, much more than IP sets require
 		echo WARNING ! if you need large lists it may be necessary to fall back to iptables+ipset firewall
 	}
 	echo select firewall type :

@@ -181,7 +181,7 @@ bool resolver_init(int threads, int fd_signal_pipe)
 	resolver.bInit = true;
 
 #ifdef __APPLE__
-	// MacOS does not support unnamed semaphores
+	// macOS does not support unnamed semaphores
 
 	char sn[64];
 	snprintf(sn, sizeof(sn), "%s_%d", sem_name, getpid());

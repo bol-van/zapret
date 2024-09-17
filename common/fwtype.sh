@@ -22,7 +22,7 @@ linux_fwtype() {
 		fi
 	else
 		SUBSYS=
-		# generic linux
+		# generic Linux
 		# flowtable is implemented since kernel 4.16
 		if linux_nft_avail && linux_min_version 4 16; then
 			FWTYPE=nftables

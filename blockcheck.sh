@@ -480,7 +480,7 @@ curl_supports_tls13() {
 	$CURL --tlsv1.3 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? = 2 ] && return 1
-	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
+	# curl can have TLSv1.3 key present but SSL library without TLS 1.3 support
 	# this is online test because there's no other way to trigger library incompatibility case
 	$CURL --tlsv1.3 --max-time "$CURL_MAX_TIME" -Is -o /dev/null https://w3.org 2>/dev/null
 	r=$?
@@ -522,7 +522,7 @@ hdrfile_location() {
 curl_with_subst_ip() {
 	# $1 - domain
 	# $2 - port
-	# $3 - ip
+	# $3 - IP
 	# $4+ - curl params
 	local connect_to="--connect-to $1::[$3]${2:+:$2}" arg
 	shift
@@ -552,7 +552,7 @@ curl_probe() {
 	# $1 - IP version: 4/6
 	# $2 - domain name
 	# $3 - port
-	# $4 - subst ip
+	# $4 - subst IP
 	# $5+ - curl params
 	local ipv="$1" dom="$2" port="$3" subst="$4"
 	shift
@@ -568,7 +568,7 @@ curl_probe() {
 curl_test_http() {
 	# $1 - IP version: 4/6
 	# $2 - domain name
-	# $3 - subst ip
+	# $3 - subst IP
 	# $4 - "detail" - detail info
 
 	local code loc
@@ -603,7 +603,7 @@ curl_test_http() {
 curl_test_https_tls12() {
 	# $1 - IP version: 4/6
 	# $2 - domain name
-	# $3 - subst ip
+	# $3 - subst IP
 
 	# do not use TLS 1.3 to make sure server certificate is not encrypted
 	curl_probe "$1" "$2" "$HTTPS_PORT" "$3" -ISs -A "$USER_AGENT" --max-time "$CURL_MAX_TIME" "$CURL_OPT" --tlsv1.2 "$TLSMAX12" "https://$2" -o /dev/null 2>&1
@@ -611,7 +611,7 @@ curl_test_https_tls12() {
 curl_test_https_tls13() {
 	# $1 - IP version: 4/6
 	# $2 - domain name
-	# $3 - subst ip
+	# $3 - subst IP
 
 	# force TLS1.3 mode
 	curl_probe "$1" "$2" "$HTTPS_PORT" "$3" -ISs -A "$USER_AGENT" --max-time "$CURL_MAX_TIME" "$CURL_OPT" --tlsv1.3 "$TLSMAX13" "https://$2" -o /dev/null 2>&1
@@ -925,7 +925,7 @@ warn_fool() {
 }
 pktws_curl_test_update_vary() {
 	# $1 - test function
-	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
+	# $2 - encrypted test: 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 	# $4 - desync mode
 	# $5,$6,... - strategy
@@ -956,7 +956,7 @@ pktws_curl_test_update_vary() {
 
 pktws_check_domain_http_bypass_() {
 	# $1 - test function
-	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
+	# $2 - encrypted test: 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
 	local tests='fake' ret ok ttls s f e desync pos fooling frag sec="$2" delta hostcase
@@ -1093,13 +1093,13 @@ pktws_check_domain_http_bypass_() {
 			pktws_curl_test_update_vary "$1" "$2" "$3" $desync --dpi-desync-fake-syndata="$ZAPRET_BASE/files/fake/$s" "$e" && [ "$SCANLEVEL" = quick ] && return
 		done
 
-		# do not do wssize test for http and TLS 1.3. it's useless
+		# do not do wssize test for HTTP and TLS 1.3. it's useless
 		[ "$sec" = 1 ] || break
 	done
 }
 pktws_check_domain_http_bypass() {
 	# $1 - test function
-	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
+	# $2 - encrypted test: 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
 	local strategy
@@ -1155,7 +1155,7 @@ warn_mss() {
 
 tpws_check_domain_http_bypass_() {
 	# $1 - test function
-	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
+	# $2 - encrypted test: 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
 	local s mss s2 s3 pos sec="$2"
@@ -1200,14 +1200,14 @@ tpws_check_domain_http_bypass_() {
 					break
 				}
 			done
-			# only linux supports mss
+			# only Linux supports mss
 			[ "$UNAME" = Linux -a "$sec" = 1 ] || break
 		done
 	fi
 }
 tpws_check_domain_http_bypass() {
 	# $1 - test function
-	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
+	# $2 - encrypted test: 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
 	local strategy
@@ -1271,7 +1271,7 @@ check_domain_prolog() {
 	}
 	code=$?
 	curl_has_reason_to_continue $code || {
-		report_append "ipv${IPV} $3 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
+		report_append "ipv${IPV} $3 $1: test aborted, no reason to continue. curl code $(curl_translate_code $code)"
 		return 1
 	}
 	return 0
@@ -1279,7 +1279,7 @@ check_domain_prolog() {
 check_domain_http_tcp() {
 	# $1 - test function
 	# $2 - port
-	# $3 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
+	# $3 - encrypted test: 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $4 - domain
 
 	# in case was interrupted before
@@ -1385,8 +1385,8 @@ configure_defrag() {
 
 	[ "$UNAME" = "Linux" ] && {
 		linux_ipv6_defrag_can_be_disabled || {
-			echo "WARNING ! ipv6 defrag can only be effectively disabled in linux kernel 4.16+"
-			echo "WARNING ! ipv6 ipfrag tests are disabled"
+			echo "WARNING ! IPv6 defrag can only be effectively disabled in Linux kernel 4.16+"
+			echo "WARNING ! IPv6 ipfrag tests are disabled"
 			echo
 			return
 		}
@@ -1434,15 +1434,15 @@ ask_params() {
 	}
 
 	echo "specify domain(s) to test. multiple domains are space separated."
-	printf "domain(s) (default: $DOMAINS) : "
+	printf "domain(s) (default: $DOMAINS): "
 	local dom
 	read dom
 	[ -n "$dom" ] && DOMAINS="$dom"
 
 	local IPVS_def=4
-	# yandex public dns
+	# Yandex public DNS
 	pingtest 6 2a02:6b8::feed:0ff && IPVS_def=46
-	printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
+	printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def): "
 	read IPVS
 	[ -n "$IPVS" ] || IPVS=$IPVS_def
 	[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
@@ -1455,11 +1455,11 @@ ask_params() {
 
 	ENABLE_HTTP=1
 	echo
-	ask_yes_no_var ENABLE_HTTP "check http"
+	ask_yes_no_var ENABLE_HTTP "check HTTP"
 
 	ENABLE_HTTPS_TLS12=1
 	echo
-	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
+	ask_yes_no_var ENABLE_HTTPS_TLS12 "check HTTPS TLS 1.2"
 
 	ENABLE_HTTPS_TLS13=0
 	echo
@@ -1469,7 +1469,7 @@ ask_params() {
 		echo "What works for TLS 1.2 will also work for TLS 1.3 but not vice versa."
 		echo "Most sites nowadays support TLS 1.3 but not all. If you can't find a strategy for TLS 1.2 use this test."
 		echo "TLS 1.3 only strategy is better than nothing."
-		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
+		ask_yes_no_var ENABLE_HTTPS_TLS13 "check HTTPS TLS 1.3"
 	else
 		echo "installed curl version does not support TLS 1.3 . tests disabled."
 	fi
@@ -1479,25 +1479,25 @@ ask_params() {
 	if [ -n "$HTTP3" ]; then
 		echo "make sure target domain(s) support QUIC or result will be negative in any case"
 		ENABLE_HTTP3=1
-		ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
+		ask_yes_no_var ENABLE_HTTP3 "check HTTP3 QUIC"
 	else
-		echo "installed curl version does not support http3 QUIC. tests disabled."
+		echo "installed curl version does not support HTTP3 QUIC. tests disabled."
 	fi
 
 	IGNORE_CA=0
 	CURL_OPT=
 	[ $ENABLE_HTTPS_TLS13 = 1 -o $ENABLE_HTTPS_TLS12 = 1 ] && {
 		echo
-		echo "on limited systems like openwrt CA certificates might not be installed to preserve space"
+		echo "on limited systems like OpenWrt CA certificates might not be installed to preserve space"
 		echo "in such a case curl cannot verify server certificate and you should either install ca-bundle or disable verification"
-		echo "however disabling verification will break https check if ISP does MitM attack and substitutes server certificate"
+		echo "however disabling verification will break HTTPS check if ISP does MitM attack and substitutes server certificate"
 		ask_yes_no_var IGNORE_CA "do not verify server certificate"
 		[ "$IGNORE_CA" = 1 ] && CURL_OPT=-k
 	}
 
 	echo
 	echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
-	printf "how many times to repeat each test (default: 1) : "
+	printf "how many times to repeat each test (default: 1): "
 	read REPEATS
 	REPEATS=$((0 + ${REPEATS:-1}))
 	[ "$REPEATS" = 0 ] && {
@@ -1536,7 +1536,7 @@ pingtest() {
 	# $2 - domain or IP
 
 	# ping command can vary a lot. some implementations have -4/-6 options. others don.t
-	# WARNING ! macos ping6 command does not have timeout option. ping6 will fail
+	# WARNING ! macOS ping6 command does not have timeout option. ping6 will fail
 
 	local PING=ping ret
 	if [ "$1" = 6 ]; then
@@ -1547,12 +1547,12 @@ pingtest() {
 		fi
 	else
 		if [ "$UNAME" = Darwin -o "$UNAME" = FreeBSD -o "$UNAME" = OpenBSD ]; then
-			# ping by default pings ipv4, ping6 only pings ipv6
+			# ping by default pings IPv4, ping6 only pings IPv6
 			# in FreeBSD -4/-6 options are supported, in others not
 			PING=ping
 		else
-			# this can be linux or cygwin
-			# in linux it's not possible for sure to figure out if it supports -4/-6. only try and check for result code=2 (invalid option)
+			# this can be Linux or cygwin
+			# in Linux it's not possible for sure to figure out if it supports -4/-6. only try and check for result code=2 (invalid option)
 			PING="ping -4"
 		fi
 	fi

@@ -111,9 +111,9 @@ unprepare_tpws_fw() {
 
 ipt_print_op() {
 	if [ "$1" = "1" ]; then
-		echo "Adding ip$4tables rule for $3 : $2"
+		echo "Adding ip$4tables rule for $3: $2"
 	else
-		echo "Deleting ip$4tables rule for $3 : $2"
+		echo "Deleting ip$4tables rule for $3: $2"
 	fi
 }
 
@@ -121,8 +121,8 @@ _fw_tpws4() {
 	# $1 - 1 - add, 0 - del
 	# $2 - iptable filter for ipv4
 	# $3 - tpws port
-	# $4 - lan interface names space separated
-	# $5 - wan interface names space separated
+	# $4 - LAN interface names space separated
+	# $5 - WAN interface names space separated
 	[ "$DISABLE_IPV4" = "1" -o -z "$2" ] || {
 		local i rule
 
@@ -149,8 +149,8 @@ _fw_tpws6() {
 	# $1 - 1 - add, 0 - del
 	# $2 - iptable filter for ipv6
 	# $3 - tpws port
-	# $4 - lan interface names space separated
-	# $5 - wan interface names space separated
+	# $4 - LAN interface names space separated
+	# $5 - WAN interface names space separated
 
 	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || {
 		local i rule DNAT6
@@ -186,7 +186,7 @@ _fw_nfqws_post4() {
 	# $1 - 1 - add, 0 - del
 	# $2 - iptable filter for ipv4
 	# $3 - queue number
-	# $4 - wan interface names space separated
+	# $4 - WAN interface names space separated
 	[ "$DISABLE_IPV4" = "1" -o -z "$2" ] || {
 		local i
 
@@ -206,7 +206,7 @@ _fw_nfqws_post6() {
 	# $1 - 1 - add, 0 - del
 	# $2 - iptable filter for ipv6
 	# $3 - queue number
-	# $4 - wan interface names space separated
+	# $4 - WAN interface names space separated
 	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || {
 		local i
 
@@ -235,7 +235,7 @@ _fw_nfqws_pre4() {
 	# $1 - 1 - add, 0 - del
 	# $2 - iptable filter for ipv4
 	# $3 - queue number
-	# $4 - wan interface names space separated
+	# $4 - WAN interface names space separated
 	[ "$DISABLE_IPV4" = "1" -o -z "$2" ] || {
 		local i
 
@@ -258,7 +258,7 @@ _fw_nfqws_pre6() {
 	# $1 - 1 - add, 0 - del
 	# $2 - iptable filter for ipv6
 	# $3 - queue number
-	# $4 - wan interface names space separated
+	# $4 - WAN interface names space separated
 	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || {
 		local i
 
@@ -415,7 +415,7 @@ zapret_do_firewall_ipt() {
 
 	[ "$mode" = "tpws-socks" ] && return 0
 
-	# always create ipsets. ip_exclude ipset is required
+	# always create IP sets. ip_exclude ipset is required
 	[ "$1" = 1 ] && create_ipset no-update
 
 	zapret_do_firewall_rules_ipt "$@"

@@ -143,7 +143,7 @@ linux_get_subsys() {
 	elif [ -x "/bin/ndm" ]; then
 		SUBSYS=keenetic
 	else
-		# generic linux
+		# generic Linux
 		SUBSYS=
 	fi
 }

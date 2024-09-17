@@ -6,7 +6,7 @@
 
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, const sigset_t *sigmask)
 {
-	// macos does not implement ppoll
+	// macOS does not implement ppoll
 	// this is a hacky ppoll shim. only for tpws which does not require sigmask
 	if (sigmask)
 	{

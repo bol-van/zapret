@@ -129,9 +129,9 @@ static void exithelp(void)
 {
 	printf(
 		" --bind-addr=<v4_addr>|<v6_addr>\t; for v6 link locals append %%interface_name\n"
-		" --bind-iface4=<interface_name>\t\t; bind to the first ipv4 addr of interface\n"
-		" --bind-iface6=<interface_name>\t\t; bind to the first ipv6 addr of interface\n"
-		" --bind-linklocal=no|unwanted|prefer|force ; prohibit, accept, prefer or force ipv6 link local bind\n"
+		" --bind-iface4=<interface_name>\t\t; bind to the first IPv4 addr of interface\n"
+		" --bind-iface6=<interface_name>\t\t; bind to the first IPv6 addr of interface\n"
+		" --bind-linklocal=no|unwanted|prefer|force ; prohibit, accept, prefer or force IPv6 link local bind\n"
 		" --bind-wait-ifup=<sec>\t\t\t; wait for interface to appear and up\n"
 		" --bind-wait-ip=<sec>\t\t\t; after ifup wait for ip address to appear up to N seconds\n"
 		" --bind-wait-ip-linklocal=<sec>\t\t; (prefer) accept only LL first N seconds then any  (unwanted) accept only globals first N seconds then LL\n"
@@ -140,7 +140,7 @@ static void exithelp(void)
 		" --connect-bind-addr=<v4_addr>|<v6_addr> ; address for outbound connections. for v6 link locals append %%interface_name\n"
 		" --port=<port>\t\t\t\t; only one port number for all binds is supported\n"
 		" --socks\t\t\t\t; implement socks4/5 proxy instead of transparent proxy\n"
-		" --no-resolve\t\t\t\t; disable socks5 remote dns ability\n"
+		" --no-resolve\t\t\t\t; disable socks5 remote DNS ability\n"
 		" --resolver-threads=<int>\t\t; number of resolver worker threads\n"
 		" --local-rcvbuf=<bytes>\n"
 		" --local-sndbuf=<bytes>\n"
@@ -163,8 +163,8 @@ static void exithelp(void)
 		" --max-orphan-time=<sec>\t\t; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds\n"
 		" --daemon\t\t\t\t; daemonize\n"
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
-		" --user=<username>\t\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t\t; drop root privs\n"
+		" --user=<username>\t\t\t; drop root privileges\n"
+		" --uid=uid[:gid]\t\t\t; drop root privileges\n"
 #if defined(__FreeBSD__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
@@ -175,13 +175,13 @@ static void exithelp(void)
 		" --hostlist-exclude=<filename>\t\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-auto=<filename>\t\t; detect DPI blocks and build hostlist automatically\n"
 		" --hostlist-auto-fail-threshold=<int>\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
-		" --hostlist-auto-fail-time=<int>\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t; all failed attempts must be within these seconds (default : %d)\n"
 		" --hostlist-auto-debug=<logfile>\t; debug auto hostlist positives\n"
 		"\nTAMPER:\n"
-		" --split-http-req=method|host\t\t; split at specified logical part of plain http request\n"
+		" --split-http-req=method|host\t\t; split at specified logical part of plain HTTP request\n"
 		" --split-tls=sni|sniext\t\t\t; split at specified logical part of TLS ClientHello\n"
-		" --split-pos=<numeric_offset>\t\t; split at specified pos. split-http-req or split-tls take precedence for http.\n"
-		" --split-any-protocol\t\t\t; split not only http and https\n"
+		" --split-pos=<numeric_offset>\t\t; split at specified pos. split-http-req or split-tls take precedence for HTTP.\n"
+		" --split-any-protocol\t\t\t; split not only HTTP and HTTPS\n"
 #if defined(BSD) && !defined(__APPLE__)
 		" --disorder[=http|tls]\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
 #else
@@ -303,7 +303,7 @@ void parse_params(int argc, char *argv[])
 	LIST_INIT(&params.hostlist_exclude_files);
 
 #if defined(__OpenBSD__) || defined(__APPLE__)
-	params.pf_enable = true; // OpenBSD and MacOS have no other choice
+	params.pf_enable = true; // OpenBSD and macOS have no other choice
 #endif
 	if (can_drop_root())
 	{
@@ -898,7 +898,7 @@ void parse_params(int argc, char *argv[])
 
 #if defined(__linux__)
 		case 58: /* mss */
-			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
+			// this option does not work in any BSD and macOS. OS may accept but it changes nothing
 			params.mss = atoi(optarg);
 			if (params.mss < 88 || params.mss > 32767)
 			{
@@ -966,7 +966,7 @@ static bool find_listen_addr(struct sockaddr_storage *salisten, const char *bind
 	if (getifaddrs(&addrs) < 0)
 		return false;
 
-	// for ipv6 preference order
+	// for IPv6 preference order
 	// bind-linklocal-1 : link-local,any
 	// bind-linklocal=0 : private,global,link-local
 	for (int pass = 0; pass < 3; pass++)
@@ -1312,7 +1312,7 @@ int main(int argc, char *argv[])
 			goto exiterr;
 		if (!params.local_rcvbuf)
 		{
-			// HACK : dont know why but if dont set RCVBUF explicitly RCVBUF of accept()-ed socket can be very large. may be linux bug ?
+			// HACK : don't know why but if don't set RCVBUF explicitly RCVBUF of accept()-ed socket can be very large. may be Linux bug ?
 			int v;
 			socklen_t sz = sizeof(int);
 			if (!getsockopt(listen_fd[i], SOL_SOCKET, SO_RCVBUF, &v, &sz))
@@ -1326,7 +1326,7 @@ int main(int argc, char *argv[])
 		{
 			if (bind(listen_fd[i], (struct sockaddr *)&list[i].salisten, list[i].salisten_len) == -1)
 			{
-				// in linux strange behaviour was observed
+				// in Linux strange behaviour was observed
 				// just after ifup and address assignment there's short window when bind() can't bind to addresses got from getifaddrs()
 				// it does not happen to transparent sockets because they can bind to any non-existend ip
 				// also only IPv6 seem to be buggy this way

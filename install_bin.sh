@@ -45,8 +45,8 @@ ccp() {
 	local F="$(basename "$1")"
 	[ -d "$ZAPRET_BASE/$2" ] || mkdir "$ZAPRET_BASE/$2"
 	[ -f "$ZAPRET_BASE/$2/$F" ] && rm -f "$ZAPRET_BASE/$2/$F"
-	ln -fs "../$BINS/$1" "$ZAPRET_BASE/$2" && echo linking : "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
-	#cp -f "../$BINS/$1" "$ZAPRET_BASE/$2" && echo copying : "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
+	ln -fs "../$BINS/$1" "$ZAPRET_BASE/$2" && echo linking: "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
+	#cp -f "../$BINS/$1" "$ZAPRET_BASE/$2" && echo copying: "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
 }
 
 UNAME=$(uname)

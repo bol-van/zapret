@@ -397,7 +397,7 @@ static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct 
 #ifdef __linux__
 	// if used in postnat chain, dropping initial packet will cause conntrack connection teardown
 	// so we need to workaround this.
-	// we can't use low ttl because TCP/IP stack listens to ttl expired ICMPs and notify socket
+	// we can't use low TTL because TCP/IP stack listens to TTL expired ICMPs and notify socket
 	// we also can't use fooling because DPI would accept fooled packets
 	if (ctrack && ctrack->pcounter_orig == 1)
 	{
@@ -603,7 +603,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					else
 					{
-						// received not http reply. do not monitor this connection anymore
+						// received not HTTP reply. do not monitor this connection anymore
 						DLOG("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
 					}
 				}
@@ -738,7 +738,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (ctrack && !ctrack->l7proto)
 				ctrack->l7proto = HTTP;
 
-			// we do not reassemble http
+			// we do not reassemble HTTP
 			reasm_orig_cancel(ctrack);
 
 			forced_wssize_cutoff(ctrack);
@@ -755,7 +755,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			}
 			if (ctrack)
 			{
-				// we do not reassemble http
+				// we do not reassemble HTTP
 				if (!ctrack->req_seq_present)
 				{
 					ctrack->req_seq_start = ctrack->seq_last;

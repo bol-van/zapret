@@ -514,7 +514,7 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 	conn->remote = remote;
 
 #ifdef SPLICE_PRESENT
-	// if dont tamper - both legs are spliced, create 2 pipes
+	// if don't tamper - both legs are spliced, create 2 pipes
 	// otherwise create pipe only in local leg
 	if (!params.nosplice && (!remote || !params.tamper || params.tamper_start || params.tamper_cutoff) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
 	{
@@ -817,14 +817,14 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 
 	if ((remote_fd = connect_remote(sa, bConnFooling)) < 0)
 	{
-		DLOG_ERR("socks failed to connect (1) errno=%d\n", errno);
+		DLOG_ERR("SOCKS failed to connect (1) errno=%d\n", errno);
 		socks_send_rep_errno(conn->socks_ver, conn->fd, errno);
 		return false;
 	}
 	if (!(conn->partner = new_conn(remote_fd, true)))
 	{
 		close(remote_fd);
-		DLOG_ERR("socks out-of-memory (1)\n");
+		DLOG_ERR("SOCKS out-of-memory (1)\n");
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_GENERAL_FAILURE);
 		return false;
 	}
@@ -832,7 +832,7 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 	conn->partner->efd = conn->efd;
 	if (!epoll_set(conn->partner, EPOLLOUT))
 	{
-		DLOG_ERR("socks epoll_set error %d\n", errno);
+		DLOG_ERR("SOCKS epoll_set error %d\n", errno);
 		free_conn(conn->partner);
 		conn->partner = NULL;
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_GENERAL_FAILURE);
@@ -848,7 +848,7 @@ bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, s
 
 static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 {
-	// To simplify things I dont care about buffering. If message splits, I just hang up
+	// To simplify things I don't care about buffering. If message splits, I just hang up
 	// in proxy mode messages are short. they can be split only intentionally. all normal programs send them in one packet
 
 	ssize_t rd, wr;
@@ -1175,7 +1175,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 		{
 			// incoming data from remote leg we splice without touching
 			// pipe is in the local leg, so its in conn->partner->splice_pipe
-			// if we dont tamper - splice both legs
+			// if we don't tamper - splice both legs
 
 			rd = splice(conn->fd, NULL, conn->partner->splice_pipe[1], NULL, SPLICE_LEN, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
 			DBGPRINT("splice fd=%d remote=%d len=%d rd=%zd err=%d\n", conn->fd, conn->remote, SPLICE_LEN, rd, errno);

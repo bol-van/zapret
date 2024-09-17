@@ -494,7 +494,7 @@ bool ip6_insert_simple_hdr(uint8_t type, uint8_t *data_pkt, size_t len_pkt, uint
 	return false;
 }
 
-// split ipv4 packet into 2 fragments at data payload position frag_pos
+// split IPv4 packet into 2 fragments at data payload position frag_pos
 bool ip_frag4(
 	const uint8_t *pkt, size_t pkt_size,
 	size_t frag_pos, uint32_t ident,
@@ -1610,7 +1610,7 @@ static int rawsend_sendto_divert(sa_family_t family, int sock, const void *buf, 
 	socklen_t slen;
 
 #ifdef __FreeBSD__
-	// since FreeBSD 14 it requires hardcoded ipv4 values, although can also send ipv6 frames
+	// since FreeBSD 14 it requires hardcoded IPv4 values, although can also send IPv6 frames
 	family = AF_INET;
 	slen = sizeof(struct sockaddr_in);
 #else
@@ -1687,13 +1687,13 @@ static int rawsend_socket(sa_family_t family)
 		// printf("rawsend_socket: family %d",family);
 
 #ifdef __FreeBSD__
-		// IPPROTO_RAW with ipv6 in FreeBSD always returns EACCES on sendto.
-		// must use IPPROTO_TCP for ipv6. IPPROTO_RAW works for ipv4
+		// IPPROTO_RAW with IPv6 in FreeBSD always returns EACCES on sendto.
+		// must use IPPROTO_TCP for IPv6. IPPROTO_RAW works for IPv4
 		// divert sockets are always v4 but accept both v4 and v6
 		*sock = rawsend_socket_divert(AF_INET);
 #elif defined(__OpenBSD__) || defined(__APPLE__)
 		// OpenBSD does not allow sending TCP frames through raw sockets
-		// I dont know about macos. They have dropped ipfw in recent versions and their PF does not support divert-packet
+		// I don't know about macOS. They have dropped ipfw in recent versions and their PF does not support divert-packet
 		*sock = rawsend_socket_divert(family);
 #else
 		*sock = rawsend_socket_raw(family, IPPROTO_RAW);

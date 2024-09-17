@@ -139,23 +139,23 @@ select_mode_mode() {
 select_mode_http() {
 	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && {
 		echo
-		ask_yes_no_var MODE_HTTP "enable http support"
+		ask_yes_no_var MODE_HTTP "enable HTTP support"
 		write_config_var MODE_HTTP
 	}
 }
 select_mode_keepalive() {
 	[ "$MODE" = "nfqws" ] && [ "$MODE_HTTP" = "1" ] && {
 		echo
-		echo enable keep alive support only if DPI checks every outgoing packet for http signature
-		echo dont enable otherwise because it consumes more cpu resources
-		ask_yes_no_var MODE_HTTP_KEEPALIVE "enable http keep alive support"
+		echo enable keep alive support only if DPI checks every outgoing packet for HTTP signature
+		echo "don't enable otherwise because it consumes more cpu resources"
+		ask_yes_no_var MODE_HTTP_KEEPALIVE "enable HTTP keep alive support"
 		write_config_var MODE_HTTP_KEEPALIVE
 	}
 }
 select_mode_https() {
 	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && {
 		echo
-		ask_yes_no_var MODE_HTTPS "enable https support"
+		ask_yes_no_var MODE_HTTPS "enable HTTPS support"
 		write_config_var MODE_HTTPS
 	}
 }
@@ -166,13 +166,13 @@ select_mode_quic() {
 		echo "WARNING ! This firmware requires additional manual iptables setup to support udp desync properly."
 		echo "WARNING ! Keenetic uses proprietary ndmmark to limit MASQUERADE."
 		echo "WARNING ! Desynced packets may go outside without MASQUERADE with LAN source ip."
-		echo "WARNING ! To fix this you need to add additional MASQUERADE rule to iptables nat table."
+		echo "WARNING ! To fix this you need to add additional MASQUERADE rule to iptables NAT table."
 		echo "WARNING ! Installer WILL NOT fix it for you automatically."
 		echo "WARNING ! If you cannot understand what it is all about - do not enable QUIC."
 	}
 	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && [ "$MODE" != "tpws" ] && {
 		echo
-		ask_yes_no_var MODE_QUIC "enable quic support"
+		ask_yes_no_var MODE_QUIC "enable QUIC support"
 		write_config_var MODE_QUIC
 	}
 }
@@ -225,8 +225,8 @@ ask_config_offload() {
 		echo flow offloading can greatly increase speed on slow devices and high speed links \(usually 150+ mbits\)
 		if [ "$SYSTEM" = openwrt ]; then
 			echo unfortuantely its not compatible with most nfqws options. nfqws traffic must be exempted from flow offloading.
-			echo donttouch = disable system flow offloading setting if nfqws mode was selected, dont touch it otherwise and dont configure selective flow offloading
-			echo none = always disable system flow offloading setting and dont configure selective flow offloading
+			echo "donttouch = disable system flow offloading setting if nfqws mode was selected, don't touch it otherwise and don't configure selective flow offloading"
+			echo "none = always disable system flow offloading setting and don't configure selective flow offloading"
 			echo software = always disable system flow offloading setting and configure selective software flow offloading
 			echo hardware = always disable system flow offloading setting and configure selective hardware flow offloading
 		else
@@ -249,7 +249,7 @@ ask_config_tmpdir() {
 	# ask tmpdir change for low ram systems with enough free disk space
 	[ -n "$GETLIST" ] && [ $(get_free_space_mb "$EXEDIR/tmp") -ge 128 ] && [ $(get_ram_mb) -le 400 ] && {
 		echo
-		echo /tmp in openwrt is tmpfs. on low RAM systems there may be not enough RAM to store downloaded files
+		echo /tmp in OpenWrt is tmpfs. on low RAM systems there may be not enough RAM to store downloaded files
 		echo default tmpfs has size of 50% RAM
 		echo "RAM: $(get_ram_mb) Mb"
 		echo "DISK: $(get_free_space_mb) Mb"
@@ -307,7 +307,7 @@ select_mode_iface() {
 	# filter just creates ip tables, no daemons involved
 	# nfqws sits in POSTROUTING chain and unable to filter by incoming interface
 	# tpws redirection works in PREROUTING chain
-	# in tpws-socks mode IFACE_LAN specifies additional bind interface for the socks listener
+	# in tpws-socks mode IFACE_LAN specifies additional bind interface for the SOCKS listener
 	# it's not possible to instruct tpws to route outgoing connection to an interface (OS routing table decides)
 	# custom mode can also benefit from interface names (depends on custom script code)
 
@@ -666,7 +666,7 @@ install_linux() {
 	echo '!!! WARNING. YOUR SETUP IS INCOMPLETE !!!'
 	echo you must manually add to auto start: "$INIT_SCRIPT_SRC" start
 	echo make sure it\'s executed after your custom/firewall iptables configuration
-	echo "if your system uses sysv init : ln -fs $INIT_SCRIPT_SRC /etc/init.d/zapret ; chkconfig zapret on"
+	echo "if your system uses sysv init: ln -fs $INIT_SCRIPT_SRC /etc/init.d/zapret ; chkconfig zapret on"
 }
 
 deoffload_openwrt_firewall() {
@@ -741,7 +741,7 @@ install_openwrt() {
 	clear_ipset
 	download_list
 	crontab_del_quiet
-	# router system : works 24/7. night is the best time
+	# router system: works 24/7. night is the best time
 	crontab_add 0 6
 	cron_ensure_running
 	install_openwrt_iface_hook

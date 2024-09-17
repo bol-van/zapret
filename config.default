@@ -7,13 +7,13 @@
 # redefine user for zapret daemons. required on Keenetic
 #WS_USER=nobody
 
-# override firewall type : iptables,nftables,ipfw
+# override firewall type: iptables,nftables,ipfw
 #FWTYPE=iptables
 
-# options for ipsets
+# options for IP sets
 # maximum number of elements in sets. also used for nft sets
 SET_MAXELEM=522288
-# too low hashsize can cause memory allocation errors on low RAM systems , even if RAM is enough
+# too low hashsize can cause memory allocation errors on low RAM systems, even if RAM is enough
 # too large hashsize will waste lots of RAM
 IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
 # dynamically generate additional ip. $1 = ipset/nfset/table name
@@ -35,7 +35,7 @@ MDIG_THREADS=30
 # ipset/*.sh can compress large lists
 GZIP_LISTS=1
 # command to reload ip/host lists after update
-# comment or leave empty for auto backend selection : ipset or ipfw if present
+# comment or leave empty for auto backend selection: ipset or ipfw if present
 # on BSD systems with PF no auto reloading happens. you must provide your own command
 # set to "-" to disable reload
 #LISTS_RELOAD="pfctl -f /etc/pf.conf"
@@ -46,20 +46,20 @@ GZIP_LISTS=1
 #QUIC_PORTS=443,444
 
 # CHOOSE OPERATION MODE
-# MODE : nfqws,tpws,tpws-socks,filter,custom
-# nfqws : nfqws for dpi desync
-# tpws : tpws transparent mode
-# tpws-socks : tpws socks mode
-# filter : no daemon, just create ipset or download hostlist
-# custom : custom mode. should modify custom init script and add your own code
+# MODE: nfqws,tpws,tpws-socks,filter,custom
+# nfqws: nfqws for dpi desync
+# tpws: tpws transparent mode
+# tpws-socks: tpws socks mode
+# filter: no daemon, just create ipset or download hostlist
+# custom: custom mode. should modify custom init script and add your own code
 MODE=tpws
-# apply fooling to http
+# apply fooling to HTTP
 MODE_HTTP=1
-# for nfqws only. support http keep alives. enable only if DPI checks for http request in any outgoing packet
+# for nfqws only. support HTTP keep alives. enable only if DPI checks for HTTP request in any outgoing packet
 MODE_HTTP_KEEPALIVE=0
-# apply fooling to https
+# apply fooling to HTTPS
 MODE_HTTPS=1
-# apply fooling to quic
+# apply fooling to QUIC
 MODE_QUIC=0
 # none,ipset,hostlist,autohostlist
 MODE_FILTER=none
@@ -78,26 +78,26 @@ NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake --dpi-desync-repeats=6"
 # CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
 TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3 --oob"
 
-# openwrt only : donttouch,none,software,hardware
+# OpenWrt only: donttouch,none,software,hardware
 FLOWOFFLOAD=donttouch
 
-# openwrt: specify networks to be treated as LAN. default is "lan"
+# OpenWrt: specify networks to be treated as LAN. default is "lan"
 #OPENWRT_LAN="lan lan2 lan3"
-# openwrt: specify networks to be treated as WAN. default wans are interfaces with default route
+# OpenWrt: specify networks to be treated as WAN. default wans are interfaces with default route
 #OPENWRT_WAN4="wan vpn"
 #OPENWRT_WAN6="wan6 vpn6"
 
-# for routers based on desktop linux and macos. has no effect in openwrt.
+# for routers based on desktop Linux and macOS. has no effect in OpenWrt.
 # CHOOSE LAN and optinally WAN/WAN6 NETWORK INTERFACES
 # or leave them commented if its not router
-# it's possible to specify multiple interfaces like this : IFACE_LAN="eth0 eth1 eth2"
+# it's possible to specify multiple interfaces like this: IFACE_LAN="eth0 eth1 eth2"
 # if IFACE_WAN6 is not defined it take the value of IFACE_WAN
 #IFACE_LAN=eth0
 #IFACE_WAN=eth1
 #IFACE_WAN6="ipsec0 wireguard0 he_net"
 
 # should start/stop command of init scripts apply firewall rules ?
-# not applicable to openwrt with firewall3+iptables
+# not applicable to OpenWrt with firewall3+iptables
 INIT_APPLY_FW=1
 # firewall apply hooks
 #INIT_FW_PRE_UP_HOOK="/etc/firewall.zapret.hook.pre_up"
@@ -105,12 +105,12 @@ INIT_APPLY_FW=1
 #INIT_FW_PRE_DOWN_HOOK="/etc/firewall.zapret.hook.pre_down"
 #INIT_FW_POST_DOWN_HOOK="/etc/firewall.zapret.hook.post_down"
 
-# do not work with ipv4
+# do not work with IPv4
 #DISABLE_IPV4=1
-# do not work with ipv6
+# do not work with IPv6
 DISABLE_IPV6=1
 
 # select which init script will be used to get ip or host list
-# possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
+# possible values: get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
 # comment if not required
 GETLIST=get_antifilter_ipsmart.sh

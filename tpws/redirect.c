@@ -212,7 +212,7 @@ bool get_dest_addr(int sockfd, const struct sockaddr *accept_sa, struct sockaddr
 	}
 #endif
 	if (saconvmapped(orig_dst))
-		DBGPRINT("Original destination : converted ipv6 mapped address to ipv4\n");
+		DBGPRINT("Original destination : converted IPv6 mapped address to IPv4\n");
 
 	if (params.debug)
 	{

@@ -1,4 +1,4 @@
-# this custom script in addition to MODE=nfqws runs desync to DHT packets with udp payload length 101..399 , without ipset/hostlist filtering
+# this custom script in addition to MODE=nfqws runs desync to DHT packets with udp payload length 101..399, without ipset/hostlist filtering
 # need to add to config : NFQWS_OPT_DESYNC_DHT="--dpi-desync=fake --dpi-desync-ttl=5"
 
 QNUM2=$(($QNUM + 20))
