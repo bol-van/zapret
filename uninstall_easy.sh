@@ -3,7 +3,10 @@
 # automated script for easy uninstalling zapret
 
 EXEDIR="$(dirname "$0")"
-EXEDIR="$(cd "$EXEDIR"; pwd)"
+EXEDIR="$(
+	cd "$EXEDIR"
+	pwd
+)"
 ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
 ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
 ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
@@ -26,8 +29,7 @@ IPSET_DIR="$ZAPRET_BASE/ipset"
 . "$ZAPRET_BASE/common/pf.sh"
 . "$ZAPRET_BASE/common/installer.sh"
 
-remove_systemd()
-{
+remove_systemd() {
 	clear_ipset
 	service_stop_systemd
 	service_remove_systemd
@@ -36,23 +38,21 @@ remove_systemd()
 	crontab_del
 }
 
-remove_openrc()
-{
+remove_openrc() {
 	clear_ipset
 	service_remove_openrc
 	nft_del_table
 	crontab_del
 }
 
-remove_linux()
-{
+remove_linux() {
 	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
 
 	clear_ipset
 
 	echo \* executing sysv init stop
 	"$INIT_SCRIPT_SRC" stop
-	
+
 	nft_del_table
 	crontab_del
 
@@ -61,8 +61,7 @@ remove_linux()
 	echo 'you must manually remove zapret auto start from your system'
 }
 
-remove_openwrt()
-{
+remove_openwrt() {
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 
 	clear_ipset
@@ -74,13 +73,11 @@ remove_openwrt()
 	crontab_del
 }
 
-remove_macos()
-{
+remove_macos() {
 	remove_macos_firewall
 	service_remove_macos
 	crontab_del
 }
-
 
 fix_sbin_path
 check_system
@@ -89,22 +86,21 @@ require_root
 [ "$SYSTEM" = "macos" ] && . "$EXEDIR/init.d/macos/functions"
 
 case $SYSTEM in
-	systemd)
-		remove_systemd
-		;;
-	openrc)
-		remove_openrc
-		;;
-	linux)
-		remove_linux
-		;;
-	openwrt)
-		remove_openwrt
-		;;
-	macos)
-		remove_macos
-		;;
+systemd)
+	remove_systemd
+	;;
+openrc)
+	remove_openrc
+	;;
+linux)
+	remove_linux
+	;;
+openwrt)
+	remove_openwrt
+	;;
+macos)
+	remove_macos
+	;;
 esac
-
 
 exitp 0

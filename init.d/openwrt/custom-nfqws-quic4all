@@ -2,10 +2,9 @@
 # need to add to config : NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
 # NOTE : do not use TTL fooling. chromium QUIC engine breaks sessions if TTL expired in transit received
 
-QNUM2=$(($QNUM+10))
+QNUM2=$(($QNUM + 10))
 
-zapret_custom_daemons()
-{
+zapret_custom_daemons() {
 	# stop logic is managed by procd
 
 	local MODE_OVERRIDE=nfqws
@@ -14,10 +13,9 @@ zapret_custom_daemons()
 	start_daemons_procd
 
 	opt="--qnum=$QNUM2 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
-	run_daemon 100 $NFQWS "$opt"
+	run_daemon 100 "$NFQWS" "$opt"
 }
-zapret_custom_firewall()
-{
+zapret_custom_firewall() {
 	# $1 - 1 - run, 0 - stop
 
 	local MODE_OVERRIDE=nfqws
@@ -25,14 +23,13 @@ zapret_custom_firewall()
 	local first_packets_only="$ipt_connbytes 1:3"
 	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
 
-	zapret_do_firewall_rules_ipt $1
+	zapret_do_firewall_rules_ipt "$1"
 
 	f="-p udp -m multiport --dports $QUIC_PORTS_IPT"
-	fw_nfqws_post $1 "$f $desync $first_packets_only" "$f $desync $first_packets_only" $QNUM2
+	fw_nfqws_post "$1" "$f $desync $first_packets_only" "$f $desync $first_packets_only" $QNUM2
 
 }
-zapret_custom_firewall_nft()
-{
+zapret_custom_firewall_nft() {
 	# stop logic is not required
 
 	local MODE_OVERRIDE=nfqws

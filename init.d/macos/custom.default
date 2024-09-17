@@ -2,8 +2,7 @@
 # use helpers from "functions" file
 # in case of upgrade keep this file only, do not modify others
 
-zapret_custom_daemons()
-{
+zapret_custom_daemons() {
 	# $1 - 1 - run, 0 - stop
 	:
 }
@@ -11,11 +10,9 @@ zapret_custom_daemons()
 # custom firewall functions echo rules for zapret-v4 and zapret-v6 anchors
 # they come after automated table definitions. so you can use <zapret> <zapret6> <zapret-user> ...
 
-zapret_custom_firewall_v4()
-{
+zapret_custom_firewall_v4() {
 	:
 }
-zapret_custom_firewall_v6()
-{
+zapret_custom_firewall_v6() {
 	:
 }

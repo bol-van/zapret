@@ -21,8 +21,7 @@ TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/macos/custom"
 [ -f "$CUSTOM_SCRIPT" ] && . "$CUSTOM_SCRIPT"
 
-run_daemon()
-{
+run_daemon() {
 	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# $3 - daemon args
@@ -31,14 +30,13 @@ run_daemon()
 	local PIDFILE="$PIDDIR/$DAEMONBASE$1.pid"
 	local ARGS="--daemon --pidfile=$PIDFILE $3"
 	[ -f "$PIDFILE" ] && pgrep -qF "$PIDFILE" && {
-		echo Already running $1: $2
+		echo Already running "$1": "$2"
 		return 0
 	}
 	echo "Starting daemon $1: $2 $ARGS"
-	"$2" $ARGS
+	"$2" "$ARGS"
 }
-stop_daemon()
-{
+stop_daemon() {
 	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
@@ -49,19 +47,17 @@ stop_daemon()
 	[ -f "$PIDFILE" ] && read PID <"$PIDFILE"
 	[ -n "$PID" ] && {
 		echo "Stopping daemon $1: $2 (PID=$PID)"
-		kill $PID
+		kill "$PID"
 		rm -f "$PIDFILE"
 	}
 	return 0
 }
-do_daemon()
-{
+do_daemon() {
 	# $1 - 1 - run, 0 - stop
 	on_off_function run_daemon stop_daemon "$@"
 }
 
-tpws_apply_binds()
-{
+tpws_apply_binds() {
 	local o
 	[ "$DISABLE_IPV4" = "1" ] || o="--bind-addr=127.0.0.1"
 	[ "$DISABLE_IPV6" = "1" ] || {
@@ -69,32 +65,29 @@ tpws_apply_binds()
 			o="$o --bind-iface6=$i --bind-linklocal=force $TPWS_WAIT"
 		done
 	}
-	eval $1="\"\$$1 $o\""
+	eval "$1"="\"\$$1 $o\""
 }
-tpws_apply_socks_binds()
-{
+tpws_apply_socks_binds() {
 	local o
 
 	[ "$DISABLE_IPV4" = "1" ] || o="--bind-addr=127.0.0.1"
 	[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-addr=::1"
-	
+
 	for lan in $IFACE_LAN; do
-	    [ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$lan $TPWS_WAIT"
-	    [ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$lan --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
+		[ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$lan $TPWS_WAIT"
+		[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$lan --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
 	done
-	eval $1="\"\$$1 $o\""
+	eval "$1"="\"\$$1 $o\""
 }
 
-wait_interface_ll()
-{
-	echo waiting for an ipv6 link local address on $1 ...
-	"$TPWS" --bind-wait-only --bind-iface6=$1 --bind-linklocal=force $TPWS_WAIT
+wait_interface_ll() {
+	echo waiting for an IPv6 link local address on "$1" ...
+	"$TPWS" --bind-wait-only --bind-iface6="$1" --bind-linklocal=force "$TPWS_WAIT"
 }
-wait_lan_ll()
-{
+wait_lan_ll() {
 	[ "$DISABLE_IPV6" != "1" ] && {
 		for lan in $IFACE_LAN; do
-			wait_interface_ll $lan >&2 || {
+			wait_interface_ll "$lan" >&2 || {
 				echo "wait interface failed on $lan"
 				return 1
 			}
@@ -102,30 +95,27 @@ wait_lan_ll()
 	}
 	return 0
 }
-get_ipv6_linklocal()
-{
-	ifconfig $1 | sed -nEe 's/^.*inet6 (fe80:[a-f0-9:]+).*/\1/p'
+get_ipv6_linklocal() {
+	ifconfig "$1" | sed -nEe 's/^.*inet6 (fe80:[a-f0-9:]+).*/\1/p'
 }
 
-
-zapret_do_firewall()
-{
+zapret_do_firewall() {
 	# $1 - 1 - add, 0 - del
 
 	[ "$1" = 1 -a -n "$INIT_FW_PRE_UP_HOOK" ] && $INIT_FW_PRE_UP_HOOK
 	[ "$1" = 0 -a -n "$INIT_FW_PRE_DOWN_HOOK" ] && $INIT_FW_PRE_DOWN_HOOK
 
 	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws|filter|custom)
-			if [ "$1" = "1" ] ; then
-				pf_anchor_root || return 1
-				pf_anchors_create
-				pf_anchors_load || return 1
-				pf_enable
-			else
-				pf_anchors_clear
-			fi
-			;;
+	tpws | filter | custom)
+		if [ "$1" = "1" ]; then
+			pf_anchor_root || return 1
+			pf_anchors_create
+			pf_anchors_load || return 1
+			pf_enable
+		else
+			pf_anchors_clear
+		fi
+		;;
 	esac
 
 	[ "$1" = 1 -a -n "$INIT_FW_POST_UP_HOOK" ] && $INIT_FW_POST_UP_HOOK
@@ -133,75 +123,65 @@ zapret_do_firewall()
 
 	return 0
 }
-zapret_apply_firewall()
-{
+zapret_apply_firewall() {
 	zapret_do_firewall 1 "$@"
 }
-zapret_unapply_firewall()
-{
+zapret_unapply_firewall() {
 	zapret_do_firewall 0 "$@"
 }
-zapret_restart_firewall()
-{
+zapret_restart_firewall() {
 	zapret_unapply_firewall "$@"
 	zapret_apply_firewall "$@"
 }
 
-
-
-zapret_do_daemons()
-{
+zapret_do_daemons() {
 	# $1 - 1 - run, 0 - stop
 
 	local opt
 
 	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws)
-			[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
-				echo "both ipv4 and ipv6 are disabled. nothing to do"
-				return 0
-			}
-			# MacOS requires root. kernel hardcoded requirement for /dev/pf ioctls
-			opt="--user=root --port=$TPPORT"
-			filter_apply_hostlist_target opt
-			tpws_apply_binds opt
-			opt="$opt $TPWS_OPT"
-			do_daemon $1 1 "$TPWS" "$opt"
-			;;
-		tpws-socks)
-			[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
-				echo "both ipv4 and ipv6 are disabled. nothing to do"
-				return 0
-			}
-			opt="--socks --user=$WS_USER --port=$TPPORT"
-			tpws_apply_socks_binds opt
-			filter_apply_hostlist_target opt
-			opt="$opt $TPWS_OPT"
-			do_daemon $1 1 "$TPWS" "$opt"
-			;;
-		filter)
-			;;
-		custom)
-			existf zapret_custom_daemons && zapret_custom_daemons $1
-			;;
-		*)
-			echo "unsupported MODE=$MODE"
-			return 1
-			;;
+	tpws)
+		[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
+			echo "both IPv4 and IPv6 are disabled. nothing to do"
+			return 0
+		}
+		# macOS requires root. kernel hardcoded requirement for /dev/pf ioctls
+		opt="--user=root --port=$TPPORT"
+		filter_apply_hostlist_target opt
+		tpws_apply_binds opt
+		opt="$opt $TPWS_OPT"
+		do_daemon "$1" 1 "$TPWS" "$opt"
+		;;
+	tpws-socks)
+		[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
+			echo "both IPv4 and IPv6 are disabled. nothing to do"
+			return 0
+		}
+		opt="--socks --user=$WS_USER --port=$TPPORT"
+		tpws_apply_socks_binds opt
+		filter_apply_hostlist_target opt
+		opt="$opt $TPWS_OPT"
+		do_daemon "$1" 1 "$TPWS" "$opt"
+		;;
+	filter) ;;
+	custom)
+		existf zapret_custom_daemons && zapret_custom_daemons "$1"
+		;;
+	*)
+		echo "unsupported MODE=$MODE"
+		return 1
+		;;
 	esac
 
 	return 0
 }
-zapret_run_daemons()
-{
+zapret_run_daemons() {
 	zapret_do_daemons 1 "$@"
 }
-zapret_stop_daemons()
-{
+zapret_stop_daemons() {
 	zapret_do_daemons 0 "$@"
 }
-zapret_restart_daemons()
-{
+zapret_restart_daemons() {
 	zapret_stop_daemons "$@"
 	zapret_run_daemons "$@"
 }

@@ -1,5 +1,4 @@
-require_root()
-{
+require_root() {
 	local exe
 	echo \* checking privileges
 	[ $(id -u) -ne "0" ] && {

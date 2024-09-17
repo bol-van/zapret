@@ -2,8 +2,7 @@
 
 ZAPRET=/etc/init.d/zapret
 
-check_lan()
-{
+check_lan() {
 	IS_LAN=
 	[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
 	for lan in $OPENWRT_LAN; do
@@ -13,15 +12,13 @@ check_lan()
 		}
 	done
 }
-check_need_to_reload_tpws6()
-{
+check_need_to_reload_tpws6() {
 	# tpws6 dnat target nft map can only be reloaded within firewall apply procedure
 	# interface ifsets (wanif, wanif6, lanif) can be reloaded independently
 	check_lan
 	RELOAD_TPWS6=
 	[ "$ACTION" = "ifup" -a "$DISABLE_IPV6" != 1 -a -n "$IS_LAN" ] && [ "$MODE" = "tpws" -o "$MODE" = "custom" ] && RELOAD_TPWS6=1
 }
-
 
 [ -n "$INTERFACE" ] && [ "$ACTION" = ifup -o "$ACTION" = ifdown ] && [ -x "$ZAPRET" ] && "$ZAPRET" enabled && {
 	SCRIPT=$(readlink "$ZAPRET")
@@ -37,27 +34,27 @@ check_need_to_reload_tpws6()
 
 	check_need_to_reload_tpws6
 	[ -n "$RELOAD_TPWS6" ] && {
-		logger -t zapret restarting daemons due to $ACTION of $INTERFACE to update tpws6 dnat target
+		logger -t zapret restarting daemons due to "$ACTION" of "$INTERFACE" to update tpws6 dnat target
 		"$ZAPRET" restart_daemons
 	}
 	. "$ZAPRET_BASE/common/base.sh"
 	. "$ZAPRET_BASE/common/fwtype.sh"
 	linux_fwtype
 	case "$FWTYPE" in
-		nftables)
-			if [ -n "$RELOAD_TPWS6" ] ; then
-				logger -t zapret reloading nftables due to $ACTION of $INTERFACE to update tpws6 dnat target
-				"$ZAPRET" restart_fw
-			else
-				logger -t zapret reloading nftables ifsets due to $ACTION of $INTERFACE
-				"$ZAPRET" reload_ifsets
-			fi
-			;;
-		iptables)
-			openwrt_fw3 || {
-				logger -t zapret reloading iptables due to $ACTION of $INTERFACE
-				"$ZAPRET" restart_fw
-			}
-			;;
+	nftables)
+		if [ -n "$RELOAD_TPWS6" ]; then
+			logger -t zapret reloading nftables due to "$ACTION" of "$INTERFACE" to update tpws6 dnat target
+			"$ZAPRET" restart_fw
+		else
+			logger -t zapret reloading nftables ifsets due to "$ACTION" of "$INTERFACE"
+			"$ZAPRET" reload_ifsets
+		fi
+		;;
+	iptables)
+		openwrt_fw3 || {
+			logger -t zapret reloading iptables due to "$ACTION" of "$INTERFACE"
+			"$ZAPRET" restart_fw
+		}
+		;;
 	esac
 }

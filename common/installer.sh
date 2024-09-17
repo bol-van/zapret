@@ -6,36 +6,31 @@ SYSTEMD_DIR=/lib/systemd
 
 INIT_SCRIPT=/etc/init.d/zapret
 
-
-exitp()
-{
+exitp() {
 	echo
 	echo press enter to continue
 	read A
-	exit $1
+	exit "$1"
 }
 
-parse_var_checked()
-{
+parse_var_checked() {
 	# $1 - file name
 	# $2 - var name
 	local sed="sed -nre s/^[[:space:]]*$2=[\\\"|\']?([^\\\"|\']*)[\\\"|\']?/\1/p"
 	local v="$($sed <"$1" | tail -n 1)"
-	eval $2=\"$v\"
+	eval "$2"=\""$v"\"
 }
-parse_vars_checked()
-{
+parse_vars_checked() {
 	# $1 - file name
 	# $2,$3,... - var names
 	local f="$1"
 	shift
 	while [ -n "$1" ]; do
-		parse_var_checked "$f" $1
+		parse_var_checked "$f" "$1"
 		shift
-	done	
+	done
 }
-edit_file()
-{
+edit_file() {
 	# $1 - file name
 	local ed="$EDITOR"
 	[ -n "$ed" ] || {
@@ -48,8 +43,7 @@ edit_file()
 	}
 	[ -n "$ed" ] && "$ed" "$1"
 }
-edit_vars()
-{
+edit_vars() {
 	# $1,$2,... - var names
 	local n=1 var v tmp="/tmp/zvars"
 	rm -f "$tmp"
@@ -57,21 +51,19 @@ edit_vars()
 		eval var="\$$n"
 		[ -n "$var" ] || break
 		eval v="\$$var"
-		echo $var=\"$v\" >>"$tmp"
-		n=$(($n+1))
+		echo "$var"=\""$v"\" >>"$tmp"
+		n=$(($n + 1))
 	done
 	edit_file "$tmp" && parse_vars_checked "$tmp" "$@"
 	rm -f "$tmp"
 }
 
-openrc_test()
-{
+openrc_test() {
 	exists rc-update || return 1
 	# some systems do not usse openrc-init but launch openrc from inittab
 	[ "$INIT" = "openrc-init" ] || grep -qE "sysinit.*openrc" /etc/inittab 2>/dev/null
 }
-check_system()
-{
+check_system() {
 	# $1 - nonempty = do not fail on unknown rc system
 
 	echo \* checking system
@@ -93,21 +85,21 @@ check_system()
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd
-		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] ; then
-		{
-			SYSTEM=openwrt
-			if openwrt_fw3 ; then
-				OPENWRT_FW3=1
-				info="openwrt firewall uses fw3"
-				if is_ipt_flow_offload_avail; then
-					info="$info. hardware flow offloading requires iptables."
-				else
-					info="$info. flow offloading unavailable."
+		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ]; then
+			{
+				SYSTEM=openwrt
+				if openwrt_fw3; then
+					OPENWRT_FW3=1
+					info="openwrt firewall uses fw3"
+					if is_ipt_flow_offload_avail; then
+						info="$info. hardware flow offloading requires iptables."
+					else
+						info="$info. flow offloading unavailable."
+					fi
+				elif openwrt_fw4; then
+					info="openwrt firewall uses fw4. flow offloading requires nftables."
 				fi
-			elif openwrt_fw4; then
-				info="openwrt firewall uses fw4. flow offloading requires nftables."
-			fi
-		}
+			}
 		elif openrc_test; then
 			SYSTEM=openrc
 		else
@@ -115,9 +107,9 @@ check_system()
 			echo easy installer can set up config settings but can\'t configure auto start
 			echo you have to do it manually. check readme.txt for manual setup info.
 			if [ -n "$1" ] || ask_yes_no N "do you want to continue"; then
-			    SYSTEM=linux
+				SYSTEM=linux
 			else
-			    exitp 5
+				exitp 5
 			fi
 		fi
 		linux_get_subsys
@@ -128,25 +120,21 @@ check_system()
 		exitp 5
 	fi
 	echo system is based on $SYSTEM
-	[ -n "$info" ] && echo $info
+	[ -n "$info" ] && echo "$info"
 }
 
-get_free_space_mb()
-{
-    df -m $PWD | awk '/[0-9]%/{print $(NF-2)}'
+get_free_space_mb() {
+	df -m "$PWD" | awk '/[0-9]%/{print $(NF-2)}'
 }
-get_ram_kb()
-{
-    grep MemTotal /proc/meminfo | awk '{print $2}'
+get_ram_kb() {
+	grep MemTotal /proc/meminfo | awk '{print $2}'
 }
-get_ram_mb()
-{
-    local R=$(get_ram_kb)
-    echo $(($R/1024))
+get_ram_mb() {
+	local R=$(get_ram_kb)
+	echo $(($R / 1024))
 }
 
-crontab_del()
-{
+crontab_del() {
 	exists crontab || return
 
 	echo \* removing crontab entry
@@ -162,8 +150,7 @@ crontab_del()
 	fi
 	rm -f $CRONTMP
 }
-crontab_del_quiet()
-{
+crontab_del_quiet() {
 	exists crontab || return
 
 	CRONTMP=/tmp/cron.tmp
@@ -175,11 +162,10 @@ crontab_del_quiet()
 	fi
 	rm -f $CRONTMP
 }
-crontab_add()
-{
+crontab_add() {
 	# $1 - hour min
 	# $2 - hour max
-	[ -x "$GET_LIST" ] &&	{
+	[ -x "$GET_LIST" ] && {
 		echo \* adding crontab entry
 
 		if exists crontab; then
@@ -190,7 +176,7 @@ crontab_add()
 				grep "$GET_LIST_PREFIX" $CRONTMP
 			else
 				end_with_newline <"$CRONTMP" || echo >>"$CRONTMP"
-				echo "$(random 0 59) $(random $1 $2) */2 * * $GET_LIST" >>$CRONTMP
+				echo "$(random 0 59) $(random "$1" "$2") */2 * * $GET_LIST" >>$CRONTMP
 				crontab $CRONTMP
 			fi
 			rm -f $CRONTMP
@@ -199,18 +185,15 @@ crontab_add()
 		fi
 	}
 }
-cron_ensure_running()
-{
-	# if no crontabs present in /etc/cron openwrt init script does not launch crond. this is default
+cron_ensure_running() {
+	# if no crontabs present in /etc/cron OpenWrt init script does not launch crond. this is default
 	[ "$SYSTEM" = "openwrt" ] && {
 		/etc/init.d/cron enable
 		/etc/init.d/cron start
 	}
 }
 
-
-service_start_systemd()
-{
+service_start_systemd() {
 	echo \* starting zapret service
 
 	"$SYSTEMCTL" start zapret || {
@@ -218,23 +201,20 @@ service_start_systemd()
 		exitp 30
 	}
 }
-service_stop_systemd()
-{
+service_stop_systemd() {
 	echo \* stopping zapret service
 
 	"$SYSTEMCTL" daemon-reload
 	"$SYSTEMCTL" disable zapret
 	"$SYSTEMCTL" stop zapret
 }
-service_remove_systemd()
-{
+service_remove_systemd() {
 	echo \* removing zapret service
 
 	rm -f "$SYSTEMD_SYSTEM_DIR/zapret.service"
 	"$SYSTEMCTL" daemon-reload
 }
-timer_remove_systemd()
-{
+timer_remove_systemd() {
 	echo \* removing zapret-list-update timer
 
 	"$SYSTEMCTL" daemon-reload
@@ -244,8 +224,7 @@ timer_remove_systemd()
 	"$SYSTEMCTL" daemon-reload
 }
 
-install_sysv_init()
-{
+install_sysv_init() {
 	# $1 - "0"=disable
 	echo \* installing init script
 
@@ -256,8 +235,7 @@ install_sysv_init()
 	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
 	[ "$1" != "0" ] && "$INIT_SCRIPT" enable
 }
-install_openrc_init()
-{
+install_openrc_init() {
 	# $1 - "0"=disable
 	echo \* installing init script
 
@@ -268,8 +246,7 @@ install_openrc_init()
 	ln -fs "$INIT_SCRIPT_SRC" "$INIT_SCRIPT"
 	[ "$1" != "0" ] && rc-update add zapret
 }
-service_remove_openrc()
-{
+service_remove_openrc() {
 	echo \* removing zapret service
 
 	[ -x "$INIT_SCRIPT" ] && {
@@ -278,8 +255,7 @@ service_remove_openrc()
 	}
 	rm -f "$INIT_SCRIPT"
 }
-service_start_sysv()
-{
+service_start_sysv() {
 	[ -x "$INIT_SCRIPT" ] && {
 		echo \* starting zapret service
 		"$INIT_SCRIPT" start || {
@@ -288,15 +264,13 @@ service_start_sysv()
 		}
 	}
 }
-service_stop_sysv()
-{
+service_stop_sysv() {
 	[ -x "$INIT_SCRIPT" ] && {
 		echo \* stopping zapret service
 		"$INIT_SCRIPT" stop
 	}
 }
-service_remove_sysv()
-{
+service_remove_sysv() {
 	echo \* removing zapret service
 
 	[ -x "$INIT_SCRIPT" ] && {
@@ -306,104 +280,91 @@ service_remove_sysv()
 	rm -f "$INIT_SCRIPT"
 }
 
-check_kmod()
-{
+check_kmod() {
 	[ -f "/lib/modules/$(uname -r)/$1.ko" ]
 }
-check_package_exists_openwrt()
-{
-	[ -n "$(opkg list $1)" ]
+check_package_exists_openwrt() {
+	[ -n "$(opkg list "$1")" ]
 }
-check_package_openwrt()
-{
-	[ -n "$(opkg list-installed $1)" ] && return 0
-	local what="$(opkg whatprovides $1 | tail -n +2 | head -n 1)"
+check_package_openwrt() {
+	[ -n "$(opkg list-installed "$1")" ] && return 0
+	local what="$(opkg whatprovides "$1" | tail -n +2 | head -n 1)"
 	[ -n "$what" ] || return 1
-	[ -n "$(opkg list-installed $what)" ]
+	[ -n "$(opkg list-installed "$what")" ]
 }
-check_packages_openwrt()
-{
+check_packages_openwrt() {
 	for pkg in $@; do
-		check_package_openwrt $pkg || return
+		check_package_openwrt "$pkg" || return
 	done
 }
 
-install_openwrt_iface_hook()
-{
+install_openwrt_iface_hook() {
 	echo \* installing ifup hook
-	
+
 	ln -fs "$OPENWRT_IFACE_HOOK" /etc/hotplug.d/iface
 }
-remove_openwrt_iface_hook()
-{
+remove_openwrt_iface_hook() {
 	echo \* removing ifup hook
-	
+
 	rm -f /etc/hotplug.d/iface/??-zapret
 }
-openwrt_fw_section_find()
-{
+openwrt_fw_section_find() {
 	# $1 - fw include postfix
 	# echoes section number
-	
+
 	i=0
-	while true
-	do
+	while true; do
 		path=$(uci -q get firewall.@include[$i].path)
 		[ -n "$path" ] || break
 		[ "$path" = "$OPENWRT_FW_INCLUDE$1" ] && {
-	 		echo $i
-	 		return 0
+			echo $i
+			return 0
 		}
-		i=$(($i+1))
+		i=$(($i + 1))
 	done
 	return 1
 }
-openwrt_fw_section_del()
-{
+openwrt_fw_section_del() {
 	# $1 - fw include postfix
 
-	local id="$(openwrt_fw_section_find $1)"
+	local id="$(openwrt_fw_section_find "$1")"
 	[ -n "$id" ] && {
-		uci delete firewall.@include[$id] && uci commit firewall
+		uci delete firewall.@include["$id"] && uci commit firewall
 		rm -f "$OPENWRT_FW_INCLUDE$1"
 	}
 }
-openwrt_fw_section_add()
-{
+openwrt_fw_section_add() {
 	openwrt_fw_section_find ||
-	{
-		uci add firewall include >/dev/null || return
-		echo -1
-	}
+		{
+			uci add firewall include >/dev/null || return
+			echo -1
+		}
 }
-openwrt_fw_section_configure()
-{
-	local id="$(openwrt_fw_section_add $1)"
+openwrt_fw_section_configure() {
+	local id="$(openwrt_fw_section_add "$1")"
 	[ -z "$id" ] ||
-	 ! uci set firewall.@include[$id].path="$OPENWRT_FW_INCLUDE" ||
-	 ! uci set firewall.@include[$id].reload="1" ||
-	 ! uci commit firewall &&
-	{
-		echo could not add firewall include
-		exitp 50
-	}
+		! uci set firewall.@include["$id"].path="$OPENWRT_FW_INCLUDE" ||
+		! uci set firewall.@include["$id"].reload="1" ||
+		! uci commit firewall &&
+		{
+			echo could not add firewall include
+			exitp 50
+		}
 }
-install_openwrt_firewall()
-{
-	echo \* installing firewall script $1
-	
+install_openwrt_firewall() {
+	echo \* installing firewall script "$1"
+
 	[ -n "MODE" ] || {
-		echo should specify MODE in $ZAPRET_CONFIG
+		echo should specify MODE in "$ZAPRET_CONFIG"
 		exitp 7
 	}
-	
-	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
+
+	echo "linking: $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
 	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"
-	
-	openwrt_fw_section_configure $1
+
+	openwrt_fw_section_configure "$1"
 }
-restart_openwrt_firewall()
-{
+restart_openwrt_firewall() {
 	echo \* restarting firewall
 
 	local FW=fw4
@@ -413,52 +374,44 @@ restart_openwrt_firewall()
 		exitp 30
 	}
 }
-remove_openwrt_firewall()
-{
+remove_openwrt_firewall() {
 	echo \* removing firewall script
-	
+
 	openwrt_fw_section_del
 	# from old zapret versions. now we use single include
 	openwrt_fw_section_del 6
 }
 
-clear_ipset()
-{
+clear_ipset() {
 	echo "* clearing ipset(s)"
 
 	# free some RAM
 	"$IPSET_DIR/create_ipset.sh" clear
 }
 
-
-service_install_macos()
-{
+service_install_macos() {
 	echo \* installing zapret service
 
 	ln -fs "$ZAPRET_BASE/init.d/macos/zapret.plist" /Library/LaunchDaemons
 }
-service_start_macos()
-{
+service_start_macos() {
 	echo \* starting zapret service
 
 	"$INIT_SCRIPT_SRC" start
 }
-service_stop_macos()
-{
+service_stop_macos() {
 	echo \* stopping zapret service
 
 	"$INIT_SCRIPT_SRC" stop
 }
-service_remove_macos()
-{
+service_remove_macos() {
 	echo \* removing zapret service
 
 	rm -f /Library/LaunchDaemons/zapret.plist
 	zapret_stop_daemons
 }
 
-remove_macos_firewall()
-{
+remove_macos_firewall() {
 	echo \* removing zapret PF hooks
 
 	pf_anchors_clear
@@ -467,9 +420,8 @@ remove_macos_firewall()
 	pf_anchor_root_reload
 }
 
-sedi()
-{
-	# MacOS doesnt support -i without parameter. busybox doesnt support -i with parameter.
+sedi() {
+	# macOS doesnt support -i without parameter. busybox doesnt support -i with parameter.
 	# its not possible to put "sed -i ''" to a variable and then use it
 	if [ "$SYSTEM" = "macos" ]; then
 		sed -i '' "$@"
@@ -478,8 +430,7 @@ sedi()
 	fi
 }
 
-write_config_var()
-{
+write_config_var() {
 	# $1 - mode var
 	local M
 	eval M="\$$1"
@@ -487,7 +438,7 @@ write_config_var()
 	if grep -q "^$1=\|^#$1=" "$ZAPRET_CONFIG"; then
 		# replace / => \/
 		#M=${M//\//\\\/}
-		M=$(echo $M | sed 's/\//\\\//g')
+		M=$(echo "$M" | sed 's/\//\\\//g')
 		if [ -n "$M" ]; then
 			if contains "$M" " "; then
 				sedi -Ee "s/^#?$1=.*$/$1=\"$M\"/" "$ZAPRET_CONFIG"
@@ -508,37 +459,36 @@ write_config_var()
 	fi
 }
 
-check_prerequisites_linux()
-{
+check_prerequisites_linux() {
 	echo \* checking prerequisites
 
 	local s cmd PKGS UTILS req="curl curl"
 	case "$FWTYPE" in
-		iptables)
-			req="$req iptables iptables ip6tables iptables ipset ipset"
-			;;
-		nftables)
-			req="$req nft nftables"
-			;;
+	iptables)
+		req="$req iptables iptables ip6tables iptables ipset ipset"
+		;;
+	nftables)
+		req="$req nft nftables"
+		;;
 	esac
 
-	PKGS=$(for s in $req; do echo $s; done |
+	PKGS=$(for s in $req; do echo "$s"; done |
 		while read cmd; do
 			read pkg
-			exists $cmd || echo $pkg
+			exists "$cmd" || echo "$pkg"
 		done | sort -u | xargs)
-	UTILS=$(for s in $req; do echo $s; done |
+	UTILS=$(for s in $req; do echo "$s"; done |
 		while read cmd; do
 			read pkg
-			echo $cmd
+			echo "$cmd"
 		done | sort -u | xargs)
 
-	if [ -z "$PKGS" ] ; then
-		echo required utilities exist : $UTILS
+	if [ -z "$PKGS" ]; then
+		echo required utilities exist: "$UTILS"
 	else
 		echo \* installing prerequisites
 
-		echo packages required : $PKGS
+		echo packages required: "$PKGS"
 
 		APTGET=$(whichq apt-get)
 		YUM=$(whichq yum)
@@ -546,78 +496,77 @@ check_prerequisites_linux()
 		ZYPPER=$(whichq zypper)
 		EOPKG=$(whichq eopkg)
 		APK=$(whichq apk)
-		if [ -x "$APTGET" ] ; then
+		if [ -x "$APTGET" ]; then
 			"$APTGET" update
-			"$APTGET" install -y --no-install-recommends $PKGS dnsutils || {
+			"$APTGET" install -y --no-install-recommends "$PKGS" dnsutils || {
 				echo could not install prerequisites
 				exitp 6
 			}
-		elif [ -x "$YUM" ] ; then
-			"$YUM" -y install $PKGS || {
+		elif [ -x "$YUM" ]; then
+			"$YUM" -y install "$PKGS" || {
 				echo could not install prerequisites
 				exitp 6
 			}
-		elif [ -x "$PACMAN" ] ; then
+		elif [ -x "$PACMAN" ]; then
 			"$PACMAN" -Syy
-			"$PACMAN" --noconfirm -S $PKGS || {
+			"$PACMAN" --noconfirm -S "$PKGS" || {
 				echo could not install prerequisites
 				exitp 6
 			}
-		elif [ -x "$ZYPPER" ] ; then
-			"$ZYPPER" --non-interactive install $PKGS || {
+		elif [ -x "$ZYPPER" ]; then
+			"$ZYPPER" --non-interactive install "$PKGS" || {
 				echo could not install prerequisites
 				exitp 6
 			}
-		elif [ -x "$EOPKG" ] ; then
-			"$EOPKG" -y install $PKGS || {
+		elif [ -x "$EOPKG" ]; then
+			"$EOPKG" -y install "$PKGS" || {
 				echo could not install prerequisites
 				exitp 6
 			}
-		elif [ -x "$APK" ] ; then
+		elif [ -x "$APK" ]; then
 			"$APK" update
 			# for alpine
 			[ "$FWTYPE" = iptables ] && [ -n "$($APK list ip6tables)" ] && PKGS="$PKGS ip6tables"
-			"$APK" add $PKGS || {
+			"$APK" add "$PKGS" || {
 				echo could not install prerequisites
 				exitp 6
 			}
 		else
 			echo supported package manager not found
-			echo you must manually install : $UTILS
+			echo you must manually install: "$UTILS"
 			exitp 5
 		fi
 	fi
 }
 
-check_prerequisites_openwrt()
-{
+check_prerequisites_openwrt() {
 	echo \* checking prerequisites
 
 	local PKGS="curl" UPD=0
 
 	case "$FWTYPE" in
-		iptables)
-			PKGS="$PKGS ipset iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
-			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS ip6tables ip6tables-mod-nat ip6tables-extra"
-			;;
-		nftables)
-			PKGS="$PKGS nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
-			;;
+	iptables)
+		PKGS="$PKGS ipset iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
+		[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS ip6tables ip6tables-mod-nat ip6tables-extra"
+		;;
+	nftables)
+		PKGS="$PKGS nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
+		;;
 	esac
 
-	if check_packages_openwrt $PKGS ; then
+	if check_packages_openwrt "$PKGS"; then
 		echo everything is present
 	else
 		echo \* installing prerequisites
 
 		opkg update
 		UPD=1
-		opkg install $PKGS || {
+		opkg install "$PKGS" || {
 			echo could not install prerequisites
 			exitp 6
 		}
 	fi
-	
+
 	is_linked_to_busybox gzip && {
 		echo
 		echo your system uses default busybox gzip. its several times slower than GNU gzip.
@@ -659,10 +608,7 @@ check_prerequisites_openwrt()
 	}
 }
 
-
-
-select_ipv6()
-{
+select_ipv6() {
 	local T=N
 
 	[ "$DISABLE_IPV6" != '1' ] && T=Y
@@ -675,8 +621,7 @@ select_ipv6()
 	fi
 	[ "$old6" != "$DISABLE_IPV6" ] && write_config_var DISABLE_IPV6
 }
-select_fwtype()
-{
+select_fwtype() {
 	echo
 	[ $(get_ram_mb) -le 400 ] && {
 		echo WARNING ! you are running a low RAM system

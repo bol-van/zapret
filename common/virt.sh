@@ -1,28 +1,26 @@
-get_virt()
-{
+get_virt() {
 	local vm s v UNAME
 	UNAME=$(uname)
 	case "$UNAME" in
-		Linux)
-			if exists systemd-detect-virt; then
-				vm=$(systemd-detect-virt --vm)
-			elif [ -f /sys/class/dmi/id/product_name ]; then
-				read s </sys/class/dmi/id/product_name
-				for v in KVM QEMU VMware VMW VirtualBox Xen Bochs Parallels BHYVE Hyper-V; do
-					case "$s" in
-						"$v"*)
-						vm=$v
-						break
-		    			;;
-					esac
-				done
-			fi
-			;;
+	Linux)
+		if exists systemd-detect-virt; then
+			vm=$(systemd-detect-virt --vm)
+		elif [ -f /sys/class/dmi/id/product_name ]; then
+			read s </sys/class/dmi/id/product_name
+			for v in KVM QEMU VMware VMW VirtualBox Xen Bochs Parallels BHYVE Hyper-V; do
+				case "$s" in
+				"$v"*)
+					vm=$v
+					break
+					;;
+				esac
+			done
+		fi
+		;;
 	esac
 	echo "$vm" | awk '{print tolower($0)}'
 }
-check_virt()
-{
+check_virt() {
 	echo \* checking virtualization
 	local vm="$(get_virt)"
 	if [ -n "$vm" ]; then

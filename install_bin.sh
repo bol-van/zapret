@@ -1,15 +1,17 @@
 #!/bin/sh
 
 EXEDIR="$(dirname "$0")"
-EXEDIR="$(cd "$EXEDIR"; pwd)"
+EXEDIR="$(
+	cd "$EXEDIR"
+	pwd
+)"
 BINS=binaries
 BINDIR="$EXEDIR/$BINS"
 
 ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
 . "$ZAPRET_BASE/common/base.sh"
 
-check_dir()
-{
+check_dir() {
 	local dir="$BINDIR/$1"
 	local exe="$dir/ip2net"
 	local out
@@ -39,8 +41,7 @@ check_dir()
 }
 
 # link or copy executables. uncomment either ln or cp, comment other
-ccp()
-{
+ccp() {
 	local F="$(basename "$1")"
 	[ -d "$ZAPRET_BASE/$2" ] || mkdir "$ZAPRET_BASE/$2"
 	[ -f "$ZAPRET_BASE/$2/$F" ] && rm -f "$ZAPRET_BASE/$2/$F"
@@ -51,49 +52,48 @@ ccp()
 UNAME=$(uname)
 unset PKTWS
 case $UNAME in
-	Linux)
-		ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
-		PKTWS=nfqws
-		;;
-	Darwin)
-		ARCHLIST="my mac64"
-		;;
-	FreeBSD)
-		ARCHLIST="my freebsd-x64"
-		PKTWS=dvtws
-		;;
-	CYGWIN*)
-		UNAME=CYGWIN
-		ARCHLIST="win64"
-		PKTWS=winws
-		;;
-	*)
-		ARCHLIST="my"
+Linux)
+	ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb ppc"
+	PKTWS=nfqws
+	;;
+Darwin)
+	ARCHLIST="my mac64"
+	;;
+FreeBSD)
+	ARCHLIST="my freebsd-x64"
+	PKTWS=dvtws
+	;;
+CYGWIN*)
+	UNAME=CYGWIN
+	ARCHLIST="win64"
+	PKTWS=winws
+	;;
+*)
+	ARCHLIST="my"
+	;;
 esac
 
 if [ "$1" = "getarch" ]; then
-	for arch in $ARCHLIST
-	do
+	for arch in $ARCHLIST; do
 		[ -d "$BINDIR/$arch" ] || continue
-		if check_dir $arch; then
-	 		echo $arch
-	 		exit 0
-	 	fi
+		if check_dir "$arch"; then
+			echo "$arch"
+			exit 0
+		fi
 	done
 else
-	for arch in $ARCHLIST
-	do
+	for arch in $ARCHLIST; do
 		[ -d "$BINDIR/$arch" ] || continue
-		if check_dir $arch; then
-			echo $arch is OK
+		if check_dir "$arch"; then
+			echo "$arch" is OK
 			echo installing binaries ...
-			ccp $arch/ip2net ip2net
-			ccp $arch/mdig mdig
-			[ -n "$PKTWS" ] && ccp $arch/$PKTWS nfq
-			[ "$UNAME" = CYGWIN ] || ccp $arch/tpws tpws
-	 		exit 0
+			ccp "$arch"/ip2net ip2net
+			ccp "$arch"/mdig mdig
+			[ -n "$PKTWS" ] && ccp "$arch"/$PKTWS nfq
+			[ "$UNAME" = CYGWIN ] || ccp "$arch"/tpws tpws
+			exit 0
 		else
-			echo $arch is NOT OK
+			echo "$arch" is NOT OK
 		fi
 	done
 	echo no compatible binaries found

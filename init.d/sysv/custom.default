@@ -2,8 +2,7 @@
 # use helpers from "functions" file
 # in case of upgrade keep this file only, do not modify others
 
-zapret_custom_daemons()
-{
+zapret_custom_daemons() {
 	# $1 - 1 - run, 0 - stop
 
 	# PLACEHOLDER
@@ -11,10 +10,9 @@ zapret_custom_daemons()
 	echo Start daemon\(s\)
 	echo Study how other sections work
 
-	do_daemon $1 1 /bin/sleep 20
+	do_daemon "$1" 1 /bin/sleep 20
 }
-zapret_custom_firewall()
-{
+zapret_custom_firewall() {
 	# $1 - 1 - run, 0 - stop
 
 	# PLACEHOLDER
@@ -23,8 +21,7 @@ zapret_custom_firewall()
 	echo Study how other sections work
 }
 
-zapret_custom_firewall_nft()
-{
+zapret_custom_firewall_nft() {
 	# stop logic is not required
 
 	# PLACEHOLDER

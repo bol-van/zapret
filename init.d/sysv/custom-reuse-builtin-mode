@@ -4,35 +4,32 @@ MY_TPPORT=$(($TPPORT + 1))
 MY_TPWS_OPT="--methodeol --hostcase"
 MY_DPORT=81
 
-zapret_custom_daemons()
-{
+zapret_custom_daemons() {
 	# $1 - 1 - run, 0 - stop
 
 	local MODE_OVERRIDE=tpws
 	local opt
 
-	zapret_do_daemons $1
+	zapret_do_daemons "$1"
 
 	opt="--port=$MY_TPPORT $MY_TPWS_OPT"
 	filter_apply_hostlist_target opt
-	do_tpws $1 100 "$opt"
+	do_tpws "$1" 100 "$opt"
 }
-zapret_custom_firewall()
-{
+zapret_custom_firewall() {
 	# $1 - 1 - run, 0 - stop
 
 	local MODE_OVERRIDE=tpws
 	local f4 f6
 
-	zapret_do_firewall_rules_ipt $1
+	zapret_do_firewall_rules_ipt "$1"
 
 	f4="-p tcp --dport $MY_DPORT"
 	f6=$f4
 	filter_apply_ipset_target f4 f6
-	fw_tpws $1 "$f4" "$f6" $MY_TPPORT
+	fw_tpws "$1" "$f4" "$f6" $MY_TPPORT
 }
-zapret_custom_firewall_nft()
-{
+zapret_custom_firewall_nft() {
 	# stop logic is not required
 
 	local MODE_OVERRIDE=tpws

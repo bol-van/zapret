@@ -13,38 +13,34 @@ ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 . "$ZAPRET_BASE/common/linux_fw.sh"
 . "$ZAPRET_BASE/common/list.sh"
 
-
-user_exists()
-{
-	id -u $1 >/dev/null 2>/dev/null
+user_exists() {
+	id -u "$1" >/dev/null 2>/dev/null
 }
-useradd_compat()
-{
+useradd_compat() {
 	# $1 - username
 	# skip for readonly systems
 	[ -w "/etc" ] && {
-		if exists useradd ; then
-			useradd --no-create-home --system --shell /bin/false $1
-		elif is_linked_to_busybox adduser ; then
+		if exists useradd; then
+			useradd --no-create-home --system --shell /bin/false "$1"
+		elif is_linked_to_busybox adduser; then
 			# some systems may miss nogroup group in /etc/group
 			# adduser fails if it's absent and no group is specified
 			addgroup nogroup 2>/dev/null
 			# busybox has special adduser syntax
-			adduser -S -H -D $1
+			adduser -S -H -D "$1"
 		elif exists adduser; then
-			adduser --no-create-home --system --disabled-login $1
+			adduser --no-create-home --system --disabled-login "$1"
 		fi
 	}
-	user_exists $1
+	user_exists "$1"
 }
-prepare_user()
-{
+prepare_user() {
 	# $WS_USER is required to prevent redirection of the traffic originating from TPWS itself
 	# otherwise infinite loop will occur
 	# also its good idea not to run tpws as root
-	user_exists $WS_USER || {
+	user_exists "$WS_USER" || {
 		# fallback to daemon if we cant add WS_USER
-		useradd_compat $WS_USER || {
+		useradd_compat "$WS_USER" || {
 			for user in daemon nobody; do
 				user_exists $user && {
 					WS_USER=$user
@@ -59,10 +55,10 @@ prepare_user()
 # this complex user selection allows to survive in any locked/readonly/minimalistic environment
 [ -n "$WS_USER" ] || WS_USER=tpws
 if prepare_user; then
- USEROPT="--user=$WS_USER"
+	USEROPT="--user=$WS_USER"
 else
- WS_USER=1
- USEROPT="--uid $WS_USER:$WS_USER"
+	WS_USER=1
+	USEROPT="--uid $WS_USER:$WS_USER"
 fi
 
 PIDDIR=/var/run
@@ -97,72 +93,54 @@ CUSTOM_SCRIPT="$ZAPRET_BASE/init.d/sysv/custom"
 IPSET_EXCLUDE="-m set ! --match-set nozapret"
 IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
 
-
-dnat6_target()
-{
+dnat6_target() {
 	_dnat6_target "$@"
 }
-set_route_localnet()
-{
-	_set_route_localnet $1 "$IFACE_LAN"
+set_route_localnet() {
+	_set_route_localnet "$1" "$IFACE_LAN"
 }
 
-fw_nfqws_post4()
-{
-	_fw_nfqws_post4  $1 "$2" $3 "$IFACE_WAN"
+fw_nfqws_post4() {
+	_fw_nfqws_post4 "$1" "$2" "$3" "$IFACE_WAN"
 }
-fw_nfqws_post6()
-{
-	_fw_nfqws_post6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
+fw_nfqws_post6() {
+	_fw_nfqws_post6 "$1" "$2" "$3" "${IFACE_WAN6:-$IFACE_WAN}"
 }
-fw_nfqws_pre4()
-{
-	_fw_nfqws_pre4  $1 "$2" $3 "$IFACE_WAN"
+fw_nfqws_pre4() {
+	_fw_nfqws_pre4 "$1" "$2" "$3" "$IFACE_WAN"
 }
-fw_nfqws_pre6()
-{
-	_fw_nfqws_pre6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
+fw_nfqws_pre6() {
+	_fw_nfqws_pre6 "$1" "$2" "$3" "${IFACE_WAN6:-$IFACE_WAN}"
 }
-fw_tpws4()
-{
-	_fw_tpws4 $1 "$2" $3 "$IFACE_LAN" "$IFACE_WAN"
+fw_tpws4() {
+	_fw_tpws4 "$1" "$2" "$3" "$IFACE_LAN" "$IFACE_WAN"
 }
-fw_tpws6()
-{
-	_fw_tpws6 $1 "$2" $3 "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
+fw_tpws6() {
+	_fw_tpws6 "$1" "$2" "$3" "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
 }
-nft_fw_tpws4()
-{
-	_nft_fw_tpws4 "$1" $2 "$IFACE_WAN"
+nft_fw_tpws4() {
+	_nft_fw_tpws4 "$1" "$2" "$IFACE_WAN"
 }
-nft_fw_tpws6()
-{
-	_nft_fw_tpws6 "$1" $2 "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
+nft_fw_tpws6() {
+	_nft_fw_tpws6 "$1" "$2" "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
 }
-nft_fw_nfqws_post4()
-{
-	_nft_fw_nfqws_post4 "$1" $2 "$IFACE_WAN"
+nft_fw_nfqws_post4() {
+	_nft_fw_nfqws_post4 "$1" "$2" "$IFACE_WAN"
 }
-nft_fw_nfqws_post6()
-{
-	_nft_fw_nfqws_post6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
+nft_fw_nfqws_post6() {
+	_nft_fw_nfqws_post6 "$1" "$2" "${IFACE_WAN6:-$IFACE_WAN}"
 }
-nft_fw_nfqws_pre4()
-{
-	_nft_fw_nfqws_pre4 "$1" $2 "$IFACE_WAN"
+nft_fw_nfqws_pre4() {
+	_nft_fw_nfqws_pre4 "$1" "$2" "$IFACE_WAN"
 }
-nft_fw_nfqws_pre6()
-{
-	_nft_fw_nfqws_pre6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
+nft_fw_nfqws_pre6() {
+	_nft_fw_nfqws_pre6 "$1" "$2" "${IFACE_WAN6:-$IFACE_WAN}"
 }
-nft_fill_ifsets_overload()
-{
+nft_fill_ifsets_overload() {
 	nft_fill_ifsets "$IFACE_LAN" "$IFACE_WAN" "${IFACE_WAN6:-$IFACE_WAN}"
 }
 
-
-run_daemon()
-{
+run_daemon() {
 	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# $3 - daemon args
@@ -171,52 +149,48 @@ run_daemon()
 	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
-	if exists start-stop-daemon ; then
-		start-stop-daemon -S -p "$PIDFILE" -m -b -x "$2" -- $3
+	if exists start-stop-daemon; then
+		start-stop-daemon -S -p "$PIDFILE" -m -b -x "$2" -- "$3"
 	else
 		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
 			echo already running
 		else
-			"$2" $3 >/dev/null 2>/dev/null &
+			"$2" "$3" >/dev/null 2>/dev/null &
 			PID=$!
 			if [ -n "$PID" ]; then
-				echo $PID >$PIDFILE
+				echo $PID >"$PIDFILE"
 			else
-				echo could not start daemon $1 : $2 $3
+				echo could not start daemon "$1" : "$2" "$3"
 				false
 			fi
 		fi
 	fi
 }
-stop_daemon()
-{
+stop_daemon() {
 	# $1 - daemon number : 1,2,3,...
 	# $2 - daemon
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
-	if exists start-stop-daemon ; then
+	if exists start-stop-daemon; then
 		start-stop-daemon -K -p "$PIDFILE" -x "$2"
 	else
 		if [ -f "$PIDFILE" ]; then
 			read PID <"$PIDFILE"
-			kill $PID
+			kill "$PID"
 			rm -f "$PIDFILE"
 		else
-			echo no pidfile : $PIDFILE
+			echo no pidfile : "$PIDFILE"
 		fi
 	fi
 }
-do_daemon()
-{
+do_daemon() {
 	# $1 - 1 - run, 0 - stop
 	on_off_function run_daemon stop_daemon "$@"
 }
 
-
-do_tpws()
-{
+do_tpws() {
 	# $1 : 1 - run, 0 - stop
 	# $2 : daemon number
 	# $3 : daemon args
@@ -233,10 +207,9 @@ do_tpws()
 		done
 	}
 
-	do_daemon $1 $2 "$TPWS" "$OPT $3"
+	do_daemon "$1" "$2" "$TPWS" "$OPT $3"
 }
-do_tpws_socks()
-{
+do_tpws_socks() {
 	# $1 : 1 - run, 0 - stop
 	# $2 : daemon number
 	# $3 : daemon args
@@ -247,104 +220,95 @@ do_tpws_socks()
 
 	tpws_apply_socks_binds opt
 
-	do_daemon $1 $2 "$TPWS" "$opt $3"
+	do_daemon "$1" "$2" "$TPWS" "$opt $3"
 }
 
-do_nfqws()
-{
+do_nfqws() {
 	# $1 : 1 - run, 0 - stop
 	# $2 : daemon number
 	# $3 : daemon args
 
-	do_daemon $1 $2 "$NFQWS" "$NFQWS_OPT_BASE $3"
+	do_daemon "$1" "$2" "$NFQWS" "$NFQWS_OPT_BASE $3"
 }
 
-tpws_apply_socks_binds()
-{
+tpws_apply_socks_binds() {
 	local o
 
 	[ "$DISABLE_IPV4" = "1" ] || o="--bind-addr=127.0.0.1"
 	[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-addr=::1"
-	
+
 	for lan in $IFACE_LAN; do
-	    [ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$lan $TPWS_WAIT"
-	    [ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$lan --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
+		[ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$lan $TPWS_WAIT"
+		[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$lan --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
 	done
-	eval $1="\"\$$1 $o\""
+	eval "$1"="\"\$$1 $o\""
 }
 
-
-create_ipset()
-{
+create_ipset() {
 	echo "Creating ip list table (firewall type $FWTYPE)"
 	"$IPSET_CR" "$@"
 }
 
-
-zapret_do_daemons()
-{
+zapret_do_daemons() {
 	# $1 - 1 - run, 0 - stop
 
 	local opt qn qns qn6 qns6
 
 	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws)
-			opt="--port=$TPPORT $TPWS_OPT"
+	tpws)
+		opt="--port=$TPPORT $TPWS_OPT"
+		filter_apply_hostlist_target opt
+		do_tpws "$1" 1 "$opt"
+		;;
+	tpws-socks)
+		opt="--port=$TPPORT $TPWS_OPT"
+		filter_apply_hostlist_target opt
+		do_tpws_socks "$1" 1 "$opt"
+		;;
+	nfqws)
+		get_nfqws_qnums qn qns qn6 qns6
+		[ -z "$qn" ] || {
+			opt="--qnum=$qn $NFQWS_OPT_DESYNC_HTTP"
 			filter_apply_hostlist_target opt
-			do_tpws $1 1 "$opt"
-			;;
-		tpws-socks)
-			opt="--port=$TPPORT $TPWS_OPT"
+			do_nfqws "$1" 1 "$opt"
+		}
+		[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
+			opt="--qnum=$qns $NFQWS_OPT_DESYNC_HTTPS"
 			filter_apply_hostlist_target opt
-			do_tpws_socks $1 1 "$opt"
-			;;
-		nfqws)
-			get_nfqws_qnums qn qns qn6 qns6
-			[ -z "$qn" ] || {
-				opt="--qnum=$qn $NFQWS_OPT_DESYNC_HTTP"
-				filter_apply_hostlist_target opt
-				do_nfqws $1 1 "$opt"
-			}
-			[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
-				opt="--qnum=$qns $NFQWS_OPT_DESYNC_HTTPS"
-				filter_apply_hostlist_target opt
-				do_nfqws $1 2 "$opt"
-			}
-			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
-				opt="--qnum=$qn6 $NFQWS_OPT_DESYNC_HTTP6"
-				filter_apply_hostlist_target opt
-				do_nfqws $1 3 "$opt"
-			}
-			[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
-				opt="--qnum=$qns6 $NFQWS_OPT_DESYNC_HTTPS6"
-				filter_apply_hostlist_target opt
-				do_nfqws $1 4 "$opt"
-			}
-			get_nfqws_qnums_quic qn qn6
-			[ -z "$qn" ] || {
-				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
-				filter_apply_hostlist_target opt
-				do_nfqws $1 10 "$opt"
-			}
-			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || {
-				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC6"
-				filter_apply_hostlist_target opt
-				do_nfqws $1 11 "$opt"
-			}
-			;;
-		custom)
-	    		existf zapret_custom_daemons && zapret_custom_daemons $1
-			;;
+			do_nfqws "$1" 2 "$opt"
+		}
+		[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
+			opt="--qnum=$qn6 $NFQWS_OPT_DESYNC_HTTP6"
+			filter_apply_hostlist_target opt
+			do_nfqws "$1" 3 "$opt"
+		}
+		[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
+			opt="--qnum=$qns6 $NFQWS_OPT_DESYNC_HTTPS6"
+			filter_apply_hostlist_target opt
+			do_nfqws "$1" 4 "$opt"
+		}
+		get_nfqws_qnums_quic qn qn6
+		[ -z "$qn" ] || {
+			opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
+			filter_apply_hostlist_target opt
+			do_nfqws "$1" 10 "$opt"
+		}
+		[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || {
+			opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC6"
+			filter_apply_hostlist_target opt
+			do_nfqws "$1" 11 "$opt"
+		}
+		;;
+	custom)
+		existf zapret_custom_daemons && zapret_custom_daemons "$1"
+		;;
 	esac
 
 	return 0
 }
-zapret_run_daemons()
-{
+zapret_run_daemons() {
 	zapret_do_daemons 1 "$@"
 }
-zapret_stop_daemons()
-{
+zapret_stop_daemons() {
 	zapret_do_daemons 0 "$@"
 }
-

@@ -1,8 +1,7 @@
 # this custom script demonstrates how to apply tpws to http and nfqws to https
 # it preserves config settings : MODE_HTTP, MODE_HTTPS, MODE_FILTER, TPWS_OPT, NFQWS_OPT_DESYNC, NFQWS_OPT_DESYNC_HTTPS
 
-zapret_custom_daemons()
-{
+zapret_custom_daemons() {
 	# stop logic is managed by procd
 
 	local opt
@@ -16,11 +15,10 @@ zapret_custom_daemons()
 	[ "$MODE_HTTPS" = "1" ] && {
 		opt="--qnum=$QNUM $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
 		filter_apply_hostlist_target opt
-		run_daemon 2 $NFQWS "$opt"
+		run_daemon 2 "$NFQWS" "$opt"
 	}
 }
-zapret_custom_firewall()
-{
+zapret_custom_firewall() {
 	# $1 - 1 - run, 0 - stop
 
 	local f4 f6
@@ -31,18 +29,17 @@ zapret_custom_firewall()
 		f4="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
 		f6=$f4
 		filter_apply_ipset_target f4 f6
-		fw_tpws $1 "$f4" "$f6" $TPPORT
+		fw_tpws "$1" "$f4" "$f6" "$TPPORT"
 	}
-	
+
 	[ "$MODE_HTTPS" = "1" ] && {
 		f4="-p tcp -m multiport --dports $HTTPS_PORTS_IPT $first_packet_only"
 		f6=$f4
 		filter_apply_ipset_target f4 f6
-		fw_nfqws_post $1 "$f4 $desync" "$f6 $desync" $QNUM
+		fw_nfqws_post "$1" "$f4 $desync" "$f6 $desync" "$QNUM"
 	}
 }
-zapret_custom_firewall_nft()
-{
+zapret_custom_firewall_nft() {
 	# stop logic is not required
 
 	local f4 f6
@@ -53,15 +50,15 @@ zapret_custom_firewall_nft()
 		f4="tcp dport {$HTTP_PORTS}"
 		f6=$f4
 		nft_filter_apply_ipset_target f4 f6
-		nft_fw_tpws "$f4" "$f6" $TPPORT
+		nft_fw_tpws "$f4" "$f6" "$TPPORT"
 	}
-	
+
 	[ "$MODE_HTTPS" = "1" ] && {
 		f4="tcp dport {$HTTPS_PORTS} $first_packet_only"
 		f6=$f4
 		nft_filter_apply_ipset_target f4 f6
-		nft_fw_nfqws_post "$f4 $desync" "$f6 $desync" $QNUM
+		nft_fw_nfqws_post "$f4 $desync" "$f6 $desync" "$QNUM"
 		# for modes that require incoming traffic
-		nft_fw_reverse_nfqws_rule "$f4" "$f6" $QNUM
+		nft_fw_reverse_nfqws_rule "$f4" "$f6" "$QNUM"
 	}
 }

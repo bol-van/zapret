@@ -6,14 +6,12 @@ PF_ANCHOR_ZAPRET_V6="$PF_ANCHOR_DIR/zapret-v6"
 
 std_ports
 
-pf_anchor_root_reload()
-{
+pf_anchor_root_reload() {
 	echo reloading PF root anchor
 	pfctl -qf "$PF_MAIN"
 }
 
-pf_anchor_root()
-{
+pf_anchor_root() {
 	local patch
 	[ -f "$PF_MAIN" ] && {
 		grep -q '^rdr-anchor "zapret"$' "$PF_MAIN" || {
@@ -39,8 +37,8 @@ set limit table-entries 5000000
 		}
 
 		grep -q '^anchor "zapret"$' "$PF_MAIN" &&
-		grep -q '^rdr-anchor "zapret"$' "$PF_MAIN" &&
-		grep -q '^set limit table-entries' "$PF_MAIN" && {
+			grep -q '^rdr-anchor "zapret"$' "$PF_MAIN" &&
+			grep -q '^set limit table-entries' "$PF_MAIN" && {
 			if [ -n "$patch" ]; then
 				echo successfully patched $PF_MAIN
 				pf_anchor_root_reload
@@ -57,13 +55,11 @@ set limit table-entries 5000000
 	echo ----------------------------------
 	return 1
 }
-pf_anchor_root_del()
-{
+pf_anchor_root_del() {
 	sed -i '' -e '/^anchor "zapret"$/d' -e '/^rdr-anchor "zapret"$/d' -e '/^set limit table-entries/d' "$PF_MAIN"
 }
 
-pf_anchor_zapret()
-{
+pf_anchor_zapret() {
 	[ "$DISABLE_IPV4" = "1" ] || {
 		if [ -f "$ZIPLIST_EXCLUDE" ]; then
 			echo "table <nozapret> persist file \"$ZIPLIST_EXCLUDE\""
@@ -83,8 +79,7 @@ pf_anchor_zapret()
 	[ "$DISABLE_IPV4" = "1" ] || echo "anchor \"/zapret-v4\" inet to !<nozapret>"
 	[ "$DISABLE_IPV6" = "1" ] || echo "anchor \"/zapret-v6\" inet6 to !<nozapret6>"
 }
-pf_anchor_zapret_tables()
-{
+pf_anchor_zapret_tables() {
 	# $1 - variable to receive applied table names
 	# $2/$3 $4/$5 ...  table_name/table_file
 	local tblv=$1
@@ -92,22 +87,21 @@ pf_anchor_zapret_tables()
 
 	shift
 	[ "$MODE_FILTER" = "ipset" ] &&
-	{
-		while [ -n "$1" ] && [ -n "$2" ] ; do
-			[ -f "$2" ] && {
-				echo "table <$1> file \"$2\""
-				_tbl="$_tbl<$1> "
-			}
-			shift
-			shift
-		done
-	}
+		{
+			while [ -n "$1" ] && [ -n "$2" ]; do
+				[ -f "$2" ] && {
+					echo "table <$1> file \"$2\""
+					_tbl="$_tbl<$1> "
+				}
+				shift
+				shift
+			done
+		}
 	[ -n "$_tbl" ] || _tbl="any"
 
-	eval $tblv="\"\$_tbl\""
+	eval "$tblv"="\"\$_tbl\""
 }
-pf_anchor_port_target()
-{
+pf_anchor_port_target() {
 	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
 		echo "{$HTTP_PORTS_IPT,$HTTPS_PORTS_IPT}"
 	elif [ "$MODE_HTTPS" = "1" ]; then
@@ -117,20 +111,19 @@ pf_anchor_port_target()
 	fi
 }
 
-pf_anchor_zapret_v4_tpws()
-{
+pf_anchor_zapret_v4_tpws() {
 	# $1 - port
 
 	local rule port=$(pf_anchor_port_target)
 	for lan in $IFACE_LAN; do
 		for t in $tbl; do
-			 echo "rdr on $lan inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
+			echo "rdr on $lan inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
 		done
 	done
 	echo "rdr on lo0 inet proto tcp from !127.0.0.0/8 to any port $port -> 127.0.0.1 port $1"
 	for t in $tbl; do
 		rule="route-to (lo0 127.0.0.1) inet proto tcp from !127.0.0.0/8 to $t port $port user { >root }"
-		if [ -n "$IFACE_WAN" ] ; then
+		if [ -n "$IFACE_WAN" ]; then
 			for wan in $IFACE_WAN; do
 				echo "pass out on $wan $rule"
 			done
@@ -140,31 +133,29 @@ pf_anchor_zapret_v4_tpws()
 	done
 }
 
-pf_anchor_zapret_v4()
-{
+pf_anchor_zapret_v4() {
 	local tbl port
 	[ "$DISABLE_IPV4" = "1" ] || {
 		case $MODE in
-			tpws)
-				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-				pf_anchor_zapret_v4_tpws $TPPORT
-				;;
-			custom)
-				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-				existf zapret_custom_firewall_v4 && zapret_custom_firewall_v4
-				;;
+		tpws)
+			[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
+			pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+			pf_anchor_zapret_v4_tpws "$TPPORT"
+			;;
+		custom)
+			pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+			existf zapret_custom_firewall_v4 && zapret_custom_firewall_v4
+			;;
 		esac
 	}
 }
-pf_anchor_zapret_v6_tpws()
-{
+pf_anchor_zapret_v6_tpws() {
 	# $1 - port
 
 	local LL_LAN rule port=$(pf_anchor_port_target)
 	# LAN link local is only for router
 	for lan in $IFACE_LAN; do
-		LL_LAN=$(get_ipv6_linklocal $lan)
+		LL_LAN=$(get_ipv6_linklocal "$lan")
 		[ -n "$LL_LAN" ] && {
 			for t in $tbl; do
 				echo "rdr on $lan inet6 proto tcp from any to $t port $port -> $LL_LAN port $1"
@@ -174,7 +165,7 @@ pf_anchor_zapret_v6_tpws()
 	echo "rdr on lo0 inet6 proto tcp from !::1 to any port $port -> fe80::1 port $1"
 	for t in $tbl; do
 		rule="route-to (lo0 fe80::1) inet6 proto tcp from !::1 to $t port $port user { >root }"
-		if [ -n "${IFACE_WAN6:-$IFACE_WAN}" ] ; then
+		if [ -n "${IFACE_WAN6:-$IFACE_WAN}" ]; then
 			for wan in ${IFACE_WAN6:-$IFACE_WAN}; do
 				echo "pass out on $wan $rule"
 			done
@@ -183,38 +174,34 @@ pf_anchor_zapret_v6_tpws()
 		fi
 	done
 }
-pf_anchor_zapret_v6()
-{
+pf_anchor_zapret_v6() {
 	local tbl port
 
 	[ "$DISABLE_IPV6" = "1" ] || {
 		case $MODE in
-			tpws)
-				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-				pf_anchor_zapret_v6_tpws $TPPORT
-				;;
-			custom)
-				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-				existf zapret_custom_firewall_v6 && zapret_custom_firewall_v6
-				;;
+		tpws)
+			[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
+			pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
+			pf_anchor_zapret_v6_tpws "$TPPORT"
+			;;
+		custom)
+			pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
+			existf zapret_custom_firewall_v6 && zapret_custom_firewall_v6
+			;;
 		esac
 	}
 }
 
-pf_anchors_create()
-{
+pf_anchors_create() {
 	wait_lan_ll
 	pf_anchor_zapret >"$PF_ANCHOR_ZAPRET"
 	pf_anchor_zapret_v4 >"$PF_ANCHOR_ZAPRET_V4"
 	pf_anchor_zapret_v6 >"$PF_ANCHOR_ZAPRET_V6"
 }
-pf_anchors_del()
-{
+pf_anchors_del() {
 	rm -f "$PF_ANCHOR_ZAPRET" "$PF_ANCHOR_ZAPRET_V4" "$PF_ANCHOR_ZAPRET_V6"
 }
-pf_anchors_load()
-{
+pf_anchors_load() {
 	echo loading zapret anchor from "$PF_ANCHOR_ZAPRET"
 	pfctl -qa zapret -f "$PF_ANCHOR_ZAPRET" || {
 		echo error loading zapret anchor
@@ -243,20 +230,17 @@ pf_anchors_load()
 	echo successfully loaded PF anchors
 	return 0
 }
-pf_anchors_clear()
-{
+pf_anchors_clear() {
 	echo clearing zapret anchors
 	pfctl -qa zapret-v4 -F all 2>/dev/null
 	pfctl -qa zapret-v6 -F all 2>/dev/null
 	pfctl -qa zapret -F all 2>/dev/null
 }
-pf_enable()
-{
+pf_enable() {
 	echo enabling PF
 	pfctl -qe
 }
-pf_table_reload()
-{
+pf_table_reload() {
 	echo reloading zapret tables
 	[ "$DISABLE_IPV4" = "1" ] || pfctl -qTl -a zapret-v4 -f "$PF_ANCHOR_ZAPRET_V4"
 	[ "$DISABLE_IPV6" = "1" ] || pfctl -qTl -a zapret-v6 -f "$PF_ANCHOR_ZAPRET_V6"

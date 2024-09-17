@@ -25,17 +25,16 @@ my_extra_command restart_daemons "Restart zapret firewall only (=restart in ipta
 
 SCRIPT=$(readlink /etc/init.d/zapret)
 if [ -n "$SCRIPT" ]; then
- EXEDIR=$(dirname "$SCRIPT")
- ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
+	EXEDIR=$(dirname "$SCRIPT")
+	ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
 else
- ZAPRET_BASE=/opt/zapret
+	ZAPRET_BASE=/opt/zapret
 fi
 
 . "$ZAPRET_BASE/init.d/openwrt/functions"
 
-
-# !!!!! in old openwrt 21.x- with iptables firewall rules are configured separately
-# !!!!! in new openwrt >21.x with nftables firewall is configured here
+# !!!!! in old OpenWrt 21.x- with iptables firewall rules are configured separately
+# !!!!! in new OpenWrt >21.x with nftables firewall is configured here
 
 PIDDIR=/var/run
 
@@ -50,8 +49,7 @@ TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
 
-run_daemon()
-{
+run_daemon() {
 	# $1 - daemon string id or number. can use 1,2,3,...
 	# $2 - daemon
 	# $3 - daemon args
@@ -59,13 +57,12 @@ run_daemon()
 	local DAEMONBASE="$(basename "$2")"
 	echo "Starting daemon $1: $2 $3"
 	procd_open_instance
-	procd_set_param command $2 $3
-	procd_set_param pidfile $PIDDIR/$DAEMONBASE$1.pid
+	procd_set_param command "$2" "$3"
+	procd_set_param pidfile $PIDDIR/"$DAEMONBASE"$1.pid
 	procd_close_instance
 }
 
-run_tpws()
-{
+run_tpws() {
 	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
 
 	local OPT="$TPWS_OPT_BASE"
@@ -75,144 +72,128 @@ run_tpws()
 	[ "$DISABLE_IPV6" = "1" ] || {
 		OPT="$OPT $TPWS_OPT_BASE6"
 		for lan in $OPENWRT_LAN; do
-		    network_get_device DEVICE $lan
-		    [ -n "$DEVICE" ] && OPT="$OPT --bind-iface6=$DEVICE $TPWS_OPT_BASE6_PRE"
+			network_get_device DEVICE "$lan"
+			[ -n "$DEVICE" ] && OPT="$OPT --bind-iface6=$DEVICE $TPWS_OPT_BASE6_PRE"
 		done
 	}
-	run_daemon $1 "$TPWS" "$OPT $2"
+	run_daemon "$1" "$TPWS" "$OPT $2"
 }
-run_tpws_socks()
-{
+run_tpws_socks() {
 	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
 
 	local opt="$TPWS_OPT_BASE --socks"
 
 	tpws_apply_socks_binds opt
-	run_daemon $1 "$TPWS" "$opt $2"
+	run_daemon "$1" "$TPWS" "$opt $2"
 }
 
-stop_tpws()
-{
-	stop_daemon $1 "$TPWS"
+stop_tpws() {
+	stop_daemon "$1" "$TPWS"
 }
 
-
-tpws_apply_socks_binds()
-{
+tpws_apply_socks_binds() {
 	local o
 
 	[ "$DISABLE_IPV4" = "1" ] || o="--bind-addr=127.0.0.1"
 	[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-addr=::1"
-	
+
 	for lan in $OPENWRT_LAN; do
-	    network_get_device DEVICE $lan
-	    [ -n "$DEVICE" ] || continue
-	    [ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$DEVICE $TPWS_WAIT"
-	    [ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$DEVICE --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
+		network_get_device DEVICE "$lan"
+		[ -n "$DEVICE" ] || continue
+		[ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$DEVICE $TPWS_WAIT"
+		[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$DEVICE --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
 	done
-	eval $1="\"\$$1 $o\""
+	eval "$1"="\"\$$1 $o\""
 }
 
-
-start_daemons_procd()
-{
+start_daemons_procd() {
 	local opt qn qns qn6 qns6
 
 	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws)
-			opt="--port=$TPPORT $TPWS_OPT"
+	tpws)
+		opt="--port=$TPPORT $TPWS_OPT"
+		filter_apply_hostlist_target opt
+		run_tpws 1 "$opt"
+		;;
+	tpws-socks)
+		opt="--port=$TPPORT $TPWS_OPT"
+		filter_apply_hostlist_target opt
+		run_tpws_socks 1 "$opt"
+		;;
+	nfqws)
+		# quite complex but we need to minimize nfqws processes to save RAM
+		get_nfqws_qnums qn qns qn6 qns6
+		[ -z "$qn" ] || {
+			opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP"
 			filter_apply_hostlist_target opt
-			run_tpws 1 "$opt"
-			;;
-		tpws-socks)
-			opt="--port=$TPPORT $TPWS_OPT"
+			run_daemon 1 "$NFQWS" "$opt"
+		}
+		[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
+			opt="--qnum=$qns $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
 			filter_apply_hostlist_target opt
-			run_tpws_socks 1 "$opt"
-			;;
-		nfqws)
-			# quite complex but we need to minimize nfqws processes to save RAM
-			get_nfqws_qnums qn qns qn6 qns6
-			[ -z "$qn" ] || {
-				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP"
-				filter_apply_hostlist_target opt
-				run_daemon 1 "$NFQWS" "$opt"
-			}
-			[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
-				opt="--qnum=$qns $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
-				filter_apply_hostlist_target opt
-				run_daemon 2 "$NFQWS" "$opt"
-			}
-			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
-				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP6"
-				filter_apply_hostlist_target opt
-				run_daemon 3 "$NFQWS" "$opt"
-			}
-			[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
-				opt="--qnum=$qns6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS6"
-				filter_apply_hostlist_target opt
-				run_daemon 4 "$NFQWS" "$opt"
-			}
-			get_nfqws_qnums_quic qn qn6
-			[ -z "$qn" ] || {
-				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
-				filter_apply_hostlist_target opt
-				run_daemon 10 "$NFQWS" "$opt"
-			}
-			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || {
-				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC6"
-				filter_apply_hostlist_target opt
-				run_daemon 11 "$NFQWS" "$opt"
-			}
-			;;
-		custom)
-	    		existf zapret_custom_daemons && zapret_custom_daemons $1
-			;;
+			run_daemon 2 "$NFQWS" "$opt"
+		}
+		[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
+			opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP6"
+			filter_apply_hostlist_target opt
+			run_daemon 3 "$NFQWS" "$opt"
+		}
+		[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
+			opt="--qnum=$qns6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS6"
+			filter_apply_hostlist_target opt
+			run_daemon 4 "$NFQWS" "$opt"
+		}
+		get_nfqws_qnums_quic qn qn6
+		[ -z "$qn" ] || {
+			opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
+			filter_apply_hostlist_target opt
+			run_daemon 10 "$NFQWS" "$opt"
+		}
+		[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || {
+			opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC6"
+			filter_apply_hostlist_target opt
+			run_daemon 11 "$NFQWS" "$opt"
+		}
+		;;
+	custom)
+		existf zapret_custom_daemons && zapret_custom_daemons "$1"
+		;;
 	esac
 
 	return 0
 }
-start_daemons()
-{
+start_daemons() {
 	rc_procd start_daemons_procd "$@"
 }
-stop_daemons()
-{
-	procd_kill "$(basename ${basescript:-$initscript})" "$1"
+stop_daemons() {
+	procd_kill "$(basename "${basescript:-$initscript}")" "$1"
 }
-restart_daemons()
-{
+restart_daemons() {
 	stop_daemons
 	start_daemons
 }
 
-start_fw()
-{
+start_fw() {
 	zapret_apply_firewall
 }
-stop_fw()
-{
+stop_fw() {
 	zapret_unapply_firewall
 }
-restart_fw()
-{
+restart_fw() {
 	stop_fw
 	start_fw
 }
-reload_ifsets()
-{
+reload_ifsets() {
 	zapret_reload_ifsets
 }
-list_ifsets()
-{
+list_ifsets() {
 	zapret_list_ifsets
 }
-list_table()
-{
+list_table() {
 	zapret_list_table
 }
 
-start_service()
-{
+start_service() {
 	start_daemons_procd
 	[ "$INIT_APPLY_FW" != "1" ] || {
 		linux_fwtype
@@ -220,8 +201,7 @@ start_service()
 	}
 }
 
-stop_service()
-{
+stop_service() {
 	# this procedure is called from stop()
 	# stop() already stop daemons
 	[ "$INIT_APPLY_FW" != "1" ] || {

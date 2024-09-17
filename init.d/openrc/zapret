@@ -4,7 +4,10 @@
 # on some systems (alpine) for unknown reason non-openrc-run scripts are not started from /etc/init.d
 
 EXEDIR=$(dirname "$RC_SERVICE")
-EXEDIR="$(cd "$EXEDIR"; pwd)"
+EXEDIR="$(
+	cd "$EXEDIR"
+	pwd
+)"
 ZAPRET_BASE="$EXEDIR/../.."
 ZAPRET_INIT="$ZAPRET_BASE/init.d/sysv/zapret"
 
@@ -23,47 +26,36 @@ description_restart_daemons="Restart zapret firewall only"
 depend() {
 	rc-service -e networking && need networking
 }
-start()
-{
+start() {
 	"$ZAPRET_INIT" start
 }
-stop()
-{
+stop() {
 	"$ZAPRET_INIT" stop
 }
-start_fw()
-{
+start_fw() {
 	"$ZAPRET_INIT" start_fw
 }
-stop_fw()
-{
+stop_fw() {
 	"$ZAPRET_INIT" stop_fw
 }
-restart_fw()
-{
+restart_fw() {
 	"$ZAPRET_INIT" restart_fw
 }
-start_daemons()
-{
+start_daemons() {
 	"$ZAPRET_INIT" start_daemons
 }
-stop_daemons()
-{
+stop_daemons() {
 	"$ZAPRET_INIT" stop_daemons
 }
-restart_daemons()
-{
+restart_daemons() {
 	"$ZAPRET_INIT" restart_daemons
 }
-reload_ifsets()
-{
+reload_ifsets() {
 	"$ZAPRET_INIT" reload_ifsets
 }
-list_ifsets()
-{
+list_ifsets() {
 	"$ZAPRET_INIT" list_ifsets
 }
-list_table()
-{
+list_table() {
 	"$ZAPRET_INIT" list_table
 }
