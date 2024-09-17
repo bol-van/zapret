@@ -9,36 +9,40 @@
 #include <stdio.h>
 
 // segment buffer has at least 5 extra bytes to extend data block
-void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos, uint8_t *split_flags)
+void tamper_out(t_ctrack *ctrack, uint8_t *segment, size_t segment_buffer_size, size_t *size, size_t *split_pos, uint8_t *split_flags)
 {
 	uint8_t *p, *pp, *pHost = NULL;
 	size_t method_len = 0, pos;
 	const char *method;
 	bool bBypass = false, bHaveHost = false, bHostExcluded = false;
 	char *pc, Host[256];
-	
+
 	DBGPRINT("tamper_out\n");
 
-	*split_pos=0;
-	*split_flags=0;
+	*split_pos = 0;
+	*split_flags = 0;
 
-	if ((method = HttpMethod(segment,*size)))
+	if ((method = HttpMethod(segment, *size)))
 	{
-		method_len = strlen(method)-2;
-		VPRINT("Data block looks like http request start : %s\n", method);
-		if (!ctrack->l7proto) ctrack->l7proto=HTTP;
+		method_len = strlen(method) - 2;
+		VPRINT("Data block looks like HTTP request start : %s\n", method);
+		if (!ctrack->l7proto)
+			ctrack->l7proto = HTTP;
 		// cpu saving : we search host only if and when required. we do not research host every time we need its position
-		if ((params.hostlist || params.hostlist_exclude) && HttpFindHost(&pHost,segment,*size))
+		if ((params.hostlist || params.hostlist_exclude) && HttpFindHost(&pHost, segment, *size))
 		{
 			p = pHost + 5;
-			while (p < (segment + *size) && (*p == ' ' || *p == '\t')) p++;
+			while (p < (segment + *size) && (*p == ' ' || *p == '\t'))
+				p++;
 			pp = p;
-			while (pp < (segment + *size) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n') pp++;
+			while (pp < (segment + *size) && (pp - p) < (sizeof(Host) - 1) && *pp != '\r' && *pp != '\n')
+				pp++;
 			memcpy(Host, p, pp - p);
 			Host[pp - p] = '\0';
 			bHaveHost = true;
 			VPRINT("Requested Host is : %s\n", Host);
-			for(pc = Host; *pc; pc++) *pc=tolower(*pc);
+			for (pc = Host; *pc; pc++)
+				*pc = tolower(*pc);
 			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
 		if (!bBypass)
@@ -48,7 +52,8 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				p = pp = segment;
 				while ((p = memmem(p, segment + *size - p, "\r\n", 2)))
 				{
-					*p = '\n'; p++;
+					*p = '\n';
+					p++;
 					memmove(p, p + 1, segment + *size - p - 1);
 					(*size)--;
 					if (pp == (p - 1))
@@ -61,13 +66,14 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				}
 				pHost = NULL; // invalidate
 			}
-			if (params.methodeol && (*size+1+!params.unixeol)<=segment_buffer_size)
+			if (params.methodeol && (*size + 1 + !params.unixeol) <= segment_buffer_size)
 			{
 				VPRINT("Adding EOL before method\n");
 				if (params.unixeol)
 				{
 					memmove(segment + 1, segment, *size);
-					(*size)++;;
+					(*size)++;
+					;
 					segment[0] = '\n';
 				}
 				else
@@ -79,39 +85,41 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				}
 				pHost = NULL; // invalidate
 			}
-			if (params.methodspace && *size<segment_buffer_size)
+			if (params.methodspace && *size < segment_buffer_size)
 			{
 				// we only work with data blocks looking as HTTP query, so method is at the beginning
 				VPRINT("Adding extra space after method\n");
 				p = segment + method_len + 1;
 				pos = method_len + 1;
 				memmove(p + 1, p, *size - pos);
-				*p = ' '; // insert extra space
+				*p = ' ';  // insert extra space
 				(*size)++; // block will grow by 1 byte
-				if (pHost) pHost++; // Host: position will move by 1 byte
+				if (pHost)
+					pHost++; // Host: position will move by 1 byte
 			}
-			if ((params.hostdot || params.hosttab) && *size<segment_buffer_size && HttpFindHost(&pHost,segment,*size))
+			if ((params.hostdot || params.hosttab) && *size < segment_buffer_size && HttpFindHost(&pHost, segment, *size))
 			{
 				p = pHost + 5;
-				while (p < (segment + *size) && *p != '\r' && *p != '\n') p++;
+				while (p < (segment + *size) && *p != '\r' && *p != '\n')
+					p++;
 				if (p < (segment + *size))
 				{
 					pos = p - segment;
 					VPRINT("Adding %s to host name at pos %zu\n", params.hostdot ? "dot" : "tab", pos);
 					memmove(p + 1, p, *size - pos);
 					*p = params.hostdot ? '.' : '\t'; // insert dot or tab
-					(*size)++; // block will grow by 1 byte
+					(*size)++;						  // block will grow by 1 byte
 				}
 			}
-			if (params.domcase && HttpFindHost(&pHost,segment,*size))
+			if (params.domcase && HttpFindHost(&pHost, segment, *size))
 			{
 				p = pHost + 5;
 				pos = p - segment;
-				VPRINT("Mixing domain case at pos %zu\n",pos);
+				VPRINT("Mixing domain case at pos %zu\n", pos);
 				for (; p < (segment + *size) && *p != '\r' && *p != '\n'; p++)
 					*p = (((size_t)p) & 1) ? tolower(*p) : toupper(*p);
 			}
-			if (params.hostnospace && HttpFindHost(&pHost,segment,*size) && (pHost+5)<(segment+*size) && pHost[5] == ' ')
+			if (params.hostnospace && HttpFindHost(&pHost, segment, *size) && (pHost + 5) < (segment + *size) && pHost[5] == ' ')
 			{
 				p = pHost + 6;
 				pos = p - segment;
@@ -119,78 +127,83 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				memmove(p - 1, p, *size - pos);
 				(*size)--; // block will shrink by 1 byte
 			}
-			if (params.hostcase && HttpFindHost(&pHost,segment,*size))
+			if (params.hostcase && HttpFindHost(&pHost, segment, *size))
 			{
 				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment);
 				memcpy(pHost, params.hostspell, 4);
 			}
-			if (params.hostpad && HttpFindHost(&pHost,segment,*size))
+			if (params.hostpad && HttpFindHost(&pHost, segment, *size))
 			{
 				//  add :  XXXXX: <padding?[\r\n|\n]
 				char s[8];
 				size_t hsize = params.unixeol ? 8 : 9;
-				size_t hostpad = params.hostpad<hsize ? hsize : params.hostpad;
+				size_t hostpad = params.hostpad < hsize ? hsize : params.hostpad;
 
-				if ((hsize+*size)>segment_buffer_size)
+				if ((hsize + *size) > segment_buffer_size)
 					VPRINT("could not add host padding : buffer too small\n");
 				else
 				{
-					if ((hostpad+*size)>segment_buffer_size)
+					if ((hostpad + *size) > segment_buffer_size)
 					{
-						hostpad=segment_buffer_size-*size;
+						hostpad = segment_buffer_size - *size;
 						VPRINT("host padding reduced to %zu bytes : buffer too small\n", hostpad);
 					}
 					else
 						VPRINT("host padding with %zu bytes\n", hostpad);
-					
+
 					p = pHost;
 					pos = p - segment;
 					memmove(p + hostpad, p, *size - pos);
 					(*size) += hostpad;
-					while(hostpad)
+					while (hostpad)
 					{
-						#define MAX_HDR_SIZE	2048
-						size_t padsize = hostpad > hsize ? hostpad-hsize : 0;
-						if (padsize>MAX_HDR_SIZE) padsize=MAX_HDR_SIZE;
+#define MAX_HDR_SIZE 2048
+						size_t padsize = hostpad > hsize ? hostpad - hsize : 0;
+						if (padsize > MAX_HDR_SIZE)
+							padsize = MAX_HDR_SIZE;
 						// if next header would be too small then add extra padding to the current one
-						if ((hostpad-padsize-hsize)<hsize) padsize+=hostpad-padsize-hsize;
-						snprintf(s,sizeof(s),"%c%04x: ", 'a'+rand()%('z'-'a'+1), rand() & 0xFFFF);
-						memcpy(p,s,7);
-						p+=7;
-						memset(p,'a'+rand()%('z'-'a'+1),padsize);
-						p+=padsize;
+						if ((hostpad - padsize - hsize) < hsize)
+							padsize += hostpad - padsize - hsize;
+						snprintf(s, sizeof(s), "%c%04x: ", 'a' + rand() % ('z' - 'a' + 1), rand() & 0xFFFF);
+						memcpy(p, s, 7);
+						p += 7;
+						memset(p, 'a' + rand() % ('z' - 'a' + 1), padsize);
+						p += padsize;
 						if (params.unixeol)
-							*p++='\n';
+							*p++ = '\n';
 						else
 						{
-							*p++='\r';
-							*p++='\n';
+							*p++ = '\r';
+							*p++ = '\n';
 						}
-						hostpad-=hsize+padsize;
+						hostpad -= hsize + padsize;
 					}
 					pHost = NULL; // invalidate
 				}
 			}
 			*split_pos = HttpPos(params.split_http_req, params.split_pos, segment, *size);
-			if (params.disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
-			if (params.oob_http) *split_flags |= SPLIT_FLAG_OOB;
+			if (params.disorder_http)
+				*split_flags |= SPLIT_FLAG_DISORDER;
+			if (params.oob_http)
+				*split_flags |= SPLIT_FLAG_OOB;
 		}
 		else
 		{
 			VPRINT("Not acting on this request\n");
 		}
 	}
-	else if (IsTLSClientHello(segment,*size,false))
+	else if (IsTLSClientHello(segment, *size, false))
 	{
-		size_t tpos=0,spos=0;
-		
-		if (!ctrack->l7proto) ctrack->l7proto=TLS;
+		size_t tpos = 0, spos = 0;
+
+		if (!ctrack->l7proto)
+			ctrack->l7proto = TLS;
 
 		VPRINT("packet contains TLS ClientHello\n");
 		// we need host only if hostlist is present
-		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false))
+		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t *)segment, *size, Host, sizeof(Host), false))
 		{
-			VPRINT("hostname: %s\n",Host);
+			VPRINT("hostname: %s\n", Host);
 			bHaveHost = true;
 			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
@@ -202,52 +215,59 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 		{
 			spos = TLSPos(params.split_tls, params.split_pos, segment, *size, 0);
 
-			if ((5+*size)<=segment_buffer_size)
+			if ((5 + *size) <= segment_buffer_size)
 			{
-				tpos = TLSPos(params.tlsrec, params.tlsrec_pos+5, segment, *size, 0);
-				if (tpos>5)
+				tpos = TLSPos(params.tlsrec, params.tlsrec_pos + 5, segment, *size, 0);
+				if (tpos > 5)
 				{
 					// construct 2 TLS records from one
-					uint16_t l = pntoh16(segment+3); // length
-					if (l>=2)
+					uint16_t l = pntoh16(segment + 3); // length
+					if (l >= 2)
 					{
 						// length is checked in IsTLSClientHello and cannot exceed buffer size
-						if ((tpos-5)>=l) tpos=5+1;
-						VPRINT("making 2 TLS records at pos %zu\n",tpos);
-						memmove(segment+tpos+5,segment+tpos,*size-tpos);
+						if ((tpos - 5) >= l)
+							tpos = 5 + 1;
+						VPRINT("making 2 TLS records at pos %zu\n", tpos);
+						memmove(segment + tpos + 5, segment + tpos, *size - tpos);
 						segment[tpos] = segment[0];
-						segment[tpos+1] = segment[1];
-						segment[tpos+2] = segment[2];
-						phton16(segment+tpos+3,l-(tpos-5));
-						phton16(segment+3,tpos-5);
+						segment[tpos + 1] = segment[1];
+						segment[tpos + 2] = segment[2];
+						phton16(segment + tpos + 3, l - (tpos - 5));
+						phton16(segment + 3, tpos - 5);
 						*size += 5;
 						// split pos present and it is not before tlsrec split. increase split pos by tlsrec header size (5 bytes)
-						if (spos && spos>=tpos) spos+=5;
+						if (spos && spos >= tpos)
+							spos += 5;
 					}
 				}
 			}
 
 			if (spos && spos < *size)
 			{
-				VPRINT("split pos %zu\n",spos);
+				VPRINT("split pos %zu\n", spos);
 				*split_pos = spos;
 			}
 
-			if (params.disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
-			if (params.oob_tls) *split_flags |= SPLIT_FLAG_OOB;
+			if (params.disorder_tls)
+				*split_flags |= SPLIT_FLAG_DISORDER;
+			if (params.oob_tls)
+				*split_flags |= SPLIT_FLAG_OOB;
 		}
 	}
 	else if (params.split_any_protocol && params.split_pos < *size)
 		*split_pos = params.split_pos;
-		
+
 	if (bHaveHost && bBypass && !bHostExcluded && *params.hostlist_auto_filename)
 	{
 		DBGPRINT("tamper_out put hostname : %s\n", Host);
-		if (ctrack->hostname) free(ctrack->hostname);
-		ctrack->hostname=strdup(Host);
+		if (ctrack->hostname)
+			free(ctrack->hostname);
+		ctrack->hostname = strdup(Host);
 	}
-	if (params.disorder) *split_flags |= SPLIT_FLAG_DISORDER;
-	if (params.oob) *split_flags |= SPLIT_FLAG_OOB;
+	if (params.disorder)
+		*split_flags |= SPLIT_FLAG_DISORDER;
+	if (params.oob)
+		*split_flags |= SPLIT_FLAG_OOB;
 }
 
 static void auto_hostlist_reset_fail_counter(const char *hostname)
@@ -255,7 +275,7 @@ static void auto_hostlist_reset_fail_counter(const char *hostname)
 	if (hostname)
 	{
 		hostfail_pool *fail_counter;
-	
+
 		fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
 		if (fail_counter)
 		{
@@ -287,9 +307,9 @@ static void auto_hostlist_failed(const char *hostname)
 	{
 		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist\n", hostname);
 		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
-		
+
 		VPRINT("auto hostlist : rechecking %s to avoid duplicates\n", hostname);
-		bool bExcluded=false;
+		bool bExcluded = false;
 		if (!HostlistCheck(hostname, &bExcluded) && !bExcluded)
 		{
 			VPRINT("auto hostlist : adding %s\n", hostname);
@@ -314,9 +334,9 @@ static void auto_hostlist_failed(const char *hostname)
 	}
 }
 
-void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size)
+void tamper_in(t_ctrack *ctrack, uint8_t *segment, size_t segment_buffer_size, size_t *size)
 {
-	bool bFail=false;
+	bool bFail = false;
 
 	DBGPRINT("tamper_in hostname=%s\n", ctrack->hostname);
 
@@ -324,9 +344,9 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 	{
 		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 
-		if (ctrack->l7proto==HTTP && ctrack->hostname)
+		if (ctrack->l7proto == HTTP && ctrack->hostname)
 		{
-			if (IsHttpReply(segment,*size))
+			if (IsHttpReply(segment, *size))
 			{
 				VPRINT("incoming HTTP reply detected for hostname %s\n", ctrack->hostname);
 				bFail = HttpReplyLooksLikeDPIRedirect(segment, *size, ctrack->hostname);
@@ -343,11 +363,11 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 				// received not http reply. do not monitor this connection anymore
 				VPRINT("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
 			}
-			if (bFail) auto_hostlist_failed(ctrack->hostname);
-
+			if (bFail)
+				auto_hostlist_failed(ctrack->hostname);
 		}
-		if (!bFail) auto_hostlist_reset_fail_counter(ctrack->hostname);
-
+		if (!bFail)
+			auto_hostlist_reset_fail_counter(ctrack->hostname);
 	}
 	ctrack->bTamperInCutoff = true;
 }
@@ -356,7 +376,8 @@ void rst_in(t_ctrack *ctrack)
 {
 	DBGPRINT("rst_in hostname=%s\n", ctrack->hostname);
 
-	if (!*params.hostlist_auto_filename) return;
+	if (!*params.hostlist_auto_filename)
+		return;
 
 	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 
@@ -371,7 +392,8 @@ void hup_out(t_ctrack *ctrack)
 {
 	DBGPRINT("hup_out hostname=%s\n", ctrack->hostname);
 
-	if (!*params.hostlist_auto_filename) return;
+	if (!*params.hostlist_auto_filename)
+		return;
 
 	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
 

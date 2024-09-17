@@ -19,12 +19,14 @@
 struct registered_fds_node_;
 typedef struct registered_fds_node_ RegisteredFDsNode;
 
-typedef enum {
+typedef enum
+{
 	EOF_STATE_READ_EOF = 0x01,
 	EOF_STATE_WRITE_EOF = 0x02,
 } EOFState;
 
-typedef enum {
+typedef enum
+{
 	NODE_TYPE_FIFO = 1,
 	NODE_TYPE_SOCKET = 2,
 	NODE_TYPE_KQUEUE = 3,
@@ -32,9 +34,12 @@ typedef enum {
 	NODE_TYPE_POLL = 5,
 } NodeType;
 
-struct registered_fds_node_ {
-	RB_ENTRY(registered_fds_node_) entry;
-	TAILQ_ENTRY(registered_fds_node_) pollfd_list_entry;
+struct registered_fds_node_
+{
+	RB_ENTRY(registered_fds_node_)
+	entry;
+	TAILQ_ENTRY(registered_fds_node_)
+	pollfd_list_entry;
 
 	int fd;
 	epoll_data_t data;
@@ -50,8 +55,10 @@ struct registered_fds_node_ {
 	bool got_evfilt_except;
 
 	NodeType node_type;
-	union {
-		struct {
+	union
+	{
+		struct
+		{
 			bool readable;
 			bool writable;
 		} fifo;
@@ -72,7 +79,8 @@ struct registered_fds_node_ {
 typedef TAILQ_HEAD(pollfds_list_, registered_fds_node_) PollFDList;
 typedef RB_HEAD(registered_fds_set_, registered_fds_node_) RegisteredFDsSet;
 
-typedef struct {
+typedef struct
+{
 	int kq; // non owning
 	pthread_mutex_t mutex;
 
@@ -101,8 +109,8 @@ errno_t epollfd_ctx_terminate(EpollFDCtx *epollfd);
 void epollfd_ctx_fill_pollfds(EpollFDCtx *epollfd, struct pollfd *pfds);
 
 errno_t epollfd_ctx_ctl(EpollFDCtx *epollfd, int op, int fd2,
-    struct epoll_event *ev);
+						struct epoll_event *ev);
 errno_t epollfd_ctx_wait(EpollFDCtx *epollfd, struct epoll_event *ev, int cnt,
-    int *actual_cnt);
+						 int *actual_cnt);
 
 #endif

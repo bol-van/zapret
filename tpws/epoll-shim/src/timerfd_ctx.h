@@ -11,7 +11,8 @@
 #include <pthread.h>
 #include <time.h>
 
-typedef struct {
+typedef struct
+{
 	int kq; // non owning
 	int flags;
 	pthread_mutex_t mutex;
@@ -30,7 +31,7 @@ errno_t timerfd_ctx_init(TimerFDCtx *timerfd, int kq, int clockid);
 errno_t timerfd_ctx_terminate(TimerFDCtx *timerfd);
 
 errno_t timerfd_ctx_settime(TimerFDCtx *timerfd, int flags,
-    struct itimerspec const *new, struct itimerspec *old);
+							struct itimerspec const *new, struct itimerspec *old);
 errno_t timerfd_ctx_gettime(TimerFDCtx *timerfd, struct itimerspec *cur);
 
 errno_t timerfd_ctx_read(TimerFDCtx *timerfd, uint64_t *value);

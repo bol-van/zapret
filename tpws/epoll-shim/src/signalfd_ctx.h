@@ -7,7 +7,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct {
+typedef struct
+{
 	int kq; // non owning
 } SignalFDCtx;
 

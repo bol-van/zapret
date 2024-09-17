@@ -14,44 +14,44 @@
 #include "sha.h"
 #include <stddef.h>
 
- /*
-  *  hmac
-  *
-  *  Description:
-  *      This function will compute an HMAC message digest.
-  *
-  *  Parameters:
-  *      whichSha: [in]
-  *          One of SHA1, SHA224, SHA256, SHA384, SHA512
-  *      message_array[ ]: [in]
-  *          An array of octets representing the message.
-  *          Note: in RFC 2104, this parameter is known
-  *          as 'text'.
-  *      length: [in]
-  *          The length of the message in message_array.
-  *      key[ ]: [in]
-  *          The secret shared key.
-  *      key_len: [in]
-  *          The length of the secret shared key.
-  *      digest[ ]: [out]
-  *          Where the digest is to be returned.
-  *          NOTE: The length of the digest is determined by
-  *              the value of whichSha.
-  *
-  *  Returns:
-  *      sha Error Code.
-  *
-  */
+/*
+ *  hmac
+ *
+ *  Description:
+ *      This function will compute an HMAC message digest.
+ *
+ *  Parameters:
+ *      whichSha: [in]
+ *          One of SHA1, SHA224, SHA256, SHA384, SHA512
+ *      message_array[ ]: [in]
+ *          An array of octets representing the message.
+ *          Note: in RFC 2104, this parameter is known
+ *          as 'text'.
+ *      length: [in]
+ *          The length of the message in message_array.
+ *      key[ ]: [in]
+ *          The secret shared key.
+ *      key_len: [in]
+ *          The length of the secret shared key.
+ *      digest[ ]: [out]
+ *          Where the digest is to be returned.
+ *          NOTE: The length of the digest is determined by
+ *              the value of whichSha.
+ *
+ *  Returns:
+ *      sha Error Code.
+ *
+ */
 
 int hmac(SHAversion whichSha,
-	const unsigned char *message_array, size_t length,
-	const unsigned char *key, size_t key_len,
-	uint8_t digest[USHAMaxHashSize])
+		 const unsigned char *message_array, size_t length,
+		 const unsigned char *key, size_t key_len,
+		 uint8_t digest[USHAMaxHashSize])
 {
 	HMACContext context;
 	return hmacReset(&context, whichSha, key, key_len) ||
-		hmacInput(&context, message_array, length) ||
-		hmacResult(&context, digest);
+		   hmacInput(&context, message_array, length) ||
+		   hmacResult(&context, digest);
 }
 
 /*
@@ -76,7 +76,7 @@ int hmac(SHAversion whichSha,
  *
  */
 int hmacReset(HMACContext *context, enum SHAversion whichSha,
-	const unsigned char *key, size_t key_len)
+			  const unsigned char *key, size_t key_len)
 {
 	size_t i, blocksize, hashsize;
 	int ret;
@@ -87,7 +87,8 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
 	/* temporary buffer when keylen > blocksize */
 	unsigned char tempkey[USHAMaxHashSize];
 
-	if (!context) return shaNull;
+	if (!context)
+		return shaNull;
 	context->Computed = 0;
 	context->Corrupted = shaSuccess;
 
@@ -99,12 +100,14 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
 	 * If key is longer than the hash blocksize,
 	 * reset it to key = HASH(key).
 	 */
-	if (key_len > blocksize) {
+	if (key_len > blocksize)
+	{
 		USHAContext tcontext;
 		int err = USHAReset(&tcontext, whichSha) ||
-			USHAInput(&tcontext, key, key_len) ||
-			USHAResult(&tcontext, tempkey);
-		if (err != shaSuccess) return err;
+				  USHAInput(&tcontext, key, key_len) ||
+				  USHAResult(&tcontext, tempkey);
+		if (err != shaSuccess)
+			return err;
 
 		key = tempkey;
 		key_len = hashsize;
@@ -121,13 +124,15 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
 	 * and text is the data being protected.
 	 */
 
-	 /* store key into the pads, XOR'd with ipad and opad values */
-	for (i = 0; i < key_len; i++) {
+	/* store key into the pads, XOR'd with ipad and opad values */
+	for (i = 0; i < key_len; i++)
+	{
 		k_ipad[i] = key[i] ^ 0x36;
 		context->k_opad[i] = key[i] ^ 0x5c;
 	}
 	/* remaining pad bytes are '\0' XOR'd with ipad and opad values */
-	for (; i < blocksize; i++) {
+	for (; i < blocksize; i++)
+	{
 		k_ipad[i] = 0x36;
 		context->k_opad[i] = 0x5c;
 	}
@@ -135,8 +140,8 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
 	/* perform inner hash */
 	/* init context for 1st pass */
 	ret = USHAReset(&context->shaContext, whichSha) ||
-		/* and start with inner pad */
-		USHAInput(&context->shaContext, k_ipad, blocksize);
+		  /* and start with inner pad */
+		  USHAInput(&context->shaContext, k_ipad, blocksize);
 	return context->Corrupted = ret;
 }
 
@@ -161,14 +166,17 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
  *
  */
 int hmacInput(HMACContext *context, const unsigned char *text,
-	size_t text_len)
+			  size_t text_len)
 {
-	if (!context) return shaNull;
-	if (context->Corrupted) return context->Corrupted;
-	if (context->Computed) return context->Corrupted = shaStateError;
+	if (!context)
+		return shaNull;
+	if (context->Corrupted)
+		return context->Corrupted;
+	if (context->Computed)
+		return context->Corrupted = shaStateError;
 	/* then text of datagram */
 	return context->Corrupted =
-		USHAInput(&context->shaContext, text, text_len);
+			   USHAInput(&context->shaContext, text, text_len);
 }
 
 /*
@@ -191,14 +199,17 @@ int hmacInput(HMACContext *context, const unsigned char *text,
  *   sha Error Code.
  */
 int hmacFinalBits(HMACContext *context,
-	uint8_t bits, unsigned int bit_count)
+				  uint8_t bits, unsigned int bit_count)
 {
-	if (!context) return shaNull;
-	if (context->Corrupted) return context->Corrupted;
-	if (context->Computed) return context->Corrupted = shaStateError;
+	if (!context)
+		return shaNull;
+	if (context->Corrupted)
+		return context->Corrupted;
+	if (context->Computed)
+		return context->Corrupted = shaStateError;
 	/* then final bits of datagram */
 	return context->Corrupted =
-		USHAFinalBits(&context->shaContext, bits, bit_count);
+			   USHAFinalBits(&context->shaContext, bits, bit_count);
 }
 
 /*
@@ -223,9 +234,12 @@ int hmacFinalBits(HMACContext *context,
 int hmacResult(HMACContext *context, uint8_t *digest)
 {
 	int ret;
-	if (!context) return shaNull;
-	if (context->Corrupted) return context->Corrupted;
-	if (context->Computed) return context->Corrupted = shaStateError;
+	if (!context)
+		return shaNull;
+	if (context->Corrupted)
+		return context->Corrupted;
+	if (context->Computed)
+		return context->Corrupted = shaStateError;
 
 	/* finish up 1st pass */
 	/* (Use digest here as a temporary buffer.) */
@@ -238,7 +252,7 @@ int hmacResult(HMACContext *context, uint8_t *digest)
 
 		/* start with outer pad */
 		USHAInput(&context->shaContext, context->k_opad,
-			context->blockSize) ||
+				  context->blockSize) ||
 
 		/* then results of 1st hash */
 		USHAInput(&context->shaContext, digest, context->hashSize) ||

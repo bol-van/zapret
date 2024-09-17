@@ -20,66 +20,65 @@ bool dropcaps(void);
 
 #if defined(__aarch64__)
 
-# define ARCH_NR	AUDIT_ARCH_AARCH64
+#define ARCH_NR AUDIT_ARCH_AARCH64
 
 #elif defined(__amd64__)
 
-# define ARCH_NR	AUDIT_ARCH_X86_64
+#define ARCH_NR AUDIT_ARCH_X86_64
 
 #elif defined(__arm__) && (defined(__ARM_EABI__) || defined(__thumb__))
 
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define ARCH_NR	AUDIT_ARCH_ARM
-# else
-#  define ARCH_NR	AUDIT_ARCH_ARMEB
-# endif
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define ARCH_NR AUDIT_ARCH_ARM
+#else
+#define ARCH_NR AUDIT_ARCH_ARMEB
+#endif
 
 #elif defined(__i386__)
 
-# define ARCH_NR	AUDIT_ARCH_I386
+#define ARCH_NR AUDIT_ARCH_I386
 
 #elif defined(__mips__)
 
 #if _MIPS_SIM == _MIPS_SIM_ABI32
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define ARCH_NR	AUDIT_ARCH_MIPSEL
-# else
-#  define ARCH_NR	AUDIT_ARCH_MIPS
-# endif
-#elif _MIPS_SIM == _MIPS_SIM_ABI64
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define ARCH_NR	AUDIT_ARCH_MIPSEL64
-# else
-#  define ARCH_NR	AUDIT_ARCH_MIPS64
-# endif
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define ARCH_NR AUDIT_ARCH_MIPSEL
 #else
-# error "Unsupported mips abi"
+#define ARCH_NR AUDIT_ARCH_MIPS
+#endif
+#elif _MIPS_SIM == _MIPS_SIM_ABI64
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define ARCH_NR AUDIT_ARCH_MIPSEL64
+#else
+#define ARCH_NR AUDIT_ARCH_MIPS64
+#endif
+#else
+#error "Unsupported MIPS ABI"
 #endif
 
 #elif defined(__PPC64__)
 
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define ARCH_NR	AUDIT_ARCH_PPC64LE
-# else
-#  define ARCH_NR	AUDIT_ARCH_PPC64
-# endif
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define ARCH_NR AUDIT_ARCH_PPC64LE
+#else
+#define ARCH_NR AUDIT_ARCH_PPC64
+#endif
 
 #elif defined(__PPC__)
 
-# define ARCH_NR	AUDIT_ARCH_PPC
+#define ARCH_NR AUDIT_ARCH_PPC
 
 #elif __riscv && __riscv_xlen == 64
 
-# define ARCH_NR	AUDIT_ARCH_RISCV64
+#define ARCH_NR AUDIT_ARCH_RISCV64
 
 #else
 
-# error "Platform does not support seccomp filter yet"
+#error "Platform does not support seccomp filter yet"
 
 #endif
 
 #endif
-
 
 #ifndef __CYGWIN__
 bool sec_harden(void);

@@ -9,33 +9,33 @@ int DLOG_FILE(FILE *F, const char *format, va_list args)
 }
 int DLOG_CON(const char *format, int syslog_priority, va_list args)
 {
-	return DLOG_FILE(syslog_priority==LOG_ERR ? stderr : stdout, format, args);
+	return DLOG_FILE(syslog_priority == LOG_ERR ? stderr : stdout, format, args);
 }
 int DLOG_FILENAME(const char *filename, const char *format, va_list args)
 {
 	int r;
-	FILE *F = fopen(filename,"at");
+	FILE *F = fopen(filename, "at");
 	if (F)
 	{
 		r = DLOG_FILE(F, format, args);
 		fclose(F);
 	}
 	else
-		r=-1;
+		r = -1;
 	return r;
 }
 
 static char syslog_buf[1024];
-static size_t syslog_buf_sz=0;
+static size_t syslog_buf_sz = 0;
 static void syslog_buffered(int priority, const char *format, va_list args)
 {
-	if (vsnprintf(syslog_buf+syslog_buf_sz,sizeof(syslog_buf)-syslog_buf_sz,format,args)>0)
+	if (vsnprintf(syslog_buf + syslog_buf_sz, sizeof(syslog_buf) - syslog_buf_sz, format, args) > 0)
 	{
-		syslog_buf_sz=strlen(syslog_buf);
+		syslog_buf_sz = strlen(syslog_buf);
 		// log when buffer is full or buffer ends with \n
-		if (syslog_buf_sz>=(sizeof(syslog_buf)-1) || (syslog_buf_sz && syslog_buf[syslog_buf_sz-1]=='\n'))
+		if (syslog_buf_sz >= (sizeof(syslog_buf) - 1) || (syslog_buf_sz && syslog_buf[syslog_buf_sz - 1] == '\n'))
 		{
-			syslog(priority,"%s",syslog_buf);
+			syslog(priority, "%s", syslog_buf);
 			syslog_buf_sz = 0;
 		}
 	}
@@ -43,31 +43,31 @@ static void syslog_buffered(int priority, const char *format, va_list args)
 
 static int DLOG_VA(const char *format, int syslog_priority, bool condup, int level, va_list args)
 {
-	int r=0;
+	int r = 0;
 	va_list args2;
 
-	if (condup && !(params.debug>=level && params.debug_target==LOG_TARGET_CONSOLE))
+	if (condup && !(params.debug >= level && params.debug_target == LOG_TARGET_CONSOLE))
 	{
-		va_copy(args2,args);
-		DLOG_CON(format,syslog_priority,args2);
+		va_copy(args2, args);
+		DLOG_CON(format, syslog_priority, args2);
 	}
-	if (params.debug>=level)
+	if (params.debug >= level)
 	{
-		switch(params.debug_target)
+		switch (params.debug_target)
 		{
-			case LOG_TARGET_CONSOLE:
-				r = DLOG_CON(format,syslog_priority,args);
-				break;
-			case LOG_TARGET_FILE:
-				r = DLOG_FILENAME(params.debug_logfile,format,args);
-				break;
-			case LOG_TARGET_SYSLOG:
-				// skip newlines
-				syslog_buffered(syslog_priority,format,args);
-				r = 1;
-				break;
-			default:
-				break;
+		case LOG_TARGET_CONSOLE:
+			r = DLOG_CON(format, syslog_priority, args);
+			break;
+		case LOG_TARGET_FILE:
+			r = DLOG_FILENAME(params.debug_logfile, format, args);
+			break;
+		case LOG_TARGET_SYSLOG:
+			// skip newlines
+			syslog_buffered(syslog_priority, format, args);
+			r = 1;
+			break;
+		default:
+			break;
 		}
 	}
 	return r;
@@ -105,11 +105,10 @@ int DLOG_PERROR(const char *s)
 	return DLOG_ERR("%s: %s\n", s, strerror(errno));
 }
 
-
 int LOG_APPEND(const char *filename, const char *format, va_list args)
 {
 	int r;
-	FILE *F = fopen(filename,"at");
+	FILE *F = fopen(filename, "at");
 	if (F)
 	{
 		fprint_localtime(F);
@@ -119,7 +118,7 @@ int LOG_APPEND(const char *filename, const char *format, va_list args)
 		fclose(F);
 	}
 	else
-		r=-1;
+		r = -1;
 	return r;
 }
 

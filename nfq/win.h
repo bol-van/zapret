@@ -7,4 +7,3 @@
 bool service_run();
 
 #endif
-

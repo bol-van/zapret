@@ -8,17 +8,19 @@
 static bool addpool(strpool **hostlist, char **s, const char *end)
 {
 	char *p;
-	
+
 	// advance until eol lowering all chars
-	for (p = *s; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
-	if (!StrPoolAddStrLen(hostlist, *s, p-*s))
+	for (p = *s; p < end && *p && *p != '\r' && *p != '\n'; p++)
+		*p = tolower(*p);
+	if (!StrPoolAddStrLen(hostlist, *s, p - *s))
 	{
 		StrPoolDestroy(hostlist);
 		*hostlist = NULL;
 		return false;
 	}
 	// advance to the next line
-	for (; p<end && (!*p || *p=='\r' || *p=='\n') ; p++);
+	for (; p < end && (!*p || *p == '\r' || *p == '\n'); p++)
+		;
 	*s = p;
 	return true;
 }
@@ -31,7 +33,7 @@ bool AppendHostList(strpool **hostlist, char *filename)
 	FILE *F;
 	int r;
 
-	DLOG_CONDUP("Loading hostlist %s\n",filename);
+	DLOG_CONDUP("Loading hostlist %s\n", filename);
 
 	if (!(F = fopen(filename, "rb")))
 	{
@@ -41,18 +43,19 @@ bool AppendHostList(strpool **hostlist, char *filename)
 
 	if (is_gzip(F))
 	{
-		r = z_readfile(F,&zbuf,&zsize);
+		r = z_readfile(F, &zbuf, &zsize);
 		fclose(F);
-		if (r==Z_OK)
+		if (r == Z_OK)
 		{
 			DLOG_CONDUP("zlib compression detected. uncompressed size : %zu\n", zsize);
-			
+
 			p = zbuf;
 			e = zbuf + zsize;
-			while(p<e)
+			while (p < e)
 			{
-				if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
-				if (!addpool(hostlist,&p,e))
+				if (*p == '#' || *p == ';' || *p == '/' || *p == '\n')
+					continue;
+				if (!addpool(hostlist, &p, e))
 				{
 					DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 					free(zbuf);
@@ -64,19 +67,20 @@ bool AppendHostList(strpool **hostlist, char *filename)
 		}
 		else
 		{
-			DLOG_ERR("zlib decompression failed : result %d\n",r);
+			DLOG_ERR("zlib decompression failed : result %d\n", r);
 			return false;
 		}
 	}
 	else
 	{
 		DLOG_CONDUP("loading plain text list\n");
-		
+
 		while (fgets(s, 256, F))
 		{
 			p = s;
-			if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
-			if (!addpool(hostlist,&p,p+strlen(p)))
+			if (*p == '#' || *p == ';' || *p == '/' || *p == '\n')
+				continue;
+			if (!addpool(hostlist, &p, p + strlen(p)))
 			{
 				DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 				fclose(F);
@@ -103,7 +107,8 @@ bool LoadHostLists(strpool **hostlist, struct str_list_head *file_list)
 
 	LIST_FOREACH(file, file_list, next)
 	{
-		if (!AppendHostList(hostlist, file->str)) return false;
+		if (!AppendHostList(hostlist, file->str))
+			return false;
 	}
 	return true;
 }
@@ -113,7 +118,6 @@ bool NonEmptyHostlist(strpool **hostlist)
 	// add impossible hostname if the list is empty
 	return *hostlist ? true : StrPoolAddStrLen(hostlist, "@&()", 4);
 }
-
 
 bool SearchHostList(strpool *hostlist, const char *host)
 {
@@ -125,9 +129,11 @@ bool SearchHostList(strpool *hostlist, const char *host)
 		{
 			bInHostList = StrPoolCheckStr(hostlist, p);
 			VPRINT("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
-			if (bInHostList) return true;
+			if (bInHostList)
+				return true;
 			p = strchr(p, '.');
-			if (p) p++;
+			if (p)
+				p++;
 		}
 	}
 	return false;
@@ -136,13 +142,15 @@ bool SearchHostList(strpool *hostlist, const char *host)
 // return : true = apply fooling, false = do not apply
 static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const char *host, bool *excluded)
 {
-	if (excluded) *excluded = false;
+	if (excluded)
+		*excluded = false;
 	if (hostlist_exclude)
 	{
 		VPRINT("Checking exclude hostlist\n");
 		if (SearchHostList(hostlist_exclude, host))
 		{
-			if (excluded) *excluded = true;
+			if (excluded)
+				*excluded = true;
 			return false;
 		}
 	}
@@ -160,7 +168,7 @@ bool HostlistCheck(const char *host, bool *excluded)
 	if (*params.hostlist_auto_filename)
 	{
 		time_t t = file_mod_time(params.hostlist_auto_filename);
-		if (t!=params.hostlist_auto_mod_time)
+		if (t != params.hostlist_auto_mod_time)
 		{
 			DLOG_CONDUP("Autohostlist was modified by another process. Reloading include hostslist.\n");
 			if (!LoadIncludeHostLists())

@@ -11,10 +11,11 @@ typedef int errno_t;
 #include <signal.h>
 #include <poll.h>
 
-struct itimerspec {
-        struct timespec  it_interval;
-        struct timespec  it_value;
+struct itimerspec
+{
+        struct timespec it_interval;
+        struct timespec it_value;
 };
-int ppoll(struct pollfd *fds, nfds_t nfds,const struct timespec *tmo_p, const sigset_t *sigmask);
+int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, const sigset_t *sigmask);
 
 #endif

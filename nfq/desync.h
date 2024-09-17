@@ -19,8 +19,9 @@
 
 #define DPI_DESYNC_MAX_FAKE_LEN 9216
 
-enum dpi_desync_mode {
-	DESYNC_NONE=0,
+enum dpi_desync_mode
+{
+	DESYNC_NONE = 0,
 	DESYNC_INVALID,
 	DESYNC_FAKE,
 	DESYNC_FAKE_KNOWN,

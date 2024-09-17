@@ -18,8 +18,7 @@ bool service_run(int argc, char *argv[])
 {
 	SERVICE_TABLE_ENTRY ServiceTable[] = {
 		{SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION)service_main},
-		{NULL, NULL}
-	};
+		{NULL, NULL}};
 
 	service_argc = argc;
 	service_argv = argv;
@@ -75,6 +74,5 @@ void service_main(int argc __attribute__((unused)), char *argv[] __attribute__((
 	SetServiceStatus(hStatus, &ServiceStatus);
 	return;
 }
-
 
 #endif

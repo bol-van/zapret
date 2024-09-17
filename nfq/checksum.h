@@ -18,10 +18,10 @@ uint16_t csum_ipv6_magic(const void *saddr, const void *daddr, size_t len, uint8
 uint16_t ip4_compute_csum(const void *buff, size_t len);
 void ip4_fix_checksum(struct ip *ip);
 
-void tcp4_fix_checksum(struct tcphdr *tcp,size_t len, const struct in_addr *src_addr, const struct in_addr *dest_addr);
-void tcp6_fix_checksum(struct tcphdr *tcp,size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr);
-void tcp_fix_checksum(struct tcphdr *tcp,size_t len,const struct ip *ip,const struct ip6_hdr *ip6hdr);
+void tcp4_fix_checksum(struct tcphdr *tcp, size_t len, const struct in_addr *src_addr, const struct in_addr *dest_addr);
+void tcp6_fix_checksum(struct tcphdr *tcp, size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr);
+void tcp_fix_checksum(struct tcphdr *tcp, size_t len, const struct ip *ip, const struct ip6_hdr *ip6hdr);
 
-void udp4_fix_checksum(struct udphdr *udp,size_t len, const struct in_addr *src_addr, const struct in_addr *dest_addr);
-void udp6_fix_checksum(struct udphdr *udp,size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr);
-void udp_fix_checksum(struct udphdr *udp,size_t len,const struct ip *ip,const struct ip6_hdr *ip6hdr);
+void udp4_fix_checksum(struct udphdr *udp, size_t len, const struct in_addr *src_addr, const struct in_addr *dest_addr);
+void udp6_fix_checksum(struct udphdr *udp, size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr);
+void udp_fix_checksum(struct udphdr *udp, size_t len, const struct ip *ip, const struct ip6_hdr *ip6hdr);

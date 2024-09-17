@@ -5,33 +5,33 @@
 #include <stdio.h>
 
 #define DESTROY_STR_POOL(etype, ppool) \
-	etype *elem, *tmp; \
-	HASH_ITER(hh, *ppool, elem, tmp) { \
-		free(elem->str); \
-		HASH_DEL(*ppool, elem); \
-		free(elem); \
-	}
-	
-#define ADD_STR_POOL(etype, ppool, keystr, keystr_len) \
-	etype *elem; \
-	if (!(elem = (etype*)malloc(sizeof(etype)))) \
-		return false; \
-	if (!(elem->str = malloc(keystr_len + 1))) \
-	{ \
-		free(elem); \
-		return false; \
-	} \
-	memcpy(elem->str, keystr, keystr_len); \
-	elem->str[keystr_len] = 0; \
-	oom = false; \
-	HASH_ADD_KEYPTR(hh, *ppool, elem->str, strlen(elem->str), elem); \
-	if (oom) \
-	{ \
-		free(elem->str); \
-		free(elem); \
-		return false; \
+	etype *elem, *tmp;                 \
+	HASH_ITER(hh, *ppool, elem, tmp)   \
+	{                                  \
+		free(elem->str);               \
+		HASH_DEL(*ppool, elem);        \
+		free(elem);                    \
 	}
 
+#define ADD_STR_POOL(etype, ppool, keystr, keystr_len)               \
+	etype *elem;                                                     \
+	if (!(elem = (etype *)malloc(sizeof(etype))))                    \
+		return false;                                                \
+	if (!(elem->str = malloc(keystr_len + 1)))                       \
+	{                                                                \
+		free(elem);                                                  \
+		return false;                                                \
+	}                                                                \
+	memcpy(elem->str, keystr, keystr_len);                           \
+	elem->str[keystr_len] = 0;                                       \
+	oom = false;                                                     \
+	HASH_ADD_KEYPTR(hh, *ppool, elem->str, strlen(elem->str), elem); \
+	if (oom)                                                         \
+	{                                                                \
+		free(elem->str);                                             \
+		free(elem);                                                  \
+		return false;                                                \
+	}
 
 #undef uthash_nonfatal_oom
 #define uthash_nonfatal_oom(elt) ut_oom_recover(elt)
@@ -65,13 +65,8 @@ void StrPoolDestroy(strpool **pp)
 	DESTROY_STR_POOL(strpool, pp)
 }
 
-
-
-void HostFailPoolDestroy(hostfail_pool **pp)
-{
-	DESTROY_STR_POOL(hostfail_pool, pp)
-}
-hostfail_pool * HostFailPoolAdd(hostfail_pool **pp,const char *s,int fail_time)
+void HostFailPoolDestroy(hostfail_pool **pp){
+	DESTROY_STR_POOL(hostfail_pool, pp)} hostfail_pool *HostFailPoolAdd(hostfail_pool **pp, const char *s, int fail_time)
 {
 	size_t slen = strlen(s);
 	ADD_STR_POOL(hostfail_pool, pp, s, slen)
@@ -79,7 +74,7 @@ hostfail_pool * HostFailPoolAdd(hostfail_pool **pp,const char *s,int fail_time)
 	elem->counter = 0;
 	return elem;
 }
-hostfail_pool *HostFailPoolFind(hostfail_pool *p,const char *s)
+hostfail_pool *HostFailPoolFind(hostfail_pool *p, const char *s)
 {
 	hostfail_pool *elem;
 	HASH_FIND_STR(p, s, elem);
@@ -104,7 +99,7 @@ void HostFailPoolPurge(hostfail_pool **pp)
 		}
 	}
 }
-static time_t host_fail_purge_prev=0;
+static time_t host_fail_purge_prev = 0;
 void HostFailPoolPurgeRateLimited(hostfail_pool **pp)
 {
 	time_t now = time(NULL);
@@ -120,14 +115,14 @@ void HostFailPoolDump(hostfail_pool *p)
 	hostfail_pool *elem, *tmp;
 	time_t now = time(NULL);
 	HASH_ITER(hh, p, elem, tmp)
-		printf("host=%s counter=%d time_left=%lld\n",elem->str,elem->counter,(long long int)elem->expire-now);
+	printf("host=%s counter=%d time_left=%lld\n", elem->str, elem->counter, (long long int)elem->expire - now);
 }
-
 
 bool strlist_add(struct str_list_head *head, const char *filename)
 {
 	struct str_list *entry = malloc(sizeof(struct str_list));
-	if (!entry) return false;
+	if (!entry)
+		return false;
 	entry->str = strdup(filename);
 	if (!entry->str)
 	{
@@ -139,7 +134,8 @@ bool strlist_add(struct str_list_head *head, const char *filename)
 }
 static void strlist_entry_destroy(struct str_list *entry)
 {
-	if (entry->str)	free(entry->str);
+	if (entry->str)
+		free(entry->str);
 	free(entry);
 }
 void strlist_destroy(struct str_list_head *head)

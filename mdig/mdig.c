@@ -34,10 +34,11 @@
 static void trimstr(char *s)
 {
 	char *p;
-	for (p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--) *p = '\0';
+	for (p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--)
+		*p = '\0';
 }
 
-static const char* eai_str(int r)
+static const char *eai_str(int r)
 {
 	switch (r)
 	{
@@ -76,18 +77,21 @@ static const char* eai_str(int r)
 
 static bool dom_valid(char *dom)
 {
-	if (!dom || *dom=='.') return false;
-	for (; *dom; dom++)
-	if (*dom < 0x20 || (*dom & 0x80) || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
+	if (!dom || *dom == '.')
 		return false;
+	for (; *dom; dom++)
+		if (*dom < 0x20 || (*dom & 0x80) || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
+			return false;
 	return true;
 }
 
 static void invalid_domain_beautify(char *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
-		if (*dom < 0x20 || *dom>0x7F) *dom = '?';
-	if (*dom) *dom = 0;
+		if (*dom < 0x20 || *dom > 0x7F)
+			*dom = '?';
+	if (*dom)
+		*dom = 0;
 }
 
 #define FAMILY4 1
@@ -99,7 +103,7 @@ static struct
 	int threads;
 	time_t start_time;
 	pthread_mutex_t flock;
-	pthread_mutex_t slock; // stats lock
+	pthread_mutex_t slock;					// stats lock
 	int stats_every, stats_ct, stats_ct_ok; // stats
 	FILE *F_log_resolved, *F_log_failed;
 } glob;
@@ -111,11 +115,12 @@ static char interlocked_get_dom(char *dom, size_t size)
 	pthread_mutex_lock(&glob.flock);
 	s = fgets(dom, size, stdin);
 	pthread_mutex_unlock(&glob.flock);
-	if (!s) return 0;
+	if (!s)
+		return 0;
 	trimstr(s);
 	return 1;
 }
-static void interlocked_fprintf(FILE *stream, const char * format, ...)
+static void interlocked_fprintf(FILE *stream, const char *format, ...)
 {
 	if (stream)
 	{
@@ -128,8 +133,12 @@ static void interlocked_fprintf(FILE *stream, const char * format, ...)
 	}
 }
 
-#define ELOG(format, ...) interlocked_fprintf(stderr,  "[%d] " format "\n", tid, ##__VA_ARGS__)
-#define VLOG(format, ...) {if (glob.verbose) ELOG(format, ##__VA_ARGS__);}
+#define ELOG(format, ...) interlocked_fprintf(stderr, "[%d] " format "\n", tid, ##__VA_ARGS__)
+#define VLOG(format, ...)                \
+	{                                    \
+		if (glob.verbose)                \
+			ELOG(format, ##__VA_ARGS__); \
+	}
 
 static void print_addrinfo(struct addrinfo *ai)
 {
@@ -139,11 +148,11 @@ static void print_addrinfo(struct addrinfo *ai)
 		switch (ai->ai_family)
 		{
 		case AF_INET:
-			if (inet_ntop(ai->ai_family, &((struct sockaddr_in*)ai->ai_addr)->sin_addr, str, sizeof(str)))
+			if (inet_ntop(ai->ai_family, &((struct sockaddr_in *)ai->ai_addr)->sin_addr, str, sizeof(str)))
 				interlocked_fprintf(stdout, "%s\n", str);
 			break;
 		case AF_INET6:
-			if (inet_ntop(ai->ai_family, &((struct sockaddr_in6*)ai->ai_addr)->sin6_addr, str, sizeof(str)))
+			if (inet_ntop(ai->ai_family, &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr, str, sizeof(str)))
 				interlocked_fprintf(stdout, "%s\n", str);
 			break;
 		}
@@ -155,8 +164,8 @@ static void stat_print(int ct, int ct_ok)
 {
 	if (glob.stats_every > 0)
 	{
-		time_t tm = time(NULL)-glob.start_time;
-		interlocked_fprintf(stderr, "mdig stats : %02u:%02u:%02u : domains=%d success=%d error=%d\n", (unsigned int)(tm/3600), (unsigned int)((tm/60)%60), (unsigned int)(tm%60), ct, ct_ok, ct - ct_ok);
+		time_t tm = time(NULL) - glob.start_time;
+		interlocked_fprintf(stderr, "mdig stats : %02u:%02u:%02u : domains=%d success=%d error=%d\n", (unsigned int)(tm / 3600), (unsigned int)((tm / 60) % 60), (unsigned int)(tm % 60), ct, ct_ok, ct - ct_ok);
 	}
 }
 
@@ -170,7 +179,8 @@ static void stat_plus(bool is_ok)
 		ct_ok = glob.stats_ct_ok += is_ok;
 		pthread_mutex_unlock(&glob.slock);
 
-		if (!(ct % glob.stats_every)) stat_print(ct, ct_ok);
+		if (!(ct % glob.stats_every))
+			stat_print(ct, ct_ok);
 	}
 }
 
@@ -198,7 +208,8 @@ static void *t_resolver(void *arg)
 	VLOG("started");
 
 	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = (glob.family == FAMILY4) ? AF_INET : (glob.family == FAMILY6) ? AF_INET6 : AF_UNSPEC;
+	hints.ai_family = (glob.family == FAMILY4) ? AF_INET : (glob.family == FAMILY6) ? AF_INET6
+																					: AF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
 
 	while (interlocked_get_dom(dom, sizeof(dom)))
@@ -211,7 +222,8 @@ static void *t_resolver(void *arg)
 
 			strncpy(s_ip, dom, sizeof(s_ip));
 			s_mask = strchr(s_ip, '/');
-			if (s_mask) *s_mask++ = 0;
+			if (s_mask)
+				*s_mask++ = 0;
 			family = GetAddrFamily(s_ip);
 			if (family)
 			{
@@ -221,12 +233,18 @@ static void *t_resolver(void *arg)
 					bool mask_needed = false;
 					if (s_mask)
 					{
-						if (sscanf(s_mask, "%u", &mask)==1)
+						if (sscanf(s_mask, "%u", &mask) == 1)
 						{
 							switch (family)
 							{
-							case AF_INET: is_ok = mask <= 32; mask_needed = mask < 32; break;
-							case AF_INET6: is_ok = mask <= 128; mask_needed = mask < 128; break;
+							case AF_INET:
+								is_ok = mask <= 32;
+								mask_needed = mask < 32;
+								break;
+							case AF_INET6:
+								is_ok = mask <= 128;
+								mask_needed = mask < 128;
+								break;
 							}
 						}
 					}
@@ -248,7 +266,8 @@ static void *t_resolver(void *arg)
 					if ((r = getaddrinfo(dom, NULL, &hints, &result)))
 					{
 						VLOG("failed to resolve %s : result %d (%s)", dom, r, eai_str(r));
-						if (r == EAI_AGAIN) continue; // temporary failure. should retry
+						if (r == EAI_AGAIN)
+							continue; // temporary failure. should retry
 					}
 					else
 					{
@@ -262,11 +281,11 @@ static void *t_resolver(void *arg)
 			else if (glob.verbose)
 			{
 				char dom2[sizeof(dom)];
-				strcpy(dom2,dom);
+				strcpy(dom2, dom);
 				invalid_domain_beautify(dom2);
 				VLOG("invalid domain : %s", dom2);
 			}
-			interlocked_fprintf(is_ok ? glob.F_log_resolved : glob.F_log_failed,"%s\n",dom);
+			interlocked_fprintf(is_ok ? glob.F_log_resolved : glob.F_log_failed, "%s\n", dom);
 		}
 		stat_plus(is_ok);
 	}
@@ -292,7 +311,7 @@ static int run_threads(void)
 		pthread_mutex_destroy(&glob.flock);
 		return 10;
 	}
-	t = (pthread_t*)malloc(sizeof(pthread_t)*glob.threads);
+	t = (pthread_t *)malloc(sizeof(pthread_t) * glob.threads);
 	if (!t)
 	{
 		fprintf(stderr, "out of memory\n");
@@ -302,7 +321,7 @@ static int run_threads(void)
 	}
 	for (thread = 0; thread < glob.threads; thread++)
 	{
-		if (pthread_create(t + thread, NULL, t_resolver, (void*)(size_t)thread))
+		if (pthread_create(t + thread, NULL, t_resolver, (void *)(size_t)thread))
 		{
 			interlocked_fprintf(stderr, "failed to create thread #%d\n", thread);
 			break;
@@ -327,25 +346,23 @@ static void exithelp(void)
 		" --verbose\t\t; print query progress to stderr\n"
 		" --stats=N\t\t; print resolve stats to stderr every N domains\n"
 		" --log-resolved=<file>\t; log successfully resolved domains to a file\n"
-		" --log-failed=<file>\t; log failed domains to a file\n"
-	);
+		" --log-failed=<file>\t; log failed domains to a file\n");
 	exit(1);
 }
 int main(int argc, char **argv)
 {
 	int r, v, option_index = 0;
-	char fn1[256],fn2[256];
+	char fn1[256], fn2[256];
 
 	static const struct option long_options[] = {
-			{"help",no_argument,0,0},		// optidx=0
-			{"threads",required_argument,0,0},	// optidx=1
-			{"family",required_argument,0,0},	// optidx=2
-			{"verbose",no_argument,0,0},		// optidx=3
-			{"stats",required_argument,0,0},	// optidx=4
-			{"log-resolved",required_argument,0,0},	// optidx=5
-			{"log-failed",required_argument,0,0},	// optidx=6
-			{NULL,0,NULL,0}
-	};
+		{"help", no_argument, 0, 0},			   // optidx=0
+		{"threads", required_argument, 0, 0},	   // optidx=1
+		{"family", required_argument, 0, 0},	   // optidx=2
+		{"verbose", no_argument, 0, 0},			   // optidx=3
+		{"stats", required_argument, 0, 0},		   // optidx=4
+		{"log-resolved", required_argument, 0, 0}, // optidx=5
+		{"log-failed", required_argument, 0, 0},   // optidx=6
+		{NULL, 0, NULL, 0}};
 
 	memset(&glob, 0, sizeof(glob));
 	*fn1 = *fn2 = 0;
@@ -353,7 +370,8 @@ int main(int argc, char **argv)
 	glob.threads = 1;
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
-		if (v) exithelp();
+		if (v)
+			exithelp();
 		switch (option_index)
 		{
 		case 0: /* help */
@@ -387,12 +405,12 @@ int main(int argc, char **argv)
 			glob.stats_every = optarg ? atoi(optarg) : 0;
 			break;
 		case 5: /* log-resolved */
-			strncpy(fn1,optarg,sizeof(fn1));
-			fn1[sizeof(fn1)-1] = 0;
+			strncpy(fn1, optarg, sizeof(fn1));
+			fn1[sizeof(fn1) - 1] = 0;
 			break;
 		case 6: /* log-failed */
-			strncpy(fn2,optarg,sizeof(fn2));
-			fn2[sizeof(fn2)-1] = 0;
+			strncpy(fn2, optarg, sizeof(fn2));
+			fn2[sizeof(fn2) - 1] = 0;
 			break;
 		}
 	}
@@ -401,35 +419,39 @@ int main(int argc, char **argv)
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
-		fprintf(stderr,"WSAStartup failed\n");
+		fprintf(stderr, "WSAStartup failed\n");
 		return 4;
 	}
 #endif
 
 	if (*fn1)
 	{
-		glob.F_log_resolved = fopen(fn1,"wt");
+		glob.F_log_resolved = fopen(fn1, "wt");
 		if (!glob.F_log_resolved)
 		{
-			fprintf(stderr,"failed to create %s\n",fn1);
-			r=5; goto ex;
+			fprintf(stderr, "failed to create %s\n", fn1);
+			r = 5;
+			goto ex;
 		}
 	}
 	if (*fn2)
 	{
-		glob.F_log_failed = fopen(fn2,"wt");
+		glob.F_log_failed = fopen(fn2, "wt");
 		if (!glob.F_log_failed)
 		{
-			fprintf(stderr,"failed to create %s\n",fn2);
-			r=5; goto ex;
+			fprintf(stderr, "failed to create %s\n", fn2);
+			r = 5;
+			goto ex;
 		}
 	}
 
 	r = run_threads();
 
 ex:
-	if (glob.F_log_resolved) fclose(glob.F_log_resolved);
-	if (glob.F_log_failed) fclose(glob.F_log_failed);
+	if (glob.F_log_resolved)
+		fclose(glob.F_log_resolved);
+	if (glob.F_log_failed)
+		fclose(glob.F_log_failed);
 
 	return r;
 }

@@ -10,21 +10,22 @@
 
 #define BACKLOG 10
 #define MAX_EPOLL_EVENTS 64
-#define IP_TRANSPARENT 19 //So that application compiles on OpenWRT
+#define IP_TRANSPARENT 19 // So that application compiles on OpenWrt
 #define SPLICE_LEN 65536
-#define DEFAULT_MAX_CONN	512
-#define DEFAULT_MAX_ORPHAN_TIME	5
-#define DEFAULT_TCP_USER_TIMEOUT_LOCAL	10
-#define DEFAULT_TCP_USER_TIMEOUT_REMOTE	20
+#define DEFAULT_MAX_CONN 512
+#define DEFAULT_MAX_ORPHAN_TIME 5
+#define DEFAULT_TCP_USER_TIMEOUT_LOCAL 10
+#define DEFAULT_TCP_USER_TIMEOUT_REMOTE 20
 
 int event_loop(const int *listen_fd, size_t listen_fd_ct);
 
-//Three different states of a connection
-enum{
-	CONN_UNAVAILABLE=0, // connecting
-	CONN_AVAILABLE, // operational
-	CONN_RDHUP, // received RDHUP, only sending unsent buffers. more RDHUPs are blocked
-	CONN_CLOSED // will be deleted soon
+// Three different states of a connection
+enum
+{
+	CONN_UNAVAILABLE = 0, // connecting
+	CONN_AVAILABLE,		  // operational
+	CONN_RDHUP,			  // received RDHUP, only sending unsent buffers. more RDHUPs are blocked
+	CONN_CLOSED			  // will be deleted soon
 };
 typedef uint8_t conn_state_t;
 
@@ -34,13 +35,14 @@ typedef uint8_t conn_state_t;
 struct send_buffer
 {
 	uint8_t *data;
-	size_t len,pos;
+	size_t len, pos;
 	int ttl, flags;
 };
 typedef struct send_buffer send_buffer_t;
 
-enum{
-	CONN_TYPE_TRANSPARENT=0,
+enum
+{
+	CONN_TYPE_TRANSPARENT = 0,
 	CONN_TYPE_SOCKS
 };
 typedef uint8_t conn_type_t;
@@ -48,8 +50,8 @@ typedef uint8_t conn_type_t;
 struct tproxy_conn
 {
 	bool listener; // true - listening socket. false = connecion socket
-	bool remote; // false - accepted, true - connected
-	int efd; // epoll fd
+	bool remote;   // false - accepted, true - connected
+	int efd;	   // epoll fd
 	int fd;
 	int splice_pipe[2];
 	conn_state_t state;
@@ -59,8 +61,9 @@ struct tproxy_conn
 	time_t orphan_since;
 
 	// socks5 state machine
-	enum {
-		S_WAIT_HANDSHAKE=0,
+	enum
+	{
+		S_WAIT_HANDSHAKE = 0,
 		S_WAIT_REQUEST,
 		S_WAIT_RESOLVE,
 		S_WAIT_CONNECTION,
@@ -70,11 +73,11 @@ struct tproxy_conn
 	struct resolve_item *socks_ri;
 
 	// these value are used in flow control. we do not use ET (edge triggered) polling
-	// if we dont disable notifications they will come endlessly until condition becomes false and will eat all cpu time
-	bool bFlowIn,bFlowOut, bShutdown, bFlowInPrev,bFlowOutPrev, bPrevRdhup;
+	// if we don't disable notifications they will come endlessly until condition becomes false and will eat all cpu time
+	bool bFlowIn, bFlowOut, bShutdown, bFlowInPrev, bFlowOutPrev, bPrevRdhup;
 
 	// total read,write
-	uint64_t trd,twr, tnrd;
+	uint64_t trd, twr, tnrd;
 	// number of epoll_wait events
 	unsigned int event_count;
 
@@ -94,14 +97,14 @@ struct tproxy_conn
 
 	t_ctrack track;
 
-	//Create the struct which contains ptrs to next/prev element
-	TAILQ_ENTRY(tproxy_conn) conn_ptrs;
+	// Create the struct which contains ptrs to next/prev element
+	TAILQ_ENTRY(tproxy_conn)
+	conn_ptrs;
 };
 typedef struct tproxy_conn tproxy_conn_t;
 
-//Define the struct tailhead (code in sys/queue.h is quite intuitive)
-//Use tail queue for efficient delete
+// Define the struct tailhead (code in sys/queue.h is quite intuitive)
+// Use tail queue for efficient delete
 TAILQ_HEAD(tailhead, tproxy_conn);
-
 
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);

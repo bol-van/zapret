@@ -18,7 +18,7 @@
 #include <netinet/udp.h>
 
 #ifndef IPV6_FREEBIND
-#define IPV6_FREEBIND           78
+#define IPV6_FREEBIND 78
 #endif
 
 #ifdef __CYGWIN__
@@ -30,7 +30,7 @@
 #endif
 
 #ifndef AF_DIVERT
-#define	AF_DIVERT	44	/* divert(4) */
+#define AF_DIVERT 44 /* divert(4) */
 #endif
 #ifndef PF_DIVERT
 #define PF_DIVERT AF_DIVERT
@@ -40,24 +40,24 @@
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
 uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 
-#define FOOL_NONE	0x00
-#define FOOL_MD5SIG	0x01
-#define FOOL_BADSUM	0x02
-#define FOOL_TS		0x04
-#define FOOL_BADSEQ	0x08
-#define FOOL_HOPBYHOP	0x10
-#define FOOL_HOPBYHOP2	0x20
-#define FOOL_DESTOPT	0x40
-#define FOOL_IPFRAG1	0x80
-#define FOOL_DATANOACK	0x100
+#define FOOL_NONE 0x00
+#define FOOL_MD5SIG 0x01
+#define FOOL_BADSUM 0x02
+#define FOOL_TS 0x04
+#define FOOL_BADSEQ 0x08
+#define FOOL_HOPBYHOP 0x10
+#define FOOL_HOPBYHOP2 0x20
+#define FOOL_DESTOPT 0x40
+#define FOOL_IPFRAG1 0x80
+#define FOOL_DATANOACK 0x100
 
-#define SCALE_NONE ((uint8_t)-1)
+#define SCALE_NONE ((uint8_t) - 1)
 
-#define VERDICT_PASS	0
-#define VERDICT_MODIFY	1
-#define VERDICT_DROP	2
-#define VERDICT_MASK	3
-#define VERDICT_NOCSUM	4
+#define VERDICT_PASS 0
+#define VERDICT_MODIFY 1
+#define VERDICT_DROP 2
+#define VERDICT_MASK 3
+#define VERDICT_NOCSUM 4
 
 // seq and wsize have network byte order
 bool prepare_tcp_segment4(
@@ -99,7 +99,6 @@ bool prepare_tcp_segment(
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen);
-
 
 bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
@@ -144,11 +143,11 @@ bool ip_frag(
 	size_t frag_pos, uint32_t ident,
 	uint8_t *pkt1, size_t *pkt1_size,
 	uint8_t *pkt2, size_t *pkt2_size);
-	
+
 void rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl);
 
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport);
-void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr,const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
+void extract_endpoints(const struct ip *ip, const struct ip6_hdr *ip6hdr, const struct tcphdr *tcphdr, const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);
 uint8_t *tcp_find_option(struct tcphdr *tcp, uint8_t kind);
 uint32_t *tcp_find_timestamps(struct tcphdr *tcp);
 uint8_t tcp_find_scale_factor(const struct tcphdr *tcp);
@@ -170,7 +169,7 @@ bool rawsend_preinit(bool bind_fix4, bool bind_fix6);
 #endif
 
 // auto creates internal socket and uses it for subsequent calls
-bool rawsend(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len);
+bool rawsend(const struct sockaddr *dst, uint32_t fwmark, const char *ifout, const void *data, size_t len);
 bool rawsend_rp(const struct rawpacket *rp);
 // return trues if all packets were send successfully
 bool rawsend_queue(struct rawpacket_tailhead *q);
@@ -189,7 +188,7 @@ void print_tcphdr(const struct tcphdr *tcphdr);
 void print_udphdr(const struct udphdr *udphdr);
 void str_ip(char *s, size_t s_len, const struct ip *ip);
 void str_ip6hdr(char *s, size_t s_len, const struct ip6_hdr *ip6hdr, uint8_t proto);
-void str_srcdst_ip6(char *s, size_t s_len, const void *saddr,const void *daddr);
+void str_srcdst_ip6(char *s, size_t s_len, const void *saddr, const void *daddr);
 void str_tcphdr(char *s, size_t s_len, const struct tcphdr *tcphdr);
 void str_udphdr(char *s, size_t s_len, const struct udphdr *udphdr);
 
@@ -225,7 +224,12 @@ typedef struct
 #define AUTOTTL_DEFAULT_MIN 3
 #define AUTOTTL_DEFAULT_MAX 20
 #define AUTOTTL_ENABLED(a) (!!(a).delta)
-#define AUTOTTL_SET_DEFAULT(a) {(a).delta=AUTOTTL_DEFAULT_DELTA; (a).min=AUTOTTL_DEFAULT_MIN; (a).max=AUTOTTL_DEFAULT_MAX;}
+#define AUTOTTL_SET_DEFAULT(a)             \
+	{                                      \
+		(a).delta = AUTOTTL_DEFAULT_DELTA; \
+		(a).min = AUTOTTL_DEFAULT_MIN;     \
+		(a).max = AUTOTTL_DEFAULT_MAX;     \
+	}
 
 uint8_t autottl_guess(uint8_t ttl, const autottl *attl);
 void do_nat(bool bOutbound, struct ip *ip, struct ip6_hdr *ip6, struct tcphdr *tcphdr, struct udphdr *udphdr, const struct sockaddr_in *target4, const struct sockaddr_in6 *target6);
