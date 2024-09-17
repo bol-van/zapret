@@ -55,6 +55,10 @@ typedef enum {SYN=0, ESTABLISHED, FIN} t_connstate;
 typedef enum {UNKNOWN=0, HTTP, TLS, QUIC, WIREGUARD, DHT} t_l7proto;
 typedef struct
 {
+	struct desync_profile *dp;		// desync profile cache
+	bool dp_search_complete;
+	bool bCheckDone, bCheckResult, bCheckExcluded; // hostlist check result cache
+
 	// common state
 	time_t t_start, t_last;
 	uint64_t pcounter_orig, pcounter_reply;	// packet counter

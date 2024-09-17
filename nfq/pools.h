@@ -26,7 +26,6 @@ struct str_list {
 };
 LIST_HEAD(str_list_head, str_list);
 
-
 typedef struct hostfail_pool {
     char *str;		/* key */
     int counter;	/* value */

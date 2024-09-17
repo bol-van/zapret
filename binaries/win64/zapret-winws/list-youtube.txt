@@ -1,0 +1,3 @@
+googlevideo.com
+youtubei.googleapis.com
+i.ytimg.com

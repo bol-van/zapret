@@ -1,7 +1,11 @@
 #include "params.h"
+
 #include <stdarg.h>
 #include <syslog.h>
 #include <errno.h>
+
+#include "pools.h"
+#include "desync.h"
 
 #ifdef BSD
 const char *progname = "dvtws";
@@ -149,3 +153,80 @@ int HOSTLIST_DEBUGLOG_APPEND(const char *format, ...)
 	else
 		return 0;
 }
+
+
+struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *entry = calloc(1,sizeof(struct desync_profile_list));
+	if (!entry) return NULL;
+	
+	LIST_INIT(&entry->dp.hostlist_files);
+	LIST_INIT(&entry->dp.hostlist_exclude_files);
+	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
+	entry->dp.desync_skip_nosni = true;
+	entry->dp.desync_split_pos = 2;
+	entry->dp.desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
+	entry->dp.desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
+	entry->dp.desync_repeats = 1;
+	entry->dp.fake_tls_size = sizeof(fake_tls_clienthello_default);
+	memcpy(entry->dp.fake_tls,fake_tls_clienthello_default,entry->dp.fake_tls_size);
+	randomize_default_tls_payload(entry->dp.fake_tls);
+	entry->dp.fake_http_size = strlen(fake_http_request_default);
+	memcpy(entry->dp.fake_http,fake_http_request_default,entry->dp.fake_http_size);
+	entry->dp.fake_quic_size = 620; // must be 601+ for TSPU hack
+	entry->dp.fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
+	entry->dp.fake_wg_size = 64;
+	entry->dp.fake_dht_size = 64;
+	entry->dp.fake_unknown_size = 256;
+	entry->dp.fake_syndata_size = 16;
+	entry->dp.fake_unknown_udp_size = 64;
+	entry->dp.wscale=-1; // default - dont change scale factor (client)
+	entry->dp.desync_ttl6 = 0xFF; // unused
+	entry->dp.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
+	entry->dp.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
+	entry->dp.wssize_cutoff_mode = entry->dp.desync_start_mode = entry->dp.desync_cutoff_mode = 'n'; // packet number by default
+	entry->dp.udplen_increment = UDPLEN_INCREMENT_DEFAULT;
+	entry->dp.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
+	entry->dp.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+	entry->dp.hostlist_auto_retrans_threshold = HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT;
+	entry->dp.filter_ipv4 = entry->dp.filter_ipv6 = true;
+
+	// add to the tail
+	struct desync_profile_list *dpn,*dpl=LIST_FIRST(&params.desync_profiles);
+	if (dpl)
+	{
+		while ((dpn=LIST_NEXT(dpl,next))) dpl = dpn;
+		LIST_INSERT_AFTER(dpl, entry, next);
+	}
+	else
+		LIST_INSERT_HEAD(&params.desync_profiles, entry, next);
+
+	return entry;
+}
+static void dp_entry_destroy(struct desync_profile_list *entry)
+{
+	strlist_destroy(&entry->dp.hostlist_files);
+	strlist_destroy(&entry->dp.hostlist_exclude_files);
+	StrPoolDestroy(&entry->dp.hostlist_exclude);
+	StrPoolDestroy(&entry->dp.hostlist);
+	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
+	free(entry);
+}
+void dp_list_destroy(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		dp_entry_destroy(entry);
+	}
+}
+bool dp_list_have_autohostlist(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, head, next)
+		if (*dpl->dp.hostlist_auto_filename)
+			return true;
+	return false;
+}
+

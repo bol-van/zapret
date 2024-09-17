@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "hostlist.h"
 #include "gzip.h"
-#include "params.h"
 #include "helpers.h"
 
 // inplace tolower() and add to pool
@@ -154,36 +153,53 @@ static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const c
 	return true;
 }
 
-// return : true = apply fooling, false = do not apply
-bool HostlistCheck(const char *host, bool *excluded)
+static bool LoadIncludeHostListsForProfile(struct desync_profile *dp)
 {
-	if (*params.hostlist_auto_filename)
+	if (!LoadHostLists(&dp->hostlist, &dp->hostlist_files))
+		return false;
+	if (*dp->hostlist_auto_filename)
 	{
-		time_t t = file_mod_time(params.hostlist_auto_filename);
-		if (t!=params.hostlist_auto_mod_time)
+		dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
+		NonEmptyHostlist(&dp->hostlist);
+	}
+	return true;
+}
+
+// return : true = apply fooling, false = do not apply
+bool HostlistCheck(struct desync_profile *dp, const char *host, bool *excluded)
+{
+	DLOG("* Hostlist check for profile %d\n",dp->n);
+	if (*dp->hostlist_auto_filename)
+	{
+		time_t t = file_mod_time(dp->hostlist_auto_filename);
+		if (t!=dp->hostlist_auto_mod_time)
 		{
-			DLOG_CONDUP("Autohostlist was modified by another process. Reloading include hostslist.\n");
-			if (!LoadIncludeHostLists())
+			DLOG_CONDUP("Autohostlist '%s' from profile %d was modified. Reloading include hostlists for this profile.\n",dp->hostlist_auto_filename, dp->n);
+			if (!LoadIncludeHostListsForProfile(dp))
 			{
 				// what will we do without hostlist ?? sure, gonna die
 				exit(1);
 			}
-			params.hostlist_auto_mod_time = t;
-			NonEmptyHostlist(&params.hostlist);
+			dp->hostlist_auto_mod_time = t;
+			NonEmptyHostlist(&dp->hostlist);
 		}
 	}
-	return HostlistCheck_(params.hostlist, params.hostlist_exclude, host, excluded);
+	return HostlistCheck_(dp->hostlist, dp->hostlist_exclude, host, excluded);
 }
 
 bool LoadIncludeHostLists()
 {
-	if (!LoadHostLists(&params.hostlist, &params.hostlist_files))
-		return false;
-	if (*params.hostlist_auto_filename)
-		params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+		if (!LoadIncludeHostListsForProfile(&dpl->dp))
+			return false;
 	return true;
 }
 bool LoadExcludeHostLists()
 {
-	return LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files);
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+		if (!LoadHostLists(&dpl->dp.hostlist_exclude, &dpl->dp.hostlist_exclude_files))
+			return false;
+	return true;
 }

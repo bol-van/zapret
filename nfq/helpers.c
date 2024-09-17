@@ -1,12 +1,13 @@
 #define _GNU_SOURCE
 
 #include "helpers.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <sys/stat.h>
-
+#include <libgen.h>
 
 #include "params.h"
 
@@ -320,7 +321,7 @@ bool pf_parse(const char *s, port_filter *pf)
 	unsigned int v1,v2;
 
 	if (!s) return false;
-	if (*s=='~') 
+	if (*s=='~')
 	{
 		pf->neg=true;
 		s++;
@@ -329,18 +330,24 @@ bool pf_parse(const char *s, port_filter *pf)
 		pf->neg=false;
 	if (sscanf(s,"%u-%u",&v1,&v2)==2)
 	{
-		if (!v1 || v1>65535 || v2>65535 || v1>v2) return false;
+		if (v1>65535 || v2>65535 || v1>v2) return false;
 		pf->from=(uint16_t)v1;
 		pf->to=(uint16_t)v2;
 	}
 	else if (sscanf(s,"%u",&v1)==1)
 	{
-		if (!v1 || v1>65535) return false;
+		if (v1>65535) return false;
 		pf->to=pf->from=(uint16_t)v1;
 	}
 	else
 		return false;
+	// deny all case
+	if (!pf->from && !pf->to) pf->neg=true;
 	return true;
+}
+bool pf_is_empty(const port_filter *pf)
+{
+	return !pf->neg && !pf->from && !pf->to;
 }
 
 void fill_random_bytes(uint8_t *p,size_t sz)
@@ -363,4 +370,17 @@ void fill_random_az09(uint8_t *p,size_t sz)
 		rnd = random() % (10 + 'z'-'a'+1);
 		p[k] = rnd<10 ? rnd+'0' : 'a'+rnd-10;
 	}
+}
+
+bool cd_to_exe_dir(const char *argv0)
+{
+	char *s,*d;
+	bool bOK=false;
+	if ((s = strdup(argv0)))
+	{
+		if ((d = dirname(s)))
+			bOK = !chdir(d);
+		free(s);
+	}
+	return bOK;
 }
