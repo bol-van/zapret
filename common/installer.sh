@@ -54,7 +54,7 @@ edit_vars()
 	local n=1 var v tmp="/tmp/zvars"
 	rm -f "$tmp"
 	while [ 1=1 ]; do
-		eval var="\$$n"
+		eval var="\${$n}"
 		[ -n "$var" ] || break
 		eval v="\$$var"
 		echo $var=\"$v\" >>"$tmp"

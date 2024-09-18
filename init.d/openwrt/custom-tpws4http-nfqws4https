@@ -16,6 +16,7 @@ zapret_custom_daemons()
 	[ "$MODE_HTTPS" = "1" ] && {
 		opt="--qnum=$QNUM $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
 		filter_apply_hostlist_target opt
+		filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTPS_SUFFIX"
 		run_daemon 2 $NFQWS "$opt"
 	}
 }

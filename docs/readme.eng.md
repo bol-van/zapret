@@ -463,8 +463,8 @@ becomes the possible maximum. If you set `scale_factor` 64:0, it will be very sl
 
 On the other hand, the server response must not be large enough for the DPI to find what it is looking for.
 
-Hostlist filter does not affect `--wssize` because it works since the connection initiation when it's not yet possible
-to extract the host name.
+`--wssize` is not applied in desync profiles with hostlist filter because it works since the connection initiation when it's not yet possible
+to extract the host name. But it works with auto hostlist profiles.
 
 `--wssize` may slow down sites and/or increase response time. It's desired to use another methods if possible.
 
@@ -962,6 +962,19 @@ If one of `NFQWS_OPT_DESYNC_HTTP6`/`NFQWS_OPT_DESYNC_HTTPS6` is not defined it t
 It means if only `NFQWS_OPT_DESYNC` is defined all four take its value.
 
 If a variable is not defined, the value `NFQWS_OPT_DESYNC` is taken.
+
+Additional low priority desync profile for `MODE_FILTER=hostlist`.
+With multiple profile support 0-phase desync methods are no more applied with hostlist !
+To apply they additional profile is required without hostlist filter.
+```
+#NFQWS_OPT_DESYNC_SUFFIX="--dpi-desync=syndata"
+#NFQWS_OPT_DESYNC_HTTP_SUFFIX="--dpi-desync=syndata"
+#NFQWS_OPT_DESYNC_HTTPS_SUFFIX="--wssize 1:6"
+#NFQWS_OPT_DESYNC_HTTP6_SUFFIX="--dpi-desync=syndata"
+#NFQWS_OPT_DESYNC_HTTPS6_SUFFIX="--wssize 1:6"
+```
+
+Defaults are filled the same ways as with NFQWS_OPT_*.
 
 Separate QUIC options for ip protocol versions :
 

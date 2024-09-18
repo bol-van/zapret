@@ -45,3 +45,11 @@ filter_apply_hostlist_target()
 	[ -n "$HOSTLIST_EXCLUDE" ] && eval $1="\"\$$1 --hostlist-exclude=$HOSTLIST_EXCLUDE\""
 	[ "$MODE_FILTER" = "autohostlist" ] && filter_apply_autohostlist_target $1
 }
+
+filter_apply_suffix()
+{
+	# $1 - var name of tpws or nfqws params
+	# $2 - suffix value
+	local v="${2:+ --new $2}"
+	eval $1="\"\$$1$v\""
+}
