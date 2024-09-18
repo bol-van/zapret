@@ -921,9 +921,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			}
 		}
 
-		reasm_orig_cancel(ctrack);
-		rdata_payload=NULL;
-
 		if (ctrack && ctrack->req_seq_finalized)
 		{
 			uint32_t dseq = ctrack->seq_last - ctrack->req_seq_end;
@@ -943,13 +940,18 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!ctrack_replay->hostname)
 					{
 						DLOG_ERR("hostname dup : out of memory");
+						reasm_orig_cancel(ctrack);
 						return verdict;
 					}
 					DLOG("we have hostname now. searching desync profile again.\n");
 					struct desync_profile *dp_prev = dp;
 					dp = ctrack_replay->dp = dp_find(&params.desync_profiles, !!ip6hdr, ntohs(bReverse ? tcphdr->th_sport : tcphdr->th_dport), 0, ctrack_replay->hostname, &ctrack_replay->bCheckDone, &ctrack_replay->bCheckResult, &ctrack_replay->bCheckExcluded);
 					ctrack_replay->dp_search_complete = true;
-					if (!dp) return verdict;
+					if (!dp)
+					{
+						reasm_orig_cancel(ctrack);
+						return verdict;
+					}
 					if (dp!=dp_prev)
 					{
 						DLOG("desync profile changed by revealed hostname !\n");
@@ -957,7 +959,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						if (!replay)
 						{
 							maybe_cutoff(ctrack, IPPROTO_TCP);
-							if (!process_desync_interval(dp, ctrack)) return verdict;
+							if (!process_desync_interval(dp, ctrack))
+							{
+								reasm_orig_cancel(ctrack);
+								return verdict;
+							}
 						}
 					}
 				}
@@ -980,15 +986,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							ctrack_stop_retrans_counter(ctrack_replay);
 					}
 					DLOG("not applying tampering to this request\n");
+					reasm_orig_cancel(ctrack);
 					return verdict;
 				}
 			}
-		}
-
-		if (l7proto==UNKNOWN)
-		{
-			if (!dp->desync_any_proto) return verdict;
-			DLOG("applying tampering to unknown protocol\n");
 		}
 
 		// desync profile may have changed after hostname was revealed
@@ -1010,8 +1011,18 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				split_pos=dp->desync_split_pos;
 				break;
 		}
-		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 
+		// we do not need reasm buffer anymore
+		reasm_orig_cancel(ctrack);
+		rdata_payload=NULL;
+
+		if (l7proto==UNKNOWN)
+		{
+			if (!dp->desync_any_proto) return verdict;
+			DLOG("applying tampering to unknown protocol\n");
+		}
+
+		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 
 		if (bIsHttp && (dp->hostcase || dp->hostnospace || dp->domcase) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
 		{
