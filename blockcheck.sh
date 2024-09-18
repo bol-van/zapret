@@ -293,7 +293,7 @@ netcat_test()
 	# $2 - port
 	local cmd
 	netcat_setup && {
-		cmd="$NCAT -z -w 1 $1 $2"
+		cmd="$NCAT -z -w 2 $1 $2"
 		echo $cmd
 		$cmd 2>&1
 	}
