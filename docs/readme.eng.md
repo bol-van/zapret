@@ -965,7 +965,7 @@ If a variable is not defined, the value `NFQWS_OPT_DESYNC` is taken.
 
 Additional low priority desync profile for `MODE_FILTER=hostlist`.
 With multiple profile support 0-phase desync methods are no more applied with hostlist !
-To apply they additional profile is required without hostlist filter.
+To apply them additional profile is required without hostlist filter.
 ```
 #NFQWS_OPT_DESYNC_SUFFIX="--dpi-desync=syndata"
 #NFQWS_OPT_DESYNC_HTTP_SUFFIX="--dpi-desync=syndata"
