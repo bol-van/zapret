@@ -186,6 +186,7 @@ static struct desync_profile *dp_find(
 {
 	struct desync_profile_list *dpl;
 	DLOG("desync profile search for hostname='%s' ipv6=%u tcp_port=%u udp_port=%u\n", hostname ? hostname : "", ipv6, tcp_port, udp_port);
+	if (bCheckDone) *bCheckDone = false;
 	LIST_FOREACH(dpl, head, next)
 	{
 		if (dp_match(&dpl->dp,ipv6,tcp_port,udp_port,hostname,bCheckDone,bCheckResult,bExcluded))
