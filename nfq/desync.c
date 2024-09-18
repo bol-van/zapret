@@ -805,7 +805,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		size_t fake_size;
 		char host[256];
 		bool bHaveHost=false;
-		bool bIsHttp;
 		uint8_t *p, *phost;
 		const uint8_t *rdata_payload = data_payload;
 		size_t rlen_payload = len_payload;
@@ -824,7 +823,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 		process_retrans_fail(ctrack, IPPROTO_TCP);
 
-		if ((bIsHttp = IsHttp(rdata_payload,rlen_payload)))
+		if (IsHttp(rdata_payload,rlen_payload))
 		{
 			DLOG("packet contains HTTP request\n");
 			l7proto = HTTP;
@@ -1024,7 +1023,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 
-		if (bIsHttp && (dp->hostcase || dp->hostnospace || dp->domcase) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
+		if ((l7proto == HTTP) && (dp->hostcase || dp->hostnospace || dp->domcase) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
 		{
 			if (dp->hostcase)
 			{
