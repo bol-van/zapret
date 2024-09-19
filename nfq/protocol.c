@@ -51,7 +51,7 @@ static const uint8_t *FindHostInConst(const uint8_t *buf, size_t bs)
 	size_t pos;
 	if (bs<6) return NULL;
 	bs-=6;
-	for(pos=0;pos<bs;pos++)
+	for(pos=0;pos<=bs;pos++)
 		if (IsHostAt(buf+pos))
 			return buf+pos;
 
