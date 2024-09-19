@@ -282,8 +282,8 @@ static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const ch
 		if (fail_counter)
 		{
 			HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
-			DLOG("auto hostlist : %s : fail counter reset. website is working.\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : fail counter reset. website is working.", hostname);
+			DLOG("auto hostlist (profile %d) : %s : fail counter reset. website is working.\n", dp->n, hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter reset. website is working.", hostname, dp->n);
 		}
 	}
 }
@@ -331,19 +331,19 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		}
 	}
 	fail_counter->counter++;
-	DLOG("auto hostlist : %s : fail counter %d/%d\n", hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
-	HOSTLIST_DEBUGLOG_APPEND("%s : fail counter %d/%d", hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	DLOG("auto hostlist (profile %d) : %s : fail counter %d/%d\n", dp->n, hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter %d/%d", hostname, dp->n, fail_counter->counter, dp->hostlist_auto_fail_threshold);
 	if (fail_counter->counter >= dp->hostlist_auto_fail_threshold)
 	{
-		DLOG("auto hostlist : fail threshold reached. about to add %s to auto hostlist\n", hostname);
+		DLOG("auto hostlist (profile %d) : fail threshold reached. about to add %s to auto hostlist\n", dp->n, hostname);
 		HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
 		
-		DLOG("auto hostlist : rechecking %s to avoid duplicates\n", hostname);
+		DLOG("auto hostlist (profile %d) : rechecking %s to avoid duplicates\n", dp->n, hostname);
 		bool bExcluded=false;
 		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
 		{
-			DLOG("auto hostlist : adding %s\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
+			DLOG("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : adding to %s", hostname, dp->n, dp->hostlist_auto_filename);
 			if (!StrPoolAddStr(&dp->hostlist, hostname))
 			{
 				fprintf(stderr, "StrPoolAddStr out of memory\n");
@@ -358,8 +358,8 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		}
 		else
 		{
-			DLOG("auto hostlist : NOT adding %s\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
+			DLOG("auto hostlist (profile %d) : NOT adding %s\n", dp->n, hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : NOT adding, duplicate detected", hostname, dp->n);
 		}
 	}
 }
@@ -368,7 +368,7 @@ static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto)
 {
 	if (ctrack && ctrack->dp && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, ctrack->dp->hostlist_auto_retrans_threshold))
 	{
-		HOSTLIST_DEBUGLOG_APPEND("%s : tcp retrans threshold reached", ctrack->hostname);
+		HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : tcp retrans threshold reached", ctrack->hostname, ctrack->dp->n);
 		auto_hostlist_failed(ctrack->dp, ctrack->hostname);
 	}
 }
@@ -683,7 +683,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				if (tcphdr->th_flags & TH_RST)
 				{
 					DLOG("incoming RST detected for hostname %s\n", ctrack->hostname);
-					HOSTLIST_DEBUGLOG_APPEND("%s : incoming RST", ctrack->hostname);
+					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : incoming RST", ctrack->hostname, ctrack->dp->n);
 					bFail = true;
 				}
 				else if (len_payload && ctrack->l7proto==HTTP)
@@ -695,7 +695,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						if (bFail)
 						{
 							DLOG("redirect to another domain detected. possibly DPI redirect.\n");
-							HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+							HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : redirect to another domain", ctrack->hostname, ctrack->dp->n);
 						}
 						else
 							DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n");
