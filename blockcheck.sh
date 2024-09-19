@@ -1224,7 +1224,7 @@ tpws_check_domain_http_bypass_()
 		done
 	else
 		for mss in '' 88; do
-			s3=${mss:+--mss=$mss --mss-pf=$HTTPS_PORT}
+			s3=${mss:+--mss=$mss}
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
 				for pos in sni sniext; do
 					s="--split-tls=$pos"
