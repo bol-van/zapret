@@ -1,23 +1,86 @@
 #define _GNU_SOURCE
 
 #include "tamper.h"
-#include "params.h"
 #include "hostlist.h"
 #include "protocol.h"
 #include "helpers.h"
 #include <string.h>
 #include <stdio.h>
 
+static bool dp_match_l3l4(struct desync_profile *dp, bool ipv6, uint16_t tcp_port)
+{
+	return \
+		((!ipv6 && dp->filter_ipv4) || (ipv6 && dp->filter_ipv6)) &&
+		(!tcp_port || pf_in_range(tcp_port,&dp->pf_tcp));
+}
+static bool dp_match(struct desync_profile *dp, bool ipv6, uint16_t tcp_port, const char *hostname)
+{
+	if (dp_match_l3l4(dp,ipv6,tcp_port))
+	{
+		// autohostlist profile matching l3/l4 filter always win
+		if (*dp->hostlist_auto_filename) return true;
+
+		if (dp->hostlist || dp->hostlist_exclude)
+		{
+			// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
+			if (hostname)
+				return HostlistCheck(dp, hostname, NULL);
+		}
+		else
+			// profile without hostlist filter wins
+			return true;
+	}
+	return false;
+}
+static struct desync_profile *dp_find(struct desync_profile_list_head *head, bool ipv6, uint16_t tcp_port, const char *hostname)
+{
+	struct desync_profile_list *dpl;
+	VPRINT("desync profile search for hostname='%s' ipv6=%u tcp_port=%u\n", hostname ? hostname : "", ipv6, tcp_port);
+	LIST_FOREACH(dpl, head, next)
+	{
+		if (dp_match(&dpl->dp,ipv6,tcp_port,hostname))
+		{
+			VPRINT("desync profile %d matches\n",dpl->dp.n);
+			return &dpl->dp;
+		}
+	}
+	VPRINT("desync profile not found\n");
+	return NULL;
+}
+void apply_desync_profile(t_ctrack *ctrack, const struct sockaddr *dest)
+{
+	ctrack->dp = dp_find(&params.desync_profiles, dest->sa_family==AF_INET6, saport(dest), ctrack->hostname);
+}
+
+
+
 // segment buffer has at least 5 extra bytes to extend data block
-void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos, uint8_t *split_flags)
+void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos, uint8_t *split_flags)
 {
 	uint8_t *p, *pp, *pHost = NULL;
 	size_t method_len = 0, pos;
+	size_t tpos, spos;
 	const char *method;
-	bool bBypass = false, bHaveHost = false, bHostExcluded = false;
+	bool bHaveHost = false;
 	char *pc, Host[256];
-	
+	t_l7proto l7proto;
+
 	DBGPRINT("tamper_out\n");
+
+	if (params.debug)
+	{
+		char ip_port[48];
+		ntop46_port(dest,ip_port,sizeof(ip_port));
+		VPRINT("tampering tcp segment with size %zu to %s\n", *size, ip_port);
+		if (ctrack->dp) VPRINT("using cached desync profile %d\n",ctrack->dp->n);
+		if (ctrack->hostname) VPRINT("connection hostname: %s\n", ctrack->hostname);
+	}
+		
+	if (dest->sa_family!=AF_INET && dest->sa_family!=AF_INET6)
+	{
+		DLOG_ERR("tamper_out dest family unknown\n");
+		return;
+	}
 
 	*split_pos=0;
 	*split_flags=0;
@@ -26,9 +89,8 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 	{
 		method_len = strlen(method)-2;
 		VPRINT("Data block looks like http request start : %s\n", method);
-		if (!ctrack->l7proto) ctrack->l7proto=HTTP;
-		// cpu saving : we search host only if and when required. we do not research host every time we need its position
-		if ((params.hostlist || params.hostlist_exclude) && HttpFindHost(&pHost,segment,*size))
+		l7proto=HTTP;
+		if (HttpFindHost(&pHost,segment,*size))
 		{
 			p = pHost + 5;
 			while (p < (segment + *size) && (*p == ' ' || *p == '\t')) p++;
@@ -37,13 +99,57 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			memcpy(Host, p, pp - p);
 			Host[pp - p] = '\0';
 			bHaveHost = true;
-			VPRINT("Requested Host is : %s\n", Host);
 			for(pc = Host; *pc; pc++) *pc=tolower(*pc);
-			bBypass = !HostlistCheck(Host, &bHostExcluded);
 		}
-		if (!bBypass)
+	}
+	else if (IsTLSClientHello(segment,*size,false))
+	{
+		VPRINT("Data block contains TLS ClientHello\n");
+		l7proto=TLS;
+		bHaveHost=TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false);
+	}
+	else
+	{
+		VPRINT("Data block contains unknown payload\n");
+		l7proto = UNKNOWN;
+	}
+
+	if (ctrack->l7proto==UNKNOWN) ctrack->l7proto=l7proto;
+
+	if (bHaveHost)
+	{
+		VPRINT("request hostname: %s\n", Host);
+		if (!ctrack->hostname)
 		{
-			if (params.unixeol)
+			if (!(ctrack->hostname=strdup(Host)))
+			{
+				DLOG_ERR("strdup hostname : out of memory\n");
+				return;
+			}
+
+			struct desync_profile *dp_prev = ctrack->dp;
+			apply_desync_profile(ctrack, dest);
+			if (ctrack->dp!=dp_prev)
+				VPRINT("desync profile changed by revealed hostname !\n");
+			else if (*ctrack->dp->hostlist_auto_filename)
+			{
+				bool bHostExcluded;
+				if (!HostlistCheck(ctrack->dp, Host, &bHostExcluded))
+				{
+					ctrack->b_ah_check = !bHostExcluded;
+					VPRINT("Not acting on this request\n");
+					return;
+				}
+			}
+		}
+	}
+	
+	if (!ctrack->dp) return;
+
+	switch(l7proto)
+	{
+		case HTTP:
+			if (ctrack->dp->unixeol)
 			{
 				p = pp = segment;
 				while ((p = memmem(p, segment + *size - p, "\r\n", 2)))
@@ -61,10 +167,10 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				}
 				pHost = NULL; // invalidate
 			}
-			if (params.methodeol && (*size+1+!params.unixeol)<=segment_buffer_size)
+			if (ctrack->dp->methodeol && (*size+1+!ctrack->dp->unixeol)<=segment_buffer_size)
 			{
 				VPRINT("Adding EOL before method\n");
-				if (params.unixeol)
+				if (ctrack->dp->unixeol)
 				{
 					memmove(segment + 1, segment, *size);
 					(*size)++;;
@@ -79,7 +185,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				}
 				pHost = NULL; // invalidate
 			}
-			if (params.methodspace && *size<segment_buffer_size)
+			if (ctrack->dp->methodspace && *size<segment_buffer_size)
 			{
 				// we only work with data blocks looking as HTTP query, so method is at the beginning
 				VPRINT("Adding extra space after method\n");
@@ -90,20 +196,20 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				(*size)++; // block will grow by 1 byte
 				if (pHost) pHost++; // Host: position will move by 1 byte
 			}
-			if ((params.hostdot || params.hosttab) && *size<segment_buffer_size && HttpFindHost(&pHost,segment,*size))
+			if ((ctrack->dp->hostdot || ctrack->dp->hosttab) && *size<segment_buffer_size && HttpFindHost(&pHost,segment,*size))
 			{
 				p = pHost + 5;
 				while (p < (segment + *size) && *p != '\r' && *p != '\n') p++;
 				if (p < (segment + *size))
 				{
 					pos = p - segment;
-					VPRINT("Adding %s to host name at pos %zu\n", params.hostdot ? "dot" : "tab", pos);
+					VPRINT("Adding %s to host name at pos %zu\n", ctrack->dp->hostdot ? "dot" : "tab", pos);
 					memmove(p + 1, p, *size - pos);
-					*p = params.hostdot ? '.' : '\t'; // insert dot or tab
+					*p = ctrack->dp->hostdot ? '.' : '\t'; // insert dot or tab
 					(*size)++; // block will grow by 1 byte
 				}
 			}
-			if (params.domcase && HttpFindHost(&pHost,segment,*size))
+			if (ctrack->dp->domcase && HttpFindHost(&pHost,segment,*size))
 			{
 				p = pHost + 5;
 				pos = p - segment;
@@ -111,7 +217,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				for (; p < (segment + *size) && *p != '\r' && *p != '\n'; p++)
 					*p = (((size_t)p) & 1) ? tolower(*p) : toupper(*p);
 			}
-			if (params.hostnospace && HttpFindHost(&pHost,segment,*size) && (pHost+5)<(segment+*size) && pHost[5] == ' ')
+			if (ctrack->dp->hostnospace && HttpFindHost(&pHost,segment,*size) && (pHost+5)<(segment+*size) && pHost[5] == ' ')
 			{
 				p = pHost + 6;
 				pos = p - segment;
@@ -119,17 +225,17 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 				memmove(p - 1, p, *size - pos);
 				(*size)--; // block will shrink by 1 byte
 			}
-			if (params.hostcase && HttpFindHost(&pHost,segment,*size))
+			if (ctrack->dp->hostcase && HttpFindHost(&pHost,segment,*size))
 			{
-				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3], pHost - segment);
-				memcpy(pHost, params.hostspell, 4);
+				VPRINT("Changing 'Host:' => '%c%c%c%c:' at pos %td\n", ctrack->dp->hostspell[0], ctrack->dp->hostspell[1], ctrack->dp->hostspell[2], ctrack->dp->hostspell[3], pHost - segment);
+				memcpy(pHost, ctrack->dp->hostspell, 4);
 			}
-			if (params.hostpad && HttpFindHost(&pHost,segment,*size))
+			if (ctrack->dp->hostpad && HttpFindHost(&pHost,segment,*size))
 			{
 				//  add :  XXXXX: <padding?[\r\n|\n]
 				char s[8];
-				size_t hsize = params.unixeol ? 8 : 9;
-				size_t hostpad = params.hostpad<hsize ? hsize : params.hostpad;
+				size_t hsize = ctrack->dp->unixeol ? 8 : 9;
+				size_t hostpad = ctrack->dp->hostpad<hsize ? hsize : ctrack->dp->hostpad;
 
 				if ((hsize+*size)>segment_buffer_size)
 					VPRINT("could not add host padding : buffer too small\n");
@@ -159,7 +265,7 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 						p+=7;
 						memset(p,'a'+rand()%('z'-'a'+1),padsize);
 						p+=padsize;
-						if (params.unixeol)
+						if (ctrack->dp->unixeol)
 							*p++='\n';
 						else
 						{
@@ -171,40 +277,16 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 					pHost = NULL; // invalidate
 				}
 			}
-			*split_pos = HttpPos(params.split_http_req, params.split_pos, segment, *size);
-			if (params.disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
-			if (params.oob_http) *split_flags |= SPLIT_FLAG_OOB;
-		}
-		else
-		{
-			VPRINT("Not acting on this request\n");
-		}
-	}
-	else if (IsTLSClientHello(segment,*size,false))
-	{
-		size_t tpos=0,spos=0;
-		
-		if (!ctrack->l7proto) ctrack->l7proto=TLS;
+			*split_pos = HttpPos(ctrack->dp->split_http_req, ctrack->dp->split_pos, segment, *size);
+			if (ctrack->dp->disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
+			if (ctrack->dp->oob_http) *split_flags |= SPLIT_FLAG_OOB;
+			break;
 
-		VPRINT("packet contains TLS ClientHello\n");
-		// we need host only if hostlist is present
-		if ((params.hostlist || params.hostlist_exclude) && TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false))
-		{
-			VPRINT("hostname: %s\n",Host);
-			bHaveHost = true;
-			bBypass = !HostlistCheck(Host, &bHostExcluded);
-		}
-		if (bBypass)
-		{
-			VPRINT("Not acting on this request\n");
-		}
-		else
-		{
-			spos = TLSPos(params.split_tls, params.split_pos, segment, *size, 0);
-
+		case TLS:
+			spos = TLSPos(ctrack->dp->split_tls, ctrack->dp->split_pos, segment, *size, 0);
 			if ((5+*size)<=segment_buffer_size)
 			{
-				tpos = TLSPos(params.tlsrec, params.tlsrec_pos+5, segment, *size, 0);
+				tpos = TLSPos(ctrack->dp->tlsrec, ctrack->dp->tlsrec_pos+5, segment, *size, 0);
 				if (tpos>5)
 				{
 					// construct 2 TLS records from one
@@ -228,52 +310,46 @@ void tamper_out(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,si
 			}
 
 			if (spos && spos < *size)
-			{
-				VPRINT("split pos %zu\n",spos);
 				*split_pos = spos;
-			}
 
-			if (params.disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
-			if (params.oob_tls) *split_flags |= SPLIT_FLAG_OOB;
-		}
+			if (ctrack->dp->disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
+			if (ctrack->dp->oob_tls) *split_flags |= SPLIT_FLAG_OOB;
+			
+			break;
+
+		default:
+			if (ctrack->dp->split_any_protocol && ctrack->dp->split_pos < *size)
+				*split_pos = ctrack->dp->split_pos;
 	}
-	else if (params.split_any_protocol && params.split_pos < *size)
-		*split_pos = params.split_pos;
 		
-	if (bHaveHost && bBypass && !bHostExcluded && *params.hostlist_auto_filename)
-	{
-		DBGPRINT("tamper_out put hostname : %s\n", Host);
-		if (ctrack->hostname) free(ctrack->hostname);
-		ctrack->hostname=strdup(Host);
-	}
-	if (params.disorder) *split_flags |= SPLIT_FLAG_DISORDER;
-	if (params.oob) *split_flags |= SPLIT_FLAG_OOB;
+	if (ctrack->dp->disorder) *split_flags |= SPLIT_FLAG_DISORDER;
+	if (ctrack->dp->oob) *split_flags |= SPLIT_FLAG_OOB;
 }
 
-static void auto_hostlist_reset_fail_counter(const char *hostname)
+static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname)
 {
 	if (hostname)
 	{
 		hostfail_pool *fail_counter;
 	
-		fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+		fail_counter = HostFailPoolFind(dp->hostlist_auto_fail_counters, hostname);
 		if (fail_counter)
 		{
-			HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
-			VPRINT("auto hostlist : %s : fail counter reset. website is working.\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : fail counter reset. website is working.", hostname);
+			HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
+			VPRINT("auto hostlist (profile %d) : %s : fail counter reset. website is working.\n", dp->n, hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter reset. website is working.", hostname, dp->n);
 		}
 	}
 }
 
-static void auto_hostlist_failed(const char *hostname)
+static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname)
 {
 	hostfail_pool *fail_counter;
 
-	fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+	fail_counter = HostFailPoolFind(dp->hostlist_auto_fail_counters, hostname);
 	if (!fail_counter)
 	{
-		fail_counter = HostFailPoolAdd(&params.hostlist_auto_fail_counters, hostname, params.hostlist_auto_fail_time);
+		fail_counter = HostFailPoolAdd(&dp->hostlist_auto_fail_counters, hostname, dp->hostlist_auto_fail_time);
 		if (!fail_counter)
 		{
 			DLOG_ERR("HostFailPoolAdd: out of memory\n");
@@ -281,35 +357,35 @@ static void auto_hostlist_failed(const char *hostname)
 		}
 	}
 	fail_counter->counter++;
-	VPRINT("auto hostlist : %s : fail counter %d/%d\n", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
-	HOSTLIST_DEBUGLOG_APPEND("%s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
-	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
+	VPRINT("auto hostlist (profile %d) : %s : fail counter %d/%d\n", dp->n , hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter %d/%d", hostname, dp->n, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	if (fail_counter->counter >= dp->hostlist_auto_fail_threshold)
 	{
-		VPRINT("auto hostlist : fail threshold reached. adding %s to auto hostlist\n", hostname);
-		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
+		VPRINT("auto hostlist (profile %d) : fail threshold reached. adding %s to auto hostlist\n", dp->n , hostname);
+		HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
 		
-		VPRINT("auto hostlist : rechecking %s to avoid duplicates\n", hostname);
+		VPRINT("auto hostlist (profile %d) : rechecking %s to avoid duplicates\n", dp->n, hostname);
 		bool bExcluded=false;
-		if (!HostlistCheck(hostname, &bExcluded) && !bExcluded)
+		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
 		{
-			VPRINT("auto hostlist : adding %s\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
-			if (!StrPoolAddStr(&params.hostlist, hostname))
+			VPRINT("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : adding to %s", hostname, dp->n, dp->hostlist_auto_filename);
+			if (!StrPoolAddStr(&dp->hostlist, hostname))
 			{
 				DLOG_ERR("StrPoolAddStr out of memory\n");
 				return;
 			}
-			if (!append_to_list_file(params.hostlist_auto_filename, hostname))
+			if (!append_to_list_file(dp->hostlist_auto_filename, hostname))
 			{
 				DLOG_PERROR("write to auto hostlist:");
 				return;
 			}
-			params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
+			dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
 		}
 		else
 		{
-			VPRINT("auto hostlist : NOT adding %s\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
+			VPRINT("auto hostlist (profile %d) : NOT adding %s\n", dp->n, hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : NOT adding, duplicate detected", hostname, dp->n);
 		}
 	}
 }
@@ -320,9 +396,9 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 
 	DBGPRINT("tamper_in hostname=%s\n", ctrack->hostname);
 
-	if (*params.hostlist_auto_filename)
+	if (ctrack->dp && ctrack->b_ah_check)
 	{
-		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+		HostFailPoolPurgeRateLimited(&ctrack->dp->hostlist_auto_fail_counters);
 
 		if (ctrack->l7proto==HTTP && ctrack->hostname)
 		{
@@ -333,7 +409,7 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 				if (bFail)
 				{
 					VPRINT("redirect to another domain detected. possibly DPI redirect.\n");
-					HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : redirect to another domain", ctrack->hostname, ctrack->dp->n);
 				}
 				else
 					VPRINT("local or in-domain redirect detected. it's not a DPI redirect.\n");
@@ -343,11 +419,9 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 				// received not http reply. do not monitor this connection anymore
 				VPRINT("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
 			}
-			if (bFail) auto_hostlist_failed(ctrack->hostname);
-
+			if (bFail) auto_hostlist_failed(ctrack->dp, ctrack->hostname);
 		}
-		if (!bFail) auto_hostlist_reset_fail_counter(ctrack->hostname);
-
+		if (!bFail) auto_hostlist_reset_fail_counter(ctrack->dp, ctrack->hostname);
 	}
 	ctrack->bTamperInCutoff = true;
 }
@@ -356,30 +430,32 @@ void rst_in(t_ctrack *ctrack)
 {
 	DBGPRINT("rst_in hostname=%s\n", ctrack->hostname);
 
-	if (!*params.hostlist_auto_filename) return;
-
-	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
-
-	if (!ctrack->bTamperInCutoff && ctrack->hostname)
+	if (ctrack->dp && ctrack->b_ah_check)
 	{
-		VPRINT("incoming RST detected for hostname %s\n", ctrack->hostname);
-		HOSTLIST_DEBUGLOG_APPEND("%s : incoming RST", ctrack->hostname);
-		auto_hostlist_failed(ctrack->hostname);
+		HostFailPoolPurgeRateLimited(&ctrack->dp->hostlist_auto_fail_counters);
+
+		if (!ctrack->bTamperInCutoff && ctrack->hostname)
+		{
+			VPRINT("incoming RST detected for hostname %s\n", ctrack->hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : incoming RST", ctrack->hostname, ctrack->dp->n);
+			auto_hostlist_failed(ctrack->dp, ctrack->hostname);
+		}
 	}
 }
 void hup_out(t_ctrack *ctrack)
 {
 	DBGPRINT("hup_out hostname=%s\n", ctrack->hostname);
-
-	if (!*params.hostlist_auto_filename) return;
-
-	HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
-
-	if (!ctrack->bTamperInCutoff && ctrack->hostname)
+	
+	if (ctrack->dp && ctrack->b_ah_check)
 	{
-		// local leg dropped connection after first request. probably due to timeout.
-		VPRINT("local leg closed connection after first request (timeout ?). hostname: %s\n", ctrack->hostname);
-		HOSTLIST_DEBUGLOG_APPEND("%s : client closed connection without server reply", ctrack->hostname);
-		auto_hostlist_failed(ctrack->hostname);
+		HostFailPoolPurgeRateLimited(&ctrack->dp->hostlist_auto_fail_counters);
+
+		if (!ctrack->bTamperInCutoff && ctrack->hostname)
+		{
+			// local leg dropped connection after first request. probably due to timeout.
+			VPRINT("local leg closed connection after first request (timeout ?). hostname: %s\n", ctrack->hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client closed connection without server reply", ctrack->hostname, ctrack->dp->n);
+			auto_hostlist_failed(ctrack->dp, ctrack->hostname);
+		}
 	}
 }

@@ -138,3 +138,56 @@ int HOSTLIST_DEBUGLOG_APPEND(const char *format, ...)
 	else
 		return 0;
 }
+
+
+struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *entry = calloc(1,sizeof(struct desync_profile_list));
+	if (!entry) return NULL;
+
+	LIST_INIT(&entry->dp.hostlist_files);
+	LIST_INIT(&entry->dp.hostlist_exclude_files);
+	entry->dp.filter_ipv4 = entry->dp.filter_ipv6 = true;
+
+	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
+	entry->dp.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
+	entry->dp.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+
+	// add to the tail
+	struct desync_profile_list *dpn,*dpl=LIST_FIRST(&params.desync_profiles);
+	if (dpl)
+	{
+		while ((dpn=LIST_NEXT(dpl,next))) dpl = dpn;
+		LIST_INSERT_AFTER(dpl, entry, next);
+	}
+	else
+		LIST_INSERT_HEAD(&params.desync_profiles, entry, next);
+
+	return entry;
+}
+static void dp_entry_destroy(struct desync_profile_list *entry)
+{
+	strlist_destroy(&entry->dp.hostlist_files);
+	strlist_destroy(&entry->dp.hostlist_exclude_files);
+	StrPoolDestroy(&entry->dp.hostlist_exclude);
+	StrPoolDestroy(&entry->dp.hostlist);
+	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
+	free(entry);
+}
+void dp_list_destroy(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		dp_entry_destroy(entry);
+	}
+}
+bool dp_list_have_autohostlist(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, head, next)
+		if (*dpl->dp.hostlist_auto_filename)
+			return true;
+	return false;
+}

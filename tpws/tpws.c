@@ -46,8 +46,7 @@ bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	if (params.hostlist || params.hostlist_exclude)
-		printf("Will reload hostlists on next request\n");
+	printf("Will reload hostlist on next request (if any)\n");
 	bHup = true;
 }
 // should be called in normal execution
@@ -67,7 +66,14 @@ void dohup(void)
 static void onusr2(int sig)
 {
 	printf("\nHOSTFAIL POOL DUMP\n");
-	HostFailPoolDump(params.hostlist_auto_fail_counters);
+
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+	{
+		printf("\nDESYNC PROFILE %d\n",dpl->dp.n);
+		HostFailPoolDump(dpl->dp.hostlist_auto_fail_counters);
+	}
+
 	printf("\n");
 }
 
@@ -170,7 +176,11 @@ static void exithelp(void)
 #endif
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
-		"\nFILTER:\n"
+		"\nMULTI-STRATEGY:\n"
+		" --new\t\t\t\t\t; begin new strategy\n"
+		" --filter-l3=ipv4|ipv6\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
+		" --filter-tcp=[~]port1[-port2]\t\t; TCP port filter. ~ means negation\n"
+		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-exclude=<filename>\t\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-auto=<filename>\t\t; detect DPI blocks and build hostlist automatically\n"
@@ -203,7 +213,6 @@ static void exithelp(void)
 		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n"
 #ifdef __linux__
 		" --mss=<int>\t\t\t\t; set client MSS. forces server to split messages but significantly decreases speed !\n"
-		" --mss-pf=[~]port1[-port2]\t\t; MSS port filter. ~ means negation\n"
 #endif
 		" --tamper-start=[n]<pos>\t\t; start tampering only from specified outbound stream position. default is 0. 'n' means data block number.\n"
 		" --tamper-cutoff=[n]<pos>\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
@@ -216,11 +225,7 @@ static void exithelp(void)
 }
 static void cleanup_params(void)
 {
-	strlist_destroy(&params.hostlist_files);
-	strlist_destroy(&params.hostlist_exclude_files);
-	StrPoolDestroy(&params.hostlist_exclude);
-	StrPoolDestroy(&params.hostlist);
-	HostFailPoolDestroy(&params.hostlist_auto_fail_counters);
+	dp_list_destroy(&params.desync_profiles);
 }
 static void exithelp_clean(void)
 {
@@ -285,6 +290,32 @@ bool parse_tlspos(const char *s, enum tlspos *pos)
 	return true;
 }
 
+static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
+{
+	char *e,*p,c;
+
+	for (p=opt,*ipv4=*ipv6=false ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (!strcmp(p,"ipv4"))
+			*ipv4 = true;
+		else if (!strcmp(p,"ipv6"))
+			*ipv6 = true;
+		else return false;
+
+		if (e)
+		{
+			*e++=c;
+		}
+		p = e;
+	}
+	return true;
+}
 
 void parse_params(int argc, char *argv[])
 {
@@ -292,18 +323,13 @@ void parse_params(int argc, char *argv[])
 	int v, i;
 
 	memset(&params, 0, sizeof(params));
-	memcpy(params.hostspell, "host", 4); // default hostspell
 	params.maxconn = DEFAULT_MAX_CONN;
 	params.max_orphan_time = DEFAULT_MAX_ORPHAN_TIME;
 	params.binds_last = -1;
-	params.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
-	params.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
 #if defined(__linux__) || defined(__APPLE__)
 	params.tcp_user_timeout_local = DEFAULT_TCP_USER_TIMEOUT_LOCAL;
 	params.tcp_user_timeout_remote = DEFAULT_TCP_USER_TIMEOUT_REMOTE;
 #endif
-	LIST_INIT(&params.hostlist_files);
-	LIST_INIT(&params.hostlist_exclude_files);
 
 #if defined(__OpenBSD__) || defined(__APPLE__)
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
@@ -314,6 +340,17 @@ void parse_params(int argc, char *argv[])
 	    params.droproot = true;
 	}
 
+	struct desync_profile_list *dpl;
+	struct desync_profile *dp;
+	int desync_profile_count=0;
+	if (!(dpl = dp_list_add(&params.desync_profiles)))
+	{
+		DLOG_ERR("desync_profile_add: out of memory\n");
+		exit_clean(1);
+	}
+	dp = &dpl->dp;
+	dp->n = ++desync_profile_count;
+	
 	const struct option long_options[] = {
 		{ "help",no_argument,0,0 },// optidx=0
 		{ "h",no_argument,0,0 },// optidx=1
@@ -371,18 +408,22 @@ void parse_params(int argc, char *argv[])
 		{ "tamper-start",required_argument,0,0 },// optidx=53
 		{ "tamper-cutoff",required_argument,0,0 },// optidx=54
 		{ "connect-bind-addr",required_argument,0,0 },// optidx=55
+
+		{ "new",no_argument,0,0 },		// optidx=56
+		{ "filter-l3",required_argument,0,0 },	// optidx=57
+		{ "filter-tcp",required_argument,0,0 },	// optidx=58
+
 #if defined(__FreeBSD__)
-		{ "enable-pf",no_argument,0,0 },// optidx=56
+		{ "enable-pf",no_argument,0,0 },// optidx=59
 #elif defined(__APPLE__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=56
-		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=57
+		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=59
+		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=60
 #elif defined(__linux__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=56
-		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=57
-		{ "mss",required_argument,0,0 },// optidx=58
-		{ "mss-pf",required_argument,0,0 },// optidx=59
+		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=59
+		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=60
+		{ "mss",required_argument,0,0 },// optidx=61
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },// optidx=60
+		{ "nosplice",no_argument,0,0 },// optidx=62
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -513,7 +554,7 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case 17: /* hostcase */
-			params.hostcase = true;
+			dp->hostcase = true;
 			params.tamper = true;
 			break;
 		case 18: /* hostspell */
@@ -522,28 +563,28 @@ void parse_params(int argc, char *argv[])
 				DLOG_ERR("hostspell must be exactly 4 chars long\n");
 				exit_clean(1);
 			}
-			params.hostcase = true;
-			memcpy(params.hostspell, optarg, 4);
+			dp->hostcase = true;
+			memcpy(dp->hostspell, optarg, 4);
 			params.tamper = true;
 			break;
 		case 19: /* hostdot */
-			params.hostdot = true;
+			dp->hostdot = true;
 			params.tamper = true;
 			break;
 		case 20: /* hostnospace */
-			params.hostnospace = true;
+			dp->hostnospace = true;
 			params.tamper = true;
 			break;
 		case 21: /* hostpad */
-			params.hostpad = atoi(optarg);
+			dp->hostpad = atoi(optarg);
 			params.tamper = true;
 			break;
 		case 22: /* domcase */
-			params.domcase = true;
+			dp->domcase = true;
 			params.tamper = true;
 			break;
 		case 23: /* split-http-req */
-			if (!parse_httpreqpos(optarg, &params.split_http_req))
+			if (!parse_httpreqpos(optarg, &dp->split_http_req))
 			{
 				DLOG_ERR("Invalid argument for split-http-req\n");
 				exit_clean(1);
@@ -551,7 +592,7 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 24: /* split-tls */
-			if (!parse_tlspos(optarg, &params.split_tls))
+			if (!parse_tlspos(optarg, &dp->split_tls))
 			{
 				DLOG_ERR("Invalid argument for split-tls\n");
 				exit_clean(1);
@@ -561,7 +602,7 @@ void parse_params(int argc, char *argv[])
 		case 25: /* split-pos */
 			i = atoi(optarg);
 			if (i>0)
-				params.split_pos = i;
+				dp->split_pos = i;
 			else
 			{
 				DLOG_ERR("Invalid argument for split-pos\n");
@@ -570,13 +611,13 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 26: /* split-any-protocol */
-			params.split_any_protocol = true;
+			dp->split_any_protocol = true;
 			break;
 		case 27: /* disorder */
 			if (optarg)
 			{
-				if (!strcmp(optarg,"http")) params.disorder_http=true;
-				else if (!strcmp(optarg,"tls")) params.disorder_tls=true;
+				if (!strcmp(optarg,"http")) dp->disorder_http=true;
+				else if (!strcmp(optarg,"tls")) dp->disorder_tls=true;
 				else
 				{
 					DLOG_ERR("Invalid argument for disorder\n");
@@ -584,14 +625,14 @@ void parse_params(int argc, char *argv[])
 				}
 			}
 			else
-				params.disorder = true;
+				dp->disorder = true;
 			save_default_ttl();
 			break;
 		case 28: /* oob */
 			if (optarg)
 			{
-				if (!strcmp(optarg,"http")) params.oob_http=true;
-				else if (!strcmp(optarg,"tls")) params.oob_tls=true;
+				if (!strcmp(optarg,"http")) dp->oob_http=true;
+				else if (!strcmp(optarg,"tls")) dp->oob_tls=true;
 				else
 				{
 					DLOG_ERR("Invalid argument for oob\n");
@@ -599,39 +640,39 @@ void parse_params(int argc, char *argv[])
 				}
 			}
 			else
-				params.oob = true;
+				dp->oob = true;
 			break;
 		case 29: /* oob-data */
 			{
 				size_t l = strlen(optarg);
 				unsigned int bt;
-				if (l==1) params.oob_byte = (uint8_t)*optarg;
+				if (l==1) dp->oob_byte = (uint8_t)*optarg;
 				else if (l!=4 || sscanf(optarg,"0x%02X",&bt)!=1)
 				{
 					DLOG_ERR("Invalid argument for oob-data\n");
 					exit_clean(1);
 				}
-				else params.oob_byte = (uint8_t)bt;
+				else dp->oob_byte = (uint8_t)bt;
 			}
 			break;
 		case 30: /* methodspace */
-			params.methodspace = true;
+			dp->methodspace = true;
 			params.tamper = true;
 			break;
 		case 31: /* methodeol */
-			params.methodeol = true;
+			dp->methodeol = true;
 			params.tamper = true;
 			break;
 		case 32: /* hosttab */
-			params.hosttab = true;
+			dp->hosttab = true;
 			params.tamper = true;
 			break;
 		case 33: /* unixeol */
-			params.unixeol = true;
+			dp->unixeol = true;
 			params.tamper = true;
 			break;
 		case 34: /* tlsrec */
-			if (!parse_tlspos(optarg, &params.tlsrec))
+			if (!parse_tlspos(optarg, &dp->tlsrec))
 			{
 				DLOG_ERR("Invalid argument for tlsrec\n");
 				exit_clean(1);
@@ -639,8 +680,8 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 35: /* tlsrec-pos */
-			if ((params.tlsrec_pos = atoi(optarg))>0)
-				params.tlsrec = tlspos_pos;
+			if ((dp->tlsrec_pos = atoi(optarg))>0)
+				dp->tlsrec = tlspos_pos;
 			else
 			{
 				DLOG_ERR("Invalid argument for tlsrec-pos\n");
@@ -649,7 +690,7 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 36: /* hostlist */
-			if (!strlist_add(&params.hostlist_files, optarg))
+			if (!strlist_add(&dp->hostlist_files, optarg))
 			{
 				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
@@ -657,7 +698,7 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 37: /* hostlist-exclude */
-			if (!strlist_add(&params.hostlist_exclude_files, optarg))
+			if (!strlist_add(&dp->hostlist_exclude_files, optarg))
 			{
 				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
@@ -665,9 +706,9 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 38: /* hostlist-auto */
-			if (*params.hostlist_auto_filename)
+			if (*dp->hostlist_auto_filename)
 			{
-				DLOG_ERR("only one auto hostlist is supported\n");
+				DLOG_ERR("only one auto hostlist per profile is supported\n");
 				exit_clean(1);
 			}
 			{
@@ -687,26 +728,26 @@ void parse_params(int argc, char *argv[])
 				if (params.droproot && chown(optarg, params.uid, -1))
 					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
 			}
-			if (!strlist_add(&params.hostlist_files, optarg))
+			if (!strlist_add(&dp->hostlist_files, optarg))
 			{
 				DLOG_ERR("strlist_add failed\n");
 				exit_clean(1);
 			}
-			strncpy(params.hostlist_auto_filename, optarg, sizeof(params.hostlist_auto_filename));
-			params.hostlist_auto_filename[sizeof(params.hostlist_auto_filename) - 1] = '\0';
+			strncpy(dp->hostlist_auto_filename, optarg, sizeof(dp->hostlist_auto_filename));
+			dp->hostlist_auto_filename[sizeof(dp->hostlist_auto_filename) - 1] = '\0';
 			params.tamper = true; // need to detect blocks and update autohostlist. cannot just slice.
 			break;
 		case 39: /* hostlist-auto-fail-threshold */
-			params.hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
-			if (params.hostlist_auto_fail_threshold<1 || params.hostlist_auto_fail_threshold>20)
+			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
+			if (dp->hostlist_auto_fail_threshold<1 || dp->hostlist_auto_fail_threshold>20)
 			{
 				DLOG_ERR("auto hostlist fail threshold must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
 		case 40: /* hostlist-auto-fail-time */
-			params.hostlist_auto_fail_time = (uint8_t)atoi(optarg);
-			if (params.hostlist_auto_fail_time<1)
+			dp->hostlist_auto_fail_time = (uint8_t)atoi(optarg);
+			if (dp->hostlist_auto_fail_time<1)
 			{
 				DLOG_ERR("auto hostlist fail time is not valid\n");
 				exit_clean(1);
@@ -820,26 +861,28 @@ void parse_params(int argc, char *argv[])
 				const char *p=optarg;
 				if (*p=='n')
 				{
-					params.tamper_start_n=true;
+					dp->tamper_start_n=true;
 					p++;
 				}
 				else
-					params.tamper_start_n=false;
-				params.tamper_start = atoi(p);
+					dp->tamper_start_n=false;
+				dp->tamper_start = atoi(p);
 			}
+			params.tamper_lim = true;
 			break;
 		case 54: /* tamper-cutoff */
 			{
 				const char *p=optarg;
 				if (*p=='n')
 				{
-					params.tamper_cutoff_n=true;
+					dp->tamper_cutoff_n=true;
 					p++;
 				}
 				else
-					params.tamper_cutoff_n=false;
-				params.tamper_cutoff = atoi(p);
+					dp->tamper_cutoff_n=false;
+				dp->tamper_cutoff = atoi(p);
 			}
+			params.tamper_lim = true;
 			break;
 		case 55: /* connect-bind-addr */
 			{
@@ -868,12 +911,37 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 
+
+		case 56: /* new */
+			if (!(dpl = dp_list_add(&params.desync_profiles)))
+			{
+				DLOG_ERR("desync_profile_add: out of memory\n");
+				exit_clean(1);
+			}
+			dp = &dpl->dp;
+			dp->n = ++desync_profile_count;
+			break;
+		case 57: /* filter-l3 */
+			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
+			{
+				DLOG_ERR("bad value for --filter-l3\n");
+				exit_clean(1);
+			}
+			break;
+		case 58: /* filter-tcp */
+			if (!pf_parse(optarg,&dp->pf_tcp))
+			{
+				DLOG_ERR("Invalid port filter : %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
+			
 #if defined(__FreeBSD__)
-		case 56: /* enable-pf */
+		case 59: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__) || defined(__APPLE__)
-		case 56: /* local-tcp-user-timeout */
+		case 59: /* local-tcp-user-timeout */
 			params.tcp_user_timeout_local = atoi(optarg);
 			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
 			{
@@ -881,7 +949,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 57: /* remote-tcp-user-timeout */
+		case 60: /* remote-tcp-user-timeout */
 			params.tcp_user_timeout_remote = atoi(optarg);
 			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
 			{
@@ -892,24 +960,17 @@ void parse_params(int argc, char *argv[])
 #endif
 
 #if defined(__linux__)
-		case 58: /* mss */
+		case 61: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
-			params.mss = atoi(optarg);
-			if (params.mss<88 || params.mss>32767)
+			dp->mss = atoi(optarg);
+			if (dp->mss<88 || dp->mss>32767)
 			{
 				DLOG_ERR("Invalid value for MSS. Linux accepts MSS 88-32767.\n");
 				exit_clean(1);
 			}
 			break;
-		case 59: /* mss-pf */
-			if (!pf_parse(optarg,&params.mss_pf))
-			{
-				DLOG_ERR("Invalid MSS port filter.\n");
-				exit_clean(1);
-			}
-			break;
 #ifdef SPLICE_PRESENT
-		case 60: /* nosplice */
+		case 62: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
@@ -925,22 +986,36 @@ void parse_params(int argc, char *argv[])
 	{
 		params.binds_last=0; // default bind to all
 	}
-	if (params.skip_nodelay && (params.split_http_req || params.split_pos))
+	if (!params.resolver_threads) params.resolver_threads = 5 + params.maxconn/50;
+	
+	VPRINT("adding low-priority default empty desync profile\n");
+	// add default empty profile
+	if (!(dpl = dp_list_add(&params.desync_profiles)))
 	{
-		DLOG_ERR("Cannot split with --skip-nodelay\n");
+		DLOG_ERR("desync_profile_add: out of memory\n");
 		exit_clean(1);
 	}
-	if (!params.resolver_threads) params.resolver_threads = 5 + params.maxconn/50;
-	if (params.split_tls==tlspos_none && params.split_pos) params.split_tls=tlspos_pos;
-	if (params.split_http_req==httpreqpos_none && params.split_pos) params.split_http_req=httpreqpos_pos;
 
-	if (*params.hostlist_auto_filename) params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
+	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
+
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+	{
+		dp = &dpl->dp;
+		if (dp->split_tls==tlspos_none && dp->split_pos) dp->split_tls=tlspos_pos;
+		if (dp->split_http_req==httpreqpos_none && dp->split_pos) dp->split_http_req=httpreqpos_pos;
+		if (*dp->hostlist_auto_filename) dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
+		if (params.skip_nodelay && (dp->split_tls || dp->split_http_req || dp->split_pos))
+		{
+			DLOG_ERR("Cannot split with --skip-nodelay\n");
+			exit_clean(1);
+		}
+	}
+
 	if (!LoadIncludeHostLists())
 	{
 		DLOG_ERR("Include hostlist load failed\n");
 		exit_clean(1);
 	}
-	if (*params.hostlist_auto_filename) NonEmptyHostlist(&params.hostlist);
 	if (!LoadExcludeHostLists())
 	{
 		DLOG_ERR("Exclude hostlist load failed\n");
@@ -1057,7 +1132,7 @@ static bool set_ulimit(void)
 		// additional 1/2 for unpaired remote legs sending buffers
 		// 16 for listen_fd, epoll, hostlist, ...
 #ifdef SPLICE_PRESENT
-		fdmax = (params.nosplice ? 2 : (params.tamper && !params.tamper_start && !params.tamper_cutoff ? 4 : 6)) * params.maxconn;
+		fdmax = (params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * params.maxconn;
 #else
 		fdmax = 2 * params.maxconn;
 #endif

@@ -54,6 +54,7 @@ struct tproxy_conn
 	int splice_pipe[2];
 	conn_state_t state;
 	conn_type_t conn_type;
+	struct sockaddr_storage dest;
 
 	struct tproxy_conn *partner; // other leg
 	time_t orphan_since;

@@ -368,7 +368,7 @@ static void set_user_timeout(int fd, int timeout)
 //Createas a socket and initiates the connection to the host specified by 
 //remote_addr.
 //Returns -1 if something fails, >0 on success (socket fd).
-static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnectionFooling)
+static int connect_remote(const struct sockaddr *remote_addr, int mss)
 {
 	int remote_fd = 0, yes = 1, no = 0;
     
@@ -406,24 +406,18 @@ static int connect_remote(const struct sockaddr *remote_addr, bool bApplyConnect
 		close(remote_fd);
 		return -1;
 	}
-	if (bApplyConnectionFooling && params.mss)
+#ifdef __linux__
+	if (mss)
 	{
-		uint16_t port = saport(remote_addr);
-		if (pf_in_range(port,&params.mss_pf))
+		VPRINT("Setting MSS %d\n", mss);
+		if (setsockopt(remote_fd, IPPROTO_TCP, TCP_MAXSEG, &mss, sizeof(int)) <0)
 		{
-			VPRINT("Setting MSS %d\n",params.mss);
-			if (setsockopt(remote_fd, IPPROTO_TCP, TCP_MAXSEG, &params.mss, sizeof(int)) <0)
-			{
-				DLOG_PERROR("setsockopt (TCP_MAXSEG, connect_remote)");
-				close(remote_fd);
-				return -1;
-			}
-		}
-		else
-		{
-			VPRINT("Not setting MSS. Port %u is out of MSS port range.\n",port);
+			DLOG_PERROR("setsockopt (TCP_MAXSEG, connect_remote)");
+			close(remote_fd);
+			return -1;
 		}
 	}
+#endif
 
 	// if no bind address specified - address family will be 0 in params_connect_bindX
 	if(remote_addr->sa_family == params.connect_bind4.sin_family)
@@ -494,13 +488,12 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 	tproxy_conn_t *conn;
 
 	//Create connection object and fill in information
-	if((conn = (tproxy_conn_t*) malloc(sizeof(tproxy_conn_t))) == NULL)
+	if((conn = (tproxy_conn_t*) calloc(1, sizeof(tproxy_conn_t))) == NULL)
 	{
 		DLOG_ERR("Could not allocate memory for connection\n");
 		return NULL;
 	}
 
-	memset(conn, 0, sizeof(tproxy_conn_t));
 	conn->state = CONN_UNAVAILABLE;
 	conn->fd = fd;
 	conn->remote = remote;
@@ -508,7 +501,7 @@ static tproxy_conn_t *new_conn(int fd, bool remote)
 #ifdef SPLICE_PRESENT
 	// if dont tamper - both legs are spliced, create 2 pipes
 	// otherwise create pipe only in local leg
-	if (!params.nosplice && ( !remote || !params.tamper || params.tamper_start || params.tamper_cutoff ) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
+	if (!params.nosplice && ( !remote || !params.tamper || params.tamper_lim ) && pipe2(conn->splice_pipe, O_NONBLOCK) != 0)
 	{
 		DLOG_ERR("Could not create the splice pipe\n");
 		free_conn(conn);
@@ -606,7 +599,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
-		if ((remote_fd = connect_remote((struct sockaddr *)&orig_dst, true)) < 0)
+		if ((remote_fd = connect_remote((struct sockaddr *)&orig_dst, 0)) < 0)
 		{
 			DLOG_ERR("Failed to connect\n");
 			close(local_fd);
@@ -626,6 +619,8 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
+		sacopy(&conn->dest, (struct sockaddr *)&orig_dst);
+
 		if(!(conn->partner = new_conn(remote_fd, true)))
 		{
 			free_conn(conn);
@@ -667,6 +662,10 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		TAILQ_INSERT_HEAD(conn_list, conn->partner, conn_ptrs);
 		legs_remote++;
 	}
+	
+	if (proxy_type==CONN_TYPE_TRANSPARENT)
+		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
+
 	return conn;
 } 
 
@@ -782,32 +781,26 @@ static bool handle_unsent(tproxy_conn_t *conn)
 }
 
 
-bool proxy_mode_connect_remote(const struct sockaddr *sa, tproxy_conn_t *conn, struct tailhead *conn_list)
+static bool proxy_mode_connect_remote(tproxy_conn_t *conn, struct tailhead *conn_list)
 {
 	int remote_fd;
 
 	if (params.debug>=1)
 	{
 		char ip_port[48];
-		ntop46_port(sa,ip_port,sizeof(ip_port));
+		ntop46_port((struct sockaddr *)&conn->dest,ip_port,sizeof(ip_port));
 		VPRINT("socks target for fd=%d is : %s\n", conn->fd, ip_port);
 	}
-	if (check_local_ip((struct sockaddr *)sa))
+	if (check_local_ip((struct sockaddr *)&conn->dest))
 	{
 		VPRINT("Dropping connection to local address for security reasons\n");
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_NOT_ALLOWED_BY_RULESET);
 		return false;
 	}
 
-	bool bConnFooling=true;
-	if (conn->track.hostname && params.mss)
-	{
-		bConnFooling=HostlistCheck(conn->track.hostname, NULL);
-		if (!bConnFooling)
-			VPRINT("0-phase desync hostlist check negative. not acting on this connection.\n");
-	}
+	apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
-	if ((remote_fd = connect_remote(sa, bConnFooling)) < 0)
+	if ((remote_fd = connect_remote((struct sockaddr *)&conn->dest, conn->track.dp ? conn->track.dp->mss : 0)) < 0)
 	{
 		DLOG_ERR("socks failed to connect (1) errno=%d\n", errno);
 		socks_send_rep_errno(conn->socks_ver, conn->fd, errno);
@@ -845,7 +838,6 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 
 	ssize_t rd,wr;
 	char buf[sizeof(s5_req)]; // s5_req - the largest possible req
-	struct sockaddr_storage ss;
 
 	// receive proxy control message
 	rd=recv(conn->fd, buf, sizeof(buf), MSG_DONTWAIT);
@@ -928,10 +920,10 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
-						ss.ss_family = AF_INET;
-						((struct sockaddr_in*)&ss)->sin_port = m->port;
-						((struct sockaddr_in*)&ss)->sin_addr.s_addr = m->ip;
-						return proxy_mode_connect_remote((struct sockaddr *)&ss, conn, conn_list);
+						conn->dest.ss_family = AF_INET;
+						((struct sockaddr_in*)&conn->dest)->sin_port = m->port;
+						((struct sockaddr_in*)&conn->dest)->sin_addr.s_addr = m->ip;
+						return proxy_mode_connect_remote(conn, conn_list);
 					}
 					break;
 				case S_WAIT_REQUEST:
@@ -960,16 +952,16 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 						switch(m->atyp)
 						{
 							case S5_ATYP_IP4:
-								ss.ss_family = AF_INET;
-								((struct sockaddr_in*)&ss)->sin_port = m->d4.port;
-								((struct sockaddr_in*)&ss)->sin_addr = m->d4.addr;
+								conn->dest.ss_family = AF_INET;
+								((struct sockaddr_in*)&conn->dest)->sin_port = m->d4.port;
+								((struct sockaddr_in*)&conn->dest)->sin_addr = m->d4.addr;
 								break;
 							case S5_ATYP_IP6:
-								ss.ss_family = AF_INET6;
-								((struct sockaddr_in6*)&ss)->sin6_port = m->d6.port;
-								((struct sockaddr_in6*)&ss)->sin6_addr = m->d6.addr;
-								((struct sockaddr_in6*)&ss)->sin6_flowinfo = 0;
-								((struct sockaddr_in6*)&ss)->sin6_scope_id = 0;
+								conn->dest.ss_family = AF_INET6;
+								((struct sockaddr_in6*)&conn->dest)->sin6_port = m->d6.port;
+								((struct sockaddr_in6*)&conn->dest)->sin6_addr = m->d6.addr;
+								((struct sockaddr_in6*)&conn->dest)->sin6_flowinfo = 0;
+								((struct sockaddr_in6*)&conn->dest)->sin6_scope_id = 0;
 								break;
 							case S5_ATYP_DOM:
 								{
@@ -1006,7 +998,7 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 								return false; // should not be here. S5_REQ_CONNECT_VALID checks for valid atyp
 
 						}
-						return proxy_mode_connect_remote((struct sockaddr *)&ss,conn,conn_list);
+						return proxy_mode_connect_remote(conn,conn_list);
 					}
 					break;
 				case S_WAIT_RESOLVE:
@@ -1045,7 +1037,8 @@ static bool resolve_complete(struct resolve_item *ri, struct tailhead *conn_list
 					DBGPRINT("resolve_complete put hostname : %s\n", ri->dom);
 					conn->track.hostname = strdup(ri->dom);
 				}
-				return proxy_mode_connect_remote((struct sockaddr *)&ri->ss,conn,conn_list);
+				sacopy(&conn->dest, (struct sockaddr *)&ri->ss);
+				return proxy_mode_connect_remote(conn,conn_list);
 			}
 		}
 		else
@@ -1060,8 +1053,17 @@ static bool resolve_complete(struct resolve_item *ri, struct tailhead *conn_list
 
 static bool in_tamper_out_range(tproxy_conn_t *conn)
 {
-	return (params.tamper_start_n ? (conn->tnrd+1) : conn->trd) >= params.tamper_start &&
-		(!params.tamper_cutoff || (params.tamper_cutoff_n ? (conn->tnrd+1) : conn->trd) < params.tamper_cutoff);
+	if (!conn->track.dp) return true;
+	bool in_range = \
+		((conn->track.dp->tamper_start_n ? (conn->tnrd+1) : conn->trd) >= conn->track.dp->tamper_start &&
+		 (!conn->track.dp->tamper_cutoff || (conn->track.dp->tamper_cutoff_n ? (conn->tnrd+1) : conn->trd) < conn->track.dp->tamper_cutoff));
+	DBGPRINT("tamper_out range check. stream pos %" PRIu64 "(n%" PRIu64 "). tamper range %s%u-%s%u (%s)\n",
+		conn->trd, conn->tnrd+1,
+		conn->track.dp ? conn->track.dp->tamper_start_n ? "n" : "" : "?" , conn->track.dp ? conn->track.dp->tamper_start : 0,
+		conn->track.dp ? conn->track.dp->tamper_cutoff_n ? "n" : "" : "?" , conn->track.dp ? conn->track.dp->tamper_cutoff : 0,
+		in_range ? "IN RANGE" : "OUT OF RANGE");
+	return in_range;
+		 
 }
 
 static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_size, size_t *segment_size, size_t *split_pos, uint8_t *split_flags)
@@ -1072,33 +1074,26 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 		if (conn->remote)
 		{
 			if (conn_partner_alive(conn) && !conn->partner->track.bTamperInCutoff)
-			{
 				tamper_in(&conn->partner->track,segment,segment_buffer_size,segment_size);
-			}
 		}
 		else
 		{
-			bool in_range = in_tamper_out_range(conn);
-			DBGPRINT("tamper_out stream pos %" PRIu64 "(n%" PRIu64 "). tamper range %s%u-%s%u (%s)\n",
-				conn->trd, conn->tnrd+1,
-				params.tamper_start_n ? "n" : "" , params.tamper_start,
-				params.tamper_cutoff_n ? "n" : "" , params.tamper_cutoff,
-				in_range ? "IN RANGE" : "OUT OF RANGE");
-			if (in_range) tamper_out(&conn->track,segment,segment_buffer_size,segment_size,split_pos,split_flags);
+			if (in_tamper_out_range(conn))
+				tamper_out(&conn->track,(struct sockaddr*)&conn->dest,segment,segment_buffer_size,segment_size,split_pos,split_flags);
 		}
 	}
 }
 
 // buffer must have at least one extra byte for OOB
-static ssize_t send_or_buffer_oob(send_buffer_t *sb, int fd, uint8_t *buf, size_t len, int ttl, bool oob)
+static ssize_t send_or_buffer_oob(send_buffer_t *sb, int fd, uint8_t *buf, size_t len, int ttl, bool oob, uint8_t oob_byte)
 {
 	ssize_t wr;
 	if (oob)
 	{
-		VPRINT("Sending OOB byte %02X\n", params.oob_byte);
+		VPRINT("Sending OOB byte %02X\n", oob_byte);
 		uint8_t oob_save;
 		oob_save = buf[len];
-		buf[len] = params.oob_byte;
+		buf[len] = oob_byte;
 		wr = send_or_buffer(sb, fd, buf, len+1, MSG_OOB, ttl);
 		buf[len] = oob_save;
 	}
@@ -1211,7 +1206,7 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 				{
 					VPRINT("Splitting at pos %zu%s\n", split_pos, (split_flags & SPLIT_FLAG_DISORDER) ? " with disorder" : "");
 
-					wr = send_or_buffer_oob(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, !!(split_flags & SPLIT_FLAG_DISORDER), !!(split_flags & SPLIT_FLAG_OOB));
+					wr = send_or_buffer_oob(conn->partner->wr_buf, conn->partner->fd, buf, split_pos, !!(split_flags & SPLIT_FLAG_DISORDER), !!(split_flags & SPLIT_FLAG_OOB), conn->track.dp ? conn->track.dp->oob_byte : 0);
 					DBGPRINT("send_or_buffer(1) fd=%d wr=%zd err=%d\n",conn->partner->fd,wr,errno);
 					if (wr >= 0)
 					{

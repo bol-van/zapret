@@ -25,12 +25,45 @@ bool IsHttp(const uint8_t *data, size_t len)
 {
 	return !!HttpMethod(data,len);
 }
+
+static bool IsHostAt(const uint8_t *p)
+{
+	return \
+		p[0]=='\n' &&
+		(p[1]=='H' || p[1]=='h') &&
+		(p[2]=='o' || p[2]=='O') &&
+		(p[3]=='s' || p[3]=='S') &&
+		(p[4]=='t' || p[4]=='T') &&
+		p[5]==':';
+}
+static uint8_t *FindHostIn(uint8_t *buf, size_t bs)
+{
+	size_t pos;
+	if (bs<6) return NULL;
+	bs-=6;
+	for(pos=0;pos<=bs;pos++)
+		if (IsHostAt(buf+pos))
+			return buf+pos;
+
+	return NULL;
+}
+static const uint8_t *FindHostInConst(const uint8_t *buf, size_t bs)
+{
+	size_t pos;
+	if (bs<6) return NULL;
+	bs-=6;
+	for(pos=0;pos<=bs;pos++)
+		if (IsHostAt(buf+pos))
+			return buf+pos;
+
+	return NULL;
+}
 // pHost points to "Host: ..."
 bool HttpFindHost(uint8_t **pHost,uint8_t *buf,size_t bs)
 {
 	if (!*pHost)
 	{
-		*pHost = memmem(buf, bs, "\nHost:", 6);
+		*pHost = FindHostIn(buf, bs);
 		if (*pHost) (*pHost)++;
 	}
 	return !!*pHost;
@@ -39,7 +72,7 @@ bool HttpFindHostConst(const uint8_t **pHost,const uint8_t *buf,size_t bs)
 {
 	if (!*pHost)
 	{
-		*pHost = memmem(buf, bs, "\nHost:", 6);
+		*pHost = FindHostInConst(buf, bs);
 		if (*pHost) (*pHost)++;
 	}
 	return !!*pHost;
@@ -132,7 +165,7 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 }
 size_t HttpPos(enum httpreqpos tpos_type, size_t hpos_pos, const uint8_t *http, size_t sz)
 {
-	const uint8_t *method, *host;
+	const uint8_t *method, *host=NULL;
 	int i;
 	
 	switch(tpos_type)

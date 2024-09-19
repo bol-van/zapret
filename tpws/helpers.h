@@ -25,6 +25,8 @@ uint16_t saport(const struct sockaddr *sa);
 // true = was converted
 bool saconvmapped(struct sockaddr_storage *a);
 
+void sacopy(struct sockaddr_storage *sa_dest, const struct sockaddr *sa);
+
 bool is_localnet(const struct sockaddr *a);
 bool is_linklocal(const struct sockaddr_in6* a);
 bool is_private6(const struct sockaddr_in6* a);
@@ -55,6 +57,7 @@ typedef struct
 } port_filter;
 bool pf_in_range(uint16_t port, const port_filter *pf);
 bool pf_parse(const char *s, port_filter *pf);
+bool pf_is_empty(const port_filter *pf);
 
 #ifndef IN_LOOPBACK
 #define IN_LOOPBACK(a)          ((((uint32_t) (a)) & 0xff000000) == 0x7f000000)

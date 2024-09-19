@@ -164,6 +164,21 @@ bool saconvmapped(struct sockaddr_storage *a)
 	return false;
 }
 
+void sacopy(struct sockaddr_storage *sa_dest, const struct sockaddr *sa)
+{
+	switch(sa->sa_family)
+	{
+		case AF_INET:
+			memcpy(sa_dest,sa,sizeof(struct sockaddr_in));
+			break;
+		case AF_INET6:
+			memcpy(sa_dest,sa,sizeof(struct sockaddr_in6));
+			break;
+		default:
+			sa_dest->ss_family = 0;
+	}
+}
+
 bool is_localnet(const struct sockaddr *a)
 {
 	// match 127.0.0.0/8, 0.0.0.0, ::1, ::0, :ffff:127.0.0.0/104, :ffff:0.0.0.0
@@ -243,7 +258,7 @@ bool pf_parse(const char *s, port_filter *pf)
 	unsigned int v1,v2;
 
 	if (!s) return false;
-	if (*s=='~') 
+	if (*s=='~')
 	{
 		pf->neg=true;
 		s++;
@@ -252,16 +267,22 @@ bool pf_parse(const char *s, port_filter *pf)
 		pf->neg=false;
 	if (sscanf(s,"%u-%u",&v1,&v2)==2)
 	{
-		if (!v1 || v1>65535 || v2>65535 || v1>v2) return false;
+		if (v1>65535 || v2>65535 || v1>v2) return false;
 		pf->from=(uint16_t)v1;
 		pf->to=(uint16_t)v2;
 	}
 	else if (sscanf(s,"%u",&v1)==1)
 	{
-		if (!v1 || v1>65535) return false;
+		if (v1>65535) return false;
 		pf->to=pf->from=(uint16_t)v1;
 	}
 	else
 		return false;
+	// deny all case
+	if (!pf->from && !pf->to) pf->neg=true;
 	return true;
+}
+bool pf_is_empty(const port_filter *pf)
+{
+	return !pf->neg && !pf->from && !pf->to;
 }
