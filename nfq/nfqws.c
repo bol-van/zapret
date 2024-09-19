@@ -82,12 +82,10 @@ static void onusr2(int sig)
 	printf("\nHOSTFAIL POOL DUMP\n");
 	
 	struct desync_profile_list *dpl;
-	int n=0;
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
-		printf("\nDESYNC PROFILE %d\n",n);
+		printf("\nDESYNC PROFILE %d\n",dpl->dp.n);
 		HostFailPoolDump(dpl->dp.hostlist_auto_fail_counters);
-		n++;
 	}
 	
 	printf("\n");
