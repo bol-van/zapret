@@ -165,7 +165,7 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 }
 size_t HttpPos(enum httpreqpos tpos_type, size_t hpos_pos, const uint8_t *http, size_t sz)
 {
-	const uint8_t *method, *host;
+	const uint8_t *method, *host=NULL;
 	int i;
 	
 	switch(tpos_type)
