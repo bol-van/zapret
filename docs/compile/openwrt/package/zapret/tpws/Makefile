@@ -35,7 +35,7 @@ define Package/tpws/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zapret.init $(1)/etc/init.d/zapret
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
-	$(INSTALL_DATA) ./files/zapret.hotplug $(1)/etc/hotplug.d/90-zapret
+	$(INSTALL_DATA) ./files/zapret.hotplug $(1)/etc/hotplug.d/iface/90-zapret
 	$(INSTALL_DIR) $(1)/opt/zapret/tpws
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tpws $(1)/opt/zapret/tpws
 endef
