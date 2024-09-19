@@ -33,7 +33,8 @@ How to compile native programs for use in openwrt
 
 5) make toolchain/compile
 
-6) make package/tpws/compile
+6) #For minimal version building twps package only is enough
+   make package/tpws/compile
    make package/nfqws/compile
    make package/ip2net/compile
    make package/mdig/compile

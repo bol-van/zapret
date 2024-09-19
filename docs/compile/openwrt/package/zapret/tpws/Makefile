@@ -3,7 +3,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=tpws
-PKG_RELEASE:=1
+PKG_RELEASE:=1.1
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -12,7 +12,8 @@ define Package/tpws
 	CATEGORY:=Network
 	TITLE:=tpws
 	SUBMENU:=Zapret
- 	DEPENDS:=+zlib +libcap
+ 	DEPENDS:=+zlib +libcap +zlib +libcap +gzip +iptables +iptables-mod-extra +iptables-mod-nfqueue +iptables-mod-filter +iptables-mod-ipopt +iptables-mod-conntrack-extra
+
 endef
 
 define Build/Prepare
@@ -24,7 +25,17 @@ define Build/Compile
 	$(MAKE) -C $(PKG_BUILD_DIR) $(TARGET_CONFIGURE_OPTS)
 endef
 
+define Package/tpws/conffiles
+/etc/config/zapret
+endef
+
 define Package/tpws/install
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_DATA) ./files/zapret.conf $(1)/etc/config/zapret
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/zapret.init $(1)/etc/init.d/zapret
+	$(INSTALL_DIR) $(1)/etc/hotplug.d
+	$(INSTALL_DATA) ./files/zapret.hotplug $(1)/etc/hotplug.d/90-zapret
 	$(INSTALL_DIR) $(1)/opt/zapret/tpws
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tpws $(1)/opt/zapret/tpws
 endef

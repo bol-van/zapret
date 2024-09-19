@@ -1,0 +1,19 @@
+#!/bin/sh
+
+ZAPRET=/etc/init.d/zapret
+
+check_lan()
+{
+	IS_LAN=
+	[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
+	for lan in $OPENWRT_LAN; do
+		[ "$INTERFACE" = "$lan" ] && {
+			IS_LAN=1
+			break
+		}
+	done
+}
+
+
+[ -n "$INTERFACE" ] && check_lan && [ -n "$IS_LAN" ] && [ "$ACTION" = ifup -o "$ACTION" = ifupdate ] && [ $ZAPRET stop ] && [ $ZAPRET start ]
+[ -n "$INTERFACE" ] && [ -n "$IS_LAN" ] && [ "$ACTION" = ifdown ] && [ $ZAPRET stop ]
