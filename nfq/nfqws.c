@@ -1771,7 +1771,6 @@ int main(int argc, char **argv)
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
 
-	v=0;
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
@@ -1784,7 +1783,6 @@ int main(int argc, char **argv)
 			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",v,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		if (dp->desync_split_tls==tlspos_none && dp->desync_split_pos) dp->desync_split_tls=tlspos_pos;
 		if (dp->desync_split_http_req==httpreqpos_none && dp->desync_split_pos) dp->desync_split_http_req=httpreqpos_pos;
-		v++;
 	}
 
 	if (!LoadIncludeHostLists())
