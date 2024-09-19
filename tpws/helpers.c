@@ -256,6 +256,7 @@ bool pf_in_range(uint16_t port, const port_filter *pf)
 bool pf_parse(const char *s, port_filter *pf)
 {
 	unsigned int v1,v2;
+	char c;
 
 	if (!s) return false;
 	if (*s=='~')
@@ -265,13 +266,13 @@ bool pf_parse(const char *s, port_filter *pf)
 	}
 	else
 		pf->neg=false;
-	if (sscanf(s,"%u-%u",&v1,&v2)==2)
+	if (sscanf(s,"%u-%u%c",&v1,&v2,&c)==2)
 	{
 		if (v1>65535 || v2>65535 || v1>v2) return false;
 		pf->from=(uint16_t)v1;
 		pf->to=(uint16_t)v2;
 	}
-	else if (sscanf(s,"%u",&v1)==1)
+	else if (sscanf(s,"%u%c",&v1,&c)==1)
 	{
 		if (v1>65535) return false;
 		pf->to=pf->from=(uint16_t)v1;
