@@ -111,7 +111,7 @@ select_mode_mode()
 	ask_list MODE "$MODES" tpws && write_config_var MODE
 
 	case $MODE in
-		tpws)
+		tpws|tpws-socks)
 			vars="TPWS_OPT TPWS_OPT_SUFFIX"
 			;;
 		nfqws)
