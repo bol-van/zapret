@@ -84,7 +84,9 @@ NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake --dpi-desync-repeats=6"
 #NFQWS_OPT_DESYNC_QUIC6_SUFFIX=""
 
 # CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
+# SUFFIX VARS define additional lower priority desync profile. it's required if MODE_FILTER=hostlist and strategy has hostlist-incompatible 0-phase desync methods (mss)
 TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3 --oob"
+#TPWS_OPT_SUFFIX="--mss 88"
 
 # openwrt only : donttouch,none,software,hardware
 FLOWOFFLOAD=donttouch
