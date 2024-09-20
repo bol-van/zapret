@@ -6,10 +6,10 @@ zapret_custom_daemons()
 {
 	# $1 - 1 - run, 0 - stop
 	local opt="--user=root --port=$TPPORT_MY"
-	filter_apply_hostlist_target opt
-	filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 	tpws_apply_binds opt
 	opt="$opt $TPWS_OPT"
+	filter_apply_hostlist_target opt
+	filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 	do_daemon $1 1 "$TPWS" "$opt"
 }
 
