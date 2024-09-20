@@ -633,6 +633,10 @@ tpws is transparent proxy.
 				; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
  --max-orphan-time=<sec>	; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds
 
+ --new                          ; begin new strategy
+ --filter-l3=ipv4|ipv6          ; L3 protocol filter. multiple comma separated values allowed.
+ --filter-tcp=[~]port1[-port2]  ; TCP port filter. ~ means negation
+
  --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-auto=<filename>            ; detect DPI blocks and build hostlist automatically
@@ -737,11 +741,17 @@ Server replies with it's own MSS in SYN,ACK packet. Usually servers lower their 
 fit to supplied MSS. The greater MSS client sets the bigger server's packets will be.
 If it's enough to split TLS 1.2 ServerHello, it may fool DPI that checks certificate domain name.
 This scheme may significantly lower speed. Hostlist filter is possible only in socks mode if client uses remote resolving (firefox `network.proxy.socks_remote_dns`).
-TLS version filters are not possible.
-`--mss-pf` sets port filter for MSS. Use `mss-pf=443` to apply MSS only for https.
-Likely not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
+`--mss` is not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
 Use only if nothing better is available. Works only in Linux, not BSD or MacOS.
 
+### multiple strategies
+
+`tpws` supports multiple strategies as well. They work mostly like with `nfqws` with minimal differences.
+`filter-udp` is absent because `tpws` does not support udp. 0-phase desync methods (`--mss`) can work with hostlist in socks modes with remote hostname resolve.
+This is the point where you have to plan profiles carefully. If you use `--mss` and hostlist filters, behaviour can be different depending on remote resolve feature enabled or not.
+Use `--mss` both in hostlist profile and profile without hostlist.
+Use `curl --socks5` and `curl --socks5-hostname` to issue two kinds of proxy queries.
+See `--debug` output to test your setup.
 
 ## Ways to get a list of blocked IP
 
@@ -938,6 +948,12 @@ autohostlist - hostlist mode + blocks auto detection
 Its possible to change manipulation options used by tpws :
 
 `TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"`
+
+Additional low priority desync profile for `MODE_FILTER=hostlist`.
+With multiple profile support 0-phase desync methods are no more applied with hostlist !
+To apply them additional profile is required without hostlist filter.
+
+`TPWS_OPT_SUFFIX="--mss=88"`
 
 nfqws options for DPI desync attack:
 
