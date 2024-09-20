@@ -291,11 +291,13 @@ zapret_do_daemons()
 		tpws)
 			opt="--port=$TPPORT $TPWS_OPT"
 			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 			do_tpws $1 1 "$opt"
 			;;
 		tpws-socks)
 			opt="--port=$TPPORT $TPWS_OPT"
 			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 			do_tpws_socks $1 1 "$opt"
 			;;
 		nfqws)

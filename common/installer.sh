@@ -500,6 +500,7 @@ write_config_var()
 		fi
 	else
 		# var does not exist in config. add it
+		contains "$M" " " && M="\"$M\""
 		if [ -n "$M" ]; then
 			echo "$1=$M" >>"$ZAPRET_CONFIG"
 		else

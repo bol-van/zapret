@@ -163,9 +163,10 @@ zapret_do_daemons()
 			}
 			# MacOS requires root. kernel hardcoded requirement for /dev/pf ioctls
 			opt="--user=root --port=$TPPORT"
-			filter_apply_hostlist_target opt
 			tpws_apply_binds opt
 			opt="$opt $TPWS_OPT"
+			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 			do_daemon $1 1 "$TPWS" "$opt"
 			;;
 		tpws-socks)
@@ -175,8 +176,9 @@ zapret_do_daemons()
 			}
 			opt="--socks --user=$WS_USER --port=$TPPORT"
 			tpws_apply_socks_binds opt
-			filter_apply_hostlist_target opt
 			opt="$opt $TPWS_OPT"
+			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 			do_daemon $1 1 "$TPWS" "$opt"
 			;;
 		filter)

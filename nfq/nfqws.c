@@ -925,8 +925,6 @@ bool parse_tlspos(const char *s, enum tlspos *pos)
 
 int main(int argc, char **argv)
 {
-	cd_to_exe_dir(argv[0]);
-
 #ifdef __CYGWIN__
 	if (service_run(argc, argv))
 	{

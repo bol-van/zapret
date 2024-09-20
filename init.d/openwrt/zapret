@@ -122,11 +122,13 @@ start_daemons_procd()
 		tpws)
 			opt="--port=$TPPORT $TPWS_OPT"
 			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 			run_tpws 1 "$opt"
 			;;
 		tpws-socks)
 			opt="--port=$TPPORT $TPWS_OPT"
 			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
 			run_tpws_socks 1 "$opt"
 			;;
 		nfqws)
