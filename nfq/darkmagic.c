@@ -158,9 +158,9 @@ static void fill_udphdr(struct udphdr *udp, uint16_t nsport, uint16_t ndport, ui
 	udp->uh_sum = 0;
 }
 
-static void fill_iphdr(struct ip *ip, const struct in_addr *src, const struct in_addr *dst, uint16_t pktlen, uint8_t proto, uint8_t ttl)
+static void fill_iphdr(struct ip *ip, const struct in_addr *src, const struct in_addr *dst, uint16_t pktlen, uint8_t proto, uint8_t ttl, uint8_t tos)
 {
-	ip->ip_tos = 0;
+	ip->ip_tos = tos;
 	ip->ip_sum = 0;
 	ip->ip_off = 0;
 	ip->ip_v = 4;
@@ -172,9 +172,9 @@ static void fill_iphdr(struct ip *ip, const struct in_addr *src, const struct in
 	ip->ip_src = *src;
 	ip->ip_dst = *dst;
 }
-static void fill_ip6hdr(struct ip6_hdr *ip6, const struct in6_addr *src, const struct in6_addr *dst, uint16_t payloadlen, uint8_t proto, uint8_t ttl)
+static void fill_ip6hdr(struct ip6_hdr *ip6, const struct in6_addr *src, const struct in6_addr *dst, uint16_t payloadlen, uint8_t proto, uint8_t ttl, uint32_t flow_label)
 {
-	ip6->ip6_ctlun.ip6_un1.ip6_un1_flow = htonl(0x60000000);
+	ip6->ip6_ctlun.ip6_un1.ip6_un1_flow = htonl(ntohl(flow_label) & 0x0FFFFFFF | 0x60000000);
 	ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(payloadlen);
 	ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = proto;
 	ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = ttl;
@@ -190,6 +190,7 @@ bool prepare_tcp_segment4(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
+	uint8_t tos,
 	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
@@ -205,7 +206,7 @@ bool prepare_tcp_segment4(
 	struct tcphdr *tcp = (struct tcphdr*)(ip+1);
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
-	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_TCP, ttl);
+	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_TCP, ttl, tos);
 	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
@@ -224,6 +225,7 @@ bool prepare_tcp_segment6(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
+	uint32_t flow_label,
 	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
@@ -288,7 +290,7 @@ bool prepare_tcp_segment6(
 
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
-	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
+	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl, flow_label);
 	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
@@ -307,6 +309,7 @@ bool prepare_tcp_segment(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
+	uint8_t tos, uint32_t flow_label,
 	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
@@ -314,9 +317,9 @@ bool prepare_tcp_segment(
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,tos,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,flow_label,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
 		false;
 }
 
@@ -325,6 +328,7 @@ bool prepare_tcp_segment(
 bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
+	uint8_t tos,
 	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
@@ -348,7 +352,7 @@ bool prepare_udp_segment4(
 	uint8_t *payload = (uint8_t*)(udp+1);
 
 
-	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_UDP, ttl);
+	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_UDP, ttl, tos);
 	fill_udphdr(udp, src->sin_port, dst->sin_port, datalen);
 
 	memcpy(payload,data,len);
@@ -365,6 +369,7 @@ bool prepare_udp_segment4(
 bool prepare_udp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t ttl,
+	uint32_t flow_label,
 	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
@@ -436,7 +441,7 @@ bool prepare_udp_segment6(
 
 	uint8_t *payload = (uint8_t*)(udp+1);
 
-	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl);
+	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl, flow_label);
 	fill_udphdr(udp, src->sin6_port, dst->sin6_port, datalen);
 
 	memcpy(payload,data,len);
@@ -453,6 +458,7 @@ bool prepare_udp_segment6(
 bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
+	uint8_t tos, uint32_t flow_label,
 	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
@@ -460,9 +466,9 @@ bool prepare_udp_segment(
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,fooling,padding,padding_size,padlen,data,len,buf,buflen) :
+		prepare_udp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,ttl,tos,fooling,padding,padding_size,padlen,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,fooling,padding,padding_size,padlen,data,len,buf,buflen) :
+		prepare_udp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,ttl,flow_label,fooling,padding,padding_size,padlen,data,len,buf,buflen) :
 		false;
 }
 
