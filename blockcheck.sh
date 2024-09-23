@@ -869,6 +869,7 @@ ws_curl_test()
 	# $2 - test function
 	# $3 - domain
 	# $4,$5,$6, ... - ws params
+
 	local code ws_start=$1 testf=$2 dom=$3
 	shift
 	shift
@@ -884,17 +885,17 @@ tpws_curl_test()
 	# $1 - test function
 	# $2 - domain
 	# $3,$4,$5, ... - tpws params
-	echo - checking tpws $3 $4 $5 $6 $7 $8 $9
+	echo - checking tpws $3 $4 $5 $6 $7 $8 $9 $TPWS_EXTRA
 	local ALL_PROXY="socks5://127.0.0.1:$SOCKS_PORT"
-	ws_curl_test tpws_start "$@"
+	ws_curl_test tpws_start "$@" $TPWS_EXTRA
 }
 pktws_curl_test()
 {
 	# $1 - test function
 	# $2 - domain
 	# $3,$4,$5, ... - nfqws/dvtws params
-	echo - checking $PKTWSD ${WF:+$WF }$3 $4 $5 $6 $7 $8 $9
-	ws_curl_test pktws_start "$@"
+	echo - checking $PKTWSD ${WF:+$WF }$3 $4 $5 $6 $7 $8 $9 $PKTWS_EXTRA
+	ws_curl_test pktws_start "$@" $PKTWS_EXTRA
 }
 xxxws_curl_test_update()
 {
