@@ -12,7 +12,7 @@ define Package/tpws
 	CATEGORY:=Network
 	TITLE:=tpws
 	SUBMENU:=Zapret
- 	DEPENDS:=+zlib +libcap +zlib +libcap +gzip +iptables
+ 	DEPENDS:=+zlib +libcap +zlib +libcap +iptables
 
 endef
 
