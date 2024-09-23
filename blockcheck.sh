@@ -885,7 +885,7 @@ tpws_curl_test()
 	# $1 - test function
 	# $2 - domain
 	# $3,$4,$5, ... - tpws params
-	echo - checking tpws $3 $4 $5 $6 $7 $8 $9
+	echo - checking tpws $3 $4 $5 $6 $7 $8 $9 $TPWS_EXTRA
 	local ALL_PROXY="socks5://127.0.0.1:$SOCKS_PORT"
 	ws_curl_test tpws_start "$@" $TPWS_EXTRA
 }
