@@ -14,18 +14,26 @@ How to compile native programs for use in openwrt
 
    cd openwrt
 
-2) ./scripts/feeds update -a
-   ./scripts/feeds install -a
 
-3) #add zapret packages to build root
-   #copy package descriptions
-   copy compile/openwrt/* to ~/openwrt
+2) #go to openwrt directory
+   cd ~/openwrt
+   #Create custom feed:
+   mkdir custom-feed
+   cp feeds.conf.default feeds.conf
+   echo "src-link custom ~/openwrt/custom-feed/" >> ~/openwrt/feeds.conf
+
+3) #add zapret packages to custom feed
+   #create zapret directory structure
+   mkdir -p ~/openwrt/custom-feed/zapret
    #copy source code of tpws
-   copy tpws to ~/openwrt/package/zapret/tpws
+   copy tpws to ~/openwrt/custom-feed/zapret/tpws
    #copy source code of nfq
-   copy nfq to ~/openwrt/package/zapret/nfq
+   copy nfq to ~/openwrt/custom-feed/zapret/nfq
    #copy source code of ip2net
-   copy ip2net to ~/openwrt/package/zapret/ip2net
+   copy ip2net to ~/openwrt/custom-feed/zapret/ip2net
+
+4) ./scripts/feeds update -a
+   ./scripts/feeds install -a
 
 4) make menuconfig
    #select your target architecture
