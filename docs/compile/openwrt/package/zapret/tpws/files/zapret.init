@@ -92,14 +92,14 @@ stop_service()
 
 service_triggers()
 {
-        procd_add_reload_trigger "zapret"
+    procd_add_reload_trigger "zapret"
 }
 
 reload_service()
 {
-        echo "Restarting service"
-        stop
-        start
+    echo "Restarting service"
+    stop
+    start
 }
 
 service_started()
