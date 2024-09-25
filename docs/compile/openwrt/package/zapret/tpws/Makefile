@@ -1,19 +1,27 @@
-#
+# Copyright Zapret
+# This is free software, licensed under the GNU General Public License v2.
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=tpws
-PKG_RELEASE:=1.1
+PKG_VERSION:=1.4
+PKG_RELEASE:=2
+
+PKG_LICENSE:=GPL-2.0-or-later
+PKG_MAINTAINER:=Zapret
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/tpws
 	SECTION:=net
 	CATEGORY:=Network
-	TITLE:=tpws
+	TITLE:=TPWS DPI bypass proxy server
 	SUBMENU:=Zapret
- 	DEPENDS:=+zlib +libcap +zlib +libcap +iptables
+ 	DEPENDS:=+zlib +libcap +libcap +iptables
+endef
 
+define Package/tpws/description
+DPI bypass proxy
 endef
 
 define Build/Prepare
@@ -41,4 +49,3 @@ define Package/tpws/install
 endef
 
 $(eval $(call BuildPackage,tpws))
-
