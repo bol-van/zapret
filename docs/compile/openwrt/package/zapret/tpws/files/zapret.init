@@ -7,32 +7,34 @@ START=21
 CONFIGURATION=zapret
 PIDDIR=/var/run
 
-
 load_fw_rules()
 {
-    json_add_object ""
-    json_add_string type redirect
-    json_add_string name "Transparent Proxy Redirect HTTP"
-    json_add_string src lan
-    json_add_string proto tcp
-    json_add_string dest_port "$1"
-    json_add_string src_dip "!$2"
-    json_add_string dest_ip "$2"
-    json_add_string src_dport "80"
-    json_add_string dest lan
-    json_close_object
+    for fp in $3
+    do     
+        json_add_object ""
+        json_add_string type redirect
+        json_add_string name "Transparent Proxy Redirect port $fp"
+        json_add_string src lan
+        json_add_string proto tcp
+        json_add_string dest_port "$1"
+        json_add_string src_dip "!$2"
+        json_add_string dest_ip "$2"
+        json_add_string src_dport "$fp"
+        json_add_string dest lan
+        json_close_object
+    done
 
-    json_add_object ""
-    json_add_string type redirect
-    json_add_string name "Transparent Proxy Redirect HTTPS"
-    json_add_string src lan
-    json_add_string proto tcp
-    json_add_string dest_port "$1"
-    json_add_string src_dip "!$2"
-    json_add_string dest_ip "$2"
-    json_add_string src_dport "443"
-    json_add_string dest lan
-    json_close_object
+    if [ "$4" = "1" ]; then
+        json_add_object ""
+        json_add_string type rule
+        json_add_string name "deny quic traffic"
+        json_add_string src lan
+        json_add_string proto udp
+        json_add_string dest_port "443"
+        json_add_string dest wan
+        json_add_string target "REJECT"
+        json_close_object
+    fi
 }
 
 start_service()
@@ -44,11 +46,16 @@ start_service()
     local pid
     local lanaddr
     local lport
+    local fports
+    local blockq
 
     config_get opts tpws opts
-    config_get pid tpws pid
-    config_get lport tpws port
-        config_load "network"
+    config_get pid tpws pid "tpws.pid"
+    config_get lport tpws port "8088"
+    config_get fports tpws forward_ports "80 443"
+    config_get_bool blockq tpws block_quic 0
+
+    config_load "network"
     config_get lanaddr lan ipaddr
 
     procd_open_instance
@@ -61,14 +68,13 @@ start_service()
     procd_append_param command "--bind-wait-ip=10"
     procd_append_param command "$opts"
 
-    procd_set_param file /etc/config/zapret
     procd_set_param pidfile "$PIDDIR/$pid"
     procd_set_param netdev "br-lan"
 
     procd_open_data
 
     json_add_array firewall
-    load_fw_rules "$lport" "$lanaddr"
+    load_fw_rules "$lport" "$lanaddr" "$fports" "$blockq"
     json_close_array
 
     procd_close_data
@@ -82,6 +88,18 @@ stop_service()
     # stop() already stop daemons
     procd_set_config_changed firewall
     echo "STOP Zapret service"
+}
+
+service_triggers()
+{
+        procd_add_reload_trigger "zapret"
+}
+
+reload_service()
+{
+        echo "Restarting service"
+        stop
+        start
 }
 
 service_started()
