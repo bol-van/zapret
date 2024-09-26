@@ -2,10 +2,10 @@ m = Map("zapret", translate("TPWS Proxy Settings"))
 c = m:section(NamedSection, "tpws", "zapret", translate("Configuration"))
 opt = c:option(Value, "opts", translate("TPWS Options"))
 opt.placeholder = "--split-pos=2"
-function checkDoubleMinus(inputString)
+function opt.validate(self, value)
     -- Split the string into words
     local words = {}
-    for word in inputString:gmatch("%S+") do
+    for word in value:gmatch("%S+") do
         table.insert(words, word)
     end
 
@@ -18,7 +18,7 @@ function checkDoubleMinus(inputString)
 
     return true
 end
-opt.validate = checkDoubleMinus(opt.Value)
+
 b = c:option(Flag, "block_quic", "Block QUIC", translate("Block QUIC protocol to come outside"))
 lp = c:option(Value, "port", translate("Listen Port"))
 lp.datatype = "port"
