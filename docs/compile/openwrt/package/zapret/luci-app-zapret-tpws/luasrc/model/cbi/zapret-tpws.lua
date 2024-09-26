@@ -1,5 +1,4 @@
-m = Map("zapret", translate("TPWS Proxy Settings"))
-c = m:section(NamedSection, "tpws", "zapret", translate("Configuration"))
+m = Map("zapret", translate("TPWS Proxy Settings"))c = m:section(NamedSection, "tpws", "zapret", translate("Configuration"))
 opt = c:option(Value, "opts", translate("TPWS Options"))
 opt.placeholder = "--split-pos=2"
 function opt.validate(self, value)
@@ -12,11 +11,11 @@ function opt.validate(self, value)
     -- Check each word
     for _, word in ipairs(words) do
         if not word:sub(1, 2) == "--" then
-            return false, translate("Error: Not all words start with double minuses.")
+            return nil, translate("Error: Not all words start with double minuses.")
         end
     end
 
-    return true
+    return value
 end
 
 b = c:option(Flag, "block_quic", "Block QUIC", translate("Block QUIC protocol to come outside"))
