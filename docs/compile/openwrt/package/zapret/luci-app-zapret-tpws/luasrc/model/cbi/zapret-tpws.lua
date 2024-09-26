@@ -11,7 +11,7 @@ function opt.validate(self, value)
     -- Check each word
     for _, word in ipairs(words) do
         if not word:sub(1, 2) == "--" then
-            return nil, translate("Error: Not all words start with double minuses.")
+            return nil, translate("Error: Not all options start with double dash.")
         end
     end
 
