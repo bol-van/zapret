@@ -8,8 +8,8 @@ function opt.validate(self, value)
         table.insert(words, word)
     end
     for _, word in ipairs(words) do
-        if not word:sub(1, 2) == "--" then
-            return nil
+        if word:sub(1, 2) ~= "--" then
+            return nil, translate("The field value \"TPWS Options\" has incorrect format")
         end
     end
     return value
