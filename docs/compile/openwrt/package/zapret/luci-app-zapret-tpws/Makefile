@@ -5,7 +5,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_LICENSE:=GPL-2.0-or-later
 PKG_MAINTAINER:=Zapret
-PKG_VERSION:=0.1.7
+PKG_VERSION:=0.2
 
 LUCI_TITLE:=Zapret TPWS Web UI
 LUCI_DESCRIPTION:=Provides Web UI for Zapret tpws transparent proxy
