@@ -1,0 +1,34 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: luasrc/model/cbi/zapret-tpws.lua:17
+msgid "Block QUIC protocol to come outside"
+msgstr ""
+
+#: luasrc/model/cbi/zapret-tpws.lua:2
+msgid "Configuration"
+msgstr ""
+
+#: luasrc/model/cbi/zapret-tpws.lua:18
+msgid "Listen Port"
+msgstr ""
+
+#: luasrc/model/cbi/zapret-tpws.lua:21
+msgid "Ports, forwarded to proxy"
+msgstr ""
+
+#: luasrc/controller/zapret-tpws.lua:4
+msgid "TPWS Configuration"
+msgstr ""
+
+#: luasrc/model/cbi/zapret-tpws.lua:3
+msgid "TPWS Options"
+msgstr ""
+
+#: luasrc/model/cbi/zapret-tpws.lua:1
+msgid "TPWS Proxy Settings"
+msgstr ""
+
+#: luasrc/model/cbi/zapret-tpws.lua:12
+msgid "The field value \"TPWS Options\" has incorrect format"
+msgstr ""
