@@ -352,7 +352,7 @@ zp_already_running()
 {
 	case "$UNAME" in
 		CYGWIN)
-			win_process_exists $PKTWSD
+			win_process_exists $PKTWSD || win_process_exists goodbyedpi
 			;;
 		*)
 			process_exists $PKTWSD || process_exists tpws
@@ -362,9 +362,9 @@ check_already()
 {
 	echo \* checking already running zapret processes
 	if zp_already_running; then
-		echo "!!! WARNING. some zapret processes already running !!!"
+		echo "!!! WARNING. some dpi bypass processes already running !!!"
 		echo "!!! WARNING. blockcheck requires all DPI bypass methods disabled !!!"
-		echo "!!! WARNING. pls stop all zapret instances that may interfere with blockcheck !!!"
+		echo "!!! WARNING. pls stop all dpi bypass instances that may interfere with blockcheck !!!"
 	fi
 }
 
