@@ -348,6 +348,26 @@ check_system()
 	echo firewall type is $FWTYPE
 }
 
+zp_already_running()
+{
+	case "$UNAME" in
+		CYGWIN)
+			win_process_exists $PKTWSD
+			;;
+		*)
+			process_exists $PKTWSD || process_exists tpws
+	esac
+}
+check_already()
+{
+	echo \* checking already running zapret processes
+	if zp_already_running; then
+		echo "!!! WARNING. some zapret processes already running !!!"
+		echo "!!! WARNING. blockcheck requires all DPI bypass methods disabled !!!"
+		echo "!!! WARNING. pls stop all zapret instances that may interfere with blockcheck !!!"
+	fi
+}
+
 freebsd_module_loaded()
 {
 	# $1 - module name
@@ -1796,6 +1816,7 @@ sigsilent()
 fsleep_setup
 fix_sbin_path
 check_system
+check_already
 [ "$UNAME" = CYGWIN ] || require_root
 check_prerequisites
 trap sigint_cleanup INT
