@@ -60,7 +60,7 @@ start_service()
 
     procd_open_instance
 
-    procd_set_param command "/opt/zapret/tpws/tpws"
+    procd_set_param command "/usr/bin/tpws"
     procd_append_param command "--port=$lport"
     procd_append_param command "--user=nobody"
     procd_append_param command "--bind-addr=$lanaddr"
