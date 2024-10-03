@@ -313,6 +313,22 @@ shell_name()
 	}
 }
 
+process_exists()
+{
+	if exists pgrep; then
+		pgrep ^$1$ >/dev/null
+	elif exists pidof; then
+		pidof $1 >/dev/null
+	else
+		return 1
+	fi 
+}
+
+win_process_exists()
+{
+	tasklist /NH /FI "IMAGENAME eq ${1}.exe" | grep -q "^${1}.exe"
+}
+
 std_ports()
 {
         HTTP_PORTS=${HTTP_PORTS:-80}
