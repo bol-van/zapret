@@ -17,7 +17,7 @@ define Package/tpws
 	CATEGORY:=Network
 	TITLE:=TPWS DPI bypass proxy server
 	SUBMENU:=Zapret
- 	DEPENDS:=+zlib +libcap +libcap
+ 	DEPENDS:=+zlib +libcap
 endef
 
 define Package/tpws/description
