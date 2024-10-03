@@ -185,7 +185,8 @@ start_daemons()
 }
 stop_daemons()
 {
-	procd_kill "$(basename ${basescript:-$initscript})" "$1"
+	local svc="$(basename ${basescript:-$initscript})"
+	procd_running "$svc" "$1" && procd_kill "$svc" "$1"
 }
 restart_daemons()
 {
