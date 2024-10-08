@@ -869,7 +869,7 @@ curl_test()
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 		else
 			code=$?
-			if [ "$TIMEOUT_FLAG" = "Y" ] && [ $code -eq 28 ]; then
+			if [ "$TIMEOUT_FLAG" = 1 ] && [ $code -eq 28 ]; then
 				echo "Timeout occurred. Interrupting further attempts."
 				break
 			fi
@@ -1592,10 +1592,6 @@ ask_params()
 		[ "$IGNORE_CA" = 1 ] && CURL_OPT=-k
 	}
 
-	TIMEOUT_FLAG=N
-	echo
-	ask_yes_no_var TIMEOUT_FLAG "Interrupt on timeout (Y/N) [default: N]"
-
 	echo
 	echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
 	printf "how many times to repeat each test (default: 1) : "
@@ -1605,6 +1601,12 @@ ask_params()
 		echo invalid repeat count
 		exitp 1
 	}
+
+	TIMEOUT_FLAG=0
+	if [ "$REPEATS" -gt 1 ]; then
+		echo
+		ask_yes_no_var TIMEOUT_FLAG "Interrupt on timeout"
+	fi
 
 	echo
 	echo quick    - scan as fast as possible to reveal any working strategy
