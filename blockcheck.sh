@@ -869,6 +869,10 @@ curl_test()
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 		else
 			code=$?
+			if [ "$TIMEOUT_FLAG" = 1 ] && [ $code -eq 28 ]; then
+				echo "Timeout occurred. Interrupting further attempts."
+				break
+			fi
 			[ "$SCANLEVEL" = quick ] && break
 		fi
 	done
@@ -1597,6 +1601,12 @@ ask_params()
 		echo invalid repeat count
 		exitp 1
 	}
+
+	TIMEOUT_FLAG=0
+	if [ "$REPEATS" -gt 1 ]; then
+		echo
+		ask_yes_no_var TIMEOUT_FLAG "Interrupt on timeout"
+	fi
 
 	echo
 	echo quick    - scan as fast as possible to reveal any working strategy
