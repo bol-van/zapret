@@ -1,0 +1,18 @@
+{
+	"luci-app-zapret-tpws": {
+		"description": "Grant UCI and file access for luci-app-zapret-tpws",
+		"read": {
+			"cgi-io": [
+				"exec"
+			],
+			"uci": [
+				"zapret"
+			]
+		},
+		"write": {
+			"uci": [
+				"zapret"
+			]
+		}
+	}
+}
