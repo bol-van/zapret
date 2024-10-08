@@ -964,6 +964,8 @@ report_strategy()
 	# $3 - daemon
 	echo
 	if [ -n "$strategy" ]; then
+		# trim spaces at the end
+		strategy="$(echo "$strategy" | xargs)"
 		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
 		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
@@ -1171,6 +1173,7 @@ pktws_check_domain_http_bypass()
 
 	local strategy
 	pktws_check_domain_http_bypass_ "$@"
+	strategy="${strategy:+$strategy $PKTWS_EXTRA $PKTWS_EXTRA_1 $PKTWS_EXTRA_2 $PKTWS_EXTRA_3 $PKTWS_EXTRA_4 $PKTWS_EXTRA_5 $PKTWS_EXTRA_6 $PKTWS_EXTRA_7 $PKTWS_EXTRA_8 $PKTWS_EXTRA_9}"
 	report_strategy $1 $3 $PKTWSD
 }
 
@@ -1215,6 +1218,7 @@ pktws_check_domain_http3_bypass()
 
 	local strategy
 	pktws_check_domain_http3_bypass_ "$@"
+	strategy="${strategy:+$strategy $PKTWS_EXTRA $PKTWS_EXTRA_1 $PKTWS_EXTRA_2 $PKTWS_EXTRA_3 $PKTWS_EXTRA_4 $PKTWS_EXTRA_5 $PKTWS_EXTRA_6 $PKTWS_EXTRA_7 $PKTWS_EXTRA_8 $PKTWS_EXTRA_9}"
 	report_strategy $1 $2 $PKTWSD
 }
 warn_mss()
@@ -1284,6 +1288,7 @@ tpws_check_domain_http_bypass()
 
 	local strategy
 	tpws_check_domain_http_bypass_ "$@"
+	strategy="${strategy:+$strategy $TPWS_EXTRA $TPWS_EXTRA_1 $TPWS_EXTRA_2 $TPWS_EXTRA_3 $TPWS_EXTRA_4 $TPWS_EXTRA_5 $TPWS_EXTRA_6 $TPWS_EXTRA_7 $TPWS_EXTRA_8 $TPWS_EXTRA_9}"
 	report_strategy $1 $3 tpws
 }
 
