@@ -869,6 +869,10 @@ curl_test()
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 		else
 			code=$?
+			if [ "$TIMEOUT_FLAG" = "Y" ] && [ $code -eq 28 ]; then
+				echo "Timeout occurred. Interrupting further attempts."
+				break
+			fi
 			[ "$SCANLEVEL" = quick ] && break
 		fi
 	done
@@ -1587,6 +1591,10 @@ ask_params()
 		ask_yes_no_var IGNORE_CA "do not verify server certificate"
 		[ "$IGNORE_CA" = 1 ] && CURL_OPT=-k
 	}
+
+	TIMEOUT_FLAG=N
+	echo
+	ask_yes_no_var TIMEOUT_FLAG "Interrupt on timeout (Y/N) [default: N]"
 
 	echo
 	echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
