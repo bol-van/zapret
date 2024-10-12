@@ -1087,7 +1087,7 @@ static bool read_system_maxfiles(rlim_t *maxfile)
 		return false;
 	n=fscanf(F,"%ju",&um);
 	fclose(F);
-	if (!n)	return false;
+	if (n != 1)	return false;
 	*maxfile = (rlim_t)um;
 	return true;
 #elif defined(BSD)
