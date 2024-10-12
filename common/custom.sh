@@ -23,3 +23,20 @@ custom_runner()
 		}
 	}
 }
+
+alloc_tpws_port()
+{
+	# $1 - target var name
+	alloc_num NUMPOOL_TPWS_PORT $1 910 979
+}
+alloc_qnum()
+{
+	# $1 - target var name
+	alloc_num NUMPOOL_QNUM $1 65400 65499
+}
+alloc_dnum()
+{
+	# alloc daemon number
+	# $1 - target var name
+	alloc_num NUMPOOL_DNUM $1 1000 1999
+}
