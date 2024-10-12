@@ -1132,7 +1132,7 @@ static bool set_ulimit(void)
 		// additional 1/2 for unpaired remote legs sending buffers
 		// 16 for listen_fd, epoll, hostlist, ...
 #ifdef SPLICE_PRESENT
-		fdmax = (params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * params.maxconn;
+		fdmax = (rlim_t)(params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * (rlim_t)params.maxconn;
 #else
 		fdmax = 2 * params.maxconn;
 #endif
