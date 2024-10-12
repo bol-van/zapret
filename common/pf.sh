@@ -106,6 +106,11 @@ pf_anchor_zapret_tables()
 
 	eval $tblv="\"\$_tbl\""
 }
+pf_nat_reorder_rules()
+{
+	# this is dirty hack to move rdr above route-to and remove route-to dups
+	sort -rfu
+}
 pf_anchor_port_target()
 {
 	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
@@ -119,9 +124,17 @@ pf_anchor_port_target()
 
 pf_anchor_zapret_v4_tpws()
 {
-	# $1 - port
+	# $1 - tpws listen port
+	# $2 - rdr ports. defaults are used if empty
 
-	local rule port=$(pf_anchor_port_target)
+	local rule port
+
+	if [ -n "$2" ]; then
+		port="{$2}"
+	else
+		port=$(pf_anchor_port_target)
+	fi
+
 	for lan in $IFACE_LAN; do
 		for t in $tbl; do
 			 echo "rdr on $lan inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
@@ -144,7 +157,7 @@ pf_anchor_zapret_v4()
 {
 	local tbl port
 	[ "$DISABLE_IPV4" = "1" ] || {
-		case $MODE in
+		case "${MODE_OVERRIDE:-$MODE}" in
 			tpws)
 				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
 				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
@@ -152,16 +165,24 @@ pf_anchor_zapret_v4()
 				;;
 			custom)
 				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-				existf zapret_custom_firewall_v4 && zapret_custom_firewall_v4
+				custom_runner zapret_custom_firewall_v4 | pf_nat_reorder_rules
 				;;
 		esac
 	}
 }
 pf_anchor_zapret_v6_tpws()
 {
-	# $1 - port
+	# $1 - tpws listen port
+	# $2 - rdr ports. defaults are used if empty
 
-	local LL_LAN rule port=$(pf_anchor_port_target)
+	local rule LL_LAN port
+
+	if [ -n "$2" ]; then
+		port="{$2}"
+	else
+		port=$(pf_anchor_port_target)
+	fi
+
 	# LAN link local is only for router
 	for lan in $IFACE_LAN; do
 		LL_LAN=$(get_ipv6_linklocal $lan)
@@ -188,7 +209,7 @@ pf_anchor_zapret_v6()
 	local tbl port
 
 	[ "$DISABLE_IPV6" = "1" ] || {
-		case $MODE in
+		case "${MODE_OVERRIDE:-$MODE}" in
 			tpws)
 				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
 				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
@@ -196,7 +217,7 @@ pf_anchor_zapret_v6()
 				;;
 			custom)
 				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-				existf zapret_custom_firewall_v6 && zapret_custom_firewall_v6
+				custom_runner zapret_custom_firewall_v6 | pf_nat_reorder_rules
 				;;
 		esac
 	}

@@ -437,7 +437,7 @@ zapret_do_firewall_rules_ipt()
 			fi
 			;;
 		custom)
-	    		existf zapret_custom_firewall && zapret_custom_firewall $1
+			custom_runner zapret_custom_firewall $1
 			;;
 	esac
 }

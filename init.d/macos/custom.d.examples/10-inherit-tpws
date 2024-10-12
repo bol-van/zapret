@@ -1,0 +1,18 @@
+# this custom script applies tpws mode as it would be with MODE=tpws
+
+OVERRIDE=tpws
+
+zapret_custom_daemons()
+{
+	# $1 - 1 - run, 0 - stop
+
+	MODE_OVERRIDE=$OVERRIDE zapret_do_daemons $1
+}
+zapret_custom_firewall_v4()
+{
+	MODE_OVERRIDE=$OVERRIDE pf_anchor_zapret_v4
+}
+zapret_custom_firewall_v6()
+{
+	MODE_OVERRIDE=$OVERRIDE pf_anchor_zapret_v6
+}

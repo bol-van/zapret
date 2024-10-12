@@ -705,7 +705,7 @@ zapret_apply_firewall_rules_nft()
 			POSTNAT=$POSTNAT_SAVE
 			;;
 		custom)
-	    		existf zapret_custom_firewall_nft && zapret_custom_firewall_nft
+			custom_runner zapret_custom_firewall_nft
 			;;
 	esac
 }

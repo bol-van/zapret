@@ -138,6 +138,15 @@ select_mode_mode()
 			echo ..edited..
 		done
 	}
+	[ "$MODE" = custom ] && {
+		echo
+		echo "current custom scripts :"
+		[ -f "$CUSTOM_DIR/custom" ] && echo "legacy custom script $CUSTOM_DIR/custom"
+		echo "$CUSTOM_DIR/custom.d :"
+		[ -d "$CUSTOM_DIR/custom.d" ] && ls "$CUSTOM_DIR/custom.d"
+		echo "Make sure this is ok"
+		echo
+	}
 }
 select_mode_http()
 {
@@ -393,7 +402,7 @@ default_files()
 	for dir in openwrt sysv macos; do
 		[ -d "$1/init.d/$dir" ] && {
 			[ -d "$2/init.d/$dir" ] || mkdir -p "$2/init.d/$dir"
-			[ -f "$2/init.d/$dir/custom" ] || cp "$1/init.d/$dir/custom.default" "$2/init.d/$dir/custom"
+			[ -d "$2/init.d/$dir/custom.d" ] || mkdir -p "$2/init.d/$dir/custom.d"
 		}
 	done
 }
@@ -484,7 +493,11 @@ _backup_settings()
 {
 	local i=0
 	for f in "$@"; do
+		# safety check
+		[ -z "$f" -o "$f" = "/" ] && continue
+
 		[ -f "$ZAPRET_TARGET/$f" ] && cp -f "$ZAPRET_TARGET/$f" "/tmp/zapret-bkp-$i"
+		[ -d "$ZAPRET_TARGET/$f" ] && cp -rf "$ZAPRET_TARGET/$f" "/tmp/zapret-bkp-$i"
 		i=$(($i+1))
 	done
 }
@@ -492,7 +505,14 @@ _restore_settings()
 {
 	local i=0
 	for f in "$@"; do
+		# safety check
+		[ -z "$f" -o "$f" = "/" ] && continue
+
 		[ -f "/tmp/zapret-bkp-$i" ] && mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -f "/tmp/zapret-bkp-$i"
+		[ -d "/tmp/zapret-bkp-$i" ] && {
+			[ -d "$ZAPRET_TARGET/$f" ] && rm -r "$ZAPRET_TARGET/$f"
+			mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -r "/tmp/zapret-bkp-$i"
+		}
 		i=$(($i+1))
 	done
 }
@@ -500,7 +520,7 @@ backup_restore_settings()
 {
 	# $1 - 1 - backup, 0 - restore
 	local mode=$1
-	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/openwrt/custom" "init.d/macos/custom" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt" "ipset/zapret-hosts-auto.txt"
+	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/sysv/custom.d" "init.d/openwrt/custom" "init.d/openwrt/custom.d" "init.d/macos/custom" "init.d/macos/custom.d" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt" "ipset/zapret-hosts-auto.txt"
 }
 
 check_location()
@@ -623,6 +643,7 @@ check_dns()
 install_systemd()
 {
 	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
+	CUSTOM_DIR="$ZAPRET_RW/init.d/sysv"
 
 	check_bins
 	require_root
@@ -649,6 +670,8 @@ install_systemd()
 _install_sysv()
 {
 	# $1 - install init script
+
+	CUSTOM_DIR="$ZAPRET_RW/init.d/sysv"
 
 	check_bins
 	require_root
@@ -687,6 +710,7 @@ install_openrc()
 install_linux()
 {
 	INIT_SCRIPT_SRC="$EXEDIR/init.d/sysv/zapret"
+	CUSTOM_DIR="$ZAPRET_RW/init.d/sysv"
 
 	check_bins
 	require_root
@@ -757,6 +781,7 @@ deoffload_openwrt_firewall()
 install_openwrt()
 {
 	INIT_SCRIPT_SRC="$EXEDIR/init.d/openwrt/zapret"
+	CUSTOM_DIR="$ZAPRET_RW/init.d/openwrt"
 	FW_SCRIPT_SRC="$EXEDIR/init.d/openwrt/firewall.zapret"
 	OPENWRT_FW_INCLUDE=/etc/firewall.zapret
 	OPENWRT_IFACE_HOOK="$EXEDIR/init.d/openwrt/90-zapret"
@@ -829,6 +854,7 @@ macos_fw_reload_trigger_set()
 install_macos()
 {
 	INIT_SCRIPT_SRC="$EXEDIR/init.d/macos/zapret"
+	CUSTOM_DIR="$ZAPRET_RW/init.d/macos"
 
 	# compile before root
 	check_bins

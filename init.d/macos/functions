@@ -7,6 +7,8 @@ ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/pf.sh"
 . "$ZAPRET_BASE/common/list.sh"
+. "$ZAPRET_BASE/common/custom.sh"
+CUSTOM_DIR="$ZAPRET_RW/init.d/macos"
 
 IPSET_DIR=$ZAPRET_BASE/ipset
 . "$IPSET_DIR/def.sh"
@@ -184,7 +186,7 @@ zapret_do_daemons()
 		filter)
 			;;
 		custom)
-			existf zapret_custom_daemons && zapret_custom_daemons $1
+			custom_runner zapret_custom_daemons $1
 			;;
 		*)
 			echo "unsupported MODE=$MODE"

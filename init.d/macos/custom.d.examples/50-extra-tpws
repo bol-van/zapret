@@ -1,16 +1,20 @@
 # this script is an example describing how to run tpws on a custom port
 
-TPPORT_MY=987
+DNUM=100
+TPPORT_MY=${TPPORT_MY:-987}
+TPWS_OPT_MY=${TPWS_OPT_MY:-987}
+TPWS_OPT_SUFFIX_MY="${TPWS_OPT_SUFFIX_MY:-}"
+DPORTS_MY=${DPORTS_MY:-20443,20444,30000-30009}
 
 zapret_custom_daemons()
 {
 	# $1 - 1 - run, 0 - stop
 	local opt="--user=root --port=$TPPORT_MY"
 	tpws_apply_binds opt
-	opt="$opt $TPWS_OPT"
+	opt="$opt $TPWS_OPT_MY"
 	filter_apply_hostlist_target opt
-	filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
-	do_daemon $1 1 "$TPWS" "$opt"
+	filter_apply_suffix opt "$TPWS_OPT_SUFFIX_MY"
+	do_daemon $1 $DNUM "$TPWS" "$opt"
 }
 
 # custom firewall functions echo rules for zapret-v4 and zapret-v6 anchors
@@ -18,9 +22,9 @@ zapret_custom_daemons()
 
 zapret_custom_firewall_v4()
 {
-	pf_anchor_zapret_v4_tpws $TPPORT_MY
+	pf_anchor_zapret_v4_tpws $TPPORT_MY $(replace_char - : $DPORTS_MY)
 }
 zapret_custom_firewall_v6()
 {
-	pf_anchor_zapret_v6_tpws $TPPORT_MY
+	pf_anchor_zapret_v6_tpws $TPPORT_MY $(replace_char - : $DPORTS_MY)
 }
