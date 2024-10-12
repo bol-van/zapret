@@ -317,3 +317,9 @@ nfqws: multi-strategy
 v63:
 
 tpws: multi-strategy
+
+v64:
+
+blockcheck: warn if dpi bypass software is already running
+blockcheck: TPWS_EXTRA, NFQWS_EXTRA
+init.d: multiple custom scripts
