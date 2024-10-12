@@ -4,7 +4,7 @@ OVERRIDE=tpws
 
 zapret_custom_daemons()
 {
-	# $1 - 1 - run, 0 - stop
+        # stop logic is managed by procd
 
 	MODE_OVERRIDE=$OVERRIDE start_daemons_procd
 }

@@ -3,15 +3,15 @@ readonly ipt_connbytes="-m connbytes --connbytes-dir=original --connbytes-mode=p
 
 ipt()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null || iptables -I "$@"
+	iptables $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null || iptables $FW_EXTRA_PRE -I "$@" $FW_EXTRA_POST
 }
 ipta()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null || iptables -A "$@"
+	iptables $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null || iptables $FW_EXTRA_PRE -A "$@" $FW_EXTRA_POST
 }
 ipt_del()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null && iptables -D "$@"
+	iptables $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null && iptables $FW_EXTRA_PRE -D "$@" $FW_EXTRA_POST
 }
 ipt_add_del()
 {

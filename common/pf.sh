@@ -108,8 +108,9 @@ pf_anchor_zapret_tables()
 }
 pf_nat_reorder_rules()
 {
-	# this is dirty hack to move rdr above route-to and remove route-to dups
-	sort -rfu
+	# this is dirty hack to move rdr above route-to
+        # use only first word as a key and preserve order within a single key
+	sort -srfk 1,1
 }
 pf_anchor_port_target()
 {

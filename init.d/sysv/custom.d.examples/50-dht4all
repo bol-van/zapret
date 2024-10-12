@@ -1,15 +1,15 @@
 # this custom script runs desync to DHT packets with udp payload length 101..399 , without ipset/hostlist filtering
 # need to add to config : NFQWS_OPT_DESYNC_DHT="--dpi-desync=fake --dpi-desync-ttl=5"
 
-DNUM=101
-QNUM2=$(($DNUM * 5))
+alloc_dnum DNUM_DHT4ALL
+alloc_qnum QNUM_DHT4ALL
 
 zapret_custom_daemons()
 {
         # stop logic is managed by procd
 
-        local opt="--qnum=$QNUM2 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_DHT"
-	do_nfqws $1 $DNUM "$opt"
+        local opt="--qnum=$QNUM_DHT4ALL $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_DHT"
+	do_nfqws $1 $DNUM_DHT4ALL "$opt"
 }
 zapret_custom_firewall()
 {
@@ -22,7 +22,7 @@ zapret_custom_firewall()
         f='-p udp -m length --length 109:407 -m u32 --u32'
 	uf4='0>>22&0x3C@8>>16=0x6431'
 	uf6='48>>16=0x6431'
-        fw_nfqws_post $1 "$f $uf4 $desync $first_packet_only"  "$f $uf6 $desync $first_packet_only" $QNUM2
+        fw_nfqws_post $1 "$f $uf4 $desync $first_packet_only"  "$f $uf6 $desync $first_packet_only" $QNUM_DHT4ALL
 
 }
 zapret_custom_firewall_nft()
@@ -34,6 +34,6 @@ zapret_custom_firewall_nft()
         local desync="mark and $DESYNC_MARK == 0"
 
         f="meta length 109-407 meta l4proto udp @th,64,16 0x6431"
-        nft_fw_nfqws_post "$f $desync $first_packet_only" "$f $desync $first_packet_only" $QNUM2
+        nft_fw_nfqws_post "$f $desync $first_packet_only" "$f $desync $first_packet_only" $QNUM_DHT4ALL
 }
 
