@@ -5,17 +5,27 @@
 #include "helpers.h"
 
 // inplace tolower() and add to pool
-static bool addpool(strpool **hostlist, char **s, const char *end)
+static bool addpool(strpool **hostlist, char **s, const char *end, int *ct)
 {
-	char *p;
-	
-	// advance until eol lowering all chars
-	for (p = *s; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
-	if (!StrPoolAddStrLen(hostlist, *s, p-*s))
+	char *p=*s;
+
+	// comment line
+	if ( *p == '#' || *p == ';' || *p == '/' || *p == '\r' || *p == '\n')
 	{
-		StrPoolDestroy(hostlist);
-		*hostlist = NULL;
-		return false;
+		// advance until eol
+		for (; p<end && *p && *p!='\r' && *p != '\n'; p++);
+	}
+	else
+	{
+		// advance until eol lowering all chars
+		for (; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
+		if (!StrPoolAddStrLen(hostlist, *s, p-*s))
+		{
+			StrPoolDestroy(hostlist);
+			*hostlist = NULL;
+			return false;
+		}
+		(*ct)++;
 	}
 	// advance to the next line
 	for (; p<end && (!*p || *p=='\r' || *p=='\n') ; p++);
@@ -23,7 +33,7 @@ static bool addpool(strpool **hostlist, char **s, const char *end)
 	return true;
 }
 
-bool AppendHostList(strpool **hostlist, char *filename)
+bool AppendHostList(strpool **hostlist, const char *filename)
 {
 	char *p, *e, s[256], *zbuf;
 	size_t zsize;
@@ -51,14 +61,12 @@ bool AppendHostList(strpool **hostlist, char *filename)
 			e = zbuf + zsize;
 			while(p<e)
 			{
-				if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
-				if (!addpool(hostlist,&p,e))
+				if (!addpool(hostlist,&p,e,&ct))
 				{
 					DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 					free(zbuf);
 					return false;
 				}
-				ct++;
 			}
 			free(zbuf);
 		}
@@ -72,17 +80,15 @@ bool AppendHostList(strpool **hostlist, char *filename)
 	{
 		DLOG_CONDUP("loading plain text list\n");
 		
-		while (fgets(s, 256, F))
+		while (fgets(s, sizeof(s), F))
 		{
 			p = s;
-			if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
-			if (!addpool(hostlist,&p,p+strlen(p)))
+			if (!addpool(hostlist,&p,p+strlen(p),&ct))
 			{
 				DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 				fclose(F);
 				return false;
 			}
-			ct++;
 		}
 		fclose(F);
 	}
