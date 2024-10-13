@@ -16,6 +16,7 @@ custom_runner()
 		n=$(ls "$CUSTOM_DIR/custom.d" | wc -c | xargs)
 		[ "$n" = 0 ] || {
 			for script in "$CUSTOM_DIR/custom.d/"*; do
+				[ -f "$script" ] || continue
 				unset -f $FUNC
 				. "$script"
 				existf $FUNC && $FUNC "$@"
