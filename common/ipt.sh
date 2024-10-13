@@ -134,7 +134,7 @@ unprepare_tpws_fw()
 ipt_print_op()
 {
 	if [ "$1" = "1" ]; then
-		echo "Adding ip$4tables rule for $3 : $2"
+		echo "Inserting ip$4tables rule for $3 : $2"
 	else
 		echo "Deleting ip$4tables rule for $3 : $2"
 	fi
