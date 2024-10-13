@@ -744,6 +744,7 @@ zapret_unapply_firewall_nft()
 
 	unprepare_route_localnet
 	nft_del_firewall
+	[ "$MODE" = custom ] &&	custom_runner zapret_custom_firewall_nft_flush
 	return 0
 }
 zapret_do_firewall_nft()

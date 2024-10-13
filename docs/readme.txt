@@ -1589,6 +1589,7 @@ custom код вынесен в отдельные shell includes.
 zapret_custom_daemons
 zapret_custom_firewall
 zapret_custom_firewall_nft
+zapret_custom_firewall_nft_flush
 
 Для macos
 zapret_custom_daemons
@@ -1604,7 +1605,10 @@ zapret_custom_firewall поднимает и убирает правила iptab
 В первом параметре передается код операции : 1 = запуск, 0 = останов.
 
 zapret_custom_firewall_nft поднимает правила nftables.
-Логика останова отсутствует за ненадобностью.
+Логика останова отсутствует за ненадобностью. Стандартные цепочки zapret удаляются автоматически.
+Однако, sets и правила из ваших собственных цепочек не удаляются.
+Их нужно подчистить в zapret_custom_firewall_nft_flush.
+Если set-ов и собственных цепочек у вас нет, функцию можно не определять или оставить пустой.
 
 Если вам не нужны iptables или nftables - можете не писать соответствующую функцию.
 
