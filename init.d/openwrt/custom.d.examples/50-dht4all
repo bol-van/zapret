@@ -8,7 +8,7 @@ zapret_custom_daemons()
 {
         # stop logic is managed by procd
 
-        local opt="--qnum=$QNUM2 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_DHT"
+        local opt="--qnum=$QNUM_DHT4ALL $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_DHT"
 	run_daemon $DNUM_DHT4ALL $NFQWS "$opt"
 }
 zapret_custom_firewall()
