@@ -1156,7 +1156,7 @@ static bool read_system_maxfiles(rlim_t *maxfile)
 		return false;
 	n=fscanf(F,"%ju",&um);
 	fclose(F);
-	if (!n)	return false;
+	if (n != 1) return false;
 	*maxfile = (rlim_t)um;
 	return true;
 #elif defined(BSD)
@@ -1201,7 +1201,7 @@ static bool set_ulimit(void)
 		// additional 1/2 for unpaired remote legs sending buffers
 		// 16 for listen_fd, epoll, hostlist, ...
 #ifdef SPLICE_PRESENT
-		fdmax = (params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * params.maxconn;
+		fdmax = (rlim_t)(params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * (rlim_t)params.maxconn;
 #else
 		fdmax = 2 * params.maxconn;
 #endif
