@@ -1,4 +1,14 @@
 googlevideo.com
 youtubei.googleapis.com
-i.ytimg.com
+ytimg.com
+yt3.ggpht.com
+yt4.ggpht.com
 youtube.com
+ytimg.com
+youtubeembeddedplayer.googleapis.com
+ytimg.l.google.com
+jnn-pa.googleapis.com
+youtube-nocookie.com
+youtube-ui.l.google.com
+yt-video-upload.l.google.com
+wide-youtube.l.google.com
