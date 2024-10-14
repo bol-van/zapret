@@ -8,6 +8,14 @@
 #include <stdio.h>
 #include <time.h>
 
+// this saves memory. sockaddr_storage is larger than required. it can be 128 bytes. sockaddr_in6 is 28 bytes.
+typedef union
+{
+	struct sockaddr_in sa4;		// size 16
+	struct sockaddr_in6 sa6;	// size 28
+	char _align[32];		// force 16-byte alignment for ip6_and int128 ops
+} sockaddr_in46;
+
 void rtrim(char *s);
 char *strncasestr(const char *s,const char *find, size_t slen);
 
@@ -27,6 +35,7 @@ uint16_t saport(const struct sockaddr *sa);
 bool saconvmapped(struct sockaddr_storage *a);
 
 void sacopy(struct sockaddr_storage *sa_dest, const struct sockaddr *sa);
+void sa46copy(sockaddr_in46 *sa_dest, const struct sockaddr *sa);
 
 bool is_localnet(const struct sockaddr *a);
 bool is_linklocal(const struct sockaddr_in6* a);

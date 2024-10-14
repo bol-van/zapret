@@ -183,6 +183,10 @@ void sacopy(struct sockaddr_storage *sa_dest, const struct sockaddr *sa)
 			sa_dest->ss_family = 0;
 	}
 }
+void sa46copy(sockaddr_in46 *sa_dest, const struct sockaddr *sa)
+{
+	sacopy((struct sockaddr_storage*)sa_dest, sa);
+}
 
 bool is_localnet(const struct sockaddr *a)
 {
