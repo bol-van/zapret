@@ -97,7 +97,8 @@ Then we can reduce CPU load, refusing to process unnecessary packets.
 `iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
 
 Mark filter does not allow nfqws-generated packets to enter the queue again.
-Its necessary to use this filter when also using `connbytes 1:6`. Without it packet ordering can be changed breaking the whole idea.
+Its necessary to use this filter when also using `connbytes`. Without it packet ordering can be changed breaking the whole idea.
+Also if there's huge packet send from nfqws it may deadlock without mark filter.
 
 Some attacks require redirection of incoming packets :
 
