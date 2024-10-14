@@ -33,6 +33,7 @@
 
 #include "tpws_conn.h"
 #include "hostlist.h"
+#include "ipset.h"
 #include "params.h"
 #include "sec.h"
 #include "redirect.h"
@@ -46,7 +47,7 @@ bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	printf("Will reload hostlist on next request (if any)\n");
+	printf("Will reload hostlists and ipsets on next request (if any)\n");
 	bHup = true;
 }
 // should be called in normal execution
@@ -54,9 +55,9 @@ void dohup(void)
 {
 	if (bHup)
 	{
-		if (!LoadIncludeHostLists() || !LoadExcludeHostLists())
+		if (!LoadIncludeHostLists() || !LoadExcludeHostLists() || !LoadIncludeIpsets() || !LoadExcludeIpsets())
 		{
-			// what will we do without hostlist ?? sure, gonna die
+			// what will we do without hostlist or ipset ?? sure, gonna die
 			exit(1);
 		}
 		bHup = false;
@@ -180,6 +181,9 @@ static void exithelp(void)
 		" --new\t\t\t\t\t; begin new strategy\n"
 		" --filter-l3=ipv4|ipv6\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --filter-tcp=[~]port1[-port2]\t\t; TCP port filter. ~ means negation\n"
+		" --filter-l7=[http|tls|unknown]\t\t; L6-L7 protocol filter. multiple comma separated values allowed.\n"
+		" --ipset=<filename>\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-exclude=<filename>\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
 		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-exclude=<filename>\t\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
@@ -317,6 +321,35 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 	return true;
 }
 
+static bool parse_l7_list(char *opt, uint32_t *l7)
+{
+	char *e,*p,c;
+
+	for (p=opt,*l7=0 ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (!strcmp(p,"http"))
+			*l7 |= L7_PROTO_HTTP;
+		else if (!strcmp(p,"tls"))
+			*l7 |= L7_PROTO_TLS;
+		else if (!strcmp(p,"unknown"))
+			*l7 |= L7_PROTO_UNKNOWN;
+		else return false;
+
+		if (e)
+		{
+			*e++=c;
+		}
+		p = e;
+	}
+	return true;
+}
+
 void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
@@ -409,21 +442,24 @@ void parse_params(int argc, char *argv[])
 		{ "tamper-cutoff",required_argument,0,0 },// optidx=54
 		{ "connect-bind-addr",required_argument,0,0 },// optidx=55
 
-		{ "new",no_argument,0,0 },		// optidx=56
-		{ "filter-l3",required_argument,0,0 },	// optidx=57
-		{ "filter-tcp",required_argument,0,0 },	// optidx=58
+		{ "new",no_argument,0,0 },				// optidx=56
+		{ "filter-l3",required_argument,0,0 },			// optidx=57
+		{ "filter-tcp",required_argument,0,0 },			// optidx=58
+		{ "filter-l7",required_argument,0,0 },			// optidx=59
+		{ "ipset",required_argument,0,0 },			// optidx=60
+		{ "ipset-exclude",required_argument,0,0 },		// optidx=61
 
 #if defined(__FreeBSD__)
-		{ "enable-pf",no_argument,0,0 },// optidx=59
+		{ "enable-pf",no_argument,0,0 },// optidx=62
 #elif defined(__APPLE__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=59
-		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=60
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=62
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=63
 #elif defined(__linux__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },// optidx=59
-		{ "remote-tcp-user-timeout",required_argument,0,0 },// optidx=60
-		{ "mss",required_argument,0,0 },// optidx=61
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=62
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=63
+		{ "mss",required_argument,0,0 },			// optidx=64
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },// optidx=62
+		{ "nosplice",no_argument,0,0 },				// optidx=65
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -935,13 +971,36 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
+		case 59: /* filter-l7 */
+			if (!parse_l7_list(optarg,&dp->filter_l7))
+			{
+				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
+		case 60: /* ipset */
+			if (!strlist_add(&dp->ipset_files, optarg))
+			{
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 61: /* ipset-exclude */
+			if (!strlist_add(&dp->ipset_exclude_files, optarg))
+			{
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
 			
 #if defined(__FreeBSD__)
-		case 59: /* enable-pf */
+		case 62: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__) || defined(__APPLE__)
-		case 59: /* local-tcp-user-timeout */
+		case 62: /* local-tcp-user-timeout */
 			params.tcp_user_timeout_local = atoi(optarg);
 			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
 			{
@@ -949,7 +1008,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 60: /* remote-tcp-user-timeout */
+		case 63: /* remote-tcp-user-timeout */
 			params.tcp_user_timeout_remote = atoi(optarg);
 			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
 			{
@@ -960,7 +1019,7 @@ void parse_params(int argc, char *argv[])
 #endif
 
 #if defined(__linux__)
-		case 61: /* mss */
+		case 64: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			dp->mss = atoi(optarg);
 			if (dp->mss<88 || dp->mss>32767)
@@ -970,7 +1029,7 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 #ifdef SPLICE_PRESENT
-		case 62: /* nosplice */
+		case 65: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
@@ -1019,6 +1078,16 @@ void parse_params(int argc, char *argv[])
 	if (!LoadExcludeHostLists())
 	{
 		DLOG_ERR("Exclude hostlist load failed\n");
+		exit_clean(1);
+	}
+	if (!LoadIncludeIpsets())
+	{
+		DLOG_ERR("Include ipset load failed\n");
+		exit_clean(1);
+	}
+	if (!LoadExcludeIpsets())
+	{
+		DLOG_ERR("Exclude ipset load failed\n");
 		exit_clean(1);
 	}
 }
@@ -1087,7 +1156,7 @@ static bool read_system_maxfiles(rlim_t *maxfile)
 		return false;
 	n=fscanf(F,"%ju",&um);
 	fclose(F);
-	if (n != 1)	return false;
+	if (!n)	return false;
 	*maxfile = (rlim_t)um;
 	return true;
 #elif defined(BSD)
@@ -1132,7 +1201,7 @@ static bool set_ulimit(void)
 		// additional 1/2 for unpaired remote legs sending buffers
 		// 16 for listen_fd, epoll, hostlist, ...
 #ifdef SPLICE_PRESENT
-		fdmax = (rlim_t)(params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * (rlim_t)params.maxconn;
+		fdmax = (params.nosplice ? 2 : (params.tamper && !params.tamper_lim ? 4 : 6)) * params.maxconn;
 #else
 		fdmax = 2 * params.maxconn;
 #endif
@@ -1177,6 +1246,8 @@ int main(int argc, char *argv[])
 	char ip_port[48];
 
 	srand(time(NULL));
+	mask_from_preflen6_prepare();
+
 	parse_params(argc, argv);
 
 	if (params.daemon) daemonize();

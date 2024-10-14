@@ -172,10 +172,9 @@ static bool LoadIncludeHostListsForProfile(struct desync_profile *dp)
 	return true;
 }
 
-// return : true = apply fooling, false = do not apply
 bool HostlistCheck(struct desync_profile *dp, const char *host, bool *excluded)
 {
-	VPRINT("* Hostlist check for profile %d\n",dp->n);
+	VPRINT("* hostlist check for profile %d\n",dp->n);
 	if (*dp->hostlist_auto_filename)
 	{
 		time_t t = file_mod_time(dp->hostlist_auto_filename);
