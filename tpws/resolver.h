@@ -6,10 +6,12 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include "helpers.h"
+
 struct resolve_item
 {
 	char dom[256];	// request dom
-	struct sockaddr_storage ss; // resolve result
+	sockaddr_in46 ss; // resolve result
 	int ga_res;	// getaddrinfo result code
 	uint16_t port;	// request port
 	void *ptr;

@@ -619,7 +619,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
-		sacopy(&conn->dest, (struct sockaddr *)&orig_dst);
+		sa46copy(&conn->dest, (struct sockaddr *)&orig_dst);
 
 		if(!(conn->partner = new_conn(remote_fd, true)))
 		{
@@ -662,7 +662,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		TAILQ_INSERT_HEAD(conn_list, conn->partner, conn_ptrs);
 		legs_remote++;
 	}
-	
+
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
@@ -693,7 +693,7 @@ static bool check_connection_attempt(tproxy_conn_t *conn, int efd)
 	{
 		if (params.debug>=1)
 		{
-			struct sockaddr_storage sa;
+			sockaddr_in46 sa;
 			socklen_t salen=sizeof(sa);
 			char ip_port[48];
 
@@ -920,7 +920,7 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
-						conn->dest.ss_family = AF_INET;
+						((struct sockaddr_in*)&conn->dest)->sin_family = AF_INET;
 						((struct sockaddr_in*)&conn->dest)->sin_port = m->port;
 						((struct sockaddr_in*)&conn->dest)->sin_addr.s_addr = m->ip;
 						return proxy_mode_connect_remote(conn, conn_list);
@@ -952,12 +952,12 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 						switch(m->atyp)
 						{
 							case S5_ATYP_IP4:
-								conn->dest.ss_family = AF_INET;
+								((struct sockaddr_in*)&conn->dest)->sin_family = AF_INET;
 								((struct sockaddr_in*)&conn->dest)->sin_port = m->d4.port;
 								((struct sockaddr_in*)&conn->dest)->sin_addr = m->d4.addr;
 								break;
 							case S5_ATYP_IP6:
-								conn->dest.ss_family = AF_INET6;
+								((struct sockaddr_in6*)&conn->dest)->sin6_family = AF_INET6;
 								((struct sockaddr_in6*)&conn->dest)->sin6_port = m->d6.port;
 								((struct sockaddr_in6*)&conn->dest)->sin6_addr = m->d6.addr;
 								((struct sockaddr_in6*)&conn->dest)->sin6_flowinfo = 0;
@@ -1037,7 +1037,7 @@ static bool resolve_complete(struct resolve_item *ri, struct tailhead *conn_list
 					DBGPRINT("resolve_complete put hostname : %s\n", ri->dom);
 					conn->track.hostname = strdup(ri->dom);
 				}
-				sacopy(&conn->dest, (struct sockaddr *)&ri->ss);
+				sa46copy(&conn->dest, (struct sockaddr *)&ri->ss);
 				return proxy_mode_connect_remote(conn,conn_list);
 			}
 		}
