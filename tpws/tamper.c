@@ -1,22 +1,50 @@
 #define _GNU_SOURCE
 
-#include "tamper.h"
-#include "hostlist.h"
-#include "protocol.h"
-#include "helpers.h"
 #include <string.h>
 #include <stdio.h>
+#include "tamper.h"
+#include "hostlist.h"
+#include "ipset.h"
+#include "protocol.h"
+#include "helpers.h"
 
-static bool dp_match_l3l4(struct desync_profile *dp, bool ipv6, uint16_t tcp_port)
+const char *l7proto_str(t_l7proto l7)
 {
-	return \
-		((!ipv6 && dp->filter_ipv4) || (ipv6 && dp->filter_ipv6)) &&
-		(!tcp_port || pf_in_range(tcp_port,&dp->pf_tcp));
-}
-static bool dp_match(struct desync_profile *dp, bool ipv6, uint16_t tcp_port, const char *hostname)
-{
-	if (dp_match_l3l4(dp,ipv6,tcp_port))
+	switch(l7)
 	{
+		case HTTP: return "http";
+		case TLS: return "tls";
+		default: return "unknown";
+	}
+}
+static bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
+{
+	return  (l7proto==UNKNOWN && (filter_l7 & L7_PROTO_UNKNOWN)) ||
+		(l7proto==HTTP && (filter_l7 & L7_PROTO_HTTP)) ||
+		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS));
+}
+
+static bool dp_match_l3l4(struct desync_profile *dp, const struct sockaddr *dest)
+{
+	return  ((dest->sa_family==AF_INET && dp->filter_ipv4) || (dest->sa_family==AF_INET6 && dp->filter_ipv6)) &&
+		pf_in_range(saport(dest), &dp->pf_tcp) &&
+		IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL);
+}
+static bool dp_impossible(struct desync_profile *dp, const char *hostname, t_l7proto l7proto)
+{
+	return	!PROFILE_IPSETS_EMPTY(dp) &&
+		((dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7)) || (!*dp->hostlist_auto_filename && !hostname && (dp->hostlist || dp->hostlist_exclude)));
+}
+static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
+{
+	// impossible case, hard filter
+	// impossible check avoid relatively slow ipset search
+	if (!dp_impossible(dp,hostname,l7proto) && dp_match_l3l4(dp,dest))
+	{
+		// soft filter
+		if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
+			return false;
+
 		// autohostlist profile matching l3/l4 filter always win
 		if (*dp->hostlist_auto_filename) return true;
 
@@ -32,13 +60,18 @@ static bool dp_match(struct desync_profile *dp, bool ipv6, uint16_t tcp_port, co
 	}
 	return false;
 }
-static struct desync_profile *dp_find(struct desync_profile_list_head *head, bool ipv6, uint16_t tcp_port, const char *hostname)
+static struct desync_profile *dp_find(struct desync_profile_list_head *head, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
 	struct desync_profile_list *dpl;
-	VPRINT("desync profile search for hostname='%s' ipv6=%u tcp_port=%u\n", hostname ? hostname : "", ipv6, tcp_port);
+	if (params.debug)
+	{
+		char ip_port[48];
+		ntop46_port(dest, ip_port,sizeof(ip_port));
+		VPRINT("desync profile search for tcp target=%s l7proto=%s hostname='%s'\n", ip_port, l7proto_str(l7proto), hostname ? hostname : "");
+	}
 	LIST_FOREACH(dpl, head, next)
 	{
-		if (dp_match(&dpl->dp,ipv6,tcp_port,hostname))
+		if (dp_match(&dpl->dp,dest,hostname,l7proto))
 		{
 			VPRINT("desync profile %d matches\n",dpl->dp.n);
 			return &dpl->dp;
@@ -49,7 +82,7 @@ static struct desync_profile *dp_find(struct desync_profile_list_head *head, boo
 }
 void apply_desync_profile(t_ctrack *ctrack, const struct sockaddr *dest)
 {
-	ctrack->dp = dp_find(&params.desync_profiles, dest->sa_family==AF_INET6, saport(dest), ctrack->hostname);
+	ctrack->dp = dp_find(&params.desync_profiles, dest, ctrack->hostname, ctrack->l7proto);
 }
 
 
@@ -114,38 +147,54 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 		l7proto = UNKNOWN;
 	}
 
-	if (ctrack->l7proto==UNKNOWN) ctrack->l7proto=l7proto;
-
 	if (bHaveHost)
-	{
 		VPRINT("request hostname: %s\n", Host);
-		if (!ctrack->hostname)
-		{
-			if (!(ctrack->hostname=strdup(Host)))
-			{
-				DLOG_ERR("strdup hostname : out of memory\n");
-				return;
-			}
+	if (ctrack->b_not_act)
+	{
+		VPRINT("Not acting on this request\n");
+		return;
+	}
 
-			struct desync_profile *dp_prev = ctrack->dp;
-			apply_desync_profile(ctrack, dest);
-			if (ctrack->dp!=dp_prev)
-				VPRINT("desync profile changed by revealed hostname !\n");
-			else if (*ctrack->dp->hostlist_auto_filename)
-			{
-				bool bHostExcluded;
-				if (!HostlistCheck(ctrack->dp, Host, &bHostExcluded))
-				{
-					ctrack->b_ah_check = !bHostExcluded;
-					VPRINT("Not acting on this request\n");
-					return;
-				}
-			}
+	bool bDiscoveredL7 = ctrack->l7proto==UNKNOWN && l7proto!=UNKNOWN;
+	if (bDiscoveredL7)
+	{
+		VPRINT("discovered l7 protocol\n");
+		ctrack->l7proto=l7proto;
+	}
+
+	bool bDiscoveredHostname = bHaveHost && !ctrack->hostname;
+	if (bDiscoveredHostname)
+	{
+		VPRINT("discovered hostname\n");
+		if (!(ctrack->hostname=strdup(Host)))
+		{
+			DLOG_ERR("strdup hostname : out of memory\n");
+			return;
 		}
 	}
-	
-	if (!ctrack->dp) return;
 
+	if (bDiscoveredL7 || bDiscoveredHostname)
+	{
+		struct desync_profile *dp_prev = ctrack->dp;
+		apply_desync_profile(ctrack, dest);
+		if (ctrack->dp!=dp_prev)
+			VPRINT("desync profile changed by revealed l7 protocol or hostname !\n");
+	}
+
+	if (bDiscoveredHostname && *ctrack->dp->hostlist_auto_filename)
+	{
+		bool bHostExcluded;
+		if (!HostlistCheck(ctrack->dp, Host, &bHostExcluded))
+		{
+			ctrack->b_ah_check = !bHostExcluded;
+			VPRINT("Not acting on this request\n");
+			ctrack->b_not_act = true;
+			return;
+		}
+	}
+
+	if (!ctrack->dp) return;
+	
 	switch(l7proto)
 	{
 		case HTTP:

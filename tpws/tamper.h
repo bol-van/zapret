@@ -10,6 +10,7 @@
 #define SPLIT_FLAG_OOB		0x02
 
 typedef enum {UNKNOWN=0, HTTP, TLS} t_l7proto;
+const char *l7proto_str(t_l7proto l7);
 typedef struct
 {
 	// common state
@@ -17,6 +18,7 @@ typedef struct
 	bool bFirstReplyChecked;
 	bool bTamperInCutoff;
 	bool b_ah_check;
+	bool b_not_act;
 	char *hostname;
 	struct desync_profile *dp;		// desync profile cache
 } t_ctrack;
