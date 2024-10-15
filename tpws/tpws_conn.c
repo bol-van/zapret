@@ -569,7 +569,6 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 {
 	struct sockaddr_storage orig_dst;
 	tproxy_conn_t *conn;
-	int remote_fd=0;
 
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
@@ -597,19 +596,8 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		return 0;
 	}
 
-	if (proxy_type==CONN_TYPE_TRANSPARENT)
-	{
-		if ((remote_fd = connect_remote((struct sockaddr *)&orig_dst, 0)) < 0)
-		{
-			DLOG_ERR("Failed to connect\n");
-			close(local_fd);
-			return NULL;
-		}
-	}
-
 	if(!(conn = new_conn(local_fd, false)))
 	{
-		if (remote_fd) close(remote_fd);
 		close(local_fd);
 		return NULL;
 	}
@@ -617,18 +605,33 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 	conn->state = CONN_AVAILABLE; // accepted connection is immediately available
 	conn->efd = efd;
 
+	socklen_t salen=sizeof(conn->client);
+	getpeername(conn->fd,(struct sockaddr *)&conn->client,&salen);
+
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
 		sa46copy(&conn->dest, (struct sockaddr *)&orig_dst);
 
-		if(!(conn->partner = new_conn(remote_fd, true)))
+		if(!(conn->partner = new_conn(0, true)))
 		{
 			free_conn(conn);
-			close(remote_fd);
 			return NULL;
 		}
+
 		conn->partner->partner = conn;
 		conn->partner->efd = efd;
+		conn->partner->client = conn->client;
+		conn->partner->dest = conn->dest;
+
+		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
+
+		if ((conn->partner->fd = connect_remote((struct sockaddr *)&orig_dst, conn->track.dp ? conn->track.dp->mss : 0)) < 0)
+		{
+			DLOG_ERR("Failed to connect\n");
+			free_conn(conn->partner);
+			free_conn(conn);
+			return NULL;
+		}
 
 		//remote_fd is connecting. Non-blocking connects are signaled as done by
 		//socket being marked as ready for writing
@@ -662,9 +665,6 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		TAILQ_INSERT_HEAD(conn_list, conn->partner, conn_ptrs);
 		legs_remote++;
 	}
-
-	if (proxy_type==CONN_TYPE_TRANSPARENT)
-		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
 	return conn;
 } 
@@ -815,6 +815,8 @@ static bool proxy_mode_connect_remote(tproxy_conn_t *conn, struct tailhead *conn
 	}
 	conn->partner->partner = conn;
 	conn->partner->efd = conn->efd;
+	conn->partner->client = conn->client;
+	conn->partner->dest = conn->dest;
 	if (!epoll_set(conn->partner, EPOLLOUT))
 	{
 		DLOG_ERR("socks epoll_set error %d\n", errno);
@@ -1524,18 +1526,11 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 				else
 				{	
 					print_legs();
-					
+
 					if (params.debug>=1)
 					{
-						struct sockaddr_storage sa;
-						socklen_t salen=sizeof(sa);
 						char ip_port[48];
-
-						if (getpeername(conn->fd,(struct sockaddr *)&sa,&salen))
-							*ip_port=0;
-						else
-							ntop46_port((struct sockaddr*)&sa,ip_port,sizeof(ip_port));
-
+						ntop46_port((struct sockaddr*)&conn->client,ip_port,sizeof(ip_port));
 						VPRINT("Socket fd=%d (local) connected from %s\n", conn->fd, ip_port);
 					}
 					set_user_timeout(conn->fd, params.tcp_user_timeout_local);
