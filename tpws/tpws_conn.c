@@ -1076,7 +1076,7 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 		if (conn->remote)
 		{
 			if (conn_partner_alive(conn) && !conn->partner->track.bTamperInCutoff)
-				tamper_in(&conn->partner->track,segment,segment_buffer_size,segment_size);
+				tamper_in(&conn->partner->track,(struct sockaddr*)&conn->partner->client,segment,segment_buffer_size,segment_size);
 		}
 		else
 		{
@@ -1558,7 +1558,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						read_all_and_buffer(conn,3);
 						if (errn==ECONNRESET && conn_partner_alive(conn))
 						{
-							if (conn->remote && params.tamper) rst_in(&conn->partner->track);
+							if (conn->remote && params.tamper) rst_in(&conn->partner->track,(struct sockaddr*)&conn->partner->client);
 
 							struct linger lin;
 							lin.l_onoff=1;
@@ -1583,7 +1583,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 					{
 						DBGPRINT("EPOLLRDHUP\n");
 						read_all_and_buffer(conn,2);
-						if (!conn->remote && params.tamper) hup_out(&conn->track);
+						if (!conn->remote && params.tamper) hup_out(&conn->track,(struct sockaddr*)&conn->client);
 
 						conn->state = CONN_RDHUP; // only writes. do not receive RDHUP anymore
 						if (conn_has_unsent(conn))
