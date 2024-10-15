@@ -630,7 +630,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			dp = ctrack->dp;
 			ctrack_replay = ctrack;
-			maybe_cutoff(ctrack, IPPROTO_TCP);
 		}
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
@@ -648,6 +647,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("matching desync profile not found\n");
 			return verdict;
 		}
+		maybe_cutoff(ctrack, IPPROTO_TCP);
 
 		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters);
 
@@ -1435,7 +1435,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			dp = ctrack->dp;
 			ctrack_replay = ctrack;
-			maybe_cutoff(ctrack, IPPROTO_UDP);
 		}
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
@@ -1453,6 +1452,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("matching desync profile not found\n");
 			return verdict;
 		}
+		maybe_cutoff(ctrack, IPPROTO_UDP);
 
 		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters);
 		//ConntrackPoolDump(&params.conntrack);

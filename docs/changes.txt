@@ -317,3 +317,15 @@ nfqws: multi-strategy
 v63:
 
 tpws: multi-strategy
+
+v64:
+
+blockcheck: warn if dpi bypass software is already running
+blockcheck: TPWS_EXTRA, NFQWS_EXTRA
+init.d: multiple custom scripts
+
+v65:
+
+init.d: dynamic number allocation for dnum,tpws_port,qnum
+init.d: FW_EXTRA_PRE, FW_EXTRA_POST
+init.d: zapret_custom_firewall_nft_flush

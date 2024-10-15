@@ -1,0 +1,35 @@
+# this custom script demonstrates how to apply tpws to http and nfqws to https and quic
+# it's desired that inherited basic rules are low priority to allow specializations and exceptions in other custom scripts
+
+nfqws_tpws_inheritor()
+{
+	# $1 - inherited function
+	# $2 - 1 - run, 0 - stop
+	
+	[ "$MODE_HTTP" = "1" ] && {
+		MODE_OVERRIDE=tpws MODE_HTTPS=0 MODE_QUIC=0 $1 $2
+	}
+
+	[ "$MODE_HTTPS" = "1" -o "$MODE_QUIC" = "1" ] && {
+		MODE_OVERRIDE=nfqws MODE_HTTP=0 $1 $2
+	}
+}
+
+zapret_custom_daemons()
+{
+	# $1 - 1 - run, 0 - stop
+
+	nfqws_tpws_inheritor zapret_do_daemons $1
+}
+zapret_custom_firewall()
+{
+	# $1 - 1 - run, 0 - stop
+
+	nfqws_tpws_inheritor zapret_do_firewall_rules_ipt $1
+}
+zapret_custom_firewall_nft()
+{
+	# stop logic is not required
+
+	nfqws_tpws_inheritor zapret_apply_firewall_rules_nft
+}

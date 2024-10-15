@@ -329,6 +329,25 @@ win_process_exists()
 	tasklist /NH /FI "IMAGENAME eq ${1}.exe" | grep -q "^${1}.exe"
 }
 
+alloc_num()
+{
+	# $1 - source var name
+	# $2 - target var name
+	# $3 - min
+	# $4 - max
+	
+	local v
+	eval v="\$$2"
+	# do not replace existing value
+	[ -n "$v" ] && return
+	eval v="\$$1"
+	[ -n "$v" ] || v=$3
+	eval $2="$v"
+	v=$((v + 1))
+	[ $v -gt $4 ] && v=$3
+	eval $1="$v"
+}
+
 std_ports()
 {
         HTTP_PORTS=${HTTP_PORTS:-80}

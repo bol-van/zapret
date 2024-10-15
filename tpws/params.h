@@ -51,6 +51,9 @@ struct desync_profile
 	
 	bool filter_ipv4,filter_ipv6;
 	port_filter pf_tcp;
+	uint32_t filter_l7;	// L7_PROTO_* bits
+	ipset ips,ips_exclude;
+	struct str_list_head ipset_files, ipset_exclude_files;
 
 	strpool *hostlist, *hostlist_exclude;
 	struct str_list_head hostlist_files, hostlist_exclude_files;
@@ -59,6 +62,8 @@ struct desync_profile
 	time_t hostlist_auto_mod_time;
 	hostfail_pool *hostlist_auto_fail_counters;
 };
+
+#define PROFILE_IPSETS_EMPTY(dp) (IPSET_EMPTY(&dp->ips) && IPSET_EMPTY(&dp->ips_exclude))
 
 struct desync_profile_list {
 	struct desync_profile dp;

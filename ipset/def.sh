@@ -1,10 +1,12 @@
-[ -n "$IPSET_DIR" ] || {
- IPSET_DIR="$(dirname "$0")"
- IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
-}
+EXEDIR="$(dirname "$0")"
+EXEDIR="$(cd "$EXEDIR"; pwd)"
+ZAPRET_BASE=${ZAPRET_BASE:-"$(cd "$EXEDIR/.."; pwd)"}
+ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+IPSET_RW_DIR="$ZAPRET_RW/ipset"
 
-. "$IPSET_DIR/../config"
-. "$IPSET_DIR/../common/base.sh"
+. "$ZAPRET_CONFIG"
+. "$ZAPRET_BASE/common/base.sh"
 
 [ -z "$TMPDIR" ] && TMPDIR=/tmp
 [ -z "$GZIP_LISTS" ] && GZIP_LISTS=1
@@ -21,27 +23,27 @@ ZIPSET=zapret
 ZIPSET6=zapret6
 ZIPSET_EXCLUDE=nozapret
 ZIPSET_EXCLUDE6=nozapret6
-ZIPLIST="$IPSET_DIR/zapret-ip.txt"
-ZIPLIST6="$IPSET_DIR/zapret-ip6.txt"
-ZIPLIST_EXCLUDE="$IPSET_DIR/zapret-ip-exclude.txt"
-ZIPLIST_EXCLUDE6="$IPSET_DIR/zapret-ip-exclude6.txt"
-ZIPLIST_USER="$IPSET_DIR/zapret-ip-user.txt"
-ZIPLIST_USER6="$IPSET_DIR/zapret-ip-user6.txt"
-ZUSERLIST="$IPSET_DIR/zapret-hosts-user.txt"
-ZHOSTLIST="$IPSET_DIR/zapret-hosts.txt"
+ZIPLIST="$IPSET_RW_DIR/zapret-ip.txt"
+ZIPLIST6="$IPSET_RW_DIR/zapret-ip6.txt"
+ZIPLIST_EXCLUDE="$IPSET_RW_DIR/zapret-ip-exclude.txt"
+ZIPLIST_EXCLUDE6="$IPSET_RW_DIR/zapret-ip-exclude6.txt"
+ZIPLIST_USER="$IPSET_RW_DIR/zapret-ip-user.txt"
+ZIPLIST_USER6="$IPSET_RW_DIR/zapret-ip-user6.txt"
+ZUSERLIST="$IPSET_RW_DIR/zapret-hosts-user.txt"
+ZHOSTLIST="$IPSET_RW_DIR/zapret-hosts.txt"
 
 ZIPSET_IPBAN=ipban
 ZIPSET_IPBAN6=ipban6
-ZIPLIST_IPBAN="$IPSET_DIR/zapret-ip-ipban.txt"
-ZIPLIST_IPBAN6="$IPSET_DIR/zapret-ip-ipban6.txt"
-ZIPLIST_USER_IPBAN="$IPSET_DIR/zapret-ip-user-ipban.txt"
-ZIPLIST_USER_IPBAN6="$IPSET_DIR/zapret-ip-user-ipban6.txt"
-ZUSERLIST_IPBAN="$IPSET_DIR/zapret-hosts-user-ipban.txt"
-ZUSERLIST_EXCLUDE="$IPSET_DIR/zapret-hosts-user-exclude.txt"
+ZIPLIST_IPBAN="$IPSET_RW_DIR/zapret-ip-ipban.txt"
+ZIPLIST_IPBAN6="$IPSET_RW_DIR/zapret-ip-ipban6.txt"
+ZIPLIST_USER_IPBAN="$IPSET_RW_DIR/zapret-ip-user-ipban.txt"
+ZIPLIST_USER_IPBAN6="$IPSET_RW_DIR/zapret-ip-user-ipban6.txt"
+ZUSERLIST_IPBAN="$IPSET_RW_DIR/zapret-hosts-user-ipban.txt"
+ZUSERLIST_EXCLUDE="$IPSET_RW_DIR/zapret-hosts-user-exclude.txt"
 
 
-[ -n "$IP2NET" ] || IP2NET="$IPSET_DIR/../ip2net/ip2net"
-[ -n "$MDIG" ] || MDIG="$IPSET_DIR/../mdig/mdig"
+[ -n "$IP2NET" ] || IP2NET="$ZAPRET_BASE/ip2net/ip2net"
+[ -n "$MDIG" ] || MDIG="$ZAPRET_BASE/mdig/mdig"
 [ -z "$MDIG_THREADS" ] && MDIG_THREADS=30
 
 

@@ -173,7 +173,7 @@ start_daemons_procd()
 			}
 			;;
 		custom)
-	    		existf zapret_custom_daemons && zapret_custom_daemons $1
+	    		custom_runner zapret_custom_daemons $1
 			;;
 	esac
 

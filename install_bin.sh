@@ -29,11 +29,11 @@ check_dir()
 			fi
 			[ -n "$out" ]
 		else
-			echo "$exe is not executable. set proper chmod."
+			echo >&2 "$exe is not executable. set proper chmod."
 			return 1
 		fi
 	else
-		echo "$exe is absent"
+		echo >&2 "$exe is absent"
 		return 2
 	fi
 }

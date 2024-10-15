@@ -569,7 +569,6 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 {
 	struct sockaddr_storage orig_dst;
 	tproxy_conn_t *conn;
-	int remote_fd=0;
 
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
@@ -597,19 +596,8 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		return 0;
 	}
 
-	if (proxy_type==CONN_TYPE_TRANSPARENT)
-	{
-		if ((remote_fd = connect_remote((struct sockaddr *)&orig_dst, 0)) < 0)
-		{
-			DLOG_ERR("Failed to connect\n");
-			close(local_fd);
-			return NULL;
-		}
-	}
-
 	if(!(conn = new_conn(local_fd, false)))
 	{
-		if (remote_fd) close(remote_fd);
 		close(local_fd);
 		return NULL;
 	}
@@ -617,18 +605,33 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 	conn->state = CONN_AVAILABLE; // accepted connection is immediately available
 	conn->efd = efd;
 
+	socklen_t salen=sizeof(conn->client);
+	getpeername(conn->fd,(struct sockaddr *)&conn->client,&salen);
+
 	if (proxy_type==CONN_TYPE_TRANSPARENT)
 	{
-		sacopy(&conn->dest, (struct sockaddr *)&orig_dst);
+		sa46copy(&conn->dest, (struct sockaddr *)&orig_dst);
 
-		if(!(conn->partner = new_conn(remote_fd, true)))
+		if(!(conn->partner = new_conn(0, true)))
 		{
 			free_conn(conn);
-			close(remote_fd);
 			return NULL;
 		}
+
 		conn->partner->partner = conn;
 		conn->partner->efd = efd;
+		conn->partner->client = conn->client;
+		conn->partner->dest = conn->dest;
+
+		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
+
+		if ((conn->partner->fd = connect_remote((struct sockaddr *)&orig_dst, conn->track.dp ? conn->track.dp->mss : 0)) < 0)
+		{
+			DLOG_ERR("Failed to connect\n");
+			free_conn(conn->partner);
+			free_conn(conn);
+			return NULL;
+		}
 
 		//remote_fd is connecting. Non-blocking connects are signaled as done by
 		//socket being marked as ready for writing
@@ -662,9 +665,6 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		TAILQ_INSERT_HEAD(conn_list, conn->partner, conn_ptrs);
 		legs_remote++;
 	}
-	
-	if (proxy_type==CONN_TYPE_TRANSPARENT)
-		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
 	return conn;
 } 
@@ -693,7 +693,7 @@ static bool check_connection_attempt(tproxy_conn_t *conn, int efd)
 	{
 		if (params.debug>=1)
 		{
-			struct sockaddr_storage sa;
+			sockaddr_in46 sa;
 			socklen_t salen=sizeof(sa);
 			char ip_port[48];
 
@@ -815,6 +815,8 @@ static bool proxy_mode_connect_remote(tproxy_conn_t *conn, struct tailhead *conn
 	}
 	conn->partner->partner = conn;
 	conn->partner->efd = conn->efd;
+	conn->partner->client = conn->client;
+	conn->partner->dest = conn->dest;
 	if (!epoll_set(conn->partner, EPOLLOUT))
 	{
 		DLOG_ERR("socks epoll_set error %d\n", errno);
@@ -920,7 +922,7 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 							socks4_send_rep(conn->fd, S4_REP_FAILED);
 							return false;
 						}
-						conn->dest.ss_family = AF_INET;
+						((struct sockaddr_in*)&conn->dest)->sin_family = AF_INET;
 						((struct sockaddr_in*)&conn->dest)->sin_port = m->port;
 						((struct sockaddr_in*)&conn->dest)->sin_addr.s_addr = m->ip;
 						return proxy_mode_connect_remote(conn, conn_list);
@@ -952,12 +954,12 @@ static bool handle_proxy_mode(tproxy_conn_t *conn, struct tailhead *conn_list)
 						switch(m->atyp)
 						{
 							case S5_ATYP_IP4:
-								conn->dest.ss_family = AF_INET;
+								((struct sockaddr_in*)&conn->dest)->sin_family = AF_INET;
 								((struct sockaddr_in*)&conn->dest)->sin_port = m->d4.port;
 								((struct sockaddr_in*)&conn->dest)->sin_addr = m->d4.addr;
 								break;
 							case S5_ATYP_IP6:
-								conn->dest.ss_family = AF_INET6;
+								((struct sockaddr_in6*)&conn->dest)->sin6_family = AF_INET6;
 								((struct sockaddr_in6*)&conn->dest)->sin6_port = m->d6.port;
 								((struct sockaddr_in6*)&conn->dest)->sin6_addr = m->d6.addr;
 								((struct sockaddr_in6*)&conn->dest)->sin6_flowinfo = 0;
@@ -1037,7 +1039,7 @@ static bool resolve_complete(struct resolve_item *ri, struct tailhead *conn_list
 					DBGPRINT("resolve_complete put hostname : %s\n", ri->dom);
 					conn->track.hostname = strdup(ri->dom);
 				}
-				sacopy(&conn->dest, (struct sockaddr *)&ri->ss);
+				sa46copy(&conn->dest, (struct sockaddr *)&ri->ss);
 				return proxy_mode_connect_remote(conn,conn_list);
 			}
 		}
@@ -1074,7 +1076,7 @@ static void tamper(tproxy_conn_t *conn, uint8_t *segment, size_t segment_buffer_
 		if (conn->remote)
 		{
 			if (conn_partner_alive(conn) && !conn->partner->track.bTamperInCutoff)
-				tamper_in(&conn->partner->track,segment,segment_buffer_size,segment_size);
+				tamper_in(&conn->partner->track,(struct sockaddr*)&conn->partner->client,segment,segment_buffer_size,segment_size);
 		}
 		else
 		{
@@ -1524,18 +1526,11 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 				else
 				{	
 					print_legs();
-					
+
 					if (params.debug>=1)
 					{
-						struct sockaddr_storage sa;
-						socklen_t salen=sizeof(sa);
 						char ip_port[48];
-
-						if (getpeername(conn->fd,(struct sockaddr *)&sa,&salen))
-							*ip_port=0;
-						else
-							ntop46_port((struct sockaddr*)&sa,ip_port,sizeof(ip_port));
-
+						ntop46_port((struct sockaddr*)&conn->client,ip_port,sizeof(ip_port));
 						VPRINT("Socket fd=%d (local) connected from %s\n", conn->fd, ip_port);
 					}
 					set_user_timeout(conn->fd, params.tcp_user_timeout_local);
@@ -1563,7 +1558,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						read_all_and_buffer(conn,3);
 						if (errn==ECONNRESET && conn_partner_alive(conn))
 						{
-							if (conn->remote && params.tamper) rst_in(&conn->partner->track);
+							if (conn->remote && params.tamper) rst_in(&conn->partner->track,(struct sockaddr*)&conn->partner->client);
 
 							struct linger lin;
 							lin.l_onoff=1;
@@ -1588,7 +1583,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 					{
 						DBGPRINT("EPOLLRDHUP\n");
 						read_all_and_buffer(conn,2);
-						if (!conn->remote && params.tamper) hup_out(&conn->track);
+						if (!conn->remote && params.tamper) hup_out(&conn->track,(struct sockaddr*)&conn->client);
 
 						conn->state = CONN_RDHUP; // only writes. do not receive RDHUP anymore
 						if (conn_has_unsent(conn))

@@ -199,7 +199,15 @@ nft_add_rule()
 	# $2,$3,... - rule(s)
 	local chain="$1"
 	shift
-	nft add rule inet $ZAPRET_NFT_TABLE $chain "$@"
+	nft add rule inet $ZAPRET_NFT_TABLE $chain $FW_EXTRA_PRE "$@"
+}
+nft_insert_rule()
+{
+	# $1 - chain
+	# $2,$3,... - rule(s)
+	local chain="$1"
+	shift
+	nft insert rule inet $ZAPRET_NFT_TABLE $chain $FW_EXTRA_PRE "$@"
 }
 nft_add_set_element()
 {
@@ -227,6 +235,7 @@ nft_clean_nfqws_rule()
 nft_add_nfqws_flow_exempt_rule()
 {
 	# $1 - rule (must be all filters in one var)
+	local FW_EXTRA_POST= FW_EXTRA_PRE=
 	nft_add_rule flow_offload $(nft_clean_nfqws_rule $1) return comment \"direct flow offloading exemption\"
 	# do not need this because of oifname @wanif/@wanif6 filter in forward chain
 	#nft_add_rule flow_offload $(nft_reverse_nfqws_rule $1) return comment \"reverse flow offloading exemption\"
@@ -236,6 +245,7 @@ nft_add_flow_offload_exemption()
 	# "$1" - rule for ipv4
 	# "$2" - rule for ipv6
 	# "$3" - comment
+	local FW_EXTRA_POST= FW_EXTRA_PRE=
 	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || nft_add_rule flow_offload oifname @wanif $1 ip daddr != @nozapret return comment \"$3\"
 	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || nft_add_rule flow_offload oifname @wanif6 $2 ip6 daddr != @nozapret6 return comment \"$3\"
 }
@@ -399,7 +409,7 @@ nft_only()
 
 nft_print_op()
 {
-	echo "Adding nftables ipv$3 rule for $2 : $1"
+	echo "Inserting nftables ipv$3 rule for $2 : $1"
 }
 _nft_fw_tpws4()
 {
@@ -410,8 +420,8 @@ _nft_fw_tpws4()
 	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2"
 		nft_print_op "$filter" "tpws (port $2)" 4
-		nft_add_rule dnat_output skuid != $WS_USER ${3:+oifname @wanif }$filter ip daddr != @nozapret dnat ip to $TPWS_LOCALHOST4:$port
-		nft_add_rule dnat_pre iifname @lanif $filter ip daddr != @nozapret dnat ip to $TPWS_LOCALHOST4:$port
+		nft_insert_rule dnat_output skuid != $WS_USER ${3:+oifname @wanif }$filter ip daddr != @nozapret $FW_EXTRA_POST dnat ip to $TPWS_LOCALHOST4:$port
+		nft_insert_rule dnat_pre iifname @lanif $filter ip daddr != @nozapret $FW_EXTRA_POST dnat ip to $TPWS_LOCALHOST4:$port
 		prepare_route_localnet
 	}
 }
@@ -425,9 +435,9 @@ _nft_fw_tpws6()
 	[ "$DISABLE_IPV6" = "1" -o -z "$1" ] || {
 		local filter="$1" port="$2" DNAT6 i
 		nft_print_op "$filter" "tpws (port $port)" 6
-		nft_add_rule dnat_output skuid != $WS_USER ${4:+oifname @wanif6 }$filter ip6 daddr != @nozapret6 dnat ip6 to [::1]:$port
+		nft_insert_rule dnat_output skuid != $WS_USER ${4:+oifname @wanif6 }$filter ip6 daddr != @nozapret6 $FW_EXTRA_POST dnat ip6 to [::1]:$port
 		[ -n "$3" ] && {
-			nft_add_rule dnat_pre $filter ip6 daddr != @nozapret6 dnat ip6 to iifname map @link_local:$port
+			nft_insert_rule dnat_pre $filter ip6 daddr != @nozapret6 $FW_EXTRA_POST dnat ip6 to iifname map @link_local:$port
 			for i in $3; do
 				_dnat6_target $i DNAT6
 				# can be multiple tpws processes on different ports
@@ -476,7 +486,7 @@ _nft_fw_nfqws_post4()
 		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 4
 		rule="${3:+oifname @wanif }$filter ip daddr != @nozapret"
 		is_postnat && setmark="meta mark set meta mark or $DESYNC_MARK_POSTNAT"
-		nft_add_rule $chain $rule $setmark queue num $port bypass
+		nft_insert_rule $chain $rule $setmark $FW_EXTRA_POST queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
 	}
 }
@@ -491,7 +501,7 @@ _nft_fw_nfqws_post6()
 		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 6
 		rule="${3:+oifname @wanif6 }$filter ip6 daddr != @nozapret6"
 		is_postnat && setmark="meta mark set meta mark or $DESYNC_MARK_POSTNAT"
-		nft_add_rule $chain $rule $setmark queue num $port bypass
+		nft_insert_rule $chain $rule $setmark $FW_EXTRA_POST queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
 	}
 }
@@ -515,7 +525,7 @@ _nft_fw_nfqws_pre4()
 		local filter="$1" port="$2" rule
 		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 4
 		rule="${3:+iifname @wanif }$filter ip saddr != @nozapret"
-		nft_add_rule $(get_prechain) $rule queue num $port bypass
+		nft_insert_rule $(get_prechain) $rule $FW_EXTRA_POST queue num $port bypass
 	}
 }
 _nft_fw_nfqws_pre6()
@@ -528,7 +538,7 @@ _nft_fw_nfqws_pre6()
 		local filter="$1" port="$2" rule
 		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 6
 		rule="${3:+iifname @wanif6 }$filter ip6 saddr != @nozapret6"
-		nft_add_rule $(get_prechain) $rule queue num $port bypass
+		nft_insert_rule $(get_prechain) $rule $FW_EXTRA_POST queue num $port bypass
 	}
 }
 nft_fw_nfqws_pre()
@@ -705,7 +715,7 @@ zapret_apply_firewall_rules_nft()
 			POSTNAT=$POSTNAT_SAVE
 			;;
 		custom)
-	    		existf zapret_custom_firewall_nft && zapret_custom_firewall_nft
+			custom_runner zapret_custom_firewall_nft
 			;;
 	esac
 }
@@ -734,6 +744,7 @@ zapret_unapply_firewall_nft()
 
 	unprepare_route_localnet
 	nft_del_firewall
+	[ "$MODE" = custom ] &&	custom_runner zapret_custom_firewall_nft_flush
 	return 0
 }
 zapret_do_firewall_nft()
