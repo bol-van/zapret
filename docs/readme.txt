@@ -981,10 +981,13 @@ Cкрипты с названием get_antifilter_* оперируют спис
 9) ipset/get_antifilter_allyouneed.sh. получает лист https://antifilter.download/list/allyouneed.lst.
 Суммарный список префиксов, созданный из ipsum.lst и subnet.lst.
 
-Все варианты рассмотренных скриптов автоматически создают и заполняют ipset.
-Варианты 2-9 дополнительно вызывают вариант 1.
+10) ipset/get_refilter_ipsum.sh.
+Список берется отсюда : https://github.com/1andrevich/Re-filter-lists
 
-10) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
+Все варианты рассмотренных скриптов автоматически создают и заполняют ipset.
+Варианты 2-10 дополнительно вызывают вариант 1.
+
+11) ipset/get_config.sh. этот скрипт вызывает то, что прописано в переменной GETLIST из файла config
 Если переменная не определена, то ресолвятся лишь листы для ipset nozapret/nozapret6.
 
 Листы РКН все время изменяются. Возникают новые тенденции. Требования к RAM могут меняться.
@@ -1111,7 +1114,11 @@ ipset/zapret-hosts-users-exclude.txt.gz или ipset/zapret-hosts-users-exclude.
 
 Поддомены учитываются автоматически. Например, строчка "ru" вносит в список "*.ru". Строчка "*.ru" в списке не сработает.
 
-Список доменов РКН может быть получен скриптами ipset/get_reestr_hostlist.sh или ipset/get_antizapret_domains.sh
+Список доменов РКН может быть получен скриптами
+ipset/get_reestr_hostlist.sh
+ipset/get_antizapret_domains.sh
+ipset/get_reestr_resolvable_domains.sh
+ipset/get_refilter_domains.sh
 - кладется в ipset/zapret-hosts.txt.gz.
 
 Чтобы обновить списки, перезапускать nfqws или tpws не нужно. Обновляете файлы, затем даете сигнал HUP.
