@@ -3,15 +3,15 @@ readonly ipt_connbytes="-m connbytes --connbytes-dir=original --connbytes-mode=p
 
 ipt()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null || iptables -I "$@"
+	iptables $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null || iptables $FW_EXTRA_PRE -I "$@" $FW_EXTRA_POST
 }
 ipta()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null || iptables -A "$@"
+	iptables $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null || iptables $FW_EXTRA_PRE -A "$@" $FW_EXTRA_POST
 }
 ipt_del()
 {
-	iptables -C "$@" >/dev/null 2>/dev/null && iptables -D "$@"
+	iptables $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null && iptables $FW_EXTRA_PRE -D "$@" $FW_EXTRA_POST
 }
 ipt_add_del()
 {
@@ -134,7 +134,7 @@ unprepare_tpws_fw()
 ipt_print_op()
 {
 	if [ "$1" = "1" ]; then
-		echo "Adding ip$4tables rule for $3 : $2"
+		echo "Inserting ip$4tables rule for $3 : $2"
 	else
 		echo "Deleting ip$4tables rule for $3 : $2"
 	fi
@@ -437,7 +437,7 @@ zapret_do_firewall_rules_ipt()
 			fi
 			;;
 		custom)
-	    		existf zapret_custom_firewall && zapret_custom_firewall $1
+			custom_runner zapret_custom_firewall $1
 			;;
 	esac
 }

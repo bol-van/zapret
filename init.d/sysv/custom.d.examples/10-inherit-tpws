@@ -1,0 +1,22 @@
+# this custom script applies tpws mode as it would be with MODE=tpws
+
+OVERRIDE=tpws
+
+zapret_custom_daemons()
+{
+	# $1 - 1 - run, 0 - stop
+
+	MODE_OVERRIDE=$OVERRIDE zapret_do_daemons $1
+}
+zapret_custom_firewall()
+{
+	# $1 - 1 - run, 0 - stop
+
+	MODE_OVERRIDE=$OVERRIDE zapret_do_firewall_rules_ipt $1
+}
+zapret_custom_firewall_nft()
+{
+	# stop logic is not required
+
+	MODE_OVERRIDE=$OVERRIDE zapret_apply_firewall_rules_nft
+}

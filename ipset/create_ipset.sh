@@ -4,12 +4,12 @@
 # $1=no-update    - do not update ipset, only create if its absent
 # $1=clear        - clear ipset
 
-IPSET_DIR="$(dirname "$0")"
-IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
+EXEDIR="$(dirname "$0")"
+EXEDIR="$(cd "$EXEDIR"; pwd)"
 
-. "$IPSET_DIR/def.sh"
-. "$IPSET_DIR/../common/fwtype.sh"
-. "$IPSET_DIR/../common/nft.sh"
+. "$EXEDIR/def.sh"
+. "$ZAPRET_BASE/common/fwtype.sh"
+. "$ZAPRET_BASE/common/nft.sh"
 
 IPSET_CMD="$TMPDIR/ipset_cmd.txt"
 IPSET_SAVERAM_CHUNK_SIZE=20000
@@ -119,13 +119,12 @@ nfset_get_script_multi()
 	local set=$1 nonempty N=1 f
 	
 	shift
-
 	# first we need to make sure at least one element exists or nft will fail
 	while :
 	do
 		eval f=\$$N
 		[ -n "$f" ] || break
-		nonempty=$(zzexist "$f" && zzcat "$f" | head -n 1)
+		nonempty=$(zzexist "$f" && zzcat "$f" 2>/dev/null | head -n 1)
 		[ -n "$nonempty" ] && break
 		N=$(($N+1))
 	done
