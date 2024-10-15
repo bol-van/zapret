@@ -38,7 +38,7 @@ static bool dp_impossible(struct desync_profile *dp, const char *hostname, t_l7p
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
 	// impossible case, hard filter
-	// impossible check avoid relatively slow ipset search
+	// impossible check avoids relatively slow ipset search
 	if (!dp_impossible(dp,hostname,l7proto) && dp_match_l3l4(dp,dest))
 	{
 		// soft filter
@@ -375,7 +375,7 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 	if (ctrack->dp->oob) *split_flags |= SPLIT_FLAG_OOB;
 }
 
-static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname)
+static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)
 {
 	if (hostname)
 	{
@@ -386,12 +386,12 @@ static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const ch
 		{
 			HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
 			VPRINT("auto hostlist (profile %d) : %s : fail counter reset. website is working.\n", dp->n, hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter reset. website is working.", hostname, dp->n);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : fail counter reset. website is working.", hostname, dp->n, client_ip_port, l7proto_str(l7proto));
 		}
 	}
 }
 
-static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname)
+static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)
 {
 	hostfail_pool *fail_counter;
 
@@ -407,7 +407,7 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 	}
 	fail_counter->counter++;
 	VPRINT("auto hostlist (profile %d) : %s : fail counter %d/%d\n", dp->n , hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
-	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter %d/%d", hostname, dp->n, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : fail counter %d/%d", hostname, dp->n, client_ip_port, l7proto_str(l7proto), fail_counter->counter, dp->hostlist_auto_fail_threshold);
 	if (fail_counter->counter >= dp->hostlist_auto_fail_threshold)
 	{
 		VPRINT("auto hostlist (profile %d) : fail threshold reached. adding %s to auto hostlist\n", dp->n , hostname);
@@ -418,7 +418,7 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
 		{
 			VPRINT("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : adding to %s", hostname, dp->n, dp->hostlist_auto_filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto_filename);
 			if (!StrPoolAddStr(&dp->hostlist, hostname))
 			{
 				DLOG_ERR("StrPoolAddStr out of memory\n");
@@ -434,16 +434,22 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		else
 		{
 			VPRINT("auto hostlist (profile %d) : NOT adding %s\n", dp->n, hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : NOT adding, duplicate detected", hostname, dp->n);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : NOT adding, duplicate detected", hostname, dp->n, client_ip_port, l7proto_str(l7proto));
 		}
 	}
 }
 
-void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,size_t *size)
+void tamper_in(t_ctrack *ctrack, const struct sockaddr *client, uint8_t *segment,size_t segment_buffer_size,size_t *size)
 {
+	DBGPRINT("tamper_in hostname=%s\n", ctrack->hostname);
+
 	bool bFail=false;
 
-	DBGPRINT("tamper_in hostname=%s\n", ctrack->hostname);
+	char client_ip_port[48];
+	if (*params.hostlist_auto_debuglog)
+		ntop46_port((struct sockaddr*)client,client_ip_port,sizeof(client_ip_port));
+	else
+		*client_ip_port=0;
 
 	if (ctrack->dp && ctrack->b_ah_check)
 	{
@@ -458,7 +464,7 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 				if (bFail)
 				{
 					VPRINT("redirect to another domain detected. possibly DPI redirect.\n");
-					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : redirect to another domain", ctrack->hostname, ctrack->dp->n);
+					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : redirect to another domain", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
 				}
 				else
 					VPRINT("local or in-domain redirect detected. it's not a DPI redirect.\n");
@@ -468,16 +474,22 @@ void tamper_in(t_ctrack *ctrack, uint8_t *segment,size_t segment_buffer_size,siz
 				// received not http reply. do not monitor this connection anymore
 				VPRINT("incoming unknown HTTP data detected for hostname %s\n", ctrack->hostname);
 			}
-			if (bFail) auto_hostlist_failed(ctrack->dp, ctrack->hostname);
+			if (bFail) auto_hostlist_failed(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 		}
-		if (!bFail) auto_hostlist_reset_fail_counter(ctrack->dp, ctrack->hostname);
+		if (!bFail) auto_hostlist_reset_fail_counter(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 	}
 	ctrack->bTamperInCutoff = true;
 }
 
-void rst_in(t_ctrack *ctrack)
+void rst_in(t_ctrack *ctrack, const struct sockaddr *client)
 {
 	DBGPRINT("rst_in hostname=%s\n", ctrack->hostname);
+
+	char client_ip_port[48];
+	if (*params.hostlist_auto_debuglog)
+		ntop46_port((struct sockaddr*)client,client_ip_port,sizeof(client_ip_port));
+	else
+		*client_ip_port=0;
 
 	if (ctrack->dp && ctrack->b_ah_check)
 	{
@@ -486,15 +498,21 @@ void rst_in(t_ctrack *ctrack)
 		if (!ctrack->bTamperInCutoff && ctrack->hostname)
 		{
 			VPRINT("incoming RST detected for hostname %s\n", ctrack->hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : incoming RST", ctrack->hostname, ctrack->dp->n);
-			auto_hostlist_failed(ctrack->dp, ctrack->hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : incoming RST", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
+			auto_hostlist_failed(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 		}
 	}
 }
-void hup_out(t_ctrack *ctrack)
+void hup_out(t_ctrack *ctrack, const struct sockaddr *client)
 {
 	DBGPRINT("hup_out hostname=%s\n", ctrack->hostname);
 	
+	char client_ip_port[48];
+	if (*params.hostlist_auto_debuglog)
+		ntop46_port((struct sockaddr*)client,client_ip_port,sizeof(client_ip_port));
+	else
+		*client_ip_port=0;
+
 	if (ctrack->dp && ctrack->b_ah_check)
 	{
 		HostFailPoolPurgeRateLimited(&ctrack->dp->hostlist_auto_fail_counters);
@@ -503,8 +521,8 @@ void hup_out(t_ctrack *ctrack)
 		{
 			// local leg dropped connection after first request. probably due to timeout.
 			VPRINT("local leg closed connection after first request (timeout ?). hostname: %s\n", ctrack->hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client closed connection without server reply", ctrack->hostname, ctrack->dp->n);
-			auto_hostlist_failed(ctrack->dp, ctrack->hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : client closed connection without server reply", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
+			auto_hostlist_failed(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 		}
 	}
 }
