@@ -14,10 +14,6 @@
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
-#define L7_PROTO_HTTP	1
-#define L7_PROTO_TLS	2
-#define L7_PROTO_UNKNOWN 0x80000000
-
 enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32

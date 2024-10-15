@@ -10,7 +10,12 @@
 #define SPLIT_FLAG_OOB		0x02
 
 typedef enum {UNKNOWN=0, HTTP, TLS} t_l7proto;
+
 const char *l7proto_str(t_l7proto l7);
+#define L7_PROTO_HTTP	1
+#define L7_PROTO_TLS	2
+#define L7_PROTO_UNKNOWN 0x80000000
+
 typedef struct
 {
 	// common state
