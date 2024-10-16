@@ -327,7 +327,7 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 		ctrack->req_retrans_counter++;
 		if (ctrack->req_retrans_counter >= threshold)
 		{
-			DLOG("retrans threshold reached : %u/%u\n",ctrack->req_retrans_counter, threshold);
+			DLOG("req retrans threshold reached : %u/%u\n",ctrack->req_retrans_counter, threshold);
 			ctrack_stop_retrans_counter(ctrack);
 			return true;
 		}
