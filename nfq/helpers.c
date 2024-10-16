@@ -422,7 +422,7 @@ __attribute__((optimize ("no-strict-aliasing")))
 void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result)
 {
 	// int128 requires 16-bit alignment. in struct sockaddr_in6.sin6_addr is 8-byte aligned.
-	// it causes segfault on x64 arch with latest compiler. it can cause misalign slowdown on other archs
+	// it causes segfault on x64 arch with lastest compiler. it can cause misalign slowdown on other archs
 	// use 64-bit AND
 	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
 	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];

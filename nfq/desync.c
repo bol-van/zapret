@@ -291,7 +291,7 @@ static void ctrack_stop_retrans_counter(t_ctrack *ctrack)
 	}
 }
 
-static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname)
+static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)
 {
 	if (hostname)
 	{
@@ -302,13 +302,13 @@ static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const ch
 		{
 			HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
 			DLOG("auto hostlist (profile %d) : %s : fail counter reset. website is working.\n", dp->n, hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter reset. website is working.", hostname, dp->n);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : fail counter reset. website is working.", hostname, dp->n, client_ip_port, l7proto_str(l7proto));
 		}
 	}
 }
 
 // return true if retrans trigger fires
-static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold)
+static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold, const char *client_ip_port, t_l7proto l7proto)
 {
 	if (ctrack && ctrack->dp && ctrack->hostname_ah_check && ctrack->req_retrans_counter!=RETRANS_COUNTER_STOP)
 	{
@@ -320,7 +320,7 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 			{
 				DLOG("req retrans : tcp seq %u not within the req range %u-%u. stop tracking.\n", ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end);
 				ctrack_stop_retrans_counter(ctrack);
-				auto_hostlist_reset_fail_counter(ctrack->dp, ctrack->hostname);
+				auto_hostlist_reset_fail_counter(ctrack->dp, ctrack->hostname, client_ip_port, l7proto);
 				return false;
 			}
 		}
@@ -335,7 +335,7 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 	}
 	return false;
 }
-static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname)
+static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)
 {
 	hostfail_pool *fail_counter;
 	
@@ -351,7 +351,7 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 	}
 	fail_counter->counter++;
 	DLOG("auto hostlist (profile %d) : %s : fail counter %d/%d\n", dp->n, hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
-	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : fail counter %d/%d", hostname, dp->n, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : fail counter %d/%d", hostname, dp->n, client_ip_port, l7proto_str(l7proto), fail_counter->counter, dp->hostlist_auto_fail_threshold);
 	if (fail_counter->counter >= dp->hostlist_auto_fail_threshold)
 	{
 		DLOG("auto hostlist (profile %d) : fail threshold reached. about to add %s to auto hostlist\n", dp->n, hostname);
@@ -362,7 +362,7 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
 		{
 			DLOG("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : adding to %s", hostname, dp->n, dp->hostlist_auto_filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto_filename);
 			if (!StrPoolAddStr(&dp->hostlist, hostname))
 			{
 				DLOG_ERR("StrPoolAddStr out of memory\n");
@@ -378,17 +378,22 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		else
 		{
 			DLOG("auto hostlist (profile %d) : NOT adding %s\n", dp->n, hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : NOT adding, duplicate detected", hostname, dp->n);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : NOT adding, duplicate detected", hostname, dp->n, client_ip_port, l7proto_str(l7proto));
 		}
 	}
 }
 
-static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto)
+static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto, const struct sockaddr *client)
 {
-	if (ctrack && ctrack->dp && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, ctrack->dp->hostlist_auto_retrans_threshold))
+	char client_ip_port[48];
+	if (*params.hostlist_auto_debuglog)
+		ntop46_port((struct sockaddr*)client,client_ip_port,sizeof(client_ip_port));
+	else
+		*client_ip_port=0;
+	if (ctrack && ctrack->dp && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, ctrack->dp->hostlist_auto_retrans_threshold, client_ip_port, ctrack->l7proto))
 	{
-		HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : tcp retrans threshold reached", ctrack->hostname, ctrack->dp->n);
-		auto_hostlist_failed(ctrack->dp, ctrack->hostname);
+		HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : tcp retrans threshold reached", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
+		auto_hostlist_failed(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 	}
 }
 
@@ -710,10 +715,17 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (ctrack && ctrack->hostname && ctrack->hostname_ah_check && (ctrack->ack_last-ctrack->ack0)==1)
 			{
 				bool bFail=false;
+
+				char client_ip_port[48];
+				if (*params.hostlist_auto_debuglog)
+					ntop46_port((struct sockaddr*)&dst,client_ip_port,sizeof(client_ip_port));
+				else
+					*client_ip_port=0;
+
 				if (tcphdr->th_flags & TH_RST)
 				{
 					DLOG("incoming RST detected for hostname %s\n", ctrack->hostname);
-					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : incoming RST", ctrack->hostname, ctrack->dp->n);
+					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : incoming RST", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
 					bFail = true;
 				}
 				else if (len_payload && ctrack->l7proto==HTTP)
@@ -725,7 +737,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						if (bFail)
 						{
 							DLOG("redirect to another domain detected. possibly DPI redirect.\n");
-							HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : redirect to another domain", ctrack->hostname, ctrack->dp->n);
+							HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : redirect to another domain", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
 						}
 						else
 							DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n");
@@ -737,10 +749,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 				}
 				if (bFail)
-					auto_hostlist_failed(dp, ctrack->hostname);
+					auto_hostlist_failed(dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 				else
 					if (len_payload)
-						auto_hostlist_reset_fail_counter(dp, ctrack->hostname);
+						auto_hostlist_reset_fail_counter(dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 				if (tcphdr->th_flags & TH_RST)
 					ConntrackClearHostname(ctrack); // do not react to further dup RSTs
 			}
@@ -854,7 +866,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			rlen_payload = ctrack->reasm_orig.size_present;
 		}
 
-		process_retrans_fail(ctrack, IPPROTO_TCP);
+		process_retrans_fail(ctrack, IPPROTO_TCP, (struct sockaddr*)&src);
 
 		if (IsHttp(rdata_payload,rlen_payload))
 		{
@@ -1763,7 +1775,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						// first request is not retrans
 						if (ctrack_replay->hostname)
-							process_retrans_fail(ctrack_replay, IPPROTO_UDP);
+							process_retrans_fail(ctrack_replay, IPPROTO_UDP, (struct sockaddr*)&src);
 						else
 							ctrack_replay->hostname=strdup(host);
 					}

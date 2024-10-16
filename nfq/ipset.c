@@ -75,7 +75,7 @@ static bool AppendIpset(ipset *ips, const char *filename)
 		if (r==Z_OK)
 		{
 			DLOG_CONDUP("zlib compression detected. uncompressed size : %zu\n", zsize);
-
+			
 			p = zbuf;
 			e = zbuf + zsize;
 			while(p<e)
@@ -98,7 +98,7 @@ static bool AppendIpset(ipset *ips, const char *filename)
 	else
 	{
 		DLOG_CONDUP("loading plain text list\n");
-
+		
 		while (fgets(s, sizeof(s)-1, F))
 		{
 			p = s;
