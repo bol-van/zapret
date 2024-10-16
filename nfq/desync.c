@@ -327,7 +327,7 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 		ctrack->req_retrans_counter++;
 		if (ctrack->req_retrans_counter >= threshold)
 		{
-			DLOG("req retrans threshold reached : %u/%u\n",ctrack->req_retrans_counter, threshold);
+			DLOG("retrans threshold reached : %u/%u\n",ctrack->req_retrans_counter, threshold);
 			ctrack_stop_retrans_counter(ctrack);
 			return true;
 		}
@@ -392,7 +392,7 @@ static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto, const struct s
 		*client_ip_port=0;
 	if (ctrack && ctrack->dp && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, ctrack->dp->hostlist_auto_retrans_threshold, client_ip_port, ctrack->l7proto))
 	{
-		HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : tcp retrans threshold reached", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
+		HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : retrans threshold reached", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
 		auto_hostlist_failed(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 	}
 }
