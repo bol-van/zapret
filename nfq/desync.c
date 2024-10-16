@@ -149,7 +149,7 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 static bool dp_match_l3l4(struct desync_profile *dp, uint8_t l3proto, const struct sockaddr *dest)
 {
 	return  ((dest->sa_family==AF_INET && dp->filter_ipv4) || (dest->sa_family==AF_INET6 && dp->filter_ipv6)) &&
-		(l3proto==IPPROTO_TCP && pf_in_range(saport(dest), &dp->pf_tcp) || l3proto==IPPROTO_UDP && pf_in_range(saport(dest), &dp->pf_tcp)) &&
+		(l3proto==IPPROTO_TCP && pf_in_range(saport(dest), &dp->pf_tcp) || l3proto==IPPROTO_UDP && pf_in_range(saport(dest), &dp->pf_udp)) &&
 		IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL);
 }
 static bool dp_impossible(struct desync_profile *dp, const char *hostname, t_l7proto l7proto)
