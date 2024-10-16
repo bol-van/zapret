@@ -329,3 +329,10 @@ v65:
 init.d: dynamic number allocation for dnum,tpws_port,qnum
 init.d: FW_EXTRA_PRE, FW_EXTRA_POST
 init.d: zapret_custom_firewall_nft_flush
+nfqws,tpws: l7proto and client ip:port info in autohostlist debug log
+nfqws,tpws: user mode ipset filter support
+nfqws,tpws: l7proto filter support
+tpws: fixed MSS apply in transparent mode
+nfqws: fixed autottl apply if desync profile changed
+tpws,nfqws: fixed 100% cpu hang on gzipped list with comments
+ipset: get_refilter_ipsum.sh , get_refilter_domain.sh
