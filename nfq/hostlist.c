@@ -78,7 +78,7 @@ bool AppendHostList(strpool **hostlist, const char *filename)
 	else
 	{
 		DLOG_CONDUP("loading plain text list\n");
-		
+
 		while (fgets(s, sizeof(s), F))
 		{
 			p = s;
