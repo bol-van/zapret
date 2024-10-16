@@ -5,7 +5,7 @@ CFLAGS_MAC = -mmacosx-version-min=10.8
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
-LIBS_CYGWIN = -lz -Lwindivert -lwindivert -lwlanapi -lole32 -loleaut32 -luuid
+LIBS_CYGWIN = -lz -Lwindows/windivert -Iwindows -lwindivert -lwlanapi -lole32 -loleaut32 -luuid
 SRC_FILES = *.c crypto/*.c
 
 all: nfqws
@@ -24,7 +24,7 @@ mac: $(SRC_FILES)
 	rm -f dvtwsx dvtwsa
 
 cygwin:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) winmanifest.o winicon.o
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) windows/res/winmanifest.o windows/res/winicon.o
 
 clean:
 	rm -f nfqws dvtws winws.exe
