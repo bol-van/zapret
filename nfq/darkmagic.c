@@ -22,6 +22,11 @@
 #ifdef __CYGWIN__
 #include <wlanapi.h>
 #include <netlistmgr.h>
+
+#ifndef ERROR_INVALID_IMAGE_HASH
+#define ERROR_INVALID_IMAGE_HASH __MSABI_LONG(577)
+#endif
+
 #endif
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
