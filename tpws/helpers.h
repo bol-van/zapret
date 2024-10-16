@@ -13,7 +13,6 @@ typedef union
 {
 	struct sockaddr_in sa4;		// size 16
 	struct sockaddr_in6 sa6;	// size 28
-	char _align[32];		// force 16-byte alignment for ip6_and int128 ops
 } sockaddr_in46;
 
 void rtrim(char *s);
