@@ -180,15 +180,13 @@ __attribute__((optimize ("no-strict-aliasing")))
 #endif
 static void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result)
 {
-	// int 128 can cause alignment segfaults because sin6_addr in struct sockaddr_in6 is 8-byte aligned, not 16-byte
-	
-//#ifdef __SIZEOF_INT128__
-//	// gcc and clang have 128 bit int types on some 64-bit archs. take some advantage
-//	*((unsigned __int128*)result->s6_addr) = *((unsigned __int128*)a->s6_addr) & *((unsigned __int128*)b->s6_addr);
-//#else
+#ifdef __SIZEOF_INT128__
+	// gcc and clang have 128 bit int types on some 64-bit archs. take some advantage
+	*((unsigned __int128*)result->s6_addr) = *((unsigned __int128*)a->s6_addr) & *((unsigned __int128*)b->s6_addr);
+#else
 	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
 	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
-//#endif
+#endif
 }
 
 static void rtrim(char *s)
