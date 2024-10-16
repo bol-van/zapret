@@ -52,12 +52,23 @@ typedef struct {
 // ESTABLISHED - any except SYN or SYN/ACK received
 // FIN - FIN or RST received
 typedef enum {SYN=0, ESTABLISHED, FIN} t_connstate;
+
 typedef enum {UNKNOWN=0, HTTP, TLS, QUIC, WIREGUARD, DHT} t_l7proto;
+#define L7_PROTO_HTTP		0x00000001
+#define L7_PROTO_TLS		0x00000002
+#define L7_PROTO_QUIC		0x00000004
+#define L7_PROTO_WIREGUARD	0x00000008
+#define L7_PROTO_DHT		0x00000010
+#define L7_PROTO_UNKNOWN	0x80000000
+const char *l7proto_str(t_l7proto l7);
+bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7);
+
 typedef struct
 {
+	bool bCheckDone, bCheckResult, bCheckExcluded; // hostlist check result cache
+
 	struct desync_profile *dp;		// desync profile cache
 	bool dp_search_complete;
-	bool bCheckDone, bCheckResult, bCheckExcluded; // hostlist check result cache
 
 	// common state
 	time_t t_start, t_last;
@@ -76,12 +87,13 @@ typedef struct
 	bool req_seq_present,req_seq_finalized,req_seq_abandoned;
 	uint32_t req_seq_start,req_seq_end;	// sequence interval of the request (to track retransmissions)
 
-	uint8_t autottl;
+	uint8_t incoming_ttl, autottl;
 
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff;
 
 	t_l7proto l7proto;
+	bool l7proto_discovered;
 	char *hostname;
 	bool hostname_ah_check;			// should perform autohostlist checks
 	
