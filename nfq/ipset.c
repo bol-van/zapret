@@ -75,7 +75,7 @@ static bool AppendIpset(ipset *ips, const char *filename)
 		if (r==Z_OK)
 		{
 			DLOG_CONDUP("zlib compression detected. uncompressed size : %zu\n", zsize);
-			
+
 			p = zbuf;
 			e = zbuf + zsize;
 			while(p<e)
