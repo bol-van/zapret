@@ -207,8 +207,12 @@ static void dp_entry_destroy(struct desync_profile_list *entry)
 {
 	strlist_destroy(&entry->dp.hostlist_files);
 	strlist_destroy(&entry->dp.hostlist_exclude_files);
+	strlist_destroy(&entry->dp.ipset_files);
+	strlist_destroy(&entry->dp.ipset_exclude_files);
 	StrPoolDestroy(&entry->dp.hostlist_exclude);
 	StrPoolDestroy(&entry->dp.hostlist);
+	ipsetDestroy(&entry->dp.ips);
+	ipsetDestroy(&entry->dp.ips_exclude);
 	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
 	free(entry);
 }

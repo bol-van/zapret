@@ -12,6 +12,29 @@ static void ut_oom_recover(void *elem)
 	oom = true;
 }
 
+const char *l7proto_str(t_l7proto l7)
+{
+	switch(l7)
+	{
+		case HTTP: return "http";
+		case TLS: return "tls";
+		case QUIC: return "quic";
+		case WIREGUARD: return "wireguard";
+		case DHT: return "dht";
+		default: return "unknown";
+	}
+}
+bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
+{
+	return  (l7proto==UNKNOWN && (filter_l7 & L7_PROTO_UNKNOWN)) ||
+		(l7proto==HTTP && (filter_l7 & L7_PROTO_HTTP)) ||
+		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS)) ||
+		(l7proto==QUIC && (filter_l7 & L7_PROTO_QUIC)) ||
+		(l7proto==WIREGUARD && (filter_l7 & L7_PROTO_WIREGUARD)) ||
+		(l7proto==DHT && (filter_l7 & L7_PROTO_DHT));
+}
+
+
 static const char *connstate_s[]={"SYN","ESTABLISHED","FIN"};
 
 static void connswap(const t_conn *c, t_conn *c2)
@@ -316,18 +339,6 @@ static void taddr2str(uint8_t l3proto, const t_addr *a, char *buf, size_t bufsiz
 	if (!inet_ntop(family_from_proto(l3proto), a, buf, bufsize) && bufsize) *buf=0;
 }
 
-static const char *ConntrackProtoName(t_l7proto proto)
-{
-	switch(proto)
-	{
-		case HTTP: return "HTTP";
-		case TLS: return "TLS";
-		case QUIC: return "QUIC";
-		case WIREGUARD: return "WIREGUARD";
-		case DHT: return "DHT";
-		default: return "UNKNOWN";
-	}
-}
 void ConntrackPoolDump(const t_conntrack *p)
 {
 	t_conntrack_pool *t, *tmp;
@@ -354,7 +365,7 @@ void ConntrackPoolDump(const t_conntrack *p)
 				t->track.seq_last, t->track.pos_orig,
 				t->track.ack_last, t->track.pos_reply);
 		printf(" req_retrans=%u cutoff=%u wss_cutoff=%u d_cutoff=%u hostname=%s l7proto=%s\n",
-			t->track.req_retrans_counter, t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff, t->track.hostname, ConntrackProtoName(t->track.l7proto));
+			t->track.req_retrans_counter, t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff, t->track.hostname, l7proto_str(t->track.l7proto));
 	};
 }
 
