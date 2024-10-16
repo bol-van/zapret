@@ -85,6 +85,7 @@ Make from directory `nfq` using `make cygwin`.
 `winws` requires `cygwin1.dll`, `windivert.dll`, `windivert64.sys`. You can take them from `binaries/win64/zapret-winws`.
 
 32-bit x86 version can be build from 32-bit cygwin using `make cygwin32`.
+`windivert.dll` and `windivert32.sys` can be taken from [windivert 2.2.2 archive](https://reqrypt.org/download)
 
 There's no `arm64` signed `windivert` driver and no `cygwin`.
 But it's possible to use unsigned driver version in test mode and user mode components with x64 emulation.
