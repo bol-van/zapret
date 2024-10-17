@@ -491,6 +491,7 @@ static int win_main(const char *windivert_filter)
 				win_dark_deinit();
 				return w_win32_error;
 			}
+
 			*ifout=0;
 			if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
 			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx);
@@ -506,6 +507,8 @@ static int win_main(const char *windivert_filter)
 			}
 			else
 			{
+				dohup();
+
 				mark=0;
 				// pseudo interface id IfIdx.SubIfIdx
 				verdict = processPacketData(&mark, ifout, packet, &len);
