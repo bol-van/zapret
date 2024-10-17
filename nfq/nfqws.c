@@ -8,6 +8,7 @@
 #include "params.h"
 #include "protocol.h"
 #include "hostlist.h"
+#include "ipset.h"
 #include "gzip.h"
 #include "pools.h"
 
@@ -54,7 +55,7 @@ static bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	printf("Will reload hostlist on next request (if any)\n");
+	printf("Will reload hostlists and ipsets on next request (if any)\n");
 	bHup = true;
 }
 // should be called in normal execution
@@ -62,7 +63,7 @@ static void dohup(void)
 {
 	if (bHup)
 	{
-		if (!LoadIncludeHostLists() || !LoadExcludeHostLists())
+		if (!LoadIncludeHostLists() || !LoadExcludeHostLists() || !LoadIncludeIpsets() || !LoadExcludeIpsets())
 		{
 			// what will we do without hostlist ?? sure, gonna die
 			exit(1);
@@ -490,6 +491,7 @@ static int win_main(const char *windivert_filter)
 				win_dark_deinit();
 				return w_win32_error;
 			}
+
 			*ifout=0;
 			if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
 			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx);
@@ -505,6 +507,8 @@ static int win_main(const char *windivert_filter)
 			}
 			else
 			{
+				dohup();
+
 				mark=0;
 				// pseudo interface id IfIdx.SubIfIdx
 				verdict = processPacketData(&mark, ifout, packet, &len);
@@ -621,7 +625,7 @@ static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 	}
 }
 
-bool parse_autottl(const char *s, autottl *t)
+static bool parse_autottl(const char *s, autottl *t)
 {
 	unsigned int delta,min,max;
 	AUTOTTL_SET_DEFAULT(*t);
@@ -646,6 +650,42 @@ bool parse_autottl(const char *s, autottl *t)
 	}
 	return true;
 }
+
+static bool parse_l7_list(char *opt, uint32_t *l7)
+{
+	char *e,*p,c;
+
+	for (p=opt,*l7=0 ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (!strcmp(p,"http"))
+			*l7 |= L7_PROTO_HTTP;
+		else if (!strcmp(p,"tls"))
+			*l7 |= L7_PROTO_TLS;
+		else if (!strcmp(p,"quic"))
+			*l7 |= L7_PROTO_QUIC;
+		else if (!strcmp(p,"wireguard"))
+			*l7 |= L7_PROTO_WIREGUARD;
+		else if (!strcmp(p,"dht"))
+			*l7 |= L7_PROTO_DHT;
+		else if (!strcmp(p,"unknown"))
+			*l7 |= L7_PROTO_UNKNOWN;
+		else return false;
+
+		if (e)
+		{
+			*e++=c;
+		}
+		p = e;
+	}
+	return true;
+}
+
 
 static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 {
@@ -673,6 +713,7 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 	}
 	return true;
 }
+
 #ifdef __CYGWIN__
 static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *buf, size_t len)
 {
@@ -831,6 +872,9 @@ static void exithelp(void)
 		" --filter-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --filter-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp.\n"
 		" --filter-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp.\n"
+		" --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
+		" --ipset=<filename>\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-exclude=<filename>\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
 		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
 		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
@@ -945,6 +989,7 @@ int main(int argc, char **argv)
 #endif
 
 	srandom(time(NULL));
+	mask_from_preflen6_prepare();
 
 	memset(&params, 0, sizeof(params));
 	*pidfile = 0;
@@ -1056,19 +1101,22 @@ int main(int argc, char **argv)
 		{"filter-l3",required_argument,0,0},	// optidx=53
 		{"filter-tcp",required_argument,0,0},	// optidx=54
 		{"filter-udp",required_argument,0,0},	// optidx=55
+		{"filter-l7",required_argument,0,0},	// optidx=56
+		{"ipset",required_argument,0,0},	// optidx=57
+		{"ipset-exclude",required_argument,0,0},// optidx=58
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=56
-		{"bind-fix6",no_argument,0,0},		// optidx=57
+		{"bind-fix4",no_argument,0,0},		// optidx=59
+		{"bind-fix6",no_argument,0,0},		// optidx=60
 #elif defined(__CYGWIN__)
-		{"wf-iface",required_argument,0,0},	// optidx=56
-		{"wf-l3",required_argument,0,0},	// optidx=57
-		{"wf-tcp",required_argument,0,0},	// optidx=58
-		{"wf-udp",required_argument,0,0},	// optidx=59
-		{"wf-raw",required_argument,0,0},	// optidx=60
-		{"wf-save",required_argument,0,0},	// optidx=61
-		{"ssid-filter",required_argument,0,0},	// optidx=62
-		{"nlm-filter",required_argument,0,0},	// optidx=63
-		{"nlm-list",optional_argument,0,0},	// optidx=64
+		{"wf-iface",required_argument,0,0},	// optidx=59
+		{"wf-l3",required_argument,0,0},	// optidx=60
+		{"wf-tcp",required_argument,0,0},	// optidx=61
+		{"wf-udp",required_argument,0,0},	// optidx=62
+		{"wf-raw",required_argument,0,0},	// optidx=63
+		{"wf-save",required_argument,0,0},	// optidx=64
+		{"ssid-filter",required_argument,0,0},	// optidx=65
+		{"nlm-filter",required_argument,0,0},	// optidx=66
+		{"nlm-list",optional_argument,0,0},	// optidx=67
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1596,30 +1644,53 @@ int main(int argc, char **argv)
 			// deny tcp if not set
 			if (pf_is_empty(&dp->pf_tcp)) dp->pf_tcp.neg=true;
 			break;
+		case 56: /* filter-l7 */
+			if (!parse_l7_list(optarg,&dp->filter_l7))
+			{
+				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
+		case 57: /* ipset */
+			if (!strlist_add(&dp->ipset_files, optarg))
+			{
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
+			}
+			break;
+		case 58: /* ipset-exclude */
+			if (!strlist_add(&dp->ipset_exclude_files, optarg))
+			{
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
+			}
+			break;
+
+
 
 #ifdef __linux__
-		case 56: /* bind-fix4 */
+		case 59: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 57: /* bind-fix6 */
+		case 60: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #elif defined(__CYGWIN__)
-		case 56: /* wf-iface */
+		case 59: /* wf-iface */
 			if (!sscanf(optarg,"%u.%u",&IfIdx,&SubIfIdx))
 			{
 				DLOG_ERR("bad value for --wf-iface\n");
 				exit_clean(1);
 			}
 			break;
-		case 57: /* wf-l3 */
+		case 60: /* wf-l3 */
 			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
 			{
 				DLOG_ERR("bad value for --wf-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 58: /* wf-tcp */
+		case 61: /* wf-tcp */
 			hash_wf_tcp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
@@ -1628,7 +1699,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 59: /* wf-udp */
+		case 62: /* wf-udp */
 			hash_wf_udp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
@@ -1637,7 +1708,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 60: /* wf-raw */
+		case 63: /* wf-raw */
 			hash_wf_raw=hash_jen(optarg,strlen(optarg));
 			if (optarg[0]=='@')
 			{
@@ -1651,11 +1722,11 @@ int main(int argc, char **argv)
 				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
 			}
 			break;
-		case 61: /* wf-save */
+		case 64: /* wf-save */
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
-		case 62: /* ssid-filter */
+		case 65: /* ssid-filter */
 			hash_ssid_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -1673,7 +1744,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 63: /* nlm-filter */
+		case 66: /* nlm-filter */
 			hash_nlm_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -1691,7 +1762,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 64: /* nlm-list */
+		case 67: /* nlm-list */
 			if (!nlm_list(optarg && !strcmp(optarg,"all")))
 			{
 				DLOG_ERR("could not get list of NLM networks\n");
@@ -1776,9 +1847,9 @@ int main(int argc, char **argv)
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
 		if (AUTOTTL_ENABLED(dp->desync_autottl))
-			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",v,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
+			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
-			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",v,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		if (dp->desync_split_tls==tlspos_none && dp->desync_split_pos) dp->desync_split_tls=tlspos_pos;
 		if (dp->desync_split_http_req==httpreqpos_none && dp->desync_split_pos) dp->desync_split_http_req=httpreqpos_pos;
 	}
@@ -1791,6 +1862,16 @@ int main(int argc, char **argv)
 	if (!LoadExcludeHostLists())
 	{
 		DLOG_ERR("Exclude hostlists load failed\n");
+		exit_clean(1);
+	}
+	if (!LoadIncludeIpsets())
+	{
+		DLOG_ERR("Include ipset load failed\n");
+		exit_clean(1);
+	}
+	if (!LoadExcludeIpsets())
+	{
+		DLOG_ERR("Exclude ipset load failed\n");
 		exit_clean(1);
 	}
 	

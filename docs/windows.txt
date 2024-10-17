@@ -120,8 +120,9 @@ setup-x86_64.exe --allow-unsupported-windows --no-verify --site http://ctm.crouc
 Для сборки из исходников требуется gcc-core,make,zlib-devel.
 Собирать из директории nfq командой "make cygwin".
 winws требует cygwin1.dll, windivert.dll, windivert64.sys. Их можно взять из binaries/win64/zapret-winws.
-Версию для 32-битных x86 windows собрать можно, но такие системы уже уходят в прошлое, поэтому если надо - собирайте сами.
-32-битный windivert можно взять с сайта разработчика. Требуется версия 2.2.2.
+
+32-битную x86 версию можно собрать из 32-битного cygwin командой "make cygwin32".
+windivert.dll и windivert32.sys можно взять из комплекта windivert 2.2.2 : https://reqrypt.org/download
 
 Для arm64 windows нет подписанного драйвера windivert и нет cygwin.
 Однако, эмуляция x64 windows 11 позволяет использовать все, кроме WinDivert64.sys без изменений.
@@ -220,3 +221,6 @@ winws --debug --wf-tcp=80,443 | tee winws.log
 winws.log будет в cygwin/home/<имя_пользователя>
 Если у вас windows 7, то блокнот не поймет переводы строк в стиле unix. Воспользуйтесь командой
 unix2dos winws.log
+
+Готовую 32-битную версию можно скачать здесь : https://github.com/bol-van/zapret-win32
+Поскольку 32-битные windows мало востребованы, выложены только бинарники и ничего больше.

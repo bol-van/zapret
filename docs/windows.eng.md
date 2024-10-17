@@ -80,11 +80,13 @@ curl -O https://www.cygwin.com/setup-x86_64.exe
 setup-x86_64.exe --allow-unsupported-windows --no-verify --site http://ctm.crouchingtigerhiddenfruitbat.org/pub/cygwin/circa/64bit/2024/01/30/231215
 ```
 You must choose to install `curl`. To compile from sources install `gcc-core`,`make`,`zlib-devel`.
+Make from directory `nfq` using `make cygwin`.
 
 `winws` requires `cygwin1.dll`, `windivert.dll`, `windivert64.sys`. You can take them from `binaries/win64/zapret-winws`.
 
-It's possible to build x86 32-bit version but this version is not shipped. You have to build it yourself.
-32-bit `windivert` can be downloaded from it's developer github. Required version is 2.2.2.
+32-bit x86 version can be build from 32-bit cygwin using `make cygwin32`.
+`windivert.dll` and `windivert32.sys` can be taken from [windivert 2.2.2 archive](https://reqrypt.org/download)
+
 There's no `arm64` signed `windivert` driver and no `cygwin`.
 But it's possible to use unsigned driver version in test mode and user mode components with x64 emulation.
 x64 emulation requires `windows 11` and not supported in `windows 10`.
@@ -159,3 +161,5 @@ unix2dos winws.log
 ```
 
 `winws.log` will be in `cygwin/home/<username>`. `unix2dos` helps with `windows 7` notepad. It's not necessary in `Windows 10` and later.
+
+Pre-compiled 32-bit binaries can be downloaded [here](https://github.com/bol-van/zapret-win32)

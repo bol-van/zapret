@@ -5,7 +5,11 @@ CFLAGS_MAC = -mmacosx-version-min=10.8
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
-LIBS_CYGWIN = -lz -Lwindivert -lwindivert -lwlanapi -lole32 -loleaut32 -luuid
+LIBS_CYGWIN = -lz -Lwindows/windivert -Iwindows -lwlanapi -lole32 -loleaut32 -luuid
+LIBS_CYGWIN32 = -lwindivert32
+LIBS_CYGWIN64 = -lwindivert64
+RES_CYGWIN32 = windows/res/32/winmanifest.o windows/res/32/winicon.o
+RES_CYGWIN64 = windows/res/64/winmanifest.o windows/res/64/winicon.o
 SRC_FILES = *.c crypto/*.c
 
 all: nfqws
@@ -23,8 +27,11 @@ mac: $(SRC_FILES)
 	lipo -create -output dvtws dvtwsx dvtwsa
 	rm -f dvtwsx dvtwsa
 
-cygwin:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) winmanifest.o winicon.o
+cygwin64:
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) $(LIBS_CYGWIN64) $(RES_CYGWIN64)
+cygwin32:
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) $(LIBS_CYGWIN32) $(RES_CYGWIN32)
+cygwin: cygwin64
 
 clean:
 	rm -f nfqws dvtws winws.exe
