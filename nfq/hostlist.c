@@ -55,7 +55,7 @@ bool AppendHostList(strpool **hostlist, const char *filename)
 		if (r==Z_OK)
 		{
 			DLOG_CONDUP("zlib compression detected. uncompressed size : %zu\n", zsize);
-			
+
 			p = zbuf;
 			e = zbuf + zsize;
 			while(p<e)
@@ -78,7 +78,7 @@ bool AppendHostList(strpool **hostlist, const char *filename)
 	else
 	{
 		DLOG_CONDUP("loading plain text list\n");
-		
+
 		while (fgets(s, sizeof(s), F))
 		{
 			p = s;
@@ -174,7 +174,7 @@ static bool LoadIncludeHostListsForProfile(struct desync_profile *dp)
 // return : true = apply fooling, false = do not apply
 bool HostlistCheck(struct desync_profile *dp, const char *host, bool *excluded)
 {
-	DLOG("* Hostlist check for profile %d\n",dp->n);
+	DLOG("* hostlist check for profile %d\n",dp->n);
 	if (*dp->hostlist_auto_filename)
 	{
 		time_t t = file_mod_time(dp->hostlist_auto_filename);

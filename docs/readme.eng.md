@@ -211,6 +211,9 @@ nfqws takes the following parameters:
  --filter-l3=ipv4|ipv6                          ; L3 protocol filter. multiple comma separated values allowed.
  --filter-tcp=[~]port1[-port2]                  ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp.
  --filter-udp=[~]port1[-port2]                  ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp.
+ --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
+ --ipset=<filename>                             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
 ```
 
 The manipulation parameters can be combined in any way.
@@ -575,18 +578,18 @@ You need to use nftables instead with hook priority 101 or higher.
 `nfqws` can apply different strategies to different requests. It's done with multiple desync profiles.
 Profiles are delimited by the `--new` parameter. First profile is created automatically and does not require `--new`.
 Each profile has a filter. By default it's empty and profile matches any packet.
-Filter can have hard parameters : ip version and tcp/udp port range.
-Hard parameters are always identified unambiguously even on zero-phase when hostname is unknown yet.
-Hostlist can also act as a filter. They can be combined with hard parameters.
+Filter can have hard parameters : ip version, ipset and tcp/udp port range.
+Hard parameters are always identified unambiguously even on zero-phase when hostname and L7 are unknown yet.
+Hostlists can also act as a filter. They can be combined with hard parameters.
 When a packet comes profiles are matched from the first to the last until first filter condition match.
 Hard filter is matched first. If it does not match verification goes to the next profile.
-If a profile matches hard filter and has autohostlist it's selected immediately.
-If a profile matches hard filter and has normal hostlist(s) and hostname is unknown yet verification goes to the next profile.
+If a profile matches hard filter , L7 filter and has autohostlist it's selected immediately.
+If a profile matches hard filter , L7 filter and has normal hostlist(s) and hostname is unknown yet verification goes to the next profile.
 Otherwise profile hostlist(s) are checked for the hostname. If it matches profile is selected.
 Otherwise verification goes to the next profile.
 
-It's possible that before getting hostname connection is served by one profile and after
-hostname is revealed it's switched to another profile.
+It's possible that before knowing L7 and hostname connection is served by one profile and after
+this information is revealed it's switched to another profile.
 If you use 0-phase desync methods think carefully what can happen during strategy switch.
 Use `--debug` logging to understand better what `nfqws` does.
 
@@ -596,6 +599,9 @@ It's used when no filter matched.
 IMPORTANT : multiple strategies exist only for the case when it's not possible to combine all to one strategy.
 Copy-pasting blockcheck results of different websites to multiple strategies lead to the mess.
 This way you may never unblock all resources and only confuse yourself.
+
+IMPORTANT : user-mode ipset implementation was not designed as a kernel version replacement. Kernel version is much more effective.
+It's for the systems that lack ipset support : Windows and Linux without nftables and ipset kernel modules (Android, for example).
 
 ## tpws
 
@@ -637,6 +643,9 @@ tpws is transparent proxy.
  --new                          ; begin new strategy
  --filter-l3=ipv4|ipv6          ; L3 protocol filter. multiple comma separated values allowed.
  --filter-tcp=[~]port1[-port2]  ; TCP port filter. ~ means negation
+ --filter-l7=[http|tls|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
+ --ipset=<filename>             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude=<filename>     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
 
  --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)

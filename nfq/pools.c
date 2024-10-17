@@ -151,3 +151,127 @@ void strlist_destroy(struct str_list_head *head)
 		strlist_entry_destroy(entry);
 	}
 }
+
+
+
+void ipset4Destroy(ipset4 **ipset)
+{
+	ipset4 *elem, *tmp;
+	HASH_ITER(hh, *ipset, elem, tmp)
+	{
+		HASH_DEL(*ipset, elem);
+		free(elem);
+	}
+}
+bool ipset4Check(ipset4 *ipset, const struct in_addr *a, uint8_t preflen)
+{
+	uint32_t ip = ntohl(a->s_addr);
+	struct cidr4 cidr;
+	ipset4 *ips_found;
+
+	// zero alignment bytes
+	memset(&cidr,0,sizeof(cidr));
+	cidr.preflen = preflen+1;
+	do
+	{
+		cidr.preflen--;
+		cidr.addr.s_addr = htonl(ip & mask_from_preflen(cidr.preflen));
+		HASH_FIND(hh, ipset, &cidr, sizeof(cidr), ips_found);
+		if (ips_found) return true;
+	} while(cidr.preflen);
+
+	return false;
+}
+bool ipset4Add(ipset4 **ipset, const struct in_addr *a, uint8_t preflen)
+{
+	if (preflen>32) return false;
+
+	// avoid dups
+	if (ipset4Check(*ipset, a, preflen)) return true; // already included
+
+	struct ipset4 *entry = calloc(1,sizeof(ipset4));
+	if (!entry) return false;
+
+	entry->cidr.addr.s_addr = htonl(ntohl(a->s_addr) & mask_from_preflen(preflen));
+	entry->cidr.preflen = preflen;
+	oom = false;
+	HASH_ADD(hh, *ipset, cidr, sizeof(entry->cidr), entry);
+	if (oom) { free(entry); return false; }
+
+	return true;
+}
+void ipset4Print(ipset4 *ipset)
+{
+	ipset4 *ips, *tmp;
+	HASH_ITER(hh, ipset , ips, tmp)
+	{
+		print_cidr4(&ips->cidr);
+		printf("\n");
+	}
+}
+
+void ipset6Destroy(ipset6 **ipset)
+{
+	ipset6 *elem, *tmp;
+	HASH_ITER(hh, *ipset, elem, tmp)
+	{
+		HASH_DEL(*ipset, elem);
+		free(elem);
+	}
+}
+bool ipset6Check(ipset6 *ipset, const struct in6_addr *a, uint8_t preflen)
+{
+	struct cidr6 cidr;
+	ipset6 *ips_found;
+
+	// zero alignment bytes
+	memset(&cidr,0,sizeof(cidr));
+	cidr.preflen = preflen+1;
+	do
+	{
+		cidr.preflen--;
+		ip6_and(a, mask_from_preflen6(cidr.preflen), &cidr.addr);
+		HASH_FIND(hh, ipset, &cidr, sizeof(cidr), ips_found);
+		if (ips_found) return true;
+	} while(cidr.preflen);
+
+	return false;
+}
+bool ipset6Add(ipset6 **ipset, const struct in6_addr *a, uint8_t preflen)
+{
+	if (preflen>128) return false;
+
+	// avoid dups
+	if (ipset6Check(*ipset, a, preflen)) return true; // already included
+
+	struct ipset6 *entry = calloc(1,sizeof(ipset6));
+	if (!entry) return false;
+
+	ip6_and(a, mask_from_preflen6(preflen), &entry->cidr.addr);
+	entry->cidr.preflen = preflen;
+	oom = false;
+	HASH_ADD(hh, *ipset, cidr, sizeof(entry->cidr), entry);
+	if (oom) { free(entry); return false; }
+
+	return true;
+}
+void ipset6Print(ipset6 *ipset)
+{
+	ipset6 *ips, *tmp;
+	HASH_ITER(hh, ipset , ips, tmp)
+	{
+		print_cidr6(&ips->cidr);
+		printf("\n");
+	}
+}
+
+void ipsetDestroy(ipset *ipset)
+{
+	ipset4Destroy(&ipset->ips4);
+	ipset6Destroy(&ipset->ips6);
+}
+void ipsetPrint(ipset *ipset)
+{
+	ipset4Print(ipset->ips4);
+	ipset6Print(ipset->ips6);
+}
