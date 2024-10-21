@@ -1,4 +1,4 @@
-config
+/config
 ip2net/ip2net
 mdig/mdig
 nfq/nfqws
