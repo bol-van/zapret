@@ -1736,7 +1736,7 @@ fw4 reload
 
 /etc/init.d/tpws disable
 /etc/init.d/tpws stop
-rm -f /etc/nftables.d/90-tpws.nft /etc/init.d/tpws
+rm -f /etc/nftables.d/90-tpws.nft /etc/init.d/tpws /usr/bin/tpws
 fw4 restart
 
 
