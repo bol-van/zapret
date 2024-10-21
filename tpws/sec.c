@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <sys/param.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "sec.h"
@@ -279,12 +280,14 @@ bool droproot(uid_t uid, gid_t gid)
 		return false;
 	}
 #endif
+#if !(defined(BSD) && !defined(__OpenBSD__) && !defined(__APPLE__))
 	// drop all SGIDs
 	if (setgroups(0,NULL))
 	{
 		DLOG_PERROR("setgroups");
 		return false;
 	}
+#endif
 	if (setgid(gid))
 	{
 		DLOG_PERROR("setgid");
