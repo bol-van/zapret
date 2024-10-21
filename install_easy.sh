@@ -486,6 +486,7 @@ init.d/runit/zapret/finish \
 init.d/openrc/zapret \
 init.d/sysv/zapret \
 init.d/openwrt/zapret \
+init.d/openwrt-minimal/tpws/etc/init.d/tpws \
 uninstall_easy.sh \
 	; do chmod 755 "$1/$f" 2>/dev/null ; done
 }
