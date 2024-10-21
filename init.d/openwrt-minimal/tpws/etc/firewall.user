@@ -1,0 +1,28 @@
+TP_PORT=900
+TP_USER=daemon
+
+exists()
+{
+	which "$1" >/dev/null 2>/dev/null
+}
+
+ipt()
+{
+	$IPTABLES $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null || $IPTABLES $FW_EXTRA_PRE -I "$@" $FW_EXTRA_POST
+}
+
+redirect_port()
+{
+	ipt PREROUTING -t nat -p tcp --dport $1 -j REDIRECT --to-port $2
+	ipt OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TP_USER -j REDIRECT --to-port $2
+}
+
+redirect()
+{
+	redirect_port 80 $TP_PORT
+	redirect_port 443 $TP_PORT
+}
+
+for IPTABLES in iptables ip6tables; do
+	exists $IPTABLES && redirect
+done
