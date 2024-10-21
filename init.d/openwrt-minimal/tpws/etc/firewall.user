@@ -28,7 +28,7 @@ redirect()
 for IPTABLES in iptables ip6tables; do
 	$IPTABLES -t nat -N tpws 2>/dev/null
 	$IPTABLES -t nat -F tpws
-	exists $IPTABLES && redirect
+	redirect
 done
 
 for net in $EXCLUDE4
