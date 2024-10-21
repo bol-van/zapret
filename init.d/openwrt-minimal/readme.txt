@@ -11,6 +11,7 @@ Copy everything from tpws directory to the root of the router.
 Copy tpws binary for your architecture to /usr/bin/tpws
 Set proper access rights : chmod 755 /etc/init.d/tpws /usr/bin/tpws
 EDIT /etc/config/tpws
+If you don't want ipv6 : edit /etc/nftables.d and comment lines with ipv6 redirect
 /etc/init.d/tpws enable
 /etc/init.d/tpws start
 fw4 restart
@@ -39,6 +40,7 @@ Copy everything from tpws directory to the root of the router.
 Copy tpws binary for your architecture to /usr/bin/tpws
 Set proper access rights : chmod 755 /etc/init.d/tpws /usr/bin/tpws
 EDIT /etc/config/tpws
+If you don't want ipv6 : edit /etc/firewall.user and set DISABLE_IPV6=1
 /etc/init.d/tpws enable
 /etc/init.d/tpws start
 fw3 restart
