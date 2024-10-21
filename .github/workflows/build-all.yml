@@ -1,0 +1,81 @@
+name: Build zapret
+on:
+  push:
+    paths:
+      - 'ip2net/**'
+      - 'mdig/**'
+      - 'nfq/**'
+      - 'tpws/**'
+  pull_request:
+    paths:
+      - 'ip2net/**'
+      - 'mdig/**'
+      - 'nfq/**'
+      - 'tpws/**'
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILD_SUMMARY: false
+
+jobs:
+  build:
+    name: Build for Linux
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch:
+          - aarch64-musl
+          - arm-musleabi
+          - arm-musleabihf
+          - mipsel-musl
+          - i586-musl
+          - x86_64-musl
+    # container:
+    #   image: messense/rust-musl-cross:${{ matrix.arch }}
+    #   options: --user root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker in tmpfs
+        run: |
+          sudo systemctl stop docker
+          sudo mount -t tmpfs -o size=80% tmpfs /var/lib/docker
+          sudo systemctl start docker
+
+      - name: Cache Docker images
+        id: docker-cache
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-${{ runner.os }}-${{ matrix.arch }}
+
+      # - name: Set up Docker Buildx
+      #   if: steps.docker-cache.outputs.cache-hit != 'true'
+      #   uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          tags: zapret-musl-cross:${{ matrix.arch }}
+          context: .
+          load: true
+          build-args: BUILDARCH=${{ matrix.arch }}
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
+
+      - name: Compile zapret
+        run: |
+          docker run --entrypoint=bash -v ${{ github.workspace }}:/work \
+          zapret-musl-cross:${{ matrix.arch }} \
+          -c 'cd /work; CC=$TARGET_CC CFLAGS="-static" make -j$(nproc)'
+
+      - name: Declare short commit variable
+        id: vars
+        run: |
+          git config --global --add safe.directory '*' && echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Upload output file
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret_${{ steps.vars.outputs.sha_short }}_${{ matrix.arch }}
+          path: binaries/my/
