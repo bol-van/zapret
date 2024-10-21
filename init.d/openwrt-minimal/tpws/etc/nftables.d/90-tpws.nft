@@ -1,0 +1,8 @@
+chain tpws_re {
+	type nat hook prerouting priority dstnat; policy accept;
+	tcp dport {80,443} redirect to :900
+}
+chain tpws_out {
+	type nat hook output priority -100; policy accept;
+	tcp dport {80,443} skuid != daemon redirect to :900
+}
