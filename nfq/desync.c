@@ -612,6 +612,8 @@ static void autottl_discover(t_ctrack *ctrack, bool bIpv6)
 			else
 				DLOG("autottl: could not guess\n");
 		}
+		else
+			ctrack->autottl = 0;
 	}
 }
 
