@@ -1734,7 +1734,7 @@ install_easy.sh автоматизирует ручные варианты пр�
 Отредактируйте /etc/config/tpws
 /etc/init.d/tpws enable
 /etc/init.d/tpws start
-fw4 reload
+fw4 restart
 
 Полное удаление :
 
