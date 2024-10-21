@@ -13,7 +13,7 @@ Set proper access rights : chmod 755 /etc/init.d/tpws /usr/bin/tpws
 EDIT /etc/config/tpws
 /etc/init.d/tpws enable
 /etc/init.d/tpws start
-fw4 reload
+fw4 restart
 
 * full uninstall :
 
