@@ -1,6 +1,9 @@
 TP_PORT=900
 TP_USER=daemon
 
+EXCLUDE4="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16"
+EXCLUDE6="fc00::/7 fe80::/10"
+
 exists()
 {
 	which "$1" >/dev/null 2>/dev/null
@@ -8,13 +11,12 @@ exists()
 
 ipt()
 {
-	$IPTABLES $FW_EXTRA_PRE -C "$@" $FW_EXTRA_POST >/dev/null 2>/dev/null || $IPTABLES $FW_EXTRA_PRE -I "$@" $FW_EXTRA_POST
+	$IPTABLES -C "$@" >/dev/null 2>/dev/null || $IPTABLES -I "$@"
 }
 
 redirect_port()
 {
-	ipt PREROUTING -t nat -p tcp --dport $1 -j REDIRECT --to-port $2
-	ipt OUTPUT -t nat -p tcp --dport $1 -m owner ! --uid-owner $TP_USER -j REDIRECT --to-port $2
+	ipt tpws -t nat -p tcp --dport $1 -j REDIRECT --to-port $2
 }
 
 redirect()
@@ -24,5 +26,21 @@ redirect()
 }
 
 for IPTABLES in iptables ip6tables; do
+	$IPTABLES -t nat -N tpws 2>/dev/null
+	$IPTABLES -t nat -F tpws
 	exists $IPTABLES && redirect
+done
+
+for net in $EXCLUDE4
+do
+	iptables -t nat -I tpws -d $net -j RETURN
+done
+for net in $EXCLUDE6
+do
+	ip6tables -t nat -I tpws -d $net -j RETURN
+done
+
+for IPTABLES in iptables ip6tables; do
+	ipt PREROUTING -t nat -j tpws
+	ipt OUTPUT -t nat -m owner ! --uid-owner $TP_USER -j tpws
 done
