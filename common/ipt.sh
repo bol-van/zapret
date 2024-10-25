@@ -48,28 +48,6 @@ is_ipt_flow_offload_avail()
 	grep -q FLOWOFFLOAD 2>/dev/null /proc/net/ip$1_tables_targets
 }
 
-filter_apply_port_target()
-{
-	# $1 - var name of iptables filter
-	local f
-	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		f="-p tcp -m multiport --dports $HTTP_PORTS_IPT,$HTTPS_PORTS_IPT"
-	elif [ "$MODE_HTTPS" = "1" ]; then
-		f="-p tcp -m multiport --dports $HTTPS_PORTS_IPT"
-	elif [ "$MODE_HTTP" = "1" ]; then
-		f="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
-	else
-		echo WARNING !!! HTTP and HTTPS are both disabled
-	fi
-	eval $1="\"\$$1 $f\""
-}
-filter_apply_port_target_quic()
-{
-	# $1 - var name of nftables filter
-	local f
-	f="-p udp -m multiport --dports $QUIC_PORTS_IPT"
-	eval $1="\"\$$1 $f\""
-}
 filter_apply_ipset_target4()
 {
 	# $1 - var name of ipv4 iptables filter
@@ -220,7 +198,7 @@ _fw_nfqws_post4()
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)"
 
-		rule="$2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		rule="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
 		if [ -n "$4" ] ; then
 			for i in $4; do
 				ipt_add_del $1 POSTROUTING -t mangle -o $i $rule
@@ -241,7 +219,7 @@ _fw_nfqws_post6()
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)" 6
 
-		rule="$2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		rule="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
 		if [ -n "$4" ] ; then
 			for i in $4; do
 				ipt6_add_del $1 POSTROUTING -t mangle -o $i $rule
@@ -320,27 +298,13 @@ fw_nfqws_pre()
 }
 
 
-produce_reverse_nfqws_rule()
-{
-	local rule="$1"
-	if contains "$rule" "$ipt_connbytes"; then
-		# autohostlist - need several incoming packets
-		# autottl - need only one incoming packet
-		[ "$MODE_FILTER" = autohostlist ] || rule=$(echo "$rule" | sed -re "s/$ipt_connbytes [0-9]+:[0-9]+/$ipt_connbytes 1:1/")
-	else
-		local n=1
-		[ "$MODE_FILTER" = autohostlist ] && n=$(first_packets_for_mode)
-		rule="$ipt_connbytes 1:$n $rule"
-	fi
-	echo "$rule" | reverse_nfqws_rule_stream
-}
 fw_reverse_nfqws_rule4()
 {
-	fw_nfqws_pre4 $1 "$(produce_reverse_nfqws_rule "$2")" $3
+	fw_nfqws_pre4 $1 "$(reverse_nfqws_rule "$2")" $3
 }
 fw_reverse_nfqws_rule6()
 {
-	fw_nfqws_pre6 $1 "$(produce_reverse_nfqws_rule "$2")" $3
+	fw_nfqws_pre6 $1 "$(reverse_nfqws_rule "$2")" $3
 }
 fw_reverse_nfqws_rule()
 {
@@ -353,93 +317,66 @@ fw_reverse_nfqws_rule()
 	fw_reverse_nfqws_rule6 $1 "$3" $4
 }
 
+ipt_first_packets()
+{
+	# $1 - packet count
+	[ -n "$1" -a "$1" != keepalive ] && [ "$1" -ge 1 ] && echo "$ipt_connbytes 1:$1"
+}
+ipt_do_nfqws_in_out()
+{
+	# $1 - 1 - add, 0 - del
+	# $2 - tcp,udp
+	# $3 - ports
+	# $4 - PKT_OUT. special value : 'keepalive'
+	# $5 - PKT_IN
+	local f4 f6 first_packets_only
+	[ -n "$3" ] || return
+	[ -n "$4" -a "$4" != 0 ] &&
+	{
+		first_packets_only="$(ipt_first_packets $4)"
+		f4="-p $2 -m multiport --dports $3 $first_packets_only"
+		f6=$f4
+		filter_apply_ipset_target f4 f6
+		fw_nfqws_post $1 "$f4" "$f6" $QNUM
+	}
+	[ -n "$5" -a "$5" != 0 ] &&
+	{
+		first_packets_only="$(ipt_first_packets $5)"
+		f4="-p $2 -m multiport --dports $3  $first_packets_only"
+		f6=$f4
+		filter_apply_ipset_target f4 f6
+		fw_reverse_nfqws_rule $1 "$f4" "$f6" $QNUM
+	}
+}
+
+zapret_do_firewall_standard_rules_ipt()
+{
+	# $1 - 1 - add, 0 - del
+
+	local f4 f6
+
+	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] &&
+	{
+		f4="-p tcp -m multiport --dports $TPWS_PORTS_IPT"
+		f6=$f4
+		filter_apply_ipset_target f4 f6
+		fw_tpws $1 "$f4" "$f6" $TPPORT
+	}
+	[ "$NFQWS_ENABLE" = 1 ] &&
+	{
+		ipt_do_nfqws_in_out $1 tcp "$NFQWS_PORTS_TCP_IPT" "$NFQWS_TCP_PKT_OUT" "$NFQWS_TCP_PKT_IN"
+		ipt_do_nfqws_in_out $1 tcp "$NFQWS_PORTS_TCP_KEEPALIVE_IPT" keepalive "$NFQWS_TCP_PKT_IN"
+		ipt_do_nfqws_in_out $1 udp "$NFQWS_PORTS_UDP_IPT" "$NFQWS_UDP_PKT_OUT" "$NFQWS_UDP_PKT_IN"
+		ipt_do_nfqws_in_out $1 udp "$NFQWS_PORTS_UDP_KEEPALIVE_IPT" keepalive "$NFQWS_UDP_PKT_IN"
+	}
+}
 
 zapret_do_firewall_rules_ipt()
 {
-	local mode="${MODE_OVERRIDE:-$MODE}"
+	# $1 - 1 - add, 0 - del
 
-	local first_packet_only="$ipt_connbytes 1:$(first_packets_for_mode)"
-	local desync="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK"
-	local n f4 f6 qn qns qn6 qns6
-
-	case "$mode" in
-		tpws)
-			if [ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ]; then
-				echo both http and https are disabled. not applying redirection.
-			else
-				filter_apply_port_target f4
-				f6=$f4
-				filter_apply_ipset_target f4 f6
-				fw_tpws $1 "$f4" "$f6" $TPPORT
-			fi
-			;;
-	
-		nfqws)
-			# quite complex but we need to minimize nfqws processes to save RAM
-			get_nfqws_qnums qn qns qn6 qns6
-			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn" ] && [ "$qn" = "$qns" ]; then
-				filter_apply_port_target f4
-				f4="$f4 $first_packet_only"
-				filter_apply_ipset_target4 f4
-				fw_nfqws_post4 $1 "$f4 $desync" $qn
-				fw_reverse_nfqws_rule4 $1 "$f4" $qn
-			else
-				if [ -n "$qn" ]; then
-					f4="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
-					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f4="$f4 $first_packet_only"
-					filter_apply_ipset_target4 f4
-					fw_nfqws_post4 $1 "$f4 $desync" $qn
-					fw_reverse_nfqws_rule4 $1 "$f4" $qn
-				fi
-				if [ -n "$qns" ]; then
-					f4="-p tcp -m multiport --dports $HTTPS_PORTS_IPT $first_packet_only"
-					filter_apply_ipset_target4 f4
-					fw_nfqws_post4 $1 "$f4 $desync" $qns
-					fw_reverse_nfqws_rule4 $1 "$f4" $qns
-				fi
-			fi
-			if [ "$MODE_HTTP_KEEPALIVE" != "1" ] && [ -n "$qn6" ] && [ "$qn6" = "$qns6" ]; then
-				filter_apply_port_target f6
-				f6="$f6 $first_packet_only"
-				filter_apply_ipset_target6 f6
-				fw_nfqws_post6 $1 "$f6 $desync" $qn6
-				fw_reverse_nfqws_rule6 $1 "$f6" $qn6
-			else
-				if [ -n "$qn6" ]; then
-					f6="-p tcp -m multiport --dports $HTTP_PORTS_IPT"
-					[ "$MODE_HTTP_KEEPALIVE" = "1" ] || f6="$f6 $first_packet_only"
-					filter_apply_ipset_target6 f6
-					fw_nfqws_post6 $1 "$f6 $desync" $qn6
-					fw_reverse_nfqws_rule6 $1 "$f6" $qn6
-				fi
-				if [ -n "$qns6" ]; then
-					f6="-p tcp -m multiport --dports $HTTPS_PORTS_IPT $first_packet_only"
-					filter_apply_ipset_target6 f6
-					fw_nfqws_post6 $1 "$f6 $desync" $qns6
-					fw_reverse_nfqws_rule6 $1 "$f6" $qns6
-				fi
-			fi
-
-			get_nfqws_qnums_quic qn qn6
-			if [ -n "$qn" ]; then
-				f4=
-				filter_apply_port_target_quic f4
-				f4="$f4 $first_packet_only"
-				filter_apply_ipset_target4 f4
-				fw_nfqws_post4 $1 "$f4 $desync" $qn
-			fi
-			if [ -n "$qn6" ]; then
-				f6=
-				filter_apply_port_target_quic f6
-				f6="$f6 $first_packet_only"
-				filter_apply_ipset_target6 f6
-				fw_nfqws_post6 $1 "$f6 $desync" $qn6
-			fi
-			;;
-		custom)
-			custom_runner zapret_custom_firewall $1
-			;;
-	esac
+	zapret_do_firewall_standard_rules_ipt $1
+	custom_runner zapret_custom_firewall $1
 }
 
 zapret_do_firewall_ipt()
@@ -451,10 +388,6 @@ zapret_do_firewall_ipt()
 	else
 		echo Clearing iptables
 	fi
-
-	local mode="${MODE_OVERRIDE:-$MODE}"
-
-	[ "$mode" = "tpws-socks" ] && return 0
 
 	# always create ipsets. ip_exclude ipset is required
 	[ "$1" = 1 ] && create_ipset no-update

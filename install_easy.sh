@@ -5,6 +5,9 @@
 EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
 ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
+ZAPRET_TARGET=${ZAPRET_TARGET:-/opt/zapret}
+ZAPRET_TARGET_RW=${ZAPRET_RW:-"$ZAPRET_TARGET"}
+ZAPRET_TARGET_CONFIG="$ZAPRET_TARGET_RW/config"
 ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
 ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 ZAPRET_CONFIG_DEFAULT="$ZAPRET_BASE/config.default"
@@ -24,12 +27,7 @@ IPSET_DIR="$ZAPRET_BASE/ipset"
 . "$ZAPRET_BASE/common/installer.sh"
 . "$ZAPRET_BASE/common/virt.sh"
 
-# install target
-ZAPRET_TARGET=${ZAPRET_TARGET:-/opt/zapret}
-
 GET_LIST="$IPSET_DIR/get_config.sh"
-
-[ -n "$TPPORT" ] || TPPORT=988
 
 check_readonly_system()
 {
@@ -102,112 +100,107 @@ install_binaries()
 	}
 }
 
-select_mode_mode()
+ws_opt_validate()
 {
-	local edited v vars MODES="tpws tpws-socks nfqws filter custom"
-	[ "$SYSTEM" = "macos" ] && MODES="tpws tpws-socks filter custom"
-	echo
-	echo select MODE :
-	ask_list MODE "$MODES" tpws && write_config_var MODE
+	# ПРИМЕЧАНИЕ ДЛЯ РАСПРОСТРАНИТЕЛЕЙ КОПИПАСТЫ
+	# ЭТОТ КОД СДЕЛАН СПЕЦИАЛЬНО ДЛЯ ВАС, ЧТОБЫ ВЫ НЕ ПОСТИЛИ В СЕТЬ ПЛОХИЕ РЕЦЕПТЫ
+	# ЕСЛИ ВАМ ХОЧЕТСЯ ЕГО УДАЛИТЬ И НАПИСАТЬ ИНСТРУКЦИЮ КАК ЕГО УДАЛЯТЬ, ВЫ ДЕЛАЕТЕ ХРЕНОВУЮ УСЛУГУ. НАПИШИТЕ ЛУЧШЕ custom script.
+	# custom script - ЭТО ФАЙЛИК, КОТОРЫЙ ДОСТАТОЧНО СКОПИРОВАТЬ В НУЖНУЮ ДИРЕКТОРИЮ, ЧТОБЫ ОН СДЕЛАЛ ТОЖЕ САМОЕ, НО ЭФФЕКТИВНО.
+	# ФИЛЬТРАЦИЯ ПО IPSET В ЯДРЕ НЕСРАВНИМО ЭФФЕКТИВНЕЕ, ЧЕМ ПЕРЕКИДЫВАТЬ ВСЕ ПАКЕТЫ В nfqws И ТАМ ФИЛЬТРОВАТЬ
+	# --ipset СУЩЕСТВУЕТ ТОЛЬКО ДЛЯ ВИНДЫ И LINUX СИСТЕМ БЕЗ ipset (НАПРИМЕР, Android).
+	# И ТОЛЬКО ПО ЭТОЙ ПРИЧИНЕ ОНО НЕ ВЫКИНУТО ПОЛНОСТЬЮ ИЗ LINUX ВЕРСИИ
+	has_bad_ws_options "$1" && {
+		help_bad_ws_options
+		return 1
+	}
+	return 0
+}
 
-	case $MODE in
-		tpws|tpws-socks)
-			vars="TPWS_OPT TPWS_OPT_SUFFIX"
-			;;
-		nfqws)
-			vars="NFQWS_OPT_DESYNC NFQWS_OPT_DESYNC_SUFFIX NFQWS_OPT_DESYNC_HTTP NFQWS_OPT_DESYNC_HTTP_SUFFIX NFQWS_OPT_DESYNC_HTTPS NFQWS_OPT_DESYNC_HTTPS_SUFFIX NFQWS_OPT_DESYNC_HTTP6 NFQWS_OPT_DESYNC_HTTP6_SUFFIX NFQWS_OPT_DESYNC_HTTPS6 NFQWS_OPT_DESYNC_HTTPS6_SUFFIX NFQWS_OPT_DESYNC_QUIC NFQWS_OPT_DESYNC_QUIC_SUFFIX NFQWS_OPT_DESYNC_QUIC6 NFQWS_OPT_DESYNC_QUIC6_SUFFIX"
-			;;
-	esac
-	[ -n "$vars" ] && {
+select_mode_group()
+{
+	# $1 - ENABLE var name
+	# $2 - ask text
+	# $3 - vars
+	# $4 - validator func
+	# $5 - validator func param var
+
+	local enabled var v edited bad Y param
+
+	echo
+	ask_yes_no_var $1 "$2"
+	write_config_var $1
+	eval enabled=\$$1
+	[ "$enabled" = 1 ] && {
 		echo
-		while [ 1=1 ]; do
-			for var in $vars; do
-				eval v="\$$var"
-				echo $var=\"$v\"
-			done
-			ask_yes_no N "do you want to edit the options" || {
+		while  : ; do
+			list_vars $3
+			bad=0; Y=N
+			[ -n "$4" ] && {
+				eval param="\$$5"
+				$4 "$param"; bad=$?
+				[ "$bad" = 1 ] && Y=Y
+			}
+			ask_yes_no $Y "do you want to edit the options" || {
+				[ "$bad" = 1 ] && {
+					echo installer will not allow to use bad options. exiting.
+					exitp 3
+				}
 				[ -n "$edited" ] && {
-					for var in $vars; do
+					for var in $3; do
 						write_config_var $var
 					done
 				}
 				break
 			}
-			edit_vars $vars
+			edit_vars $3
 			edited=1
 			echo ..edited..
 		done
 	}
-	[ "$MODE" = custom ] && {
-		echo
-		echo "current custom scripts :"
-		[ -f "$CUSTOM_DIR/custom" ] && echo "legacy custom script $CUSTOM_DIR/custom"
-		echo "$CUSTOM_DIR/custom.d :"
-		[ -d "$CUSTOM_DIR/custom.d" ] && ls "$CUSTOM_DIR/custom.d"
-		echo "Make sure this is ok"
-		echo
-	}
 }
-select_mode_http()
+
+select_mode_tpws_socks()
 {
-	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && {
-		echo
-		ask_yes_no_var MODE_HTTP "enable http support"
-		write_config_var MODE_HTTP
-	}
+	local EDITVAR_NEWLINE_DELIMETER="--new" EDITVAR_NEWLINE_VARS="TPWS_SOCKS_OPT"
+	# --ipset allowed here
+	select_mode_group TPWS_SOCKS_ENABLE "enable tpws socks mode on port $TPPORT_SOCKS ?" "TPPORT_SOCKS TPWS_SOCKS_OPT"
 }
-select_mode_keepalive()
+select_mode_tpws()
 {
-	[ "$MODE" = "nfqws" ] && [ "$MODE_HTTP" = "1" ] && {
-		echo
-		echo enable keep alive support only if DPI checks every outgoing packet for http signature
-		echo dont enable otherwise because it consumes more cpu resources
-		ask_yes_no_var MODE_HTTP_KEEPALIVE "enable http keep alive support"
-		write_config_var MODE_HTTP_KEEPALIVE
-	}
+	local EDITVAR_NEWLINE_DELIMETER="--new" EDITVAR_NEWLINE_VARS="TPWS_OPT"
+	select_mode_group TPWS_ENABLE "enable tpws transparent mode ?" "TPWS_PORTS TPWS_OPT" ws_opt_validate TPWS_OPT
 }
-select_mode_https()
+select_mode_nfqws()
 {
-	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && {
-		echo
-		ask_yes_no_var MODE_HTTPS "enable https support"
-		write_config_var MODE_HTTPS
-	}
+	local EDITVAR_NEWLINE_DELIMETER="--new" EDITVAR_NEWLINE_VARS="NFQWS_OPT"
+	select_mode_group NFQWS_ENABLE "enable nfqws ?" "NFQWS_PORTS_TCP NFQWS_PORTS_UDP NFQWS_TCP_PKT_OUT NFQWS_TCP_PKT_IN NFQWS_UDP_PKT_OUT NFQWS_UDP_PKT_IN NFQWS_PORTS_TCP_KEEPALIVE NFQWS_PORTS_UDP_KEEPALIVE NFQWS_OPT" ws_opt_validate NFQWS_OPT
 }
-select_mode_quic()
+
+select_mode_mode()
 {
-	[ "$SUBSYS" = "keenetic" ] && {
-		echo
-		echo "WARNING ! Keenetic is not officially supported by zapret."
-		echo "WARNING ! This firmware requires additional manual iptables setup to support udp desync properly."
-		echo "WARNING ! Keenetic uses proprietary ndmmark to limit MASQUERADE."
-		echo "WARNING ! Desynced packets may go outside without MASQUERADE with LAN source ip."
-		echo "WARNING ! To fix this you need to add additional MASQUERADE rule to iptables nat table."
-		echo "WARNING ! Installer WILL NOT fix it for you automatically."
-		echo "WARNING ! If you cannot understand what it is all about - do not enable QUIC."
-	}
-	[ "$MODE" != "filter" ] && [ "$MODE" != "tpws-socks" ] && [ "$MODE" != "tpws" ] && {
-		echo
-		ask_yes_no_var MODE_QUIC "enable quic support"
-		write_config_var MODE_QUIC
-	}
+	select_mode_tpws_socks
+	select_mode_tpws
+	[ "$UNAME" = Linux ] && select_mode_nfqws
+
+	echo
+	echo "current custom scripts in $CUSTOM_DIR/custom.d:"
+	[ -d "$CUSTOM_DIR/custom.d" ] && ls "$CUSTOM_DIR/custom.d"
+	echo "Make sure this is ok"
+	echo
 }
+
 select_mode_filter()
 {
 	local filter="none ipset hostlist autohostlist"
-	[ "$MODE" = "tpws-socks" ] && filter="none hostlist autohostlist"
 	echo
 	echo select filtering :
 	ask_list MODE_FILTER "$filter" none && write_config_var MODE_FILTER
 }
+
 select_mode()
 {
 	select_mode_mode
 	select_mode_iface
-	select_mode_http
-	select_mode_keepalive
-	select_mode_https
-	select_mode_quic
 	select_mode_filter
 }
 
@@ -286,7 +279,7 @@ ask_config_tmpdir()
 
 nft_flow_offload()
 {
-	[ "$UNAME" = Linux -a "$FWTYPE" = nftables -a "$MODE" != "tpws-socks" ] && [ "$FLOWOFFLOAD" = software -o "$FLOWOFFLOAD" = hardware ]
+	[ "$UNAME" = Linux -a "$FWTYPE" = nftables ] && [ "$FLOWOFFLOAD" = software -o "$FLOWOFFLOAD" = hardware ]
 }
 
 ask_iface()
@@ -338,57 +331,10 @@ select_mode_iface()
 	# it's not possible to instruct tpws to route outgoing connection to an interface (OS routing table decides)
 	# custom mode can also benefit from interface names (depends on custom script code)
 
-	if [ "$SYSTEM" = "openwrt" ] || [ "$MODE" = "filter" ]; then return; fi
+	[ "$SYSTEM" = "openwrt" ] && return
 
-	case "$MODE" in
-		tpws-socks)
-			echo "select LAN interface to allow socks access from your LAN. select NONE for localhost only."
-			echo "expect socks on tcp port $TPPORT"
-			ask_iface_lan
-			;;
-		tpws)
-			echo "select LAN interface to operate in router mode. select NONE for local outgoing traffic only."
-			if [ "$SYSTEM" = "macos" ]; then
-				echo "WARNING ! OS feature \"internet sharing\" is not supported."
-				echo "Only manually configured PF router is supported."
-			else
-				echo "WARNING ! This installer will not configure routing, NAT, ... for you. Its your responsibility."
-			fi
-			ask_iface_lan
-			;;
-		custom)
-			echo "select LAN interface for your custom script (how it works depends on your code)"
-			ask_iface_lan
-			;;
-		*)
-			nft_flow_offload && {
-				echo "select LAN interface for nftables flow offloading"
-				ask_iface_lan
-			}
-			;;
-	esac
-
-	case "$MODE" in
-		tpws)
-			echo "select WAN interface for $MODE operations. select ANY to operate on any interface."
-			[ -n "$IFACE_LAN" ] && echo "WAN filtering works only for local outgoing traffic !"
-			ask_iface_wan
-			;;
-		nfqws)
-			echo "select WAN interface for $MODE operations. select ANY to operate on any interface."
-			ask_iface_wan
-			;;
-		custom)
-			echo "select WAN interface for your custom script (how it works depends on your code)"
-			ask_iface_wan
-			;;
-		*)
-			nft_flow_offload && {
-				echo "select WAN interface for nftables flow offloading"
-				ask_iface_wan
-			}
-			;;
-	esac
+	ask_iface_lan
+	ask_iface_wan
 }
 
 default_files()
@@ -511,7 +457,9 @@ _restore_settings()
 		# safety check
 		[ -z "$f" -o "$f" = "/" ] && continue
 
-		[ -f "/tmp/zapret-bkp-$i" ] && mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -f "/tmp/zapret-bkp-$i"
+		[ -f "/tmp/zapret-bkp-$i" ] && {
+			mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -f "/tmp/zapret-bkp-$i" 
+		}
 		[ -d "/tmp/zapret-bkp-$i" ] && {
 			[ -d "$ZAPRET_TARGET/$f" ] && rm -r "$ZAPRET_TARGET/$f"
 			mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -r "/tmp/zapret-bkp-$i"
@@ -523,7 +471,12 @@ backup_restore_settings()
 {
 	# $1 - 1 - backup, 0 - restore
 	local mode=$1
-	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom" "init.d/sysv/custom.d" "init.d/openwrt/custom" "init.d/openwrt/custom.d" "init.d/macos/custom" "init.d/macos/custom.d" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt" "ipset/zapret-hosts-auto.txt"
+	on_off_function _backup_settings _restore_settings $mode "config" "init.d/sysv/custom.d" "init.d/openwrt/custom.d" "init.d/macos/custom.d" "ipset/zapret-hosts-user.txt" "ipset/zapret-hosts-user-exclude.txt" "ipset/zapret-hosts-user-ipban.txt" "ipset/zapret-hosts-auto.txt"
+}
+
+config_is_obsolete()
+{
+	[ -f "$1" ] && grep -qE "^[[:space:]]*NFQWS_OPT_DESYNC=|^[[:space:]]*MODE_HTTP=|^[[:space:]]*MODE_HTTPS=|^[[:space:]]*MODE_QUIC=|^[[:space:]]*MODE=" "$1"
 }
 
 check_location()
@@ -531,11 +484,22 @@ check_location()
 	# $1 - copy function
 
 	echo \* checking location
-
 	# use inodes in case something is linked
 	if [ -d "$ZAPRET_TARGET" ] && [ $(get_dir_inode "$EXEDIR") = $(get_dir_inode "$ZAPRET_TARGET") ]; then
+		config_is_obsolete "$ZAPRET_CONFIG" && {
+			echo config file $ZAPRET_CONFIG is obsolete. cannot continue.
+			exitp 3
+		}
 		default_files "$ZAPRET_TARGET" "$ZAPRET_RW"
 	else
+		local obsolete=0 rwdir=0
+		config_is_obsolete "$ZAPRET_TARGET_CONFIG" && obsolete=1
+		[ $(get_dir_inode "$ZAPRET_BASE") = $(get_dir_inode "$ZAPRET_RW") ] || rwdir=1
+		[ $rwdir = 1 -a $obsolete = 1 ] && {
+                 	echo config file in custom ZAPRET_RW directory is obsolete : $ZAPRET_TARGET_CONFIG
+			echo you need to edit or delete it to continue. also check for obsolete custom scripts.
+			exitp 3
+		}
 		echo
 		echo easy install is supported only from default location : $ZAPRET_TARGET
 		echo currently its run from $EXEDIR
@@ -547,7 +511,13 @@ check_location()
 				echo directory needs to be replaced. config and custom scripts can be kept or replaced with clean version
 				if ask_yes_no N "do you want to delete all files there and copy this version"; then
 					echo
-					if [ $(get_dir_inode "$ZAPRET_BASE") = $(get_dir_inode "$ZAPRET_RW") ]; then
+					if [ $obsolete = 1 ] ; then
+						echo obsolete config is detected : $ZAPRET_TARGET_RW
+						ask_yes_no N "impossible to keep config, custom scripts and user lists. do you want to delete them ?" || {
+							echo refused to delete config in $ZAPRET_TARGET. exiting
+							exitp 3
+						}
+					elif [ $rwdir != 1 ]; then
 						ask_yes_no Y "keep config, custom scripts and user lists" && keep=Y
 						[ "$keep" = "Y" ] && backup_restore_settings 1
 					fi
@@ -755,13 +725,15 @@ deoffload_openwrt_firewall()
 		printf "system wide flow offloading detected. "
 		case $FLOWOFFLOAD in
 			donttouch)
-				if [ "$MODE" = "nfqws" ]; then
+				if [ "$NFQWS_ENABLE" = "1" ]; then
 					echo its incompatible with nfqws tcp data tampering. disabling
 					uci set firewall.@defaults[0].flow_offloading=0
 					mod=1
 				else
-					if [ "$MODE" = "custom" ] ; then
-						echo custom mode selected !!! only you can decide whether flow offloading is compatible
+					if dir_is_not_empty "$CUSTOM_DIR/custom.d" ; then
+						echo
+						echo !!! CUSTOM SCRIPTS ARE PRESENT !!! only you can decide whether flow offloading is compatible.
+						echo !!! CUSTOM SCRIPTS ARE PRESENT !!! if they use nfqws they will not work. you have to disable system-wide offloading.
 					else
 						echo its compatible with selected options. not disabling
 					fi
@@ -837,21 +809,13 @@ remove_pf_zapret_hooks()
 
 macos_fw_reload_trigger_clear()
 {
-	case "$MODE" in
-		tpws|tpws-socks|custom)
-			LISTS_RELOAD=
-			write_config_var LISTS_RELOAD
-			;;
-	esac
+	LISTS_RELOAD=
+	write_config_var LISTS_RELOAD
 }
 macos_fw_reload_trigger_set()
 {
-	case "$MODE" in
-		tpws|custom)
-			LISTS_RELOAD="$INIT_SCRIPT_SRC reload-fw-tables"
-			write_config_var LISTS_RELOAD
-			;;
-	esac
+	LISTS_RELOAD="$INIT_SCRIPT_SRC reload-fw-tables"
+	write_config_var LISTS_RELOAD
 }
 
 install_macos()

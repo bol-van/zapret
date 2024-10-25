@@ -1,5 +1,5 @@
 PF_MAIN="/etc/pf.conf"
-PF_ANCHOR_DIR=/etc/pf.anchors
+PF_ANCHOR_DIR="/etc/pf.anchors"
 PF_ANCHOR_ZAPRET="$PF_ANCHOR_DIR/zapret"
 PF_ANCHOR_ZAPRET_V4="$PF_ANCHOR_DIR/zapret-v4"
 PF_ANCHOR_ZAPRET_V6="$PF_ANCHOR_DIR/zapret-v6"
@@ -112,30 +112,13 @@ pf_nat_reorder_rules()
         # use only first word as a key and preserve order within a single key
 	sort -srfk 1,1
 }
-pf_anchor_port_target()
-{
-	if [ "$MODE_HTTP" = "1" ] && [ "$MODE_HTTPS" = "1" ]; then
-		echo "{$HTTP_PORTS_IPT,$HTTPS_PORTS_IPT}"
-	elif [ "$MODE_HTTPS" = "1" ]; then
-		echo "{$HTTPS_PORTS_IPT}"
-	elif [ "$MODE_HTTP" = "1" ]; then
-		echo "{$HTTP_PORTS_IPT}"
-	fi
-}
 
 pf_anchor_zapret_v4_tpws()
 {
 	# $1 - tpws listen port
-	# $2 - rdr ports. defaults are used if empty
+	# $2 - rdr ports
 
-	local rule port
-
-	if [ -n "$2" ]; then
-		port="{$2}"
-	else
-		port=$(pf_anchor_port_target)
-	fi
-
+	local rule port="{$2}"
 	for lan in $IFACE_LAN; do
 		for t in $tbl; do
 			 echo "rdr on $lan inet proto tcp from any to $t port $port -> 127.0.0.1 port $1"
@@ -158,31 +141,19 @@ pf_anchor_zapret_v4()
 {
 	local tbl port
 	[ "$DISABLE_IPV4" = "1" ] || {
-		case "${MODE_OVERRIDE:-$MODE}" in
-			tpws)
-				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-				pf_anchor_zapret_v4_tpws $TPPORT
-				;;
-			custom)
-				pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
-				custom_runner zapret_custom_firewall_v4 | pf_nat_reorder_rules
-				;;
-		esac
+		{
+			pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+			custom_runner zapret_custom_firewall_v4
+			[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] && pf_anchor_zapret_v4_tpws $TPPORT "$TPWS_PORTS_IPT"
+		} | pf_nat_reorder_rules
 	}
 }
 pf_anchor_zapret_v6_tpws()
 {
 	# $1 - tpws listen port
-	# $2 - rdr ports. defaults are used if empty
+	# $2 - rdr ports
 
-	local rule LL_LAN port
-
-	if [ -n "$2" ]; then
-		port="{$2}"
-	else
-		port=$(pf_anchor_port_target)
-	fi
+	local rule LL_LAN port="{$2}"
 
 	# LAN link local is only for router
 	for lan in $IFACE_LAN; do
@@ -208,19 +179,12 @@ pf_anchor_zapret_v6_tpws()
 pf_anchor_zapret_v6()
 {
 	local tbl port
-
 	[ "$DISABLE_IPV6" = "1" ] || {
-		case "${MODE_OVERRIDE:-$MODE}" in
-			tpws)
-				[ ! "$MODE_HTTP" = "1" ] && [ ! "$MODE_HTTPS" = "1" ] && return
-				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-				pf_anchor_zapret_v6_tpws $TPPORT
-				;;
-			custom)
-				pf_anchor_zapret_tables tbl zapret6-user "$ZIPLIST_USER6" zapret6 "$ZIPLIST6"
-				custom_runner zapret_custom_firewall_v6 | pf_nat_reorder_rules
-				;;
-		esac
+		{
+			pf_anchor_zapret_tables tbl zapret-user "$ZIPLIST_USER" zapret "$ZIPLIST"
+			custom_runner zapret_custom_firewall_v6
+			[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS_IPT" ] && pf_anchor_zapret_v6_tpws $TPPORT "$TPWS_PORTS_IPT"
+		} | pf_nat_reorder_rules
 	}
 }
 

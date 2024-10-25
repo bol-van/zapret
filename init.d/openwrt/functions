@@ -6,7 +6,6 @@ ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 . "$ZAPRET_BASE/common/fwtype.sh"
-. "$ZAPRET_BASE/common/queue.sh"
 . "$ZAPRET_BASE/common/linux_iphelper.sh"
 . "$ZAPRET_BASE/common/ipt.sh"
 . "$ZAPRET_BASE/common/nft.sh"
@@ -17,6 +16,7 @@ CUSTOM_DIR="$ZAPRET_RW/init.d/openwrt"
 
 [ -n "$QNUM" ] || QNUM=200
 [ -n "$TPPORT" ] || TPPORT=988
+[ -n "$TPPORT_SOCKS" ] || TPPORT_SOCKS=987
 [ -n "$WS_USER" ] || WS_USER=daemon
 [ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
 [ -n "$DESYNC_MARK_POSTNAT" ] || DESYNC_MARK_POSTNAT=0x20000000
@@ -31,8 +31,6 @@ IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
 IPSET_EXCLUDE="-m set ! --match-set nozapret"
 IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
-
-apply_unspecified_desync_modes
 
 
 # can be multiple ipv6 outgoing interfaces

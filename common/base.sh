@@ -62,6 +62,10 @@ starts_with()
 }
 find_str_in_list()
 {
+	# $1 - string
+	# $2 - space separated values
+
+	local v
 	[ -n "$1" ] && {
 		for v in $2; do
 			[ "$v" = "$1" ] && return 0
@@ -73,6 +77,19 @@ end_with_newline()
 {
 	local c="$(tail -c 1)"
 	[ "$c" = "" ]
+}
+trim()
+{
+	awk '{gsub(/^ +| +$/,"")}1'
+}
+
+dir_is_not_empty()
+{
+	# $1 - directory
+	local n
+	[ -d "$1" ] || return 1
+	n=$(ls "$1" | wc -c | xargs)
+	[ "$n" != 0 ]
 }
 
 append_separator_list()
@@ -275,6 +292,14 @@ replace_char()
 	echo "$@" | tr $a $b
 }
 
+replace_str()
+{
+	local a=$(echo "$1" | sed 's/\//\\\//g')
+	local b=$(echo "$2" | sed 's/\//\\\//g')
+	shift; shift
+	echo "$@" | sed "s/$a/$b/g"
+}
+
 setup_md5()
 {
 	[ -n "$MD5" ] && return
@@ -350,10 +375,41 @@ alloc_num()
 
 std_ports()
 {
-        HTTP_PORTS=${HTTP_PORTS:-80}
-	HTTPS_PORTS=${HTTPS_PORTS:-443}
-	QUIC_PORTS=${QUIC_PORTS:-443}
-        HTTP_PORTS_IPT=$(replace_char - : $HTTP_PORTS)
-        HTTPS_PORTS_IPT=$(replace_char - : $HTTPS_PORTS)
-        QUIC_PORTS_IPT=$(replace_char - : $QUIC_PORTS)
+	TPWS_PORTS_IPT=$(replace_char - : $TPWS_PORTS)
+	NFQWS_PORTS_TCP_IPT=$(replace_char - : $NFQWS_PORTS_TCP)
+	NFQWS_PORTS_TCP_KEEPALIVE_IPT=$(replace_char - : $NFQWS_PORTS_TCP_KEEPALIVE)
+	NFQWS_PORTS_UDP_IPT=$(replace_char - : $NFQWS_PORTS_UDP)
+	NFQWS_PORTS_UDP_KEEPALIVE_IPT=$(replace_char - : $NFQWS_PORTS_UDP_KEEPALIVE)
+}
+
+has_bad_ws_options()
+{
+	# $1 - nfqws/tpws opts
+	# опхлевюмхе дкъ пюяопнярпюмхрекеи йнохоюярш
+	# щрнр йнд ядекюм яоежхюкэмн дкъ бюя, врнаш бш ме онярхкх б яерэ окнухе пежеорш
+	# еякх бюл унверяъ ецн сдюкхрэ х мюохяюрэ хмярпсйжхч йюй ецн сдюкърэ, бш декюере упемнбсч сяксцс. мюохьхре ксвье custom script.
+	# custom script - щрн тюикхй, йнрнпши днярюрнвмн яйнохпнбюрэ б мсфмсч дхпейрнпхч, врнаш нм ядекюк рнфе яюлне, мн щттейрхбмн.
+	# тхкэрпюжхъ он IPSET б ъдпе меяпюбмхлн щттейрхбмее, вел оепейхдшбюрэ бяе оюйерш б nfqws х рюл тхкэрпнбюрэ
+	# --ipset ясыеярбсер рнкэйн дкъ бхмдш х LINUX яхярел аег ipset (мюопхлеп, Android).
+	# х рнкэйн он щрни опхвхме нмн ме бшйхмсрн онкмнярэч хг LINUX бепяхх
+	contains "$1" "--ipset"
+}
+check_bad_ws_options()
+{
+	# $1 - 0 = stop, 1 = start
+	# $2 - nfqws/tpws options
+	if [ "$1" = 1 ] && has_bad_ws_options "$2"; then
+		echo "!!! REFUSING TO USE BAD OPTIONS : $2"
+		return 1
+	else
+		return 0
+	fi
+}
+help_bad_ws_options()
+{
+	echo "WARNING ! you have specified --ipset option"
+	echo "WARNING ! it would work but on $UNAME it's not the best option"
+	echo "WARNING ! you should use kernel mode sets. they are much more efficient."
+	echo "WARNING ! to use ipsets you have to write your own custom script"
+	echo "WARNING ! installer will stop here to prevent distribution of easy to use but bad copy-paste solutions"
 }

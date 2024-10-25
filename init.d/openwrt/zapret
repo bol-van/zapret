@@ -114,68 +114,30 @@ tpws_apply_socks_binds()
 }
 
 
+standard_mode_daemons()
+{
+	local opt
+	[ "$TPWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$TPWS_OPT" && {
+		opt="--port=$TPPORT $TPWS_OPT"
+		filter_apply_hostlist_target opt
+		run_tpws 1 "$opt"
+	}
+	[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
+		opt="--port=$TPPORT_SOCKS $TPWS_OPT"
+		filter_apply_hostlist_target opt
+		run_tpws_socks 2 "$opt"
+	}
+	[ "$NFQWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$NFQWS_OPT" && {
+		opt="--qnum=$QNUM $NFQWS_OPT"
+		filter_apply_hostlist_target opt
+		run_daemon 3 "$NFQWS" "$opt"
+	}
+}
+
 start_daemons_procd()
 {
-	local opt qn qns qn6 qns6
-
-	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws)
-			opt="--port=$TPPORT $TPWS_OPT"
-			filter_apply_hostlist_target opt
-			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
-			run_tpws 1 "$opt"
-			;;
-		tpws-socks)
-			opt="--port=$TPPORT $TPWS_OPT"
-			filter_apply_hostlist_target opt
-			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
-			run_tpws_socks 1 "$opt"
-			;;
-		nfqws)
-			# quite complex but we need to minimize nfqws processes to save RAM
-			get_nfqws_qnums qn qns qn6 qns6
-			[ -z "$qn" ] || {
-				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP"
-				filter_apply_hostlist_target opt
-				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTP_SUFFIX"
-				run_daemon 1 "$NFQWS" "$opt"
-			}
-			[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
-				opt="--qnum=$qns $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS"
-				filter_apply_hostlist_target opt
-				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTPS_SUFFIX"
-				run_daemon 2 "$NFQWS" "$opt"
-			}
-			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
-				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTP6"
-				filter_apply_hostlist_target opt
-				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTP6_SUFFIX"
-				run_daemon 3 "$NFQWS" "$opt"
-			}
-			[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
-				opt="--qnum=$qns6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_HTTPS6"
-				filter_apply_hostlist_target opt
-				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTPS6_SUFFIX"
-				run_daemon 4 "$NFQWS" "$opt"
-			}
-			get_nfqws_qnums_quic qn qn6
-			[ -z "$qn" ] || {
-				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
-				filter_apply_hostlist_target opt
-				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_QUIC_SUFFIX"
-				run_daemon 10 "$NFQWS" "$opt"
-			}
-			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || {
-				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC6"
-				filter_apply_hostlist_target opt
-				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_QUIC6_SUFFIX"
-				run_daemon 11 "$NFQWS" "$opt"
-			}
-			;;
-		custom)
-	    		custom_runner zapret_custom_daemons $1
-			;;
-	esac
+	standard_mode_daemons
+	custom_runner zapret_custom_daemons
 
 	return 0
 }

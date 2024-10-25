@@ -15,6 +15,7 @@ IPSET_DIR=$ZAPRET_BASE/ipset
 
 PIDDIR=/var/run
 [ -n "$TPPORT" ] || TPPORT=988
+[ -n "$TPPORT_SOCKS" ] || TPPORT=987
 [ -n "$WS_USER" ] || WS_USER=daemon
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
@@ -117,18 +118,14 @@ zapret_do_firewall()
 	[ "$1" = 1 -a -n "$INIT_FW_PRE_UP_HOOK" ] && $INIT_FW_PRE_UP_HOOK
 	[ "$1" = 0 -a -n "$INIT_FW_PRE_DOWN_HOOK" ] && $INIT_FW_PRE_DOWN_HOOK
 
-	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws|filter|custom)
-			if [ "$1" = "1" ] ; then
-				pf_anchor_root || return 1
-				pf_anchors_create
-				pf_anchors_load || return 1
-				pf_enable
-			else
-				pf_anchors_clear
-			fi
-			;;
-	esac
+	if [ "$1" = "1" ] ; then
+		pf_anchor_root || return 1
+		pf_anchors_create
+		pf_anchors_load || return 1
+		pf_enable
+	else
+		pf_anchors_clear
+	fi
 
 	[ "$1" = 1 -a -n "$INIT_FW_POST_UP_HOOK" ] && $INIT_FW_POST_UP_HOOK
 	[ "$1" = 0 -a -n "$INIT_FW_POST_DOWN_HOOK" ] && $INIT_FW_POST_DOWN_HOOK
@@ -150,49 +147,36 @@ zapret_restart_firewall()
 }
 
 
+standard_mode_daemons()
+{
+	local opt
+
+	if [ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] ; then
+		echo "both ipv4 and ipv6 are disabled. nothing to do"
+	else
+		[ "$TPWS_ENABLE" = 1 ] && check_bad_ws_options $1 "$TPWS_OPT" && {
+			opt="--user=root --port=$TPPORT"
+			tpws_apply_binds opt
+			opt="$opt $TPWS_OPT"
+			filter_apply_hostlist_target opt
+			do_daemon $1 1 "$TPWS" "$opt"
+		}
+		[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
+			opt="--socks --user=$WS_USER --port=$TPPORT_SOCKS"
+			tpws_apply_socks_binds opt
+			opt="$opt $TPWS_OPT"
+			filter_apply_hostlist_target opt
+			do_daemon $1 2 "$TPWS" "$opt"
+		}
+	fi
+}
 
 zapret_do_daemons()
 {
 	# $1 - 1 - run, 0 - stop
 
-	local opt
-
-	case "${MODE_OVERRIDE:-$MODE}" in
-		tpws)
-			[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
-				echo "both ipv4 and ipv6 are disabled. nothing to do"
-				return 0
-			}
-			# MacOS requires root. kernel hardcoded requirement for /dev/pf ioctls
-			opt="--user=root --port=$TPPORT"
-			tpws_apply_binds opt
-			opt="$opt $TPWS_OPT"
-			filter_apply_hostlist_target opt
-			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
-			do_daemon $1 1 "$TPWS" "$opt"
-			;;
-		tpws-socks)
-			[ "$1" = "1" ] && [ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && {
-				echo "both ipv4 and ipv6 are disabled. nothing to do"
-				return 0
-			}
-			opt="--socks --user=$WS_USER --port=$TPPORT"
-			tpws_apply_socks_binds opt
-			opt="$opt $TPWS_OPT"
-			filter_apply_hostlist_target opt
-			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
-			do_daemon $1 1 "$TPWS" "$opt"
-			;;
-		filter)
-			;;
-		custom)
-			custom_runner zapret_custom_daemons $1
-			;;
-		*)
-			echo "unsupported MODE=$MODE"
-			return 1
-			;;
-	esac
+	standard_mode_daemons $1
+	custom_runner zapret_custom_daemons $1
 
 	return 0
 }
