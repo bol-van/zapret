@@ -7,14 +7,8 @@ custom_runner()
 
 	shift
 
-	[ -f "$CUSTOM_DIR/custom" ] && {
-		unset -f $FUNC
-		. "$CUSTOM_DIR/custom"
-		existf $FUNC && $FUNC "$@"
-	}
 	[ -d "$CUSTOM_DIR/custom.d" ] && {
-		n=$(ls "$CUSTOM_DIR/custom.d" | wc -c | xargs)
-		[ "$n" = 0 ] || {
+		dir_is_not_empty "$CUSTOM_DIR/custom.d" && {
 			for script in "$CUSTOM_DIR/custom.d/"*; do
 				[ -f "$script" ] || continue
 				unset -f $FUNC

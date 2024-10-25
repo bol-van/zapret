@@ -336,3 +336,8 @@ tpws: fixed MSS apply in transparent mode
 nfqws: fixed autottl apply if desync profile changed
 tpws,nfqws: fixed 100% cpu hang on gzipped list with comments
 ipset: get_refilter_ipsum.sh , get_refilter_domain.sh
+
+v66:
+
+init.d: rewrite traffic interception and daemon launch parameters in config file. this break compatibility with old versions.
+init.d: openwrt-minimal : tpws launch for low storage openwrt devices

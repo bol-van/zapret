@@ -1,4 +1,4 @@
-GET_LIST_PREFIX=/ipset/get_
+readonly GET_LIST_PREFIX=/ipset/get_
 
 SYSTEMD_DIR=/lib/systemd
 [ -d "$SYSTEMD_DIR" ] || SYSTEMD_DIR=/usr/lib/systemd
@@ -15,13 +15,99 @@ exitp()
 	exit $1
 }
 
+extract_var_def()
+{
+	# $1 - var name
+	# this sed script parses single or multi line shell var assignments with optional ' or " enclosure
+	sed -n \
+"/^$1=\"/ {
+:s1
+/\".*\"/ {
+ p
+ b
+}
+N
+t c1
+b s1
+:c1
+}
+/^$1='/ {
+:s2
+/'.*'/ {
+ p
+ b
+}
+N
+t c2
+b s2
+:c2
+}
+/^$1=/p
+"
+}
+replace_var_def()
+{
+	# $1 - var name
+	# $2 - new val
+	# $3 - conf file
+	# this sed script replaces single or multi line shell var assignments with optional ' or " enclosure
+	local repl
+	if [ -z "$2" ]; then
+		repl="#$1="
+	elif contains "$2" " "; then
+		repl="$1=\"$2\""
+	else
+		repl="$1=$2"
+	fi
+	local script=\
+"/^#*[[:space:]]*$1=\"/ {
+:s1
+/\".*\"/ {
+ c\\
+$repl
+ b
+}
+N
+t c1
+b s1
+:c1
+}
+/^#*[[:space:]]*$1='/ {
+:s2
+/'.*'/ {
+ c\\
+$repl
+ b
+}
+N
+t c2
+b s2
+:c2
+}
+/^#*[[:space:]]*$1=/c\\
+$repl"
+	# there's incompatibility with -i option on MacOS/BSD and busybox/GNU
+	if [ "$UNAME" = "Linux" ]; then
+		sed -i -e "$script" "$3"
+	else
+		sed -i '' -e "$script" "$3"
+	fi
+}
+
 parse_var_checked()
 {
 	# $1 - file name
 	# $2 - var name
-	local sed="sed -nre s/^[[:space:]]*$2=[\\\"|\']?([^\\\"|\']*)[\\\"|\']?/\1/p"
-	local v="$($sed <"$1" | tail -n 1)"
-	eval $2=\"$v\"
+
+	local tmp="/tmp/zvar-pid-$$.sh"
+	local v
+	cat "$1" | extract_var_def "$2" >"$tmp"
+	. "$tmp"
+	rm -f "$tmp"
+	eval v="\$$2"
+	# trim
+	v="$(echo "$v" | trim)"
+	eval $2=\""$v"\"
 }
 parse_vars_checked()
 {
@@ -48,20 +134,42 @@ edit_file()
 	}
 	[ -n "$ed" ] && "$ed" "$1"
 }
+echo_var()
+{
+	local v
+	eval v="\$$1"
+	if find_str_in_list $1 "$EDITVAR_NEWLINE_VARS"; then
+		echo "$1=\""
+		echo "$v\"" | sed "s/$EDITVAR_NEWLINE_DELIMETER /$EDITVAR_NEWLINE_DELIMETER\n/g"
+	else
+		if contains "$v" " "; then
+			echo $1=\"$v\"
+		else
+			echo $1=$v
+		fi
+	fi
+}
 edit_vars()
 {
 	# $1,$2,... - var names
-	local n=1 var v tmp="/tmp/zvars"
+	local n=1 var tmp="/tmp/zvars-pid-$$.txt"
 	rm -f "$tmp"
-	while [ 1=1 ]; do
+	while : ; do
 		eval var="\${$n}"
 		[ -n "$var" ] || break
-		eval v="\$$var"
-		echo $var=\"$v\" >>"$tmp"
+		echo_var $var >> "$tmp"
 		n=$(($n+1))
 	done
 	edit_file "$tmp" && parse_vars_checked "$tmp" "$@"
 	rm -f "$tmp"
+}
+
+list_vars()
+{
+	while [ -n "$1" ] ; do
+		echo_var $1
+		shift
+	done
 }
 
 openrc_test()
@@ -483,30 +591,14 @@ write_config_var()
 	# $1 - mode var
 	local M
 	eval M="\$$1"
-
-	if grep -q "^$1=\|^#$1=" "$ZAPRET_CONFIG"; then
-		# replace / => \/
-		#M=${M//\//\\\/}
-		M=$(echo $M | sed 's/\//\\\//g')
-		if [ -n "$M" ]; then
-			if contains "$M" " "; then
-				sedi -Ee "s/^#?$1=.*$/$1=\"$M\"/" "$ZAPRET_CONFIG"
-			else
-				sedi -Ee "s/^#?$1=.*$/$1=$M/" "$ZAPRET_CONFIG"
-			fi
-		else
-			# write with comment at the beginning
-			sedi -Ee "s/^#?$1=.*$/#$1=/" "$ZAPRET_CONFIG"
-		fi
-	else
+	# replace / => \/
+	#M=${M//\//\\\/}
+	M=$(echo $M | sed 's/\//\\\//g' | trim)
+	grep -q "^[[:space:]]*$1=\|^#*[[:space:]]*$1=" "$ZAPRET_CONFIG" || {
 		# var does not exist in config. add it
-		contains "$M" " " && M="\"$M\""
-		if [ -n "$M" ]; then
-			echo "$1=$M" >>"$ZAPRET_CONFIG"
-		else
-			echo "#$1=$M" >>"$ZAPRET_CONFIG"
-		fi
-	fi
+		echo $1= >>"$ZAPRET_CONFIG"
+	}
+	replace_var_def $1 "$M" "$ZAPRET_CONFIG"
 }
 
 check_prerequisites_linux()

@@ -915,35 +915,104 @@ On openwrt by default `nftables` is selected on `firewall4` based systems.
 
 `FWTYPE=iptables`
 
-Main mode :
+With `nftables` post-NAT scheme is used by default. It allows more DPI attacks on forwarded traffic.
+It's possible to use `iptables`-like pre-NAT scheme. `nfqws` will see client source IPs and display them in logs.
+
+`#POSTNAT=0`
+
+There'are 3 standard options configured separately and independently : `tpws-socks`, `tpws`, `nfqws`.
+They can be used alone or combined. Custom scripts in `init.d/{sysv,openwrt,macos}/custom.d` are always applied.
+
+`tpws-socks` requires daemon parameter configuration but does not require traffic interception.
+Other standard options require also traffic interception.
+Each standard option launches single daemon instance. Strategy differiences are managed using multi-profile scheme.
+Main rule for interception is "intercept required minumum". Everything else only wastes CPU resources and slows down connection.
+
+`--ipset` option is prohibited intentionally to disallow easy to use but ineffective user-mode filtering.
+Use kernel ipsets instead. It may require custom scripts.
+
+To use standard updatable hostlists from the `ipset` dir use `<HOSTLIST>` placeholder. It's automatically replaced
+with hostlist parameters if `MODE_FILTER` variable enables hostlists and is removed otherwise.
+Standard hostlists are expected in final (fallback) strategies closing groups of filter parameters.
+Don't use `<HOSTLIST>` in highly specialized profiles. Use your own filter or hostlist(s).
+
+
+`tpws` socks proxy mode switch
+
+`TPWS_SOCKS_ENABLE=0`
+
+Listening tcp port for `tpws` proxy mode.
+
+`TPPORT_SOCKS=987`
+
+`tpws` socks mode parameters
 
 ```
-tpws - tpws transparent mode
-tpws-socks - tpws socks mode
- binds to localhost and LAN interface (if IFACE_LAN is specified or the system is OpenWRT). port 988
-nfqws - nfqws
-filter - only fill ipset or load hostlist
-custom - use custom script for running daemons and establishing firewall rules
+TPWS_SOCKS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+"
 ```
 
-`MODE=tpws`
+`tpws` transparent mode switch
 
-Enable http fooling :
+`TPWS_ENABLE=0`
 
-`MODE_HTTP=1`
+`tpws` transparent mode target ports
 
-Apply fooling to keep alive http sessions. Only applicable to nfqws. Tpws always fool keepalives.
-Not enabling this can save CPU time.
+`TPWS_PORTS=80,443`
 
-`MODE_HTTP_KEEPALIVE=0`
+`tpws` transparent mode parameters
 
-Enable https fooling :
+```
+TPWS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+"
+```
 
-`MODE_HTTPS=1`
+`nfqws` enable switch
 
-Enable quic fooling :
+`NFQWS_ENABLE=0`
 
-`MODE_QUIC=1`
+`nfqws` port targets for `connbytes`-limited interception. `connbytes` allows to intercept only starting packets from connections.
+This is more effective kernel-mode alternative to `nfqws --dpi-desync-cutoff=nX`.
+
+```
+NFQWS_PORTS_TCP=80,443
+NFQWS_PORTS_UDP=443
+```
+
+How many starting packets should be intercepted to nfqws in each direction
+
+```
+NFQWS_TCP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
+NFQWS_TCP_PKT_IN=3
+NFQWS_UDP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
+NFQWS_UDP_PKT_IN=0
+```
+
+There's kind of traffic that requires interception of entire outgoing stream.
+Typically it's support for plain http keepalives and stateless DPI.
+This mode of interception significantly increases CPU utilization. Use with care and only if required.
+Here you specify port numbers for unlimited interception.
+It's advised also to remove these ports from `connbytes`-limited interception list.
+
+```
+#NFQWS_PORTS_TCP_KEEPALIVE=80
+#NFQWS_PORTS_UDP_KEEPALIVE=
+```
+
+`nfqws` parameters
+
+```
+NFQWS_OPT="
+--filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST>
+"
+```
+
 
 Host filtering mode :
 ```
@@ -954,62 +1023,6 @@ autohostlist - hostlist mode + blocks auto detection
 ```
 
 `MODE_FILTER=none`
-
-Its possible to change manipulation options used by tpws :
-
-`TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"`
-
-Additional low priority desync profile for `MODE_FILTER=hostlist`.
-With multiple profile support 0-phase desync methods are no more applied with hostlist !
-To apply them additional profile is required without hostlist filter.
-
-`TPWS_OPT_SUFFIX="--mss=88"`
-
-nfqws options for DPI desync attack:
-
-```
-DESYNC_MARK=0x40000000
-DESYNC_MARK_POSTNAT=0x20000000
-NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
-```
-
-Separate nfqws options for http and https and ip protocol versions 4,6:
-
-```
-NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
-NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
-NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
-NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
-```
-
-If one of `NFQWS_OPT_DESYNC_HTTP`/`NFQWS_OPT_DESYNC_HTTPS` is not defined it takes value of NFQWS_OPT_DESYNC.
-If one of `NFQWS_OPT_DESYNC_HTTP6`/`NFQWS_OPT_DESYNC_HTTPS6` is not defined it takes value from
-`NFQWS_OPT_DESYNC_HTTP`/`NFQWS_OPT_DESYNC_HTTPS`.
-It means if only `NFQWS_OPT_DESYNC` is defined all four take its value.
-
-If a variable is not defined, the value `NFQWS_OPT_DESYNC` is taken.
-
-Additional low priority desync profile for `MODE_FILTER=hostlist`.
-With multiple profile support 0-phase desync methods are no more applied with hostlist !
-To apply them additional profile is required without hostlist filter.
-```
-#NFQWS_OPT_DESYNC_SUFFIX="--dpi-desync=syndata"
-#NFQWS_OPT_DESYNC_HTTP_SUFFIX="--dpi-desync=syndata"
-#NFQWS_OPT_DESYNC_HTTPS_SUFFIX="--wssize 1:6"
-#NFQWS_OPT_DESYNC_HTTP6_SUFFIX="--dpi-desync=syndata"
-#NFQWS_OPT_DESYNC_HTTPS6_SUFFIX="--wssize 1:6"
-```
-
-Defaults are filled the same ways as with NFQWS_OPT_*.
-
-Separate QUIC options for ip protocol versions :
-
-```
-NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
-NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
-```
-
-If `NFQWS_OPT_DESYNC_QUIC6` is not specified `NFQWS_OPT_DESYNC_QUIC` is taken.
 
 
 flow offloading control (if supported)
@@ -1207,6 +1220,8 @@ The best way to start is to put zapret dir to `/tmp` and run `/tmp/zapret/instal
 After installation remove `/tmp/zapret` to free RAM.
 
 The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extroot is recommended.
+
+For low storage openwrt see `init.d/openwrt-minimal`.
 
 ### Android
 

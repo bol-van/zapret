@@ -1,7 +1,6 @@
 # this script is an example describing how to run tpws on a custom port
 
 TPWS_OPT_EXTRA=${TPWS_OPT_EXTRA:---split-pos=2}
-TPWS_OPT_SUFFIX_EXTRA="${TPWS_OPT_SUFFIX_EXTRA:-}"
 DPORTS_EXTRA=${DPORTS_EXTRA:-20443,20444,30000-30009}
 
 alloc_dnum DNUM_EXTRA_TPWS
@@ -14,7 +13,6 @@ zapret_custom_daemons()
 	tpws_apply_binds opt
 	opt="$opt $TPWS_OPT_EXTRA"
 	filter_apply_hostlist_target opt
-	filter_apply_suffix opt "$TPWS_OPT_SUFFIX_EXTRA"
 	do_daemon $1 $DNUM_EXTRA_TPWS "$TPWS" "$opt"
 }
 

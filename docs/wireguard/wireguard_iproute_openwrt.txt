@@ -282,6 +282,14 @@ ipt PREROUTING -t mangle -i $DEVICE -m set --match-set ipban dst -m set ! --matc
 
 # /etc/init.d/firewall restart
 
+Чтобы правила обновлялись в процессе поднятия интерфейсов в системе, нужно внести параметр "reload" в указанное место :
+--- /etc/config/firewall ---
+config include
+        option path '/etc/firewall.user'
+        option reload '1'
+----------------------------
+
+
 --- Маркировка трафика nftables ---
 
 В новых openwrt по умолчанию установлен nftables, iptables отсутствует.

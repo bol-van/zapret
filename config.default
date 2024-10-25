@@ -9,6 +9,9 @@
 
 # override firewall type : iptables,nftables,ipfw
 #FWTYPE=iptables
+# nftables only : set this to 0 to use pre-nat mode. default is post-nat.
+# pre-nat mode disables some bypass techniques for forwarded traffic but allows to see client IP addresses in debug log
+#POSTNAT=0
 
 # options for ipsets
 # maximum number of elements in sets. also used for nft sets
@@ -40,53 +43,56 @@ GZIP_LISTS=1
 # set to "-" to disable reload
 #LISTS_RELOAD="pfctl -f /etc/pf.conf"
 
-# override ports
-#HTTP_PORTS=80-81,85
-#HTTPS_PORTS=443,500-501
-#QUIC_PORTS=443,444
-
-# CHOOSE OPERATION MODE
-# MODE : nfqws,tpws,tpws-socks,filter,custom
-# nfqws : nfqws for dpi desync
-# tpws : tpws transparent mode
-# tpws-socks : tpws socks mode
-# filter : no daemon, just create ipset or download hostlist
-# custom : custom mode. should modify custom init script and add your own code
-MODE=tpws
-# apply fooling to http
-MODE_HTTP=1
-# for nfqws only. support http keep alives. enable only if DPI checks for http request in any outgoing packet
-MODE_HTTP_KEEPALIVE=0
-# apply fooling to https
-MODE_HTTPS=1
-# apply fooling to quic
-MODE_QUIC=0
-# none,ipset,hostlist,autohostlist
-MODE_FILTER=none
-
-# CHOOSE NFQWS DAEMON OPTIONS for DPI desync mode. run "nfq/nfqws --help" for option list
-# SUFFIX VARS define additional lower priority desync profile. it's required if MODE_FILTER=hostlist and strategy has hostlist-incompatible 0-phase desync methods (syndata,wssize)
+# mark bit used by nfqws to prevent loop
 DESYNC_MARK=0x40000000
 DESYNC_MARK_POSTNAT=0x20000000
-NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-ttl6=0 --dpi-desync-fooling=badsum"
-#NFQWS_OPT_DESYNC_SUFFIX="--dpi-desync=syndata"
-#NFQWS_OPT_DESYNC_HTTP=""
-#NFQWS_OPT_DESYNC_HTTP_SUFFIX="--dpi-desync=syndata"
-#NFQWS_OPT_DESYNC_HTTPS=""
-#NFQWS_OPT_DESYNC_HTTPS_SUFFIX="--wssize 1:6"
-#NFQWS_OPT_DESYNC_HTTP6=""
-#NFQWS_OPT_DESYNC_HTTP6_SUFFIX="--dpi-desync=syndata"
-#NFQWS_OPT_DESYNC_HTTPS6=""
-#NFQWS_OPT_DESYNC_HTTPS6_SUFFIX="--wssize 1:6"
-NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake --dpi-desync-repeats=6"
-#NFQWS_OPT_DESYNC_QUIC_SUFFIX=""
-#NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
-#NFQWS_OPT_DESYNC_QUIC6_SUFFIX=""
 
-# CHOOSE TPWS DAEMON OPTIONS. run "tpws/tpws --help" for option list
-# SUFFIX VARS define additional lower priority desync profile. it's required if MODE_FILTER=hostlist and strategy has hostlist-incompatible 0-phase desync methods (mss)
-TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3 --oob"
-#TPWS_OPT_SUFFIX="--mss 88"
+TPWS_SOCKS_ENABLE=0
+# tpws socks listens on this port on localhost and LAN interfaces
+TPPORT_SOCKS=987
+# use <HOSTLIST> placeholders to engage standard hostlists and autohostlist in ipset dir
+# they are replaced to empty string if MODE_FILTER does not satisfy
+TPWS_SOCKS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+"
+
+TPWS_ENABLE=0
+TPWS_PORTS=80,443
+# use <HOSTLIST> placeholders to engage standard hostlists and autohostlist in ipset dir
+# they are replaced to empty string if MODE_FILTER does not satisfy
+TPWS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+"
+
+NFQWS_ENABLE=0
+# redirect outgoing traffic with connbytes limiter applied in both directions.
+NFQWS_PORTS_TCP=80,443
+NFQWS_PORTS_UDP=443
+# PKT_OUT means connbytes dir original
+# PKT_IN means connbytes dir reply
+# this is --dpi-desync-cutoff=nX kernel mode implementation for linux. it saves a lot of CPU.
+NFQWS_TCP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
+NFQWS_TCP_PKT_IN=3
+NFQWS_UDP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
+NFQWS_UDP_PKT_IN=0
+# redirect outgoing traffic without connbytes limiter and incoming with connbytes limiter
+# normally it's needed only for stateless DPI that matches every packet in a single TCP session
+# typical example are plain HTTP keep alives
+# this mode can be very CPU consuming. enable with care !
+#NFQWS_PORTS_TCP_KEEPALIVE=80
+#NFQWS_PORTS_UDP_KEEPALIVE=
+# use <HOSTLIST> placeholders to engage standard hostlists and autohostlist in ipset dir
+# they are replaced to empty string if MODE_FILTER does not satisfy
+NFQWS_OPT="
+--filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST>
+"
+
+# none,ipset,hostlist,autohostlist
+MODE_FILTER=none
 
 # openwrt only : donttouch,none,software,hardware
 FLOWOFFLOAD=donttouch
