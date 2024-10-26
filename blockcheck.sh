@@ -360,7 +360,7 @@ zp_already_running()
 }
 check_already()
 {
-	echo \* checking already running zapret processes
+	echo \* checking already running DPI bypass processes
 	if zp_already_running; then
 		echo "!!! WARNING. some dpi bypass processes already running !!!"
 		echo "!!! WARNING. blockcheck requires all DPI bypass methods disabled !!!"
@@ -387,7 +387,7 @@ check_prerequisites()
 {
 	echo \* checking prerequisites
 	
-	[ "$UNAME" = Darwin -o -x "$PKTWS" ] && [ "$UNAME" = CYGWIN -o -x "$TPWS" ] && [ -x "$MDIG" ] || {
+	[ "$SKIP_PKTWS" = 1 -o "$UNAME" = Darwin -o -x "$PKTWS" ] && [ "$SKIP_TPWS" = 1 -o "$UNAME" = CYGWIN -o -x "$TPWS" ] && [ -x "$MDIG" ] || {
 		local target
 		case $UNAME in
 			Darwin)
