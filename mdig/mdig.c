@@ -319,15 +319,135 @@ static int run_threads(void)
 	return thread ? 0 : 12;
 }
 
+// slightly patched musl code
+size_t dns_mk_query_blob(uint8_t op, const char *dname, uint8_t class, uint8_t type, uint8_t *buf, size_t buflen)
+{
+	int i, j;
+	uint16_t id;
+	struct timespec ts;
+	size_t l = strnlen(dname, 255);
+	size_t n;
+
+	if (l && dname[l-1]=='.') l--;
+	if (l && dname[l-1]=='.') return 0;
+	n = 17+l+!!l;
+	if (l>253 || buflen<n || op>15u) return 0;
+
+	/* Construct query template - ID will be filled later */
+	memset(buf, 0, n);
+	buf[2] = (op<<3) | 1;
+	buf[5] = 1;
+	memcpy((char *)buf+13, dname, l);
+	for (i=13; buf[i]; i=j+1)
+	{
+		for (j=i; buf[j] && buf[j] != '.'; j++);
+		if (j-i-1u > 62u) return 0;
+		buf[i-1] = j-i;
+	}
+	buf[i+1] = type;
+	buf[i+3] = class;
+
+	/* Make a reasonably unpredictable id */
+	clock_gettime(CLOCK_REALTIME, &ts);
+	id = (uint16_t)ts.tv_nsec + (uint16_t)(ts.tv_nsec>>16);
+	buf[0] = id>>8;
+	buf[1] = id;
+
+	return n;
+}
+int dns_make_query(const char *dom, char family)
+{
+	uint8_t q[280];
+	size_t l = dns_mk_query_blob(0, dom, 1, family == FAMILY6 ? 28 : 1, q, sizeof(q));
+	if (!l)
+	{
+		fprintf(stderr, "could not make DNS query\n");
+		return 1;
+	}
+	if (fwrite(q,l,1,stdout)!=1)
+	{
+		fprintf(stderr, "could not write DNS query blob to stdout\n");
+		return 10;
+	}
+	return 0;
+}
+
+bool dns_parse_print(const uint8_t *a, size_t len)
+{
+	// check of minimum header length and response flag
+	uint16_t k, dlen, qcount = a[4]<<8 | a[5], acount = a[6]<<8 | a[7];
+	char s_ip[40];
+
+	if (len<12 || !(a[2]&0x80)) return false;
+	a+=12; len-=12;
+	for(k=0;k<qcount;k++)
+	{
+		while (len && *a)
+		{
+			if ((*a+1)>len) return false;
+			// skip to next label
+			len -= *a+1; a += *a+1;
+		}
+		if (len<5) return false;
+		// skip zero length label, type, class
+		a+=5; len-=5;
+	}
+	for(k=0;k<acount;k++)
+	{
+		// 11 higher bits indicate pointer
+		if (len<12 || (*a & 0xC0)!=0xC0) return false;
+		dlen = a[10]<<8 | a[11];
+		if (len<(dlen+12)) return false;
+		if (a[4]==0 && a[5]==1 && a[2]==0) // IN class and higher byte of type = 0
+		{
+			switch(a[3])
+			{
+				case 1: // A
+					if (dlen!=4) break;
+					if (inet_ntop(AF_INET, a+12, s_ip, sizeof(s_ip)))
+						printf("%s\n", s_ip);
+					break;
+				case 28: // AAAA
+					if (dlen!=16) break;
+					if (inet_ntop(AF_INET6, a+12, s_ip, sizeof(s_ip)))
+						printf("%s\n", s_ip);
+					break;
+			}
+		}
+		len -= 12+dlen; a += 12+dlen;
+	}
+	return true;
+}
+int dns_parse_query()
+{
+	uint8_t a[1500];
+	size_t l;
+	l = fread(a,1,sizeof(a),stdin);
+	if (!l || !feof(stdin))
+	{
+		fprintf(stderr, "could not read DNS reply blob from stdin\n");
+		return 10;
+	}
+	if (!dns_parse_print(a,l))
+	{
+		fprintf(stderr, "could not parse DNS reply blob\n");
+		return 11;
+	}
+	return 0;
+}
+
+
 static void exithelp(void)
 {
 	printf(
 		" --threads=<threads_number>\n"
-		" --family=<4|6|46>\t; ipv4, ipv6, ipv4+ipv6\n"
-		" --verbose\t\t; print query progress to stderr\n"
-		" --stats=N\t\t; print resolve stats to stderr every N domains\n"
-		" --log-resolved=<file>\t; log successfully resolved domains to a file\n"
-		" --log-failed=<file>\t; log failed domains to a file\n"
+		" --family=<4|6|46>\t\t; ipv4, ipv6, ipv4+ipv6\n"
+		" --verbose\t\t\t; print query progress to stderr\n"
+		" --stats=N\t\t\t; print resolve stats to stderr every N domains\n"
+		" --log-resolved=<file>\t\t; log successfully resolved domains to a file\n"
+		" --log-failed=<file>\t\t; log failed domains to a file\n"
+		" --dns-make-query=<domain>\t; output to stdout binary blob with DNS query. use --family to specify ip version.\n"
+		" --dns-parse-query\t\t; read from stdin binary DNS answer blob and parse it to ipv4/ipv6 addresses\n"
 	);
 	exit(1);
 }
@@ -335,20 +455,23 @@ int main(int argc, char **argv)
 {
 	int r, v, option_index = 0;
 	char fn1[256],fn2[256];
+	char dom[256];
 
 	static const struct option long_options[] = {
-			{"help",no_argument,0,0},		// optidx=0
-			{"threads",required_argument,0,0},	// optidx=1
-			{"family",required_argument,0,0},	// optidx=2
-			{"verbose",no_argument,0,0},		// optidx=3
-			{"stats",required_argument,0,0},	// optidx=4
-			{"log-resolved",required_argument,0,0},	// optidx=5
-			{"log-failed",required_argument,0,0},	// optidx=6
+			{"help",no_argument,0,0},			// optidx=0
+			{"threads",required_argument,0,0},		// optidx=1
+			{"family",required_argument,0,0},		// optidx=2
+			{"verbose",no_argument,0,0},			// optidx=3
+			{"stats",required_argument,0,0},		// optidx=4
+			{"log-resolved",required_argument,0,0},		// optidx=5
+			{"log-failed",required_argument,0,0},		// optidx=6
+			{"dns-make-query",required_argument,0,0},	// optidx=7
+			{"dns-parse-query",no_argument,0,0},		// optidx=8
 			{NULL,0,NULL,0}
 	};
 
 	memset(&glob, 0, sizeof(glob));
-	*fn1 = *fn2 = 0;
+	*fn1 = *fn2 = *dom = 0;
 	glob.family = FAMILY4;
 	glob.threads = 1;
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
@@ -394,6 +517,12 @@ int main(int argc, char **argv)
 			strncpy(fn2,optarg,sizeof(fn2));
 			fn2[sizeof(fn2)-1] = 0;
 			break;
+		case 7: /* dns-make-query */
+			strncpy(dom,optarg,sizeof(dom));
+			dom[sizeof(dom)-1] = 0;
+			break;
+		case 8: /* dns-parse-query */
+			return dns_parse_query();
 		}
 	}
 
@@ -405,6 +534,8 @@ int main(int argc, char **argv)
 		return 4;
 	}
 #endif
+
+	if (*dom) return dns_make_query(dom, glob.family);
 
 	if (*fn1)
 	{
