@@ -53,6 +53,7 @@ NFT_TABLE=blockcheck
 
 DNSCHECK_DNS=${DNSCHECK_DNS:-8.8.8.8 1.1.1.1 77.88.8.1}
 DNSCHECK_DOM=${DNSCHECK_DOM:-pornhub.com ntc.party rutracker.org www.torproject.org bbc.com}
+DOH_SERVERS="https://cloudflare-dns.com/dns-query https://dns.google/dns-query https://dns.quad9.net/dns-query https://dns.adguard.com/dns-query https://common.dot.dns.yandex.net/dns-query"
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -201,6 +202,35 @@ nft_has_nfq()
 	}
 	return $res
 }
+
+doh_resolve()
+{
+	# $1 - ip version 4/6
+	# $2 - hostname
+	# $3 - doh server URL. use $DOH_SERVER if empty
+	$MDIG --family=$1 --dns-make-query=$2 | curl -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | $MDIG --dns-parse-query
+}
+doh_find_working()
+{
+	local doh
+
+	[ -n "$DOH_SERVER" ] && return 0
+	echo "* searching working DoH server"
+	DOH_SERVER=
+	for doh in $DOH_SERVERS; do
+		echo -n "$doh : "
+		if doh_resolve 4 iana.org $doh >/dev/null 2>/dev/null; then
+			echo OK
+			DOH_SERVER="$doh"
+			return 0
+		else
+			echo FAIL
+		fi
+	done
+	echo all DoH servers failed
+	return 1
+}
+
 mdig_vars()
 {
 	# $1 - ip version 4/6
@@ -219,7 +249,11 @@ mdig_cache()
 	mdig_vars "$@"
 	[ -n "$count" ] || {
 		# windows version of mdig outputs 0D0A line ending. remove 0D.
-		ips="$(echo $2 | "$MDIG" --family=$1 | tr -d '\r' | xargs)"
+		if [ "$SECURE_DNS" = 1 ]; then
+			ips="$(echo $2 | doh_resolve $1 $2 | tr -d '\r' | xargs)"
+		else
+			ips="$(echo $2 | "$MDIG" --family=$1 | tr -d '\r' | xargs)"
+		fi
 		[ -n "$ips" ] || return 1
 		count=0
 		for ip in $ips; do
@@ -518,7 +552,7 @@ curl_supports_tls13()
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
 	# this is online test because there's no other way to trigger library incompatibility case
-	$CURL --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://w3.org 2>/dev/null
+	$CURL --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://iana.org 2>/dev/null
 	r=$?
 	[ $r != 4 -a $r != 35 ]
 }
@@ -1677,7 +1711,7 @@ pingtest()
 dnstest()
 {
 	# $1 - dns server. empty for system resolver
-	"$LOOKUP" w3.org $1 >/dev/null 2>/dev/null
+	"$LOOKUP" iana.org $1 >/dev/null 2>/dev/null
 }
 find_working_public_dns()
 {
@@ -1726,6 +1760,10 @@ check_dns()
 {
 	local C1 C2 dom
 
+	DNS_IS_SPOOFED=0
+
+	[ "$SKIP_DNSCHECK" = 1 ] && return 0
+
 	echo \* checking DNS
 
 	[ -f "$DNSCHECK_DIGS" ] && rm -f "$DNSCHECK_DIGS"
@@ -1748,6 +1786,8 @@ check_dns()
 				check_dns_cleanup
 				echo -- POSSIBLE DNS HIJACK DETECTED. ZAPRET WILL NOT HELP YOU IN CASE DNS IS SPOOFED !!!
 				echo -- DNS CHANGE OR DNSCRYPT MAY BE REQUIRED
+				DNS_IS_SPOOFED=1
+				USE_SECURE_DNS=${USE_SECURE_DNS:-1}
 				return 1
 			else
 				echo $dom : OK
@@ -1777,6 +1817,8 @@ check_dns()
 		echo -- POSSIBLE DNS HIJACK DETECTED. ZAPRET WILL NOT HELP YOU IN CASE DNS IS SPOOFED !!!
 		echo -- DNSCRYPT MAY BE REQUIRED
 		check_dns_cleanup
+		DNS_IS_SPOOFED=1
+		USE_SECURE_DNS=${USE_SECURE_DNS:-1}
 		return 1
 	}
 	echo all resolved IPs are unique
@@ -1825,7 +1867,8 @@ check_already
 [ "$UNAME" = CYGWIN ] || require_root
 check_prerequisites
 trap sigint_cleanup INT
-[ "$SKIP_DNSCHECK" = 1 ] || check_dns
+check_dns
+[ "$SECURE_DNS" = 1 ] && doh_find_working
 check_virt
 ask_params
 trap - INT
