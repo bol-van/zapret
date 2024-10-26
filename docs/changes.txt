@@ -341,3 +341,7 @@ v66:
 
 init.d: rewrite traffic interception and daemon launch parameters in config file. this break compatibility with old versions.
 init.d: openwrt-minimal : tpws launch for low storage openwrt devices
+
+v67:
+
+mdig: --dns-make-query, --dns-parse-query for side-channel resolving (DoH)
