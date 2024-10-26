@@ -345,3 +345,4 @@ init.d: openwrt-minimal : tpws launch for low storage openwrt devices
 v67:
 
 mdig: --dns-make-query, --dns-parse-query for side-channel resolving (DoH)
+blockcheck: use DoH resolvers if DNS spoof is detected
