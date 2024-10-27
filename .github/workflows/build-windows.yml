@@ -1,0 +1,36 @@
+name: Build zapret
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for Windows
+    runs-on: windows-latest
+    env:
+      SRC_PATH: nfq
+    defaults:
+      run:
+        shell: C:\cygwin\bin\bash.exe --noprofile --norc -o igncr -eo pipefail '{0}'
+
+    steps:
+      - name: Install Cygwin Action
+        uses: cygwin/cygwin-install-action@v4
+        with:
+          packages: >-
+            gcc-core
+            make
+            zlib-devel
+
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ${{ env.SRC_PATH }}
+
+      - name: Compile zapret
+        run: make cygwin64
+        working-directory: ${{ env.SRC_PATH }}
+      - name: Upload output file
+        uses: actions/upload-artifact@v4
+        with:
+          name: winws.exe
+          path: ${{ env.SRC_PATH }}/winws.exe
