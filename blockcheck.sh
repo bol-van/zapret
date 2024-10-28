@@ -842,15 +842,15 @@ pktws_ipt_prepare_tcp()
 
 	pktws_ipt_prepare tcp $1 "$2"
 
+	# for autottl mode
 	case "$FWTYPE" in
 		iptables)
-			# for autottl
 			$IPTABLES -N blockcheck_input -t mangle 2>/dev/null
 			$IPTABLES -F blockcheck_input -t mangle 2>/dev/null
 			IPT INPUT -t mangle -j blockcheck_input
 			$IPTABLES -t mangle -A blockcheck_input ! -p tcp -j RETURN
 			$IPTABLES -t mangle -A blockcheck_input -p tcp ! --sport $1 -j RETURN
-			$IPTABLES -t mangle -A blockcheck_input -m connbytes --connbytes-dir=reply --connbytes-mode=packets ! --connbytes 1 -j RETURN
+			$IPTABLES -t mangle -A blockcheck_input -p tcp ! --tcp-flags SYN,ACK SYN,ACK -j RETURN
 			for ip in $2; do
 				$IPTABLES -A blockcheck_input -t mangle -s $ip -j NFQUEUE --queue-num $QNUM
 			done
@@ -858,12 +858,10 @@ pktws_ipt_prepare_tcp()
 		nftables)
 			ipver=$IPV
 			[ "$IPV" = 6 ] || ipver=
-			# for autottl
 			make_comma_list iplist $2
-			nft "add rule inet $NFT_TABLE prenat meta nfproto ipv${IPV} tcp sport $1 ip${ipver} saddr {$iplist} ct original packets 1 queue num $QNUM"
+			nft "add rule inet $NFT_TABLE prenat meta nfproto ipv${IPV} tcp sport $1 tcp flags & (syn | ack) == (syn | ack) ip${ipver} saddr {$iplist} queue num $QNUM"
 			;;
 		ipfw)
-			# for autottl mode
 			for ip in $2; do
 				IPFW_ADD divert $IPFW_DIVERT_PORT tcp from $ip $1 to me proto ip${IPV} tcpflags syn,ack in not diverted not sockarg
 			done
