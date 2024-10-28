@@ -1854,7 +1854,6 @@ check_dns_()
 				echo -- POSSIBLE DNS HIJACK DETECTED. ZAPRET WILL NOT HELP YOU IN CASE DNS IS SPOOFED !!!
 				echo -- DNS CHANGE OR DNSCRYPT MAY BE REQUIRED
 				DNS_IS_SPOOFED=1
-				USE_SECURE_DNS=${USE_SECURE_DNS:-1}
 				return 1
 			else
 				echo $dom : OK
@@ -1885,7 +1884,6 @@ check_dns_()
 		echo -- DNSCRYPT MAY BE REQUIRED
 		check_dns_cleanup
 		DNS_IS_SPOOFED=1
-		USE_SECURE_DNS=${USE_SECURE_DNS:-1}
 		return 1
 	}
 	echo all resolved IPs are unique
@@ -1900,7 +1898,13 @@ check_dns()
 	local r
 	check_dns_
 	r=$?
-	[ "$SECURE_DNS" = 1 ] && doh_find_working
+	[ "$DNS_IS_SPOOFED" = 1 ] && SECURE_DNS=${SECURE_DNS:-1}
+	[ "$SECURE_DNS" = 1 ] && {
+		doh_find_working || {
+			echo could not find working DoH server. exiting.
+			exitp 7
+		}
+	}
 	return $r
 }
 
