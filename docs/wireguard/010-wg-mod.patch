@@ -1,0 +1,133 @@
+Index: WireGuard-0.0.20190123/src/cookie.c
+===================================================================
+--- WireGuard-0.0.20190123.orig/src/cookie.c
++++ WireGuard-0.0.20190123/src/cookie.c
+@@ -193,6 +193,8 @@ void wg_cookie_message_create(struct mes
+ 	xchacha20poly1305_encrypt(dst->encrypted_cookie, cookie, COOKIE_LEN,
+ 				  macs->mac1, COOKIE_LEN, dst->nonce,
+ 				  checker->cookie_encryption_key);
++        // MOD : randomize trash
++	dst->header.trash = gen_trash();
+ }
+ 
+ void wg_cookie_message_consume(struct message_handshake_cookie *src,
+Index: WireGuard-0.0.20190123/src/messages.h
+===================================================================
+--- WireGuard-0.0.20190123.orig/src/messages.h
++++ WireGuard-0.0.20190123/src/messages.h
+@@ -53,23 +53,41 @@ enum limits {
+ 	MAX_QUEUED_PACKETS = 1024 /* TODO: replace this with DQL */
+ };
+ 
++/*
+ enum message_type {
+-	MESSAGE_INVALID = 0,
+-	MESSAGE_HANDSHAKE_INITIATION = 1,
+-	MESSAGE_HANDSHAKE_RESPONSE = 2,
+-	MESSAGE_HANDSHAKE_COOKIE = 3,
+-	MESSAGE_DATA = 4
++    MESSAGE_INVALID = 0,
++    MESSAGE_HANDSHAKE_INITIATION = 1,
++    MESSAGE_HANDSHAKE_RESPONSE = 2,
++    MESSAGE_HANDSHAKE_COOKIE = 3,
++    MESSAGE_DATA = 4
+ };
++*/
++
++// MOD : message type
++enum message_type {
++    MESSAGE_INVALID = 0xE319CCD0,
++    MESSAGE_HANDSHAKE_INITIATION = 0x48ADE198,
++    MESSAGE_HANDSHAKE_RESPONSE = 0xFCA6A8F3,
++    MESSAGE_HANDSHAKE_COOKIE = 0x64A3BB18,
++    MESSAGE_DATA = 0x391820AA
++};
++
++// MOD : generate fast trash without true RNG
++__le32 gen_trash(void);
+ 
+ struct message_header {
+-	/* The actual layout of this that we want is:
+-	 * u8 type
+-	 * u8 reserved_zero[3]
+-	 *
+-	 * But it turns out that by encoding this as little endian,
+-	 * we achieve the same thing, and it makes checking faster.
+-	 */
+-	__le32 type;
++    /* The actual layout of this that we want is:
++     * u8 type
++     * u8 reserved_zero[3]
++     *
++     * But it turns out that by encoding this as little endian,
++     * we achieve the same thing, and it makes checking faster.
++     */
++
++    // MOD : trash field to change message size and add 4 byte offset to all fields
++    __le32 trash;
++
++    __le32 type;
+ };
+ 
+ struct message_macs {
+Index: WireGuard-0.0.20190123/src/noise.c
+===================================================================
+--- WireGuard-0.0.20190123.orig/src/noise.c
++++ WireGuard-0.0.20190123/src/noise.c
+@@ -17,6 +17,24 @@
+ #include <linux/highmem.h>
+ #include <crypto/algapi.h>
+ 
++
++// MOD : trash generator
++__le32 gtrash = 0;
++__le32 gen_trash(void)
++{
++    if (gtrash)
++	gtrash = gtrash*1103515243 + 12345;
++    else
++	// first value is true random
++	get_random_bytes_wait(&gtrash, sizeof(gtrash));
++    return gtrash;
++}
++
+ /* This implements Noise_IKpsk2:
+  *
+  * <- s
+@@ -515,6 +533,10 @@ wg_noise_handshake_create_initiation(str
+ 		&handshake->entry);
+ 
+ 	handshake->state = HANDSHAKE_CREATED_INITIATION;
++
++	// MOD : randomize trash
++        dst->header.trash = gen_trash();
++
+ 	ret = true;
+ 
+ out:
+@@ -655,6 +677,10 @@ bool wg_noise_handshake_create_response(
+ 		&handshake->entry);
+ 
+ 	handshake->state = HANDSHAKE_CREATED_RESPONSE;
++
++        // MOD : randomize trash
++        dst->header.trash = gen_trash();
++
+ 	ret = true;
+ 
+ out:
+Index: WireGuard-0.0.20190123/src/send.c
+===================================================================
+--- WireGuard-0.0.20190123.orig/src/send.c
++++ WireGuard-0.0.20190123/src/send.c
+@@ -200,6 +200,10 @@ static bool encrypt_packet(struct sk_buf
+ 	header->header.type = cpu_to_le32(MESSAGE_DATA);
+ 	header->key_idx = keypair->remote_index;
+ 	header->counter = cpu_to_le64(PACKET_CB(skb)->nonce);
++
++        // MOD : randomize trash
++	header->header.trash = gen_trash();
++
+ 	pskb_put(skb, trailer, trailer_len);
+ 
+ 	/* Now we can encrypt the scattergather segments */

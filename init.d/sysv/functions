@@ -1,0 +1,357 @@
+# init script functions library for desktop linux systems
+
+ZAPRET_BASE=${ZAPRET_BASE:-/opt/zapret}
+ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+. "$ZAPRET_CONFIG"
+. "$ZAPRET_BASE/common/base.sh"
+. "$ZAPRET_BASE/common/fwtype.sh"
+. "$ZAPRET_BASE/common/queue.sh"
+. "$ZAPRET_BASE/common/linux_iphelper.sh"
+. "$ZAPRET_BASE/common/ipt.sh"
+. "$ZAPRET_BASE/common/nft.sh"
+. "$ZAPRET_BASE/common/linux_fw.sh"
+. "$ZAPRET_BASE/common/list.sh"
+. "$ZAPRET_BASE/common/custom.sh"
+CUSTOM_DIR="$ZAPRET_RW/init.d/sysv"
+
+
+user_exists()
+{
+	id -u $1 >/dev/null 2>/dev/null
+}
+useradd_compat()
+{
+	# $1 - username
+	# skip for readonly systems
+	[ -w "/etc" ] && {
+		if exists useradd ; then
+			useradd --no-create-home --system --shell /bin/false $1
+		elif is_linked_to_busybox adduser ; then
+			# some systems may miss nogroup group in /etc/group
+			# adduser fails if it's absent and no group is specified
+			addgroup nogroup 2>/dev/null
+			# busybox has special adduser syntax
+			adduser -S -H -D $1
+		elif exists adduser; then
+			adduser --no-create-home --system --disabled-login $1
+		fi
+	}
+	user_exists $1
+}
+prepare_user()
+{
+	# $WS_USER is required to prevent redirection of the traffic originating from TPWS itself
+	# otherwise infinite loop will occur
+	# also its good idea not to run tpws as root
+	user_exists $WS_USER || {
+		# fallback to daemon if we cant add WS_USER
+		useradd_compat $WS_USER || {
+			for user in daemon nobody; do
+				user_exists $user && {
+					WS_USER=$user
+					return 0
+				}
+			done
+			return 1
+		}
+	}
+}
+
+# this complex user selection allows to survive in any locked/readonly/minimalistic environment
+[ -n "$WS_USER" ] || WS_USER=tpws
+if prepare_user; then
+ USEROPT="--user=$WS_USER"
+else
+ WS_USER=1
+ USEROPT="--uid $WS_USER:$WS_USER"
+fi
+
+PIDDIR=/var/run
+IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
+
+[ -n "$DESYNC_MARK" ] || DESYNC_MARK=0x40000000
+[ -n "$DESYNC_MARK_POSTNAT" ] || DESYNC_MARK_POSTNAT=0x20000000
+
+[ -n "$QNUM" ] || QNUM=200
+[ -n "$NFQWS" ] || NFQWS="$ZAPRET_BASE/nfq/nfqws"
+NFQWS_OPT_BASE="$USEROPT --dpi-desync-fwmark=$DESYNC_MARK"
+apply_unspecified_desync_modes
+
+[ -n "$TPPORT" ] || TPPORT=988
+[ -n "$TPWS" ] || TPWS="$ZAPRET_BASE/tpws/tpws"
+TPWS_LOCALHOST4=127.0.0.127
+
+TPWS_OPT_BASE="$USEROPT"
+TPWS_OPT_BASE4="--bind-addr=$TPWS_LOCALHOST4"
+TPWS_OPT_BASE6="--bind-addr=::1"
+TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
+TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
+# first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
+TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
+
+# max wait time for the link local ipv6 on the LAN interface
+LINKLOCAL_WAIT_SEC=5
+
+IPSET_EXCLUDE="-m set ! --match-set nozapret"
+IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
+
+
+dnat6_target()
+{
+	_dnat6_target "$@"
+}
+set_route_localnet()
+{
+	_set_route_localnet $1 "$IFACE_LAN"
+}
+
+fw_nfqws_post4()
+{
+	_fw_nfqws_post4  $1 "$2" $3 "$IFACE_WAN"
+}
+fw_nfqws_post6()
+{
+	_fw_nfqws_post6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
+}
+fw_nfqws_pre4()
+{
+	_fw_nfqws_pre4  $1 "$2" $3 "$IFACE_WAN"
+}
+fw_nfqws_pre6()
+{
+	_fw_nfqws_pre6  $1 "$2" $3 "${IFACE_WAN6:-$IFACE_WAN}"
+}
+fw_tpws4()
+{
+	_fw_tpws4 $1 "$2" $3 "$IFACE_LAN" "$IFACE_WAN"
+}
+fw_tpws6()
+{
+	_fw_tpws6 $1 "$2" $3 "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
+}
+nft_fw_tpws4()
+{
+	_nft_fw_tpws4 "$1" $2 "$IFACE_WAN"
+}
+nft_fw_tpws6()
+{
+	_nft_fw_tpws6 "$1" $2 "$IFACE_LAN" "${IFACE_WAN6:-$IFACE_WAN}"
+}
+nft_fw_nfqws_post4()
+{
+	_nft_fw_nfqws_post4 "$1" $2 "$IFACE_WAN"
+}
+nft_fw_nfqws_post6()
+{
+	_nft_fw_nfqws_post6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
+}
+nft_fw_nfqws_pre4()
+{
+	_nft_fw_nfqws_pre4 "$1" $2 "$IFACE_WAN"
+}
+nft_fw_nfqws_pre6()
+{
+	_nft_fw_nfqws_pre6 "$1" $2 "${IFACE_WAN6:-$IFACE_WAN}"
+}
+nft_fill_ifsets_overload()
+{
+	nft_fill_ifsets "$IFACE_LAN" "$IFACE_WAN" "${IFACE_WAN6:-$IFACE_WAN}"
+}
+
+
+run_daemon()
+{
+	# $1 - daemon number : 1,2,3,...
+	# $2 - daemon
+	# $3 - daemon args
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+
+	local DAEMONBASE="$(basename "$2")"
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	echo "Starting daemon $1: $2 $3"
+	if exists start-stop-daemon ; then
+		start-stop-daemon -S -p "$PIDFILE" -m -b -x "$2" -- $3
+	else
+		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
+			echo already running
+		else
+			"$2" $3 >/dev/null 2>/dev/null &
+			PID=$!
+			if [ -n "$PID" ]; then
+				echo $PID >$PIDFILE
+			else
+				echo could not start daemon $1 : $2 $3
+				false
+			fi
+		fi
+	fi
+}
+stop_daemon()
+{
+	# $1 - daemon number : 1,2,3,...
+	# $2 - daemon
+	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
+	local DAEMONBASE="$(basename "$2")"
+	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	echo "Stopping daemon $1: $2"
+	if exists start-stop-daemon ; then
+		start-stop-daemon -K -p "$PIDFILE" -x "$2"
+	else
+		if [ -f "$PIDFILE" ]; then
+			read PID <"$PIDFILE"
+			kill $PID
+			rm -f "$PIDFILE"
+		else
+			echo no pidfile : $PIDFILE
+		fi
+	fi
+}
+do_daemon()
+{
+	# $1 - 1 - run, 0 - stop
+	on_off_function run_daemon stop_daemon "$@"
+}
+
+
+do_tpws()
+{
+	# $1 : 1 - run, 0 - stop
+	# $2 : daemon number
+	# $3 : daemon args
+
+	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
+
+	local OPT="$TPWS_OPT_BASE"
+
+	[ "$DISABLE_IPV4" = "1" ] || OPT="$OPT $TPWS_OPT_BASE4"
+	[ "$DISABLE_IPV6" = "1" ] || {
+		OPT="$OPT $TPWS_OPT_BASE6"
+		for lan in $IFACE_LAN; do
+			OPT="$OPT --bind-iface6=$lan $TPWS_OPT_BASE6_PRE"
+		done
+	}
+
+	do_daemon $1 $2 "$TPWS" "$OPT $3"
+}
+do_tpws_socks()
+{
+	# $1 : 1 - run, 0 - stop
+	# $2 : daemon number
+	# $3 : daemon args
+
+	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
+
+	local opt="$TPWS_OPT_BASE --socks"
+
+	tpws_apply_socks_binds opt
+
+	do_daemon $1 $2 "$TPWS" "$opt $3"
+}
+
+do_nfqws()
+{
+	# $1 : 1 - run, 0 - stop
+	# $2 : daemon number
+	# $3 : daemon args
+
+	do_daemon $1 $2 "$NFQWS" "$NFQWS_OPT_BASE $3"
+}
+
+tpws_apply_socks_binds()
+{
+	local o
+
+	[ "$DISABLE_IPV4" = "1" ] || o="--bind-addr=127.0.0.1"
+	[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-addr=::1"
+	
+	for lan in $IFACE_LAN; do
+	    [ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$lan $TPWS_WAIT"
+	    [ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$lan --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
+	done
+	eval $1="\"\$$1 $o\""
+}
+
+
+create_ipset()
+{
+	echo "Creating ip list table (firewall type $FWTYPE)"
+	"$IPSET_CR" "$@"
+}
+
+
+zapret_do_daemons()
+{
+	# $1 - 1 - run, 0 - stop
+
+	local opt qn qns qn6 qns6
+
+	case "${MODE_OVERRIDE:-$MODE}" in
+		tpws)
+			opt="--port=$TPPORT $TPWS_OPT"
+			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
+			do_tpws $1 1 "$opt"
+			;;
+		tpws-socks)
+			opt="--port=$TPPORT $TPWS_OPT"
+			filter_apply_hostlist_target opt
+			filter_apply_suffix opt "$TPWS_OPT_SUFFIX"
+			do_tpws_socks $1 1 "$opt"
+			;;
+		nfqws)
+			get_nfqws_qnums qn qns qn6 qns6
+			[ -z "$qn" ] || {
+				opt="--qnum=$qn $NFQWS_OPT_DESYNC_HTTP"
+				filter_apply_hostlist_target opt
+				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTP_SUFFIX"
+				do_nfqws $1 1 "$opt"
+			}
+			[ -z "$qns" ] || [ "$qns" = "$qn" ] || {
+				opt="--qnum=$qns $NFQWS_OPT_DESYNC_HTTPS"
+				filter_apply_hostlist_target opt
+				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTPS_SUFFIX"
+				do_nfqws $1 2 "$opt"
+			}
+			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || [ "$qn6" = "$qns" ] || {
+				opt="--qnum=$qn6 $NFQWS_OPT_DESYNC_HTTP6"
+				filter_apply_hostlist_target opt
+				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTP6_SUFFIX"
+				do_nfqws $1 3 "$opt"
+			}
+			[ -z "$qns6" ] || [ "$qns6" = "$qn" ] || [ "$qns6" = "$qns" ] || [ "$qns6" = "$qn6" ] || {
+				opt="--qnum=$qns6 $NFQWS_OPT_DESYNC_HTTPS6"
+				filter_apply_hostlist_target opt
+				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_HTTPS6_SUFFIX"
+				do_nfqws $1 4 "$opt"
+			}
+			get_nfqws_qnums_quic qn qn6
+			[ -z "$qn" ] || {
+				opt="--qnum=$qn $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC"
+				filter_apply_hostlist_target opt
+				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_QUIC_SUFFIX"
+				do_nfqws $1 10 "$opt"
+			}
+			[ -z "$qn6" ] || [ "$qn6" = "$qn" ] || {
+				opt="--qnum=$qn6 $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_QUIC6"
+				filter_apply_hostlist_target opt
+				filter_apply_suffix opt "$NFQWS_OPT_DESYNC_QUIC6_SUFFIX"
+				do_nfqws $1 11 "$opt"
+			}
+			;;
+		custom)
+			custom_runner zapret_custom_daemons $1
+			;;
+	esac
+
+	return 0
+}
+zapret_run_daemons()
+{
+	zapret_do_daemons 1 "$@"
+}
+zapret_stop_daemons()
+{
+	zapret_do_daemons 0 "$@"
+}
+

@@ -1,0 +1,42 @@
+How to compile native programs for use in openwrt
+-------------------------------------------------
+
+1) <fetch correct version of openwrt>
+
+   cd ~
+
+ <chaos calmer>
+   git clone git://git.openwrt.org/15.05/openwrt.git
+ <barrier breaker>
+   git clone git://git.openwrt.org/14.07/openwrt.git
+ <trunk>
+   git clone git://git.openwrt.org/openwrt.git
+
+   cd openwrt
+
+2) ./scripts/feeds update -a
+   ./scripts/feeds install -a
+
+3) #add zapret packages to build root
+   #copy package descriptions
+   copy compile/openwrt/* to ~/openwrt
+   #copy source code of tpws
+   copy tpws to ~/openwrt/package/zapret/tpws
+   #copy source code of nfq
+   copy nfq to ~/openwrt/package/zapret/nfq
+   #copy source code of ip2net
+   copy ip2net to ~/openwrt/package/zapret/ip2net
+
+4) make menuconfig
+   #select your target architecture
+   #select packages Network/Zapret/* as "M"
+
+5) make toolchain/compile
+
+6) make package/tpws/compile
+   make package/nfqws/compile
+   make package/ip2net/compile
+   make package/mdig/compile
+
+7) find bin -name tpws*.ipk
+   #take your tpws*.ipk , nfqws*.ipk , ip2net*.ipk, mdig*.ipk from there

@@ -1,0 +1,282 @@
+Пример ручной установки на debian-подобную систему
+--------------------------------------------------
+
+На debian основано большое количество дистрибутивов linux, включая ubuntu.
+Здесь рассматриваются прежде всего Debian 8+ и Ubuntu 16+.
+Но с большой вероятностью может сработать и на производных от них.
+Главное условие - наличие systemd, apt и нескольких стандартных пакетов в репозитории.
+
+Установить пакеты :
+ apt-get update
+ apt-get install ipset curl dnsutils git
+
+Если хотите использовать nftables, то нужен пакет nftables, а ipset не обязателен.
+
+Скопировать директорию zapret в /opt или скачать через git :
+ cd /opt
+ git clone --depth 1 https://github.com/bol-van/zapret
+
+Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
+ /opt/zapret/install_bin.sh
+АЛЬТЕРНАТИВА : make -C /opt/zapret. Получите динамические бинарики под вашу ось.
+Для сборки требуются dev пакеты : zlib1g-dev libcap-dev libnetfilter-queue-dev
+
+Создать конфиг по умолчанию :
+ cp /opt/zapret/config.default /opt/zapret/config
+
+Настроить параметры согласно разделу "Выбор параметров".
+
+Создать user листы по умолчанию :
+ cp /opt/zapret/ipset/zapret-hosts-user-exclude.txt.default /opt/zapret/ipset/zapret-hosts-user-exclude.txt
+ echo nonexistent.domain >/opt/zapret/ipset/zapret-hosts-user.txt
+ touch /opt/zapret/ipset/zapret-hosts-user-ipban.txt
+
+Создать ссылку на service unit в systemd :
+ ln -fs /opt/zapret/init.d/systemd/zapret.service /lib/systemd/system
+
+Удалить старые листы, если они были созданы ранее :
+ /opt/zapret/ipset/clear_lists.sh
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
+Выполнить скрипт обновления листа :
+ /opt/zapret/ipset/get_config.sh
+Настроить таймер systemd для обновления листа :
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.service /lib/systemd/system
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.timer /lib/systemd/system
+
+Принять изменения в systemd :
+ systemctl daemon-reload
+
+Включить автозапуск службы :
+ systemctl enable zapret
+
+Включить таймер обновления листа :
+ systemctl enable zapret-list-update.timer
+
+Запустить службу :
+ systemctl start zapret
+
+Шпаргалка по управлению службой и таймером :
+
+enable auto start : systemctl enable zapret
+disable auto start : systemctl disable zapret
+start : systemctl start zapret
+stop : systemctl stop zapret
+status, output messages : systemctl status zapret
+timer info : systemctl list-timer
+delete service : systemctl disable zapret ; rm /lib/systemd/system/zapret.service
+delete timer : systemctl disable zapret-list-update.timer ; rm /lib/systemd/system/zapret-list-update.*
+
+Centos 7+, Fedora
+-----------------
+
+Centos с 7 версии и более-менее новые федоры построены на systemd.
+В качестве пакетного менеджера используется yum.
+
+Установить пакеты :
+ yum install -y curl ipset dnsutils git
+
+Далее все аналогично debian.
+
+OpenSUSE
+--------
+
+Новые OpenSUSE основаны на systemd и менеджере пакетов zypper.
+
+Установить пакеты :
+ zypper --non-interactive install curl ipset
+
+Далее все аналогично debian, кроме расположения systemd.
+В opensuse он находится не в /lib/systemd, а в /usr/lib/systemd.
+Правильные команды будут :
+
+ ln -fs /opt/zapret/init.d/systemd/zapret.service /usr/lib/systemd/system
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.service /usr/lib/systemd/system
+ ln -fs /opt/zapret/init.d/systemd/zapret-list-update.timer /usr/lib/systemd/system
+
+Arch linux
+----------
+
+Построен на базе systemd.
+
+Установить пакеты :
+ pacman -Syy
+ pacman --noconfirm -S ipset curl
+
+Далее все аналогично debian.
+
+Gentoo
+------
+
+Эта система использует OpenRC - улучшенную версию sysvinit.
+Установка пакетов производится командой : emerge <package_name>
+Пакеты собираются из исходников.
+
+Требуются все те же ipset, curl, git для скачивания с github.
+git и curl по умолчанию могут присутствовать, ipset отсутствует.
+
+ emerge ipset
+
+Настроить параметры согласно разделу "Выбор параметров".
+
+Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
+ /opt/zapret/install_bin.sh
+АЛЬТЕРНАТИВА : make -C /opt/zapret. Получите динамические бинарики под вашу ось.
+
+Удалить старые листы, если они были созданы ранее :
+ /opt/zapret/ipset/clear_lists.sh
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
+Выполнить скрипт обновления листа :
+ /opt/zapret/ipset/get_config.sh
+Зашедулить обновление листа :
+ crontab -e
+ Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
+
+Подключить init скрипт :
+
+ ln -fs /opt/zapret/init.d/openrc/zapret /etc/init.d
+ rc-update add zapret
+
+Запустить службу :
+
+ rc-service zapret start
+
+Шпаргалка по управлению службой :
+
+enable auto start : rc-update add zapret
+disable auto start : rc-update del zapret
+start : rc-service zapret start
+stop : rc-service zapret stop
+
+
+
+Ручная установка на openwrt/LEDE 15.xx-21.xx
+--------------------------------------------
+
+!!! Данная инструкция написана для систем, основанных на iptables+firewall3
+!!! В новых версиях openwrt переходит на nftables+firewall4, инструкция неприменима. Пользуйтесь install_easy.sh
+
+Установить дополнительные пакеты :
+opkg update
+opkg install iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra ipset curl
+(ipv6) opkg install ip6tables-mod-nat
+(опционально) opkg install gzip
+(опционально) opkg install coreutils-sort
+
+ЭКОНОМИЯ МЕСТА :
+
+gzip от busybox в разы медленней полноценного варианта. gzip используется скриптами получения листов.
+sort от busybox медленней полноценного варианта и жрет намного больше памяти. sort используется скриптами получения листов.
+iptables-mod-nfqueue можно выкинуть, если не будем пользоваться nfqws
+curl можно выкинуть, если для получения ip листа будет использоваться только get_user.sh
+
+Самая главная трудность - скомпилировать программы на C. Это можно сделать на linux x64 при помощи SDK, который
+можно скачать с официального сайта openwrt или LEDE. Но процесс кросс компиляции - это всегда сложности.
+Недостаточно запустить make как на традиционной linux системе.
+Поэтому в binaries имеются готовые статические бинарики для всех самых распространенных архитектур.
+Статическая сборка означает, что бинарик не зависит от типа libc (glibc, uclibc или musl) и наличия установленных so.
+Его можно использовать сразу. Лишь бы подходил тип CPU. У ARM и MIPS есть несколько версий.
+Скорее всего найдется рабочий вариант. Если нет - вам придется собирать самостоятельно.
+Для всех поддерживаемых архитектур бинарики запакованы upx. На текущий момент все, кроме mips64.
+
+Скопировать директорию "zapret" в /opt на роутер.
+
+Если места достаточно, самый простой способ :
+ opkg update
+ opkg install git-http
+ mkdir /opt
+ cd /opt
+ git clone --depth 1 https://github.com/bol-van/zapret
+
+Если места немного :
+ opkg update
+ opkg install openssh-sftp-server unzip
+ ifconfig br-lan
+Скачать на комп с github zip архив кнопкой "Clone or download"->Download ZIP
+Скопировать средствами sftp zip архив на роутер в /tmp.
+ mkdir /opt
+ cd /opt
+ unzip /tmp/zapret-master.zip
+ mv zapret-master zapret
+ rm /tmp/zapret-master.zip
+
+Если места совсем мало :
+На linux системе скачать и распаковать zapret. Оставить необходимый минимум файлов.
+Запаковать в архив zapret.tar.gz.
+ nc -l -p 1111 <zapret.tar.gz
+На роутере
+ cd /tmp
+ nc <linux_system_ip> 1111 >zapret.tar.gz
+
+Не стоит работать с распакованной версией zapret на windows. Потеряются ссылки и chmod.
+
+Запустить автоинсталятор бинариков. Он сам определит рабочую архитектуру и настроит все бинарики.
+ /opt/zapret/install_bin.sh
+
+Создать ссылку на скрипт запуска :
+ ln -fs /opt/zapret/init.d/openwrt/zapret /etc/init.d
+Создать ссылку на скрипт события поднятия интерфейса :
+ ln -fs /opt/zapret/init.d/openwrt/90-zapret /etc/hotplug.d/iface
+
+Создать конфиг по умолчанию :
+ cp /opt/zapret/config.default /opt/zapret/config
+
+Настроить параметры согласно разделу "Выбор параметров".
+
+Создать user листы по умолчанию :
+ cp /opt/zapret/ipset/zapret-hosts-user-exclude.txt.default /opt/zapret/ipset/zapret-hosts-user-exclude.txt
+ echo nonexistent.domain >/opt/zapret/ipset/zapret-hosts-user.txt
+ touch /opt/zapret/ipset/zapret-hosts-user-ipban.txt
+
+Удалить старые листы, если они были созданы ранее :
+ /opt/zapret/ipset/clear_lists.sh
+По желанию прописать в /opt/zapret/ipset/zapret-hosts-user.txt свои домены.
+Выполнить скрипт обновления листа :
+ /opt/zapret/ipset/get_config.sh
+Зашедулить обновление листа :
+ crontab -e
+ Создать строчку  "0 12 */2 * * /opt/zapret/ipset/get_config.sh"
+
+Включить автозапуск службы и запустить ее :
+ /etc/init.d/zapret enable
+ /etc/init.d/zapret start
+ПРИМЕЧАНИЕ : на этапе старта системы интерфейсы еще не подняты. в некоторых случаях невозможно правильно
+сформировать параметры запуска демонов, не зная имя физического интерфейса LAN.
+Cкрипт из /etc/hotplug.d/iface перезапустит демоны по событию поднятия LAN.
+
+Создать ссылку на firewall include :
+ ln -fs /opt/zapret/init.d/openwrt/firewall.zapret /etc/firewall.zapret
+Проверить была ли создана ранее запись о firewall include :
+ uci show firewall | grep firewall.zapret
+Если firewall.zapret нет, значит добавить :
+ uci add firewall include
+ uci set firewall.@include[-1].path="/etc/firewall.zapret"
+ uci set firewall.@include[-1].reload="1"
+ uci commit firewall
+Проверить не включен ли flow offload :
+ uci show firewall.@defaults[0]
+Если flow_offloading=1 или flow_offloading_hw=1 ,
+ uci set firewall.@defaults[0].flow_offloading=0
+ uci set firewall.@defaults[0].flow_offloading_hw=0
+ uci commit firewall
+Перезапустить фаервол :
+ fw3 restart
+
+Посмотреть через iptables -nL, ip6tables -nL или через luci вкладку "firewall" появились ли нужные правила.
+
+ЭКОНОМИЯ МЕСТА : если его мало, то можно оставить в директории zapret лишь подкаталоги
+ipset, common, файл config, init.d/openwrt.
+Далее нужно создать подкаталоги с реально используемыми бинариками (ip2net, mdig, tpws, nfq)
+и скопировать туда из binaries рабочие executables.
+
+ЕСЛИ ВСЕ ПЛОХО С МЕСТОМ : откажитесь от работы со списком РКН. используйте только get_user.sh
+
+ЕСЛИ СОВСЕМ ВСЕ УЖАСНО С МЕСТОМ : берете tpws и делаете все своими руками. поднятие iptables, автостарт бинарика.
+С некоторых версий скрипты запуска zapret без ipset не работают (он требуется для ip exclude)
+
+СОВЕТ : Покупайте только роутеры с USB. В USB можно воткнуть флэшку и вынести на нее корневую файловую систему
+или использовать ее в качестве оверлея. Не надо мучать себя, запихивая незапихиваемое в 8 мб встроенной флэшки.
+Для комфортной работы с zapret нужен роутер с 16 Mb встроенной памяти или USB разъемом и 128+ Mb RAM.
+На 64 Mb без swap будут проблемы с листами РКН. Если у вас только 64 Mb, и вы хотите листы РКН, подключите swap.
+32 Mb для современных версий openwrt - конфигурация на грани живучести. Возможны хаотические падения процессов в oom.
+Работа с листами РКН невозможна в принципе.
+

@@ -1,0 +1,51 @@
+#!/bin/sh
+
+EXEDIR="$(dirname "$0")"
+ZAPRET_BASE="$EXEDIR/../.."
+ZAPRET_BASE="$(cd "$ZAPRET_BASE"; pwd)"
+
+. "$EXEDIR/functions"
+
+case "$1" in
+	start)
+		zapret_run_daemons
+		[ "$INIT_APPLY_FW" != "1" ] || zapret_apply_firewall
+		;;
+	stop)
+		[ "$INIT_APPLY_FW" != "1" ] || zapret_unapply_firewall
+		zapret_stop_daemons
+		;;
+	restart)
+		"$0" stop
+		"$0" start
+		;;
+
+	start-fw|start_fw)
+		zapret_apply_firewall
+		;;
+	stop-fw|stop_fw)
+		zapret_unapply_firewall
+		;;
+	restart-fw|stop_fw)
+		zapret_restart_firewall
+		;;
+	reload-fw-tables|reload_fw_tables)
+		pf_table_reload
+		;;
+	
+	start-daemons|start_daemons)
+		zapret_run_daemons
+		;;
+	stop-daemons|stop_daemons)
+		zapret_stop_daemons
+		;;
+	restart-daemons|restart_daemons)
+		zapret_restart_daemons
+		;;
+		
+  *)
+	N="$SCRIPT/$NAME"
+	echo "Usage: $N {start|stop|start-fw|stop-fw|restart-fw|reload-fw-tables|start-daemons|stop-daemons|restart-daemons}" >&2
+	exit 1
+	;;
+esac

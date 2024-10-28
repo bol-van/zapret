@@ -1,0 +1,19 @@
+get_antifilter()
+{
+ # $1 - list url
+ # $2 - target file
+ local ZIPLISTTMP="$TMPDIR/zapret-ip.txt"
+
+ [ "$DISABLE_IPV4" != "1" ] && {
+  curl --fail --max-time 150 --connect-timeout 20 --max-filesize 41943040 -k -L "$1" | cut_local >"$ZIPLISTTMP" &&
+  {
+   dlsize=$(LANG=C wc -c "$ZIPLISTTMP" | xargs | cut -f 1 -d ' ')
+   if [ $dlsize -lt 102400 ]; then
+    echo list file is too small. can be bad.
+    exit 2
+   fi
+   ip2net4 <"$ZIPLISTTMP" | zz "$2"
+   rm -f "$ZIPLISTTMP"
+  }
+ }
+}

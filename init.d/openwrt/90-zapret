@@ -1,0 +1,63 @@
+#!/bin/sh
+
+ZAPRET=/etc/init.d/zapret
+
+check_lan()
+{
+	IS_LAN=
+	[ -n "$OPENWRT_LAN" ] || OPENWRT_LAN=lan
+	for lan in $OPENWRT_LAN; do
+		[ "$INTERFACE" = "$lan" ] && {
+			IS_LAN=1
+			break
+		}
+	done
+}
+check_need_to_reload_tpws6()
+{
+	# tpws6 dnat target nft map can only be reloaded within firewall apply procedure
+	# interface ifsets (wanif, wanif6, lanif) can be reloaded independently
+	check_lan
+	RELOAD_TPWS6=
+	[ "$ACTION" = "ifup" -a "$DISABLE_IPV6" != 1 -a -n "$IS_LAN" ] && [ "$MODE" = "tpws" -o "$MODE" = "custom" ] && RELOAD_TPWS6=1
+}
+
+
+[ -n "$INTERFACE" ] && [ "$ACTION" = ifup -o "$ACTION" = ifdown ] && [ -x "$ZAPRET" ] && "$ZAPRET" enabled && {
+	SCRIPT=$(readlink "$ZAPRET")
+	if [ -n "$SCRIPT" ]; then
+		EXEDIR=$(dirname "$SCRIPT")
+		ZAPRET_BASE=$(readlink -f "$EXEDIR/../..")
+	else
+		ZAPRET_BASE=/opt/zapret
+	fi
+	ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+	ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+	. "$ZAPRET_CONFIG"
+
+	check_need_to_reload_tpws6
+	[ -n "$RELOAD_TPWS6" ] && {
+		logger -t zapret restarting daemons due to $ACTION of $INTERFACE to update tpws6 dnat target
+		"$ZAPRET" restart_daemons
+	}
+	. "$ZAPRET_BASE/common/base.sh"
+	. "$ZAPRET_BASE/common/fwtype.sh"
+	linux_fwtype
+	case "$FWTYPE" in
+		nftables)
+			if [ -n "$RELOAD_TPWS6" ] ; then
+				logger -t zapret reloading nftables due to $ACTION of $INTERFACE to update tpws6 dnat target
+				"$ZAPRET" restart_fw
+			else
+				logger -t zapret reloading nftables ifsets due to $ACTION of $INTERFACE
+				"$ZAPRET" reload_ifsets
+			fi
+			;;
+		iptables)
+			openwrt_fw3 || {
+				logger -t zapret reloading iptables due to $ACTION of $INTERFACE
+				"$ZAPRET" restart_fw
+			}
+			;;
+	esac
+}

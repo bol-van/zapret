@@ -1,0 +1,69 @@
+#!/sbin/openrc-run
+
+# zapret openrc to sysv adapter
+# on some systems (alpine) for unknown reason non-openrc-run scripts are not started from /etc/init.d
+
+EXEDIR=$(dirname "$RC_SERVICE")
+EXEDIR="$(cd "$EXEDIR"; pwd)"
+ZAPRET_BASE="$EXEDIR/../.."
+ZAPRET_INIT="$ZAPRET_BASE/init.d/sysv/zapret"
+
+extra_commands="start_fw stop_fw restart_fw start_daemons stop_daemons restart_daemons reload_ifsets list_ifsets list_table"
+description="extra commands :"
+description_stop_fw="Stop zapret firewall"
+description_start_fw="Start zapret firewall"
+description_restart_fw="Restart zapret firewall"
+description_reload_ifsets="Reload interface lists (nftables only)"
+description_list_ifsets="Display interface lists (nftables only)"
+description_list_table="Display zapret nftable (nftables only)"
+description_stop_daemons="Stop zapret daemons only"
+description_start_daemons="Start zapret daemons only"
+description_restart_daemons="Restart zapret firewall only"
+
+depend() {
+	rc-service -e networking && need networking
+}
+start()
+{
+	"$ZAPRET_INIT" start
+}
+stop()
+{
+	"$ZAPRET_INIT" stop
+}
+start_fw()
+{
+	"$ZAPRET_INIT" start_fw
+}
+stop_fw()
+{
+	"$ZAPRET_INIT" stop_fw
+}
+restart_fw()
+{
+	"$ZAPRET_INIT" restart_fw
+}
+start_daemons()
+{
+	"$ZAPRET_INIT" start_daemons
+}
+stop_daemons()
+{
+	"$ZAPRET_INIT" stop_daemons
+}
+restart_daemons()
+{
+	"$ZAPRET_INIT" restart_daemons
+}
+reload_ifsets()
+{
+	"$ZAPRET_INIT" reload_ifsets
+}
+list_ifsets()
+{
+	"$ZAPRET_INIT" list_ifsets
+}
+list_table()
+{
+	"$ZAPRET_INIT" list_table
+}

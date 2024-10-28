@@ -1,0 +1,12 @@
+CC ?= cc
+CFLAGS += -std=gnu99 -s -O3 -Wno-address-of-packed-member
+LIBS = -lz
+SRC_FILES = *.c crypto/*.c
+
+all: dvtws
+
+dvtws: $(SRC_FILES)
+	$(CC) $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS)
+
+clean:
+	rm -f dvtws
