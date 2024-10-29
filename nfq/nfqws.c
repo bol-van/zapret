@@ -673,6 +673,7 @@ static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
 {
 	char *e,*p,c;
 	port_filter pf;
+	bool b;
 
 	for (p=opt ; p ; )
 	{
@@ -682,9 +683,10 @@ static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
 			*e=0;
 		}
 
-		if (!pf_parse(p,&pf) || !port_filter_add(pfl,&pf)) return false;
-
+		b = pf_parse(p,&pf) && port_filter_add(pfl,&pf);
 		if (e) *e++=c;
+		if (!b) return false;
+
 		p = e;
 	}
 	return true;
