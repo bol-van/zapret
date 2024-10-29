@@ -140,3 +140,4 @@ LIST_HEAD(port_filters_head, port_filter_item);
 bool port_filter_add(struct port_filters_head *head, const port_filter *pf);
 void port_filters_destroy(struct port_filters_head *head);
 bool port_filters_in_range(const struct port_filters_head *head, uint16_t port);
+bool port_filters_deny_if_empty(struct port_filters_head *head);

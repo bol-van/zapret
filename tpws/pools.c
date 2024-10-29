@@ -481,3 +481,9 @@ bool port_filters_in_range(const struct port_filters_head *head, uint16_t port)
 	}
 	return false;
 }
+bool port_filters_deny_if_empty(struct port_filters_head *head)
+{
+	port_filter pf;
+	if (LIST_FIRST(head)) return true;
+	return pf_parse("0",&pf) && port_filter_add(head,&pf);
+}
