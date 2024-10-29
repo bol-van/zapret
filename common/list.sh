@@ -26,7 +26,6 @@ filter_apply_hostlist_target()
 	# $1 - var name of tpws or nfqws params
 
 	local v parm parm1 parm2 parm3 parm4 parm5 parm6 parm7 parm8 parmNA
-	local hmarker hmarkerNA
 	eval v="\$$1"
 	if contains "$v" "$HOSTLIST_MARKER" || contains "$v" "$HOSTLIST_NOAUTO_MARKER"; then
 		[ "$MODE_FILTER" = hostlist -o "$MODE_FILTER" = autohostlist ] &&
