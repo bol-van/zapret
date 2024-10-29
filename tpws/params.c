@@ -149,6 +149,7 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 	LIST_INIT(&entry->dp.hl_collection_exclude);
 	LIST_INIT(&entry->dp.ips_collection);
 	LIST_INIT(&entry->dp.ips_collection_exclude);
+	LIST_INIT(&entry->dp.pf_tcp);
 
 	entry->dp.filter_ipv4 = entry->dp.filter_ipv6 = true;
 	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
@@ -173,6 +174,7 @@ static void dp_entry_destroy(struct desync_profile_list *entry)
 	hostlist_collection_destroy(&entry->dp.hl_collection_exclude);
 	ipset_collection_destroy(&entry->dp.ips_collection);
 	ipset_collection_destroy(&entry->dp.ips_collection_exclude);
+	port_filters_destroy(&entry->dp.pf_tcp);
 	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
 	free(entry);
 }

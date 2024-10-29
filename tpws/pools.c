@@ -448,3 +448,36 @@ bool ipset_collection_is_empty(const struct ipset_collection_head *head)
 	}
 	return true;
 }
+
+
+bool port_filter_add(struct port_filters_head *head, const port_filter *pf)
+{
+	struct port_filter_item *entry = malloc(sizeof(struct port_filter_item));
+	if (entry)
+	{
+		entry->pf = *pf;
+		LIST_INSERT_HEAD(head, entry, next);
+	}
+	return entry;
+}
+void port_filters_destroy(struct port_filters_head *head)
+{
+	struct port_filter_item *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		free(entry);
+	}
+}
+bool port_filters_in_range(const struct port_filters_head *head, uint16_t port)
+{
+	const struct port_filter_item *item;
+
+	if (!LIST_FIRST(head)) return true;
+	LIST_FOREACH(item, head, next)
+	{
+		if (pf_in_range(port, &item->pf))
+			return true;
+	}
+	return false;
+}

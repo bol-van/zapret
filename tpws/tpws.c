@@ -164,7 +164,7 @@ static void exithelp(void)
 		"\nMULTI-STRATEGY:\n"
 		" --new\t\t\t\t\t; begin new strategy\n"
 		" --filter-l3=ipv4|ipv6\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
-		" --filter-tcp=[~]port1[-port2]\t\t; TCP port filter. ~ means negation\n"
+		" --filter-tcp=[~]port1[-port2]|*\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
 		" --filter-l7=[http|tls|unknown]\t\t; L6-L7 protocol filter. multiple comma separated values allowed.\n"
 		" --ipset=<filename>\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
 		" --ipset-exclude=<filename>\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
@@ -299,10 +299,7 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 			*ipv6 = true;
 		else return false;
 
-		if (e)
-		{
-			*e++=c;
-		}
+		if (e) *e++=c;
 		p = e;
 	}
 	return true;
@@ -328,14 +325,33 @@ static bool parse_l7_list(char *opt, uint32_t *l7)
 			*l7 |= L7_PROTO_UNKNOWN;
 		else return false;
 
-		if (e)
-		{
-			*e++=c;
-		}
+		if (e) *e++=c;
 		p = e;
 	}
 	return true;
 }
+
+static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
+{
+	char *e,*p,c;
+	port_filter pf;
+
+	for (p=opt ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (!pf_parse(p,&pf) || !port_filter_add(pfl,&pf)) return false;
+
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
 
 void parse_params(int argc, char *argv[])
 {
@@ -954,7 +970,7 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case 58: /* filter-tcp */
-			if (!pf_parse(optarg,&dp->pf_tcp))
+			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
 				exit_clean(1);

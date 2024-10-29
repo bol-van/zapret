@@ -31,7 +31,7 @@ static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, con
 	if ((dest->sa_family==AF_INET && !dp->filter_ipv4) || (dest->sa_family==AF_INET6 && !dp->filter_ipv6))
 		// L3 filter does not match
 		return false;
-	if (!pf_in_range(saport(dest), &dp->pf_tcp))
+	if (!port_filters_in_range(&dp->pf_tcp,saport(dest)))
 		// L4 filter does not match
 		return false;
 	if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
@@ -95,6 +95,8 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 	t_l7proto l7proto;
 
 	DBGPRINT("tamper_out\n");
+
+	if (!ctrack->dp) return;
 
 	if (params.debug)
 	{
@@ -189,8 +191,6 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 		}
 	}
 
-	if (!ctrack->dp) return;
-	
 	switch(l7proto)
 	{
 		case HTTP:
