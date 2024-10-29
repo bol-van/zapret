@@ -96,21 +96,37 @@ bool AppendHostList(strpool **hostlist, const char *filename)
 	return true;
 }
 
-bool LoadHostLists(strpool **hostlist, struct str_list_head *file_list)
+static bool LoadHostList(struct hostlist_file *hfile)
 {
-	struct str_list *file;
-
-	if (*hostlist)
+	time_t t = file_mod_time(hfile->filename);
+	if (!t)
 	{
-		StrPoolDestroy(hostlist);
-		*hostlist = NULL;
+		// stat() error
+		DLOG_ERR("cannot access hostlist file '%s'. in-memory content remains unchanged.\n",hfile->filename);
+		return true;
 	}
-
-	LIST_FOREACH(file, file_list, next)
+	if (t==hfile->mod_time) return true; // up to date
+	StrPoolDestroy(&hfile->hostlist);
+	if (!AppendHostList(&hfile->hostlist, hfile->filename))
 	{
-		if (!AppendHostList(hostlist, file->str)) return false;
+		StrPoolDestroy(&hfile->hostlist);
+		return false;
 	}
+	hfile->mod_time=t;
 	return true;
+}
+static bool LoadHostLists(struct hostlist_files_head *list)
+{
+	bool bres=true;
+	struct hostlist_file *hfile;
+
+	LIST_FOREACH(hfile, list, next)
+	{
+		if (!LoadHostList(hfile))
+			// at least one failed
+			bres=false;
+	}
+	return bres;
 }
 
 bool NonEmptyHostlist(strpool **hostlist)
@@ -119,8 +135,27 @@ bool NonEmptyHostlist(strpool **hostlist)
 	return *hostlist ? true : StrPoolAddStrLen(hostlist, "@&()", 4);
 }
 
+static void MakeAutolistsNonEmpty()
+{
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+	{
+		if (dpl->dp.hostlist_auto)
+			NonEmptyHostlist(&dpl->dp.hostlist_auto->hostlist);
+	}
+}
 
-bool SearchHostList(strpool *hostlist, const char *host)
+bool LoadAllHostLists()
+{
+	if (!LoadHostLists(&params.hostlists))
+		return false;
+	MakeAutolistsNonEmpty();
+	return true;
+}
+
+
+
+static bool SearchHostList(strpool *hostlist, const char *host)
 {
 	if (hostlist)
 	{
@@ -129,7 +164,7 @@ bool SearchHostList(strpool *hostlist, const char *host)
 		while (p)
 		{
 			bInHostList = StrPoolCheckStr(hostlist, p);
-			DLOG("Hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
+			DLOG("hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
 			if (bInHostList) return true;
 			p = strchr(p, '.');
 			if (p) p++;
@@ -138,74 +173,103 @@ bool SearchHostList(strpool *hostlist, const char *host)
 	return false;
 }
 
-// return : true = apply fooling, false = do not apply
-static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const char *host, bool *excluded)
+
+static bool HostlistsReloadCheck(const struct hostlist_collection_head *hostlists)
 {
-	if (excluded) *excluded = false;
-	if (hostlist_exclude)
+	struct hostlist_item *item;
+	LIST_FOREACH(item, hostlists, next)
 	{
-		DLOG("Checking exclude hostlist\n");
-		if (SearchHostList(hostlist_exclude, host))
+		if (!LoadHostList(item->hfile))
+			return false;
+	}
+	MakeAutolistsNonEmpty();
+	return true;
+}
+bool HostlistsReloadCheckForProfile(const struct desync_profile *dp)
+{
+	return HostlistsReloadCheck(&dp->hl_collection) && HostlistsReloadCheck(&dp->hl_collection_exclude);
+}
+// return : true = apply fooling, false = do not apply
+static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, const struct hostlist_collection_head *hostlists_exclude, const char *host, bool *excluded, bool bSkipReloadCheck)
+{
+	struct hostlist_item *item;
+
+	if (excluded) *excluded = false;
+
+	if (!bSkipReloadCheck)
+		if (!HostlistsReloadCheck(hostlists) || !HostlistsReloadCheck(hostlists_exclude))
+			return false;
+
+	LIST_FOREACH(item, hostlists_exclude, next)
+	{
+		DLOG("[%s] exclude ", item->hfile->filename);
+		if (SearchHostList(item->hfile->hostlist, host))
 		{
 			if (excluded) *excluded = true;
 			return false;
 		}
 	}
-	if (hostlist)
+	// old behavior compat: all include lists are empty means check passes
+	if (!hostlist_collection_is_empty(hostlists))
 	{
-		DLOG("Checking include hostlist\n");
-		return SearchHostList(hostlist, host);
+		LIST_FOREACH(item, hostlists, next)
+		{
+			DLOG("[%s] include ", item->hfile->filename);
+			if (SearchHostList(item->hfile->hostlist, host))
+				return true;
+		}
+		return false;
 	}
 	return true;
 }
 
-static bool LoadIncludeHostListsForProfile(struct desync_profile *dp)
-{
-	if (!LoadHostLists(&dp->hostlist, &dp->hostlist_files))
-		return false;
-	if (*dp->hostlist_auto_filename)
-	{
-		dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
-		NonEmptyHostlist(&dp->hostlist);
-	}
-	return true;
-}
 
 // return : true = apply fooling, false = do not apply
-bool HostlistCheck(struct desync_profile *dp, const char *host, bool *excluded)
+bool HostlistCheck(const struct desync_profile *dp, const char *host, bool *excluded, bool bSkipReloadCheck)
 {
 	DLOG("* hostlist check for profile %d\n",dp->n);
-	if (*dp->hostlist_auto_filename)
-	{
-		time_t t = file_mod_time(dp->hostlist_auto_filename);
-		if (t!=dp->hostlist_auto_mod_time)
-		{
-			DLOG_CONDUP("Autohostlist '%s' from profile %d was modified. Reloading include hostlists for this profile.\n",dp->hostlist_auto_filename, dp->n);
-			if (!LoadIncludeHostListsForProfile(dp))
-			{
-				// what will we do without hostlist ?? sure, gonna die
-				exit(1);
-			}
-			dp->hostlist_auto_mod_time = t;
-			NonEmptyHostlist(&dp->hostlist);
-		}
-	}
-	return HostlistCheck_(dp->hostlist, dp->hostlist_exclude, host, excluded);
+	return HostlistCheck_(&dp->hl_collection, &dp->hl_collection_exclude, host, excluded, bSkipReloadCheck);
 }
 
-bool LoadIncludeHostLists()
+
+static struct hostlist_file *RegisterHostlist_(struct hostlist_files_head *hostlists, struct hostlist_collection_head *hl_collection, const char *filename)
 {
-	struct desync_profile_list *dpl;
-	LIST_FOREACH(dpl, &params.desync_profiles, next)
-		if (!LoadIncludeHostListsForProfile(&dpl->dp))
-			return false;
-	return true;
+	struct hostlist_file *hfile;
+	if (!(hfile=hostlist_files_search(hostlists, filename)))
+		if (!(hfile=hostlist_files_add(hostlists, filename)))
+			return NULL;
+	if (!hostlist_collection_search(hl_collection, filename))
+		if (!hostlist_collection_add(hl_collection, hfile))
+			return NULL;
+	return hfile;
 }
-bool LoadExcludeHostLists()
+struct hostlist_file *RegisterHostlist(struct desync_profile *dp, bool bExclude, const char *filename)
 {
+	return RegisterHostlist_(
+		&params.hostlists,
+		bExclude ? &dp->hl_collection_exclude : &dp->hl_collection,
+		filename);
+}
+
+void HostlistsDebug()
+{
+	if (!params.debug) return;
+
+	struct hostlist_file *hfile;
 	struct desync_profile_list *dpl;
+	struct hostlist_item *hl_item;
+
+	LIST_FOREACH(hfile, &params.hostlists, next)
+		DLOG("hostlist file %s%s\n",hfile->filename,hfile->hostlist ? "" : " (empty)");
+
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
-		if (!LoadHostLists(&dpl->dp.hostlist_exclude, &dpl->dp.hostlist_exclude_files))
-			return false;
-	return true;
+	{
+		LIST_FOREACH(hl_item, &dpl->dp.hl_collection, next)
+			if (hl_item->hfile!=dpl->dp.hostlist_auto)
+				DLOG("profile %d include hostlist %s%s\n",dpl->dp.n, hl_item->hfile->filename,hl_item->hfile->hostlist ? "" : " (empty)");
+		LIST_FOREACH(hl_item, &dpl->dp.hl_collection_exclude, next)
+			DLOG("profile %d exclude hostlist %s%s\n",dpl->dp.n,hl_item->hfile->filename,hl_item->hfile->hostlist ? "" : " (empty)");
+		if (dpl->dp.hostlist_auto)
+			DLOG("profile %d auto hostlist %s%s\n",dpl->dp.n,dpl->dp.hostlist_auto->filename,dpl->dp.hostlist_auto->hostlist ? "" : " (empty)");
+	}
 }

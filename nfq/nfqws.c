@@ -51,25 +51,10 @@ struct params_s params;
 bool bQuit=false;
 #endif
 
-static bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	printf("Will reload hostlists and ipsets on next request (if any)\n");
-	bHup = true;
-}
-// should be called in normal execution
-static void dohup(void)
-{
-	if (bHup)
-	{
-		if (!LoadIncludeHostLists() || !LoadExcludeHostLists() || !LoadIncludeIpsets() || !LoadExcludeIpsets())
-		{
-			// what will we do without hostlist ?? sure, gonna die
-			exit(1);
-		}
-		bHup = false;
-	}
+	// do not do anything. lists auto reload themselves based on file time.
 }
 
 static void onusr1(int sig)
@@ -239,7 +224,6 @@ static int nfq_main(void)
 	{
 		while ((rv = recv(fd, buf, sizeof(buf), 0)) > 0)
 		{
-			dohup();
 			int r = nfq_handle_packet(h, (char *)buf, rv);
 			if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
 		}
@@ -351,7 +335,6 @@ static int dvt_main(void)
 			if (errno==EINTR)
 			{
 				// a signal received
-				dohup();
 				continue;
 			}
 			DLOG_PERROR("select");
@@ -507,8 +490,6 @@ static int win_main(const char *windivert_filter)
 			}
 			else
 			{
-				dohup();
-
 				mark=0;
 				// pseudo interface id IfIdx.SubIfIdx
 				verdict = processPacketData(&mark, ifout, packet, &len);
@@ -575,6 +556,8 @@ static void cleanup_params(void)
 
 	dp_list_destroy(&params.desync_profiles);
 
+	hostlist_files_destroy(&params.hostlists);
+	ipset_files_destroy(&params.ipsets);
 #ifdef __CYGWIN__
 	strlist_destroy(&params.ssid_filter);
 	strlist_destroy(&params.nlm_filter);
@@ -997,6 +980,7 @@ int main(int argc, char **argv)
 	struct desync_profile_list *dpl;
 	struct desync_profile *dp;
 	int desync_profile_count=0;
+
 	if (!(dpl = dp_list_add(&params.desync_profiles)))
 	{
 		DLOG_ERR("desync_profile_add: out of memory\n");
@@ -1015,6 +999,9 @@ int main(int argc, char **argv)
 	params.ctrack_t_est = CTRACK_T_EST;
 	params.ctrack_t_fin = CTRACK_T_FIN;
 	params.ctrack_t_udp = CTRACK_T_UDP;
+	
+	LIST_INIT(&params.hostlists);
+	LIST_INIT(&params.ipsets);
 
 #ifdef __CYGWIN__
 	LIST_INIT(&params.ssid_filter);
@@ -1522,27 +1509,27 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 45: /* hostlist */
-			if (!strlist_add(&dp->hostlist_files, optarg))
+			if (!RegisterHostlist(dp, false, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register hostlist %s\n", optarg);
 				exit_clean(1);
 			}
 			break;
 		case 46: /* hostlist-exclude */
-			if (!strlist_add(&dp->hostlist_exclude_files, optarg))
+			if (!RegisterHostlist(dp, true, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register hostlist %s\n", optarg);
 				exit_clean(1);
 			}
 			break;
 		case 47: /* hostlist-auto */
-			if (*dp->hostlist_auto_filename)
+			if (dp->hostlist_auto)
 			{
 				DLOG_ERR("only one auto hostlist per profile is supported\n");
 				exit_clean(1);
 			}
 			{
-				FILE *F = fopen(optarg,"at");
+				FILE *F = fopen(optarg,"a+b");
 				if (!F)
 				{
 					DLOG_ERR("cannot create %s\n", optarg);
@@ -1560,13 +1547,11 @@ int main(int argc, char **argv)
 					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
 #endif
 			}
-			if (!strlist_add(&dp->hostlist_files, optarg))
+			if (!(dp->hostlist_auto=RegisterHostlist(dp, false, optarg)))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register hostlist %s\n", optarg);
 				exit_clean(1);
 			}
-			strncpy(dp->hostlist_auto_filename, optarg, sizeof(dp->hostlist_auto_filename));
-			dp->hostlist_auto_filename[sizeof(dp->hostlist_auto_filename) - 1] = '\0';
 			break;
 		case 48: /* hostlist-auto-fail-threshold */
 			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
@@ -1652,16 +1637,16 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 57: /* ipset */
-			if (!strlist_add(&dp->ipset_files, optarg))
+			if (!RegisterIpset(dp, false, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register ipset %s\n", optarg);
 				exit_clean(1);
 			}
 			break;
 		case 58: /* ipset-exclude */
-			if (!strlist_add(&dp->ipset_exclude_files, optarg))
+			if (!RegisterIpset(dp, true, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register ipset %s\n", optarg);
 				exit_clean(1);
 			}
 			break;
@@ -1839,7 +1824,7 @@ int main(int argc, char **argv)
 	}
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
-
+	
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
@@ -1854,27 +1839,22 @@ int main(int argc, char **argv)
 		if (dp->desync_split_http_req==httpreqpos_none && dp->desync_split_pos) dp->desync_split_http_req=httpreqpos_pos;
 	}
 
-	if (!LoadIncludeHostLists())
+	if (!LoadAllHostLists())
 	{
-		DLOG_ERR("Include hostlists load failed\n");
+		DLOG_ERR("hostlists load failed\n");
 		exit_clean(1);
 	}
-	if (!LoadExcludeHostLists())
+	if (!LoadAllIpsets())
 	{
-		DLOG_ERR("Exclude hostlists load failed\n");
-		exit_clean(1);
-	}
-	if (!LoadIncludeIpsets())
-	{
-		DLOG_ERR("Include ipset load failed\n");
-		exit_clean(1);
-	}
-	if (!LoadExcludeIpsets())
-	{
-		DLOG_ERR("Exclude ipset load failed\n");
+		DLOG_ERR("ipset load failed\n");
 		exit_clean(1);
 	}
 	
+	DLOG("\nlists summary:\n");
+	HostlistsDebug();
+	IpsetsDebug();
+	DLOG("\n");
+
 	if (daemon) daemonize();
 
 	if (*pidfile && !writepid(pidfile))

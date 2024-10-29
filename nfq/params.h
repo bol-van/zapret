@@ -67,18 +67,21 @@ struct desync_profile
 	bool filter_ipv4,filter_ipv6;
 	port_filter pf_tcp,pf_udp;
 	uint32_t filter_l7;	// L7_PROTO_* bits
-	ipset ips,ips_exclude;
-	struct str_list_head ipset_files, ipset_exclude_files;
 
-	strpool *hostlist, *hostlist_exclude;
-	struct str_list_head hostlist_files, hostlist_exclude_files;
-	char hostlist_auto_filename[PATH_MAX];
+	// list of pointers to ipsets
+	struct ipset_collection_head ips_collection, ips_collection_exclude;
+
+	// list of pointers to hostlist files
+	struct hostlist_collection_head hl_collection, hl_collection_exclude;
+	// pointer to autohostlist. NULL if no autohostlist for the profile.
+	struct hostlist_file *hostlist_auto;
 	int hostlist_auto_fail_threshold, hostlist_auto_fail_time, hostlist_auto_retrans_threshold;
-	time_t hostlist_auto_mod_time;
+
 	hostfail_pool *hostlist_auto_fail_counters;
 };
 
-#define PROFILE_IPSETS_EMPTY(dp) (IPSET_EMPTY(&dp->ips) && IPSET_EMPTY(&dp->ips_exclude))
+#define PROFILE_IPSETS_EMPTY(dp) (ipset_collection_is_empty(&dp->ips_collection) && ipset_collection_is_empty(&dp->ips_collection_exclude))
+#define PROFILE_HOSTLISTS_EMPTY(dp) (hostlist_collection_is_empty(&dp->hl_collection) && hostlist_collection_is_empty(&dp->hl_collection_exclude))
 
 struct desync_profile_list {
 	struct desync_profile dp;
@@ -114,7 +117,12 @@ struct params_s
 #endif
 
 	char hostlist_auto_debuglog[PATH_MAX];
-	
+
+	// hostlist files with data for all profiles
+	struct hostlist_files_head hostlists;
+	// ipset files with data for all profiles
+	struct ipset_files_head ipsets;
+
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;
 	t_conntrack conntrack;
 };

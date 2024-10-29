@@ -160,8 +160,10 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 	struct desync_profile_list *entry = calloc(1,sizeof(struct desync_profile_list));
 	if (!entry) return NULL;
 	
-	LIST_INIT(&entry->dp.hostlist_files);
-	LIST_INIT(&entry->dp.hostlist_exclude_files);
+	LIST_INIT(&entry->dp.hl_collection);
+	LIST_INIT(&entry->dp.hl_collection_exclude);
+	LIST_INIT(&entry->dp.ips_collection);
+	LIST_INIT(&entry->dp.ips_collection_exclude);
 	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
 	entry->dp.desync_skip_nosni = true;
 	entry->dp.desync_split_pos = 2;
@@ -205,14 +207,10 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 }
 static void dp_entry_destroy(struct desync_profile_list *entry)
 {
-	strlist_destroy(&entry->dp.hostlist_files);
-	strlist_destroy(&entry->dp.hostlist_exclude_files);
-	strlist_destroy(&entry->dp.ipset_files);
-	strlist_destroy(&entry->dp.ipset_exclude_files);
-	StrPoolDestroy(&entry->dp.hostlist_exclude);
-	StrPoolDestroy(&entry->dp.hostlist);
-	ipsetDestroy(&entry->dp.ips);
-	ipsetDestroy(&entry->dp.ips_exclude);
+	hostlist_collection_destroy(&entry->dp.hl_collection);
+	hostlist_collection_destroy(&entry->dp.hl_collection_exclude);
+	ipset_collection_destroy(&entry->dp.ips_collection);
+	ipset_collection_destroy(&entry->dp.ips_collection_exclude);
 	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
 	free(entry);
 }
@@ -229,8 +227,7 @@ bool dp_list_have_autohostlist(struct desync_profile_list_head *head)
 {
 	struct desync_profile_list *dpl;
 	LIST_FOREACH(dpl, head, next)
-		if (*dpl->dp.hostlist_auto_filename)
+		if (dpl->dp.hostlist_auto)
 			return true;
 	return false;
 }
-

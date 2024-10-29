@@ -5,10 +5,10 @@
 #include "params.h"
 
 bool AppendHostList(strpool **hostlist, const char *filename);
-bool LoadHostLists(strpool **hostlist, struct str_list_head *file_list);
-bool LoadIncludeHostLists();
-bool LoadExcludeHostLists();
+bool LoadAllHostLists();
 bool NonEmptyHostlist(strpool **hostlist);
-bool SearchHostList(strpool *hostlist, const char *host);
 // return : true = apply fooling, false = do not apply
-bool HostlistCheck(struct desync_profile *dp,const char *host, bool *excluded);
+bool HostlistCheck(const struct desync_profile *dp,const char *host, bool *excluded, bool bSkipReloadCheck);
+struct hostlist_file *RegisterHostlist(struct desync_profile *dp, bool bExclude, const char *filename);
+bool HostlistsReloadCheckForProfile(const struct desync_profile *dp);
+void HostlistsDebug();

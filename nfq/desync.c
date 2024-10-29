@@ -146,50 +146,48 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 	return DESYNC_INVALID;
 }
 
-static bool dp_match_l3l4(struct desync_profile *dp, uint8_t l3proto, const struct sockaddr *dest)
-{
-	return  ((dest->sa_family==AF_INET && dp->filter_ipv4) || (dest->sa_family==AF_INET6 && dp->filter_ipv6)) &&
-		(l3proto==IPPROTO_TCP && pf_in_range(saport(dest), &dp->pf_tcp) || l3proto==IPPROTO_UDP && pf_in_range(saport(dest), &dp->pf_udp)) &&
-		IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL);
-}
-static bool dp_impossible(struct desync_profile *dp, const char *hostname, t_l7proto l7proto)
-{
-	return	!PROFILE_IPSETS_EMPTY(dp) &&
-		((dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7)) || (!*dp->hostlist_auto_filename && !hostname && (dp->hostlist || dp->hostlist_exclude)));
-}
-
 static bool dp_match(
 	struct desync_profile *dp,
 	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto,
 	bool *bCheckDone, bool *bCheckResult, bool *bExcluded)
 {
 	if (bCheckDone) *bCheckDone = false;
-	// impossible case, hard filter
-	// impossible check avoids relatively slow ipset search
-	if (!dp_impossible(dp,hostname,l7proto) && dp_match_l3l4(dp,l3proto,dest))
+
+	if (!HostlistsReloadCheckForProfile(dp)) return false;
+
+	if ((dest->sa_family==AF_INET && !dp->filter_ipv4) || (dest->sa_family==AF_INET6 && !dp->filter_ipv6))
+		// L3 filter does not match
+		return false;
+	if ((l3proto==IPPROTO_TCP && !pf_in_range(saport(dest), &dp->pf_tcp)) || (l3proto==IPPROTO_UDP && !pf_in_range(saport(dest), &dp->pf_udp)))
+		// L4 filter does not match
+		return false;
+	if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
+		// L7 filter does not match
+		return false;
+	if (!dp->hostlist_auto && !hostname && !PROFILE_HOSTLISTS_EMPTY(dp))
+		// avoid cpu consuming ipset check. profile cannot win if regular hostlists are present without auto hostlist and hostname is unknown.
+		return false;
+	if (!IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL))
+		// target ip does not match
+		return false;
+
+	// autohostlist profile matching l3/l4 filter always win
+	if (dp->hostlist_auto) return true;
+
+	if (PROFILE_HOSTLISTS_EMPTY(dp))
+		// profile without hostlist filter wins
+		return true;
+	else
 	{
-		// soft filter
-		if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
-			return false;
-
-		// autohostlist profile matching l3/l4 filter always win
-		if (*dp->hostlist_auto_filename) return true;
-
-		if (dp->hostlist || dp->hostlist_exclude)
+		// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
+		if (hostname)
 		{
-			// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
-			if (hostname)
-			{
-				if (bCheckDone) *bCheckDone = true;
-				bool b;
-				b = HostlistCheck(dp, hostname, bExcluded);
-				if (bCheckResult) *bCheckResult = b;
-				return b;
-			}
+			if (bCheckDone) *bCheckDone = true;
+			bool b;
+			b = HostlistCheck(dp, hostname, bExcluded, true);
+			if (bCheckResult) *bCheckResult = b;
+			return b;
 		}
-		else
-			// profile without hostlist filter wins
-			return true;
 	}
 	return false;
 }
@@ -359,21 +357,21 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		
 		DLOG("auto hostlist (profile %d) : rechecking %s to avoid duplicates\n", dp->n, hostname);
 		bool bExcluded=false;
-		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
+		if (!HostlistCheck(dp, hostname, &bExcluded, false) && !bExcluded)
 		{
-			DLOG("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto_filename);
-			if (!StrPoolAddStr(&dp->hostlist, hostname))
+			DLOG("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto->filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto->filename);
+			if (!StrPoolAddStr(&dp->hostlist_auto->hostlist, hostname))
 			{
 				DLOG_ERR("StrPoolAddStr out of memory\n");
 				return;
 			}
-			if (!append_to_list_file(dp->hostlist_auto_filename, hostname))
+			if (!append_to_list_file(dp->hostlist_auto->filename, hostname))
 			{
 				DLOG_PERROR("write to auto hostlist:");
 				return;
 			}
-			dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
+			dp->hostlist_auto->mod_time = file_mod_time(dp->hostlist_auto->filename);
 		}
 		else
 		{
@@ -1044,17 +1042,17 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			bCheckExcluded = ctrack_replay->bCheckExcluded;
 		}
 
-		if (bHaveHost && (dp->hostlist || dp->hostlist_exclude))
+		if (bHaveHost && !PROFILE_HOSTLISTS_EMPTY(dp))
 		{
 			if (!bCheckDone)
-				bCheckResult = HostlistCheck(dp, host, &bCheckExcluded);
+				bCheckResult = HostlistCheck(dp, host, &bCheckExcluded, false);
 			if (bCheckResult)
 				ctrack_stop_retrans_counter(ctrack_replay);
 			else
 			{
 				if (ctrack_replay)
 				{
-					ctrack_replay->hostname_ah_check = *dp->hostlist_auto_filename && !bCheckExcluded;
+					ctrack_replay->hostname_ah_check = dp->hostlist_auto && !bCheckExcluded;
 					if (!ctrack_replay->hostname_ah_check)
 						ctrack_stop_retrans_counter(ctrack_replay);
 				}
@@ -1762,17 +1760,17 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			bCheckExcluded = ctrack_replay->bCheckExcluded;
 		}
 
-		if (bHaveHost && (dp->hostlist || dp->hostlist_exclude))
+		if (bHaveHost && !PROFILE_HOSTLISTS_EMPTY(dp))
 		{
 			if (!bCheckDone)
-				bCheckResult = HostlistCheck(dp, host, &bCheckExcluded);
+				bCheckResult = HostlistCheck(dp, host, &bCheckExcluded, false);
 			if (bCheckResult)
 				ctrack_stop_retrans_counter(ctrack_replay);
 			else
 			{
 				if (ctrack_replay)
 				{
-					ctrack_replay->hostname_ah_check = *dp->hostlist_auto_filename && !bCheckExcluded;
+					ctrack_replay->hostname_ah_check = dp->hostlist_auto && !bCheckExcluded;
 					if (ctrack_replay->hostname_ah_check)
 					{
 						// first request is not retrans
