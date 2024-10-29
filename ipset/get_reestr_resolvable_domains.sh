@@ -34,8 +34,6 @@ dl()
 
 dl "$URL" "$ZHOSTLIST" 65536 67108864
 
-hup_zapret_daemons
-
 [ "$DISABLE_IPV4" != "1" ] && dl "$IPB4" "$ZIPLIST_IPBAN" 8192 1048576
 [ "$DISABLE_IPV6" != "1" ] && dl "$IPB6" "$ZIPLIST_IPBAN6" 128 1048576
 

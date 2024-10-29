@@ -255,16 +255,3 @@ getipban()
  _get_ipban
  return 0
 }
-
-hup_zapret_daemons()
-{
- echo forcing zapret daemons to reload their hostlist
- if exists killall; then
-  killall -HUP tpws nfqws dvtws 2>/dev/null
- elif exists pkill; then
-  pkill -HUP ^tpws$ ^nfqws$ ^dvtws$
- else
-  echo no mass killer available ! cant HUP zapret daemons
- fi
-}
-

@@ -31,6 +31,4 @@ sort -u "$ZDOM" | zz "$ZHOSTLIST"
 
 rm -f "$ZDOM"
 
-hup_zapret_daemons
-
 exit 0
