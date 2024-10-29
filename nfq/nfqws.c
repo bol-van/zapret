@@ -1511,14 +1511,14 @@ int main(int argc, char **argv)
 		case 45: /* hostlist */
 			if (!RegisterHostlist(dp, false, optarg))
 			{
-				DLOG_ERR("failed to register hostlist %s\n", optarg);
+				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
 		case 46: /* hostlist-exclude */
 			if (!RegisterHostlist(dp, true, optarg))
 			{
-				DLOG_ERR("failed to register hostlist %s\n", optarg);
+				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
@@ -1549,7 +1549,7 @@ int main(int argc, char **argv)
 			}
 			if (!(dp->hostlist_auto=RegisterHostlist(dp, false, optarg)))
 			{
-				DLOG_ERR("failed to register hostlist %s\n", optarg);
+				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
@@ -1639,14 +1639,14 @@ int main(int argc, char **argv)
 		case 57: /* ipset */
 			if (!RegisterIpset(dp, false, optarg))
 			{
-				DLOG_ERR("failed to register ipset %s\n", optarg);
+				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
 		case 58: /* ipset-exclude */
 			if (!RegisterIpset(dp, true, optarg))
 			{
-				DLOG_ERR("failed to register ipset %s\n", optarg);
+				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;

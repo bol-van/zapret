@@ -245,6 +245,11 @@ static struct hostlist_file *RegisterHostlist_(struct hostlist_files_head *hostl
 }
 struct hostlist_file *RegisterHostlist(struct desync_profile *dp, bool bExclude, const char *filename)
 {
+	if (!file_mod_time(filename))
+	{
+		DLOG_ERR("cannot access hostlist file '%s'\n",filename);
+		return NULL;
+	}
 	return RegisterHostlist_(
 		&params.hostlists,
 		bExclude ? &dp->hl_collection_exclude : &dp->hl_collection,

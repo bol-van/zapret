@@ -225,7 +225,8 @@ static bool IpsetCheck_(const struct ipset_collection_head *ips, const struct ip
 
 bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6)
 {
-	if (!PROFILE_IPSETS_EMPTY(dp)) DLOG("* ipset check for profile %d\n",dp->n);
+	if (PROFILE_IPSETS_EMPTY(dp)) return true;
+	DLOG("* ipset check for profile %d\n",dp->n);
 	return IpsetCheck_(&dp->ips_collection,&dp->ips_collection_exclude,ipv4,ipv6);
 }
 
@@ -243,6 +244,11 @@ static struct ipset_file *RegisterIpset_(struct ipset_files_head *ipsets, struct
 }
 struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename)
 {
+	if (!file_mod_time(filename))
+	{
+		DLOG_ERR("cannot access ipset file '%s'\n",filename);
+		return NULL;
+	}
 	return RegisterIpset_(
 		&params.ipsets,
 		bExclude ? &dp->ips_collection_exclude : &dp->ips_collection,
