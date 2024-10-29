@@ -1469,8 +1469,6 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 			break;
 		}
 
-		dohup();
-
 		for (i = 0; i < num_events; i++)
 		{
 			conn = (tproxy_conn_t*)events[i].data.ptr;

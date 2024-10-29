@@ -3,6 +3,7 @@
 #include "gzip.h"
 #include "helpers.h"
 
+
 // inplace tolower() and add to pool
 static bool addpool(ipset *ips, char **s, const char *end, int *ct)
 {
@@ -75,7 +76,7 @@ static bool AppendIpset(ipset *ips, const char *filename)
 		if (r==Z_OK)
 		{
 			DLOG_CONDUP("zlib compression detected. uncompressed size : %zu\n", zsize);
-			
+
 			p = zbuf;
 			e = zbuf + zsize;
 			while(p<e)
@@ -98,7 +99,7 @@ static bool AppendIpset(ipset *ips, const char *filename)
 	else
 	{
 		DLOG_CONDUP("loading plain text list\n");
-		
+
 		while (fgets(s, sizeof(s)-1, F))
 		{
 			p = s;
@@ -116,37 +117,45 @@ static bool AppendIpset(ipset *ips, const char *filename)
 	return true;
 }
 
-static bool LoadIpsets(ipset *ips, struct str_list_head *file_list)
+static bool LoadIpset(struct ipset_file *hfile)
 {
-	struct str_list *file;
-
-	ipsetDestroy(ips);
-
-	LIST_FOREACH(file, file_list, next)
+	time_t t = file_mod_time(hfile->filename);
+	if (!t)
 	{
-		if (!AppendIpset(ips, file->str)) return false;
+		// stat() error
+		DLOG_ERR("cannot access ipset file '%s'. in-memory content remains unchanged.\n",hfile->filename);
+		return true;
 	}
+	if (t==hfile->mod_time) return true; // up to date
+	ipsetDestroy(&hfile->ipset);
+	if (!AppendIpset(&hfile->ipset, hfile->filename))
+	{
+		ipsetDestroy(&hfile->ipset);
+		return false;
+	}
+	hfile->mod_time=t;
 	return true;
+}
+static bool LoadIpsets(struct ipset_files_head *list)
+{
+	bool bres=true;
+	struct ipset_file *hfile;
+
+	LIST_FOREACH(hfile, list, next)
+	{
+		if (!LoadIpset(hfile))
+			// at least one failed
+			bres=false;
+	}
+	return bres;
 }
 
-bool LoadIncludeIpsets()
+bool LoadAllIpsets()
 {
-	struct desync_profile_list *dpl;
-	LIST_FOREACH(dpl, &params.desync_profiles, next)
-		if (!LoadIpsets(&dpl->dp.ips, &dpl->dp.ipset_files))
-			return false;
-	return true;
-}
-bool LoadExcludeIpsets()
-{
-	struct desync_profile_list *dpl;
-	LIST_FOREACH(dpl, &params.desync_profiles, next)
-		if (!LoadIpsets(&dpl->dp.ips_exclude, &dpl->dp.ipset_exclude_files))
-			return false;
-	return true;
+	return LoadIpsets(&params.ipsets);
 }
 
-bool SearchIpset(const ipset *ips, const struct in_addr *ipv4, const struct in6_addr *ipv6)
+static bool SearchIpset(const ipset *ips, const struct in_addr *ipv4, const struct in6_addr *ipv6)
 {
 	char s_ip[40];
 	bool bInSet=false;
@@ -172,24 +181,109 @@ bool SearchIpset(const ipset *ips, const struct in_addr *ipv4, const struct in6_
 	return bInSet;
 }
 
-static bool IpsetCheck_(const ipset *ips, const ipset *ips_exclude, const struct in_addr *ipv4, const struct in6_addr *ipv6)
+static bool IpsetsReloadCheck(const struct ipset_collection_head *ipsets)
 {
-	if (!IPSET_EMPTY(ips_exclude))
+	struct ipset_item *item;
+	LIST_FOREACH(item, ipsets, next)
 	{
-		VPRINT("exclude ");
-		if (SearchIpset(ips_exclude, ipv4, ipv6))
+		if (!LoadIpset(item->hfile))
 			return false;
 	}
-	if (!IPSET_EMPTY(ips))
+	return true;
+}
+bool IpsetsReloadCheckForProfile(const struct desync_profile *dp)
+{
+	return IpsetsReloadCheck(&dp->ips_collection) && IpsetsReloadCheck(&dp->ips_collection_exclude);
+}
+
+static bool IpsetCheck_(const struct ipset_collection_head *ips, const struct ipset_collection_head *ips_exclude, const struct in_addr *ipv4, const struct in6_addr *ipv6)
+{
+	struct ipset_item *item;
+
+	if (!IpsetsReloadCheck(ips) || !IpsetsReloadCheck(ips_exclude))
+		return false;
+
+	LIST_FOREACH(item, ips_exclude, next)
 	{
-		VPRINT("include ");
-		return SearchIpset(ips, ipv4, ipv6);
+		VPRINT("[%s] exclude ",item->hfile->filename);
+		if (SearchIpset(&item->hfile->ipset, ipv4, ipv6))
+			return false;
+	}
+	// old behavior compat: all include lists are empty means check passes
+	if (!ipset_collection_is_empty(ips))
+	{
+		LIST_FOREACH(item, ips, next)
+		{
+			VPRINT("[%s] include ",item->hfile->filename);
+			if (SearchIpset(&item->hfile->ipset, ipv4, ipv6))
+				return true;
+		}
+		return false;
 	}
 	return true;
 }
 
-bool IpsetCheck(struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6)
+bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6)
 {
-	if (!PROFILE_IPSETS_EMPTY(dp)) VPRINT("* ipset check for profile %d\n",dp->n);
-	return IpsetCheck_(&dp->ips,&dp->ips_exclude,ipv4,ipv6);
+	if (PROFILE_IPSETS_EMPTY(dp)) return true;
+	VPRINT("* ipset check for profile %d\n",dp->n);
+	return IpsetCheck_(&dp->ips_collection,&dp->ips_collection_exclude,ipv4,ipv6);
+}
+
+
+static struct ipset_file *RegisterIpset_(struct ipset_files_head *ipsets, struct ipset_collection_head *ips_collection, const char *filename)
+{
+	struct ipset_file *hfile;
+	if (!(hfile=ipset_files_search(ipsets, filename)))
+		if (!(hfile=ipset_files_add(ipsets, filename)))
+			return NULL;
+	if (!ipset_collection_search(ips_collection, filename))
+		if (!ipset_collection_add(ips_collection, hfile))
+			return NULL;
+	return hfile;
+}
+struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename)
+{
+	if (!file_mod_time(filename))
+	{
+		DLOG_ERR("cannot access ipset file '%s'\n",filename);
+		return NULL;
+	}
+	return RegisterIpset_(
+		&params.ipsets,
+		bExclude ? &dp->ips_collection_exclude : &dp->ips_collection,
+		filename);
+}
+
+static const char *dbg_ipset_fill(const ipset *ips)
+{
+	if (ips->ips4)
+		if (ips->ips6)
+			return "ipv4+ipv6";
+		else
+			return "ipv4";
+	else
+		if (ips->ips6)
+			return "ipv6";
+		else
+			return "empty";
+}
+void IpsetsDebug()
+{
+	if (!params.debug) return;
+
+	struct ipset_file *hfile;
+	struct desync_profile_list *dpl;
+	struct ipset_item *ips_item;
+
+	LIST_FOREACH(hfile, &params.ipsets, next)
+		VPRINT("ipset file %s (%s)\n",hfile->filename,dbg_ipset_fill(&hfile->ipset));
+
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+	{
+		LIST_FOREACH(ips_item, &dpl->dp.ips_collection, next)
+			VPRINT("profile %d include ipset %s (%s)\n",dpl->dp.n,ips_item->hfile->filename,dbg_ipset_fill(&ips_item->hfile->ipset));
+		LIST_FOREACH(ips_item, &dpl->dp.ips_collection_exclude, next)
+			VPRINT("profile %d exclude ipset %s (%s)\n",dpl->dp.n,ips_item->hfile->filename,dbg_ipset_fill(&ips_item->hfile->ipset));
+	}
 }

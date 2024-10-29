@@ -5,7 +5,7 @@
 #include "params.h"
 #include "pools.h"
 
-bool LoadIncludeIpsets();
-bool LoadExcludeIpsets();
-bool SearchIpset(const ipset *ips, const struct in_addr *ipv4, const struct in6_addr *ipv6);
-bool IpsetCheck(struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6);
+bool LoadAllIpsets();
+bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6);
+struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename);
+void IpsetsDebug();

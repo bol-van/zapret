@@ -52,12 +52,6 @@ bool StrPoolAddStr(strpool **pp, const char *s)
 {
 	return StrPoolAddStrLen(pp, s, strlen(s));
 }
-bool StrPoolAddUniqueStr(strpool **pp,const char *s)
-{
-	if (StrPoolCheckStr(*pp,s))
-		return true;
-	return StrPoolAddStr(pp,s);
-}
 
 bool StrPoolCheckStr(strpool *p, const char *s)
 {
@@ -158,6 +152,93 @@ void strlist_destroy(struct str_list_head *head)
 	}
 }
 
+
+
+
+struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const char *filename)
+{
+	struct hostlist_file *entry = malloc(sizeof(struct hostlist_file));
+	if (entry)
+	{
+		if (!(entry->filename = strdup(filename)))
+		{
+			free(entry);
+			return false;
+		}
+		entry->mod_time=0;
+		entry->hostlist = NULL;
+		LIST_INSERT_HEAD(head, entry, next);
+	}
+	return entry;
+}
+static void hostlist_files_entry_destroy(struct hostlist_file *entry)
+{
+	if (entry->filename) free(entry->filename);
+	StrPoolDestroy(&entry->hostlist);
+	free(entry);
+}
+void hostlist_files_destroy(struct hostlist_files_head *head)
+{
+	struct hostlist_file *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		hostlist_files_entry_destroy(entry);
+	}
+}
+struct hostlist_file *hostlist_files_search(struct hostlist_files_head *head, const char *filename)
+{
+	struct hostlist_file *hfile;
+
+	LIST_FOREACH(hfile, head, next)
+	{
+		if (!strcmp(hfile->filename,filename))
+			return hfile;
+	}
+	return NULL;
+}
+
+struct hostlist_item *hostlist_collection_add(struct hostlist_collection_head *head, struct hostlist_file *hfile)
+{
+	struct hostlist_item *entry = malloc(sizeof(struct hostlist_item));
+	if (entry)
+	{
+		entry->hfile = hfile;
+		LIST_INSERT_HEAD(head, entry, next);
+	}
+	return entry;
+}
+void hostlist_collection_destroy(struct hostlist_collection_head *head)
+{
+	struct hostlist_item *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		free(entry);
+	}
+}
+struct hostlist_item *hostlist_collection_search(struct hostlist_collection_head *head, const char *filename)
+{
+	struct hostlist_item *item;
+
+	LIST_FOREACH(item, head, next)
+	{
+		if (!strcmp(item->hfile->filename,filename))
+			return item;
+	}
+	return NULL;
+}
+bool hostlist_collection_is_empty(const struct hostlist_collection_head *head)
+{
+	const struct hostlist_item *item;
+
+	LIST_FOREACH(item, head, next)
+	{
+		if (item->hfile->hostlist)
+			return false;
+	}
+	return true;
+}
 
 
 void ipset4Destroy(ipset4 **ipset)
@@ -280,4 +361,90 @@ void ipsetPrint(ipset *ipset)
 {
 	ipset4Print(ipset->ips4);
 	ipset6Print(ipset->ips6);
+}
+
+
+struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *filename)
+{
+	struct ipset_file *entry = malloc(sizeof(struct ipset_file));
+	if (entry)
+	{
+		if (!(entry->filename = strdup(filename)))
+		{
+			free(entry);
+			return false;
+		}
+		entry->mod_time=0;
+		memset(&entry->ipset,0,sizeof(entry->ipset));
+		LIST_INSERT_HEAD(head, entry, next);
+	}
+	return entry;
+}
+static void ipset_files_entry_destroy(struct ipset_file *entry)
+{
+	if (entry->filename) free(entry->filename);
+	ipsetDestroy(&entry->ipset);
+	free(entry);
+}
+void ipset_files_destroy(struct ipset_files_head *head)
+{
+	struct ipset_file *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		ipset_files_entry_destroy(entry);
+	}
+}
+struct ipset_file *ipset_files_search(struct ipset_files_head *head, const char *filename)
+{
+	struct ipset_file *hfile;
+
+	LIST_FOREACH(hfile, head, next)
+	{
+		if (!strcmp(hfile->filename,filename))
+			return hfile;
+	}
+	return NULL;
+}
+
+struct ipset_item *ipset_collection_add(struct ipset_collection_head *head, struct ipset_file *hfile)
+{
+	struct ipset_item *entry = malloc(sizeof(struct ipset_item));
+	if (entry)
+	{
+		entry->hfile = hfile;
+		LIST_INSERT_HEAD(head, entry, next);
+	}
+	return entry;
+}
+void ipset_collection_destroy(struct ipset_collection_head *head)
+{
+	struct ipset_item *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		free(entry);
+	}
+}
+struct ipset_item *ipset_collection_search(struct ipset_collection_head *head, const char *filename)
+{
+	struct ipset_item *item;
+
+	LIST_FOREACH(item, head, next)
+	{
+		if (!strcmp(item->hfile->filename,filename))
+			return item;
+	}
+	return NULL;
+}
+bool ipset_collection_is_empty(const struct ipset_collection_head *head)
+{
+	const struct ipset_item *item;
+
+	LIST_FOREACH(item, head, next)
+	{
+		if (!IPSET_EMPTY(&item->hfile->ipset))
+			return false;
+	}
+	return true;
 }

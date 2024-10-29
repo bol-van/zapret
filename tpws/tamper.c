@@ -24,40 +24,36 @@ static bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
 		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS));
 }
 
-static bool dp_match_l3l4(struct desync_profile *dp, const struct sockaddr *dest)
-{
-	return  ((dest->sa_family==AF_INET && dp->filter_ipv4) || (dest->sa_family==AF_INET6 && dp->filter_ipv6)) &&
-		pf_in_range(saport(dest), &dp->pf_tcp) &&
-		IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL);
-}
-static bool dp_impossible(struct desync_profile *dp, const char *hostname, t_l7proto l7proto)
-{
-	return	!PROFILE_IPSETS_EMPTY(dp) &&
-		((dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7)) || (!*dp->hostlist_auto_filename && !hostname && (dp->hostlist || dp->hostlist_exclude)));
-}
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
-	// impossible case, hard filter
-	// impossible check avoids relatively slow ipset search
-	if (!dp_impossible(dp,hostname,l7proto) && dp_match_l3l4(dp,dest))
-	{
-		// soft filter
-		if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
-			return false;
+	if (!HostlistsReloadCheckForProfile(dp)) return false;
 
-		// autohostlist profile matching l3/l4 filter always win
-		if (*dp->hostlist_auto_filename) return true;
+	if ((dest->sa_family==AF_INET && !dp->filter_ipv4) || (dest->sa_family==AF_INET6 && !dp->filter_ipv6))
+		// L3 filter does not match
+		return false;
+	if (!pf_in_range(saport(dest), &dp->pf_tcp))
+		// L4 filter does not match
+		return false;
+	if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
+		// L7 filter does not match
+		return false;
+	if (!dp->hostlist_auto && !hostname && !PROFILE_HOSTLISTS_EMPTY(dp))
+		// avoid cpu consuming ipset check. profile cannot win if regular hostlists are present without auto hostlist and hostname is unknown.
+		return false;
+	if (!IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL))
+		// target ip does not match
+		return false;
 
-		if (dp->hostlist || dp->hostlist_exclude)
-		{
-			// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
-			if (hostname)
-				return HostlistCheck(dp, hostname, NULL);
-		}
-		else
-			// profile without hostlist filter wins
-			return true;
-	}
+	// autohostlist profile matching l3/l4 filter always win
+	if (dp->hostlist_auto) return true;
+
+	if (PROFILE_HOSTLISTS_EMPTY(dp))
+		// profile without hostlist filter wins
+		return true;
+	else if (hostname)
+		// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
+		return HostlistCheck(dp, hostname, NULL, true);
+
 	return false;
 }
 static struct desync_profile *dp_find(struct desync_profile_list_head *head, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
@@ -181,10 +177,10 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 			VPRINT("desync profile changed by revealed l7 protocol or hostname !\n");
 	}
 
-	if (bDiscoveredHostname && *ctrack->dp->hostlist_auto_filename)
+	if (bDiscoveredHostname && ctrack->dp->hostlist_auto)
 	{
 		bool bHostExcluded;
-		if (!HostlistCheck(ctrack->dp, Host, &bHostExcluded))
+		if (!HostlistCheck(ctrack->dp, Host, &bHostExcluded, false))
 		{
 			ctrack->b_ah_check = !bHostExcluded;
 			VPRINT("Not acting on this request\n");
@@ -415,21 +411,21 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		
 		VPRINT("auto hostlist (profile %d) : rechecking %s to avoid duplicates\n", dp->n, hostname);
 		bool bExcluded=false;
-		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
+		if (!HostlistCheck(dp, hostname, &bExcluded, false) && !bExcluded)
 		{
-			VPRINT("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
-			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto_filename);
-			if (!StrPoolAddStr(&dp->hostlist, hostname))
+			VPRINT("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto->filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto->filename);
+			if (!StrPoolAddStr(&dp->hostlist_auto->hostlist, hostname))
 			{
 				DLOG_ERR("StrPoolAddStr out of memory\n");
 				return;
 			}
-			if (!append_to_list_file(dp->hostlist_auto_filename, hostname))
+			if (!append_to_list_file(dp->hostlist_auto->filename, hostname))
 			{
 				DLOG_PERROR("write to auto hostlist:");
 				return;
 			}
-			dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
+			dp->hostlist_auto->mod_time = file_mod_time(dp->hostlist_auto->filename);
 		}
 		else
 		{

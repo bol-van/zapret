@@ -19,7 +19,6 @@ typedef struct strpool {
 
 void StrPoolDestroy(strpool **pp);
 bool StrPoolAddStr(strpool **pp,const char *s);
-bool StrPoolAddUniqueStr(strpool **pp,const char *s);
 bool StrPoolAddStrLen(strpool **pp,const char *s,size_t slen);
 bool StrPoolCheckStr(strpool *p,const char *s);
 
@@ -28,7 +27,6 @@ struct str_list {
 	LIST_ENTRY(str_list) next;
 };
 LIST_HEAD(str_list_head, str_list);
-
 
 typedef struct hostfail_pool {
     char *str;		/* key */
@@ -47,6 +45,30 @@ void HostFailPoolDump(hostfail_pool *p);
 
 bool strlist_add(struct str_list_head *head, const char *filename);
 void strlist_destroy(struct str_list_head *head);
+
+
+
+struct hostlist_file {
+	char *filename;
+	time_t mod_time;
+	strpool *hostlist;
+	LIST_ENTRY(hostlist_file) next;
+};
+LIST_HEAD(hostlist_files_head, hostlist_file);
+
+struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const char *filename);
+void hostlist_files_destroy(struct hostlist_files_head *head);
+struct hostlist_file *hostlist_files_search(struct hostlist_files_head *head, const char *filename);
+
+struct hostlist_item {
+	struct hostlist_file *hfile;
+	LIST_ENTRY(hostlist_item) next;
+};
+LIST_HEAD(hostlist_collection_head, hostlist_item);
+struct hostlist_item *hostlist_collection_add(struct hostlist_collection_head *head, struct hostlist_file *hfile);
+void hostlist_collection_destroy(struct hostlist_collection_head *head);
+struct hostlist_item *hostlist_collection_search(struct hostlist_collection_head *head, const char *filename);
+bool hostlist_collection_is_empty(const struct hostlist_collection_head *head);
 
 
 typedef struct ipset4 {
@@ -85,3 +107,26 @@ void ipset6Print(ipset6 *ipset);
 
 void ipsetDestroy(ipset *ipset);
 void ipsetPrint(ipset *ipset);
+
+
+struct ipset_file {
+	char *filename;
+	time_t mod_time;
+	ipset ipset;
+	LIST_ENTRY(ipset_file) next;
+};
+LIST_HEAD(ipset_files_head, ipset_file);
+
+struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *filename);
+void ipset_files_destroy(struct ipset_files_head *head);
+struct ipset_file *ipset_files_search(struct ipset_files_head *head, const char *filename);
+
+struct ipset_item {
+	struct ipset_file *hfile;
+	LIST_ENTRY(ipset_item) next;
+};
+LIST_HEAD(ipset_collection_head, ipset_item);
+struct ipset_item * ipset_collection_add(struct ipset_collection_head *head, struct ipset_file *hfile);
+void ipset_collection_destroy(struct ipset_collection_head *head);
+struct ipset_item *ipset_collection_search(struct ipset_collection_head *head, const char *filename);
+bool ipset_collection_is_empty(const struct ipset_collection_head *head);

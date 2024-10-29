@@ -43,25 +43,9 @@
 
 struct params_s params;
 
-bool bHup = false;
 static void onhup(int sig)
 {
 	printf("HUP received !\n");
-	printf("Will reload hostlists and ipsets on next request (if any)\n");
-	bHup = true;
-}
-// should be called in normal execution
-void dohup(void)
-{
-	if (bHup)
-	{
-		if (!LoadIncludeHostLists() || !LoadExcludeHostLists() || !LoadIncludeIpsets() || !LoadExcludeIpsets())
-		{
-			// what will we do without hostlist or ipset ?? sure, gonna die
-			exit(1);
-		}
-		bHup = false;
-	}
 }
 
 static void onusr2(int sig)
@@ -230,6 +214,9 @@ static void exithelp(void)
 static void cleanup_params(void)
 {
 	dp_list_destroy(&params.desync_profiles);
+
+	hostlist_files_destroy(&params.hostlists);
+	ipset_files_destroy(&params.ipsets);
 }
 static void exithelp_clean(void)
 {
@@ -367,6 +354,10 @@ void parse_params(int argc, char *argv[])
 #if defined(__OpenBSD__) || defined(__APPLE__)
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
 #endif
+
+	LIST_INIT(&params.hostlists);
+	LIST_INIT(&params.ipsets);
+
 	if (can_drop_root())
 	{
 	    params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
@@ -726,29 +717,29 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 36: /* hostlist */
-			if (!strlist_add(&dp->hostlist_files, optarg))
+			if (!RegisterHostlist(dp, false, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			params.tamper = true;
 			break;
 		case 37: /* hostlist-exclude */
-			if (!strlist_add(&dp->hostlist_exclude_files, optarg))
+			if (!RegisterHostlist(dp, true, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			params.tamper = true;
 			break;
 		case 38: /* hostlist-auto */
-			if (*dp->hostlist_auto_filename)
+			if (dp->hostlist_auto)
 			{
 				DLOG_ERR("only one auto hostlist per profile is supported\n");
 				exit_clean(1);
 			}
 			{
-				FILE *F = fopen(optarg,"a+t");
+				FILE *F = fopen(optarg,"a+b");
 				if (!F)
 				{
 					DLOG_ERR("cannot create %s\n", optarg);
@@ -764,13 +755,11 @@ void parse_params(int argc, char *argv[])
 				if (params.droproot && chown(optarg, params.uid, -1))
 					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
 			}
-			if (!strlist_add(&dp->hostlist_files, optarg))
+			if (!(dp->hostlist_auto=RegisterHostlist(dp, false, optarg)))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
-			strncpy(dp->hostlist_auto_filename, optarg, sizeof(dp->hostlist_auto_filename));
-			dp->hostlist_auto_filename[sizeof(dp->hostlist_auto_filename) - 1] = '\0';
 			params.tamper = true; // need to detect blocks and update autohostlist. cannot just slice.
 			break;
 		case 39: /* hostlist-auto-fail-threshold */
@@ -979,17 +968,17 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case 60: /* ipset */
-			if (!strlist_add(&dp->ipset_files, optarg))
+			if (!RegisterIpset(dp, false, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			params.tamper = true;
 			break;
 		case 61: /* ipset-exclude */
-			if (!strlist_add(&dp->ipset_exclude_files, optarg))
+			if (!RegisterIpset(dp, true, optarg))
 			{
-				DLOG_ERR("strlist_add failed\n");
+				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			params.tamper = true;
@@ -1062,7 +1051,6 @@ void parse_params(int argc, char *argv[])
 		dp = &dpl->dp;
 		if (dp->split_tls==tlspos_none && dp->split_pos) dp->split_tls=tlspos_pos;
 		if (dp->split_http_req==httpreqpos_none && dp->split_pos) dp->split_http_req=httpreqpos_pos;
-		if (*dp->hostlist_auto_filename) dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
 		if (params.skip_nodelay && (dp->split_tls || dp->split_http_req || dp->split_pos))
 		{
 			DLOG_ERR("Cannot split with --skip-nodelay\n");
@@ -1070,26 +1058,21 @@ void parse_params(int argc, char *argv[])
 		}
 	}
 
-	if (!LoadIncludeHostLists())
+	if (!LoadAllHostLists())
 	{
-		DLOG_ERR("Include hostlist load failed\n");
+		DLOG_ERR("hostlists load failed\n");
 		exit_clean(1);
 	}
-	if (!LoadExcludeHostLists())
+	if (!LoadAllIpsets())
 	{
-		DLOG_ERR("Exclude hostlist load failed\n");
+		DLOG_ERR("ipset load failed\n");
 		exit_clean(1);
 	}
-	if (!LoadIncludeIpsets())
-	{
-		DLOG_ERR("Include ipset load failed\n");
-		exit_clean(1);
-	}
-	if (!LoadExcludeIpsets())
-	{
-		DLOG_ERR("Exclude ipset load failed\n");
-		exit_clean(1);
-	}
+
+	VPRINT("\nlists summary:\n");
+	HostlistsDebug();
+	IpsetsDebug();
+	VPRINT("\n");
 }
 
 
