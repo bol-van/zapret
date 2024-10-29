@@ -50,8 +50,9 @@ DESYNC_MARK_POSTNAT=0x20000000
 TPWS_SOCKS_ENABLE=0
 # tpws socks listens on this port on localhost and LAN interfaces
 TPPORT_SOCKS=987
-# use <HOSTLIST> placeholders to engage standard hostlists and autohostlist in ipset dir
-# they are replaced to empty string if MODE_FILTER does not satisfy
+# use <HOSTLIST> and <HOSTLIST_NOAUTO> placeholders to engage standard hostlists and autohostlist in ipset dir
+# hostlist markers are replaced to empty string if MODE_FILTER does not satisfy
+# <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 TPWS_SOCKS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
 --filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
@@ -59,8 +60,9 @@ TPWS_SOCKS_OPT="
 
 TPWS_ENABLE=0
 TPWS_PORTS=80,443
-# use <HOSTLIST> placeholders to engage standard hostlists and autohostlist in ipset dir
-# they are replaced to empty string if MODE_FILTER does not satisfy
+# use <HOSTLIST> and <HOSTLIST_NOAUTO> placeholders to engage standard hostlists and autohostlist in ipset dir
+# hostlist markers are replaced to empty string if MODE_FILTER does not satisfy
+# <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 TPWS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
 --filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
@@ -83,12 +85,13 @@ NFQWS_UDP_PKT_IN=0
 # this mode can be very CPU consuming. enable with care !
 #NFQWS_PORTS_TCP_KEEPALIVE=80
 #NFQWS_PORTS_UDP_KEEPALIVE=
-# use <HOSTLIST> placeholders to engage standard hostlists and autohostlist in ipset dir
-# they are replaced to empty string if MODE_FILTER does not satisfy
+# use <HOSTLIST> and <HOSTLIST_NOAUTO> placeholders to engage standard hostlists and autohostlist in ipset dir
+# hostlist markers are replaced to empty string if MODE_FILTER does not satisfy
+# <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 NFQWS_OPT="
 --filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
 --filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
---filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST>
+--filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST_NOAUTO>
 "
 
 # none,ipset,hostlist,autohostlist

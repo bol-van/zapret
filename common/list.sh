@@ -1,4 +1,5 @@
 readonly HOSTLIST_MARKER="<HOSTLIST>"
+readonly HOSTLIST_NOAUTO_MARKER="<HOSTLIST_NOAUTO>"
 
 find_hostlists()
 {
@@ -24,10 +25,10 @@ filter_apply_hostlist_target()
 {
 	# $1 - var name of tpws or nfqws params
 
-	local v parm parm1 parm2 parm3 parm4 parm5 parm6 parm7
+	local v parm parm1 parm2 parm3 parm4 parm5 parm6 parm7 parm8 parmNA
+	local hmarker hmarkerNA
 	eval v="\$$1"
-	contains "$v" "$HOSTLIST_MARKER" &&
-	{
+	if contains "$v" "$HOSTLIST_MARKER" || contains "$v" "$HOSTLIST_NOAUTO_MARKER"; then
 		[ "$MODE_FILTER" = hostlist -o "$MODE_FILTER" = autohostlist ] &&
 		{
 			find_hostlists
@@ -40,13 +41,16 @@ filter_apply_hostlist_target()
 				parm5="${AUTOHOSTLIST_FAIL_THRESHOLD:+--hostlist-auto-fail-threshold=$AUTOHOSTLIST_FAIL_THRESHOLD}"
 				parm6="${AUTOHOSTLIST_FAIL_TIME:+--hostlist-auto-fail-time=$AUTOHOSTLIST_FAIL_TIME}"
 				parm7="${AUTOHOSTLIST_RETRANS_THRESHOLD:+--hostlist-auto-retrans-threshold=$AUTOHOSTLIST_RETRANS_THRESHOLD}"
+				parm8="--hostlist=$HOSTLIST_AUTO"
 			}
 			parm="$parm1${parm2:+ $parm2}${parm3:+ $parm3}${parm4:+ $parm4}${parm5:+ $parm5}${parm6:+ $parm6}${parm7:+ $parm7}"
+			parmNA="$parm1${parm2:+ $parm2}${parm3:+ $parm3}${parm8:+ $parm8}"
 		}
+		v="$(replace_str $HOSTLIST_NOAUTO_MARKER "$parmNA" "$v")"
 		v="$(replace_str $HOSTLIST_MARKER "$parm" "$v")"
 		[ "$MODE_FILTER" = autohostlist -a "$AUTOHOSTLIST_DEBUGLOG" = 1 ] && {
 			v="$v --hostlist-auto-debug=$HOSTLIST_AUTO_DEBUGLOG"
 		}
 		eval $1=\""$v"\"
-	}
+	fi
 }
