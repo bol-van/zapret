@@ -228,3 +228,11 @@ void dp_list_destroy(struct desync_profile_list_head *head)
 		dp_entry_destroy(entry);
 	}
 }
+bool dp_list_have_autohostlist(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, head, next)
+		if (dpl->dp.hostlist_auto)
+			return true;
+	return false;
+}

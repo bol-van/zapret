@@ -90,6 +90,7 @@ struct desync_profile_list {
 LIST_HEAD(desync_profile_list_head, desync_profile_list);
 struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head);
 void dp_list_destroy(struct desync_profile_list_head *head);
+bool dp_list_have_autohostlist(struct desync_profile_list_head *head);
 
 struct params_s
 {
