@@ -350,4 +350,4 @@ blockcheck: restring fooling to testing domain's IPs
 nfqws,tpws: internal hostlist deduplication to save RAM
 nfqws,tpws: hostlist/ipset auto reload on file change. no more HUP.
 nfqws,tpws: --filter-tcp, --filter-udp take comma separated port range list
-blockcheck: <HOSTLIST_NOAUTO> marker
+config: <HOSTLIST_NOAUTO> marker
