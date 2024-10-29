@@ -669,6 +669,26 @@ static bool parse_l7_list(char *opt, uint32_t *l7)
 	return true;
 }
 
+static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
+{
+	char *e,*p,c;
+	port_filter pf;
+
+	for (p=opt ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (!pf_parse(p,&pf) || !port_filter_add(pfl,&pf)) return false;
+
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
 
 static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 {
@@ -853,8 +873,8 @@ static void exithelp(void)
 		"\nMULTI-STRATEGY:\n"
 		" --new\t\t\t\t\t\t; begin new strategy\n"
 		" --filter-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
-		" --filter-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp.\n"
-		" --filter-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp.\n"
+		" --filter-tcp=[~]port1[-port2]|*\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list allowed.\n"
+		" --filter-udp=[~]port1[-port2]|*\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
 		" --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
 		" --ipset=<filename>\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
 		" --ipset-exclude=<filename>\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
@@ -1612,22 +1632,24 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 54: /* filter-tcp */
-			if (!pf_parse(optarg,&dp->pf_tcp))
-			{
-				DLOG_ERR("Invalid port filter : %s\n",optarg);
-				exit_clean(1);
-			}
-			// deny udp if not set
-			if (pf_is_empty(&dp->pf_udp)) dp->pf_udp.neg=true;
-			break;
-		case 55: /* filter-udp */
-			if (!pf_parse(optarg,&dp->pf_udp))
+			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			// deny tcp if not set
-			if (pf_is_empty(&dp->pf_tcp)) dp->pf_tcp.neg=true;
+			if (!port_filters_deny_if_empty(&dp->pf_udp))
+				exit_clean(1);
+			break;
+		case 55: /* filter-udp */
+			if (!parse_pf_list(optarg,&dp->pf_udp))
+			{
+				DLOG_ERR("Invalid port filter : %s\n",optarg);
+				exit_clean(1);
+			}
+			// deny tcp if not set
+			if (!port_filters_deny_if_empty(&dp->pf_tcp))
+				exit_clean(1);
 			break;
 		case 56: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))

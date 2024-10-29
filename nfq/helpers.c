@@ -333,6 +333,11 @@ bool pf_parse(const char *s, port_filter *pf)
 	char c;
 
 	if (!s) return false;
+	if (*s=='*' && s[1]==0)
+	{
+		pf->from=1; pf->to=0xFFFF;
+		return true;
+	}
 	if (*s=='~')
 	{
 		pf->neg=true;

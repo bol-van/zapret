@@ -158,7 +158,7 @@ static bool dp_match(
 	if ((dest->sa_family==AF_INET && !dp->filter_ipv4) || (dest->sa_family==AF_INET6 && !dp->filter_ipv6))
 		// L3 filter does not match
 		return false;
-	if ((l3proto==IPPROTO_TCP && !pf_in_range(saport(dest), &dp->pf_tcp)) || (l3proto==IPPROTO_UDP && !pf_in_range(saport(dest), &dp->pf_udp)))
+	if ((l3proto==IPPROTO_TCP && !port_filters_in_range(&dp->pf_tcp,saport(dest))) || (l3proto==IPPROTO_UDP && !port_filters_in_range(&dp->pf_udp,saport(dest))))
 		// L4 filter does not match
 		return false;
 	if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))

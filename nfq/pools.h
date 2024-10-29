@@ -130,3 +130,14 @@ struct ipset_item * ipset_collection_add(struct ipset_collection_head *head, str
 void ipset_collection_destroy(struct ipset_collection_head *head);
 struct ipset_item *ipset_collection_search(struct ipset_collection_head *head, const char *filename);
 bool ipset_collection_is_empty(const struct ipset_collection_head *head);
+
+
+struct port_filter_item {
+	port_filter pf;
+	LIST_ENTRY(port_filter_item) next;
+};
+LIST_HEAD(port_filters_head, port_filter_item);
+bool port_filter_add(struct port_filters_head *head, const port_filter *pf);
+void port_filters_destroy(struct port_filters_head *head);
+bool port_filters_in_range(const struct port_filters_head *head, uint16_t port);
+bool port_filters_deny_if_empty(struct port_filters_head *head);

@@ -65,7 +65,7 @@ struct desync_profile
 	int udplen_increment;
 
 	bool filter_ipv4,filter_ipv6;
-	port_filter pf_tcp,pf_udp;
+	struct port_filters_head pf_tcp,pf_udp;
 	uint32_t filter_l7;	// L7_PROTO_* bits
 
 	// list of pointers to ipsets
