@@ -346,3 +346,8 @@ v67:
 
 mdig: --dns-make-query, --dns-parse-query for side-channel resolving (DoH)
 blockcheck: use DoH resolvers if DNS spoof is detected
+blockcheck: restring fooling to testing domain's IPs
+nfqws,tpws: internal hostlist deduplication to save RAM
+nfqws,tpws: hostlist/ipset auto reload on file change. no more HUP.
+nfqws,tpws: --filter-tcp, --filter-udp take comma separated port range list
+blockcheck: <HOSTLIST_NOAUTO> marker

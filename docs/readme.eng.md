@@ -209,8 +209,8 @@ nfqws takes the following parameters:
  --hostlist-auto-debug=<logfile>        	; debug auto hostlist positives
  --new                                          ; begin new strategy
  --filter-l3=ipv4|ipv6                          ; L3 protocol filter. multiple comma separated values allowed.
- --filter-tcp=[~]port1[-port2]                  ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp.
- --filter-udp=[~]port1[-port2]                  ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp.
+ --filter-tcp=[~]port1[-port2]|*                ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list supported.
+ --filter-udp=[~]port1[-port2]|*                ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list supported.
  --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
  --ipset=<filename>                             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
  --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
@@ -642,7 +642,7 @@ tpws is transparent proxy.
 
  --new                          ; begin new strategy
  --filter-l3=ipv4|ipv6          ; L3 protocol filter. multiple comma separated values allowed.
- --filter-tcp=[~]port1[-port2]  ; TCP port filter. ~ means negation
+ --filter-tcp=[~]port1[-port2]|* ; TCP port filter. ~ means negation. comma separated list supported.
  --filter-l7=[http|tls|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
  --ipset=<filename>             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
  --ipset-exclude=<filename>     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
@@ -854,7 +854,7 @@ If you need "all except" mode you dont have to delete zapret-hosts-users.txt. Ju
 
 Subdomains auto apply. For example, "ru" in the list affects "*.ru" .
 
-tpws and nfqws reread lists on HUP signal.
+tpws and nfqws automatically reload lists if their modification date is changed.
 
 When filtering by domain name, daemons should run without filtering by ipset.
 When using large regulator lists estimate the amount of RAM on the router !
@@ -864,7 +864,7 @@ When using large regulator lists estimate the amount of RAM on the router !
 This mode analyzes both client requests and server replies.
 If a host is not in any list and a situation similar to block occurs host is automatically added to the special list both in memory and file.
 Use exclude hostlist to prevent autohostlist triggering.
-If it did happen - delete the undesired record from the file and restart tpws/nfqws or send them SIGHUP to force lists reload.
+If it did happen - delete the undesired record from the file.
 
 In case of nfqws it's required to redirect both incoming and outgoing traffic to the queue.
 It's strongly recommended to use connbytes filter or nfqws will process gigabytes of incoming traffic.
@@ -892,7 +892,7 @@ Otherwise it's nothing to lose.
 However false positives still can occur in case target website is behaving abnormally
 (may be due to DDoS attack or server malfunction). If it happens bypass strategy
 may start to break the website. This situation can only be controlled manually.
-Remove undesired domain from the autohostlist file, restart nfqws/tpws or send them SIGHUP.
+Remove undesired domain from the autohostlist file.
 Use exclude hostlist to prevent further auto additions.
 
 It's possible to use one auto hostlist with multiple processes. All processes check for file modification time.
@@ -935,6 +935,8 @@ To use standard updatable hostlists from the `ipset` dir use `<HOSTLIST>` placeh
 with hostlist parameters if `MODE_FILTER` variable enables hostlists and is removed otherwise.
 Standard hostlists are expected in final (fallback) strategies closing groups of filter parameters.
 Don't use `<HOSTLIST>` in highly specialized profiles. Use your own filter or hostlist(s).
+`<HOSTLIST_AUTO>` marker uses standard autohostlist as usual hostlist thus disabling auto additions in this profile.
+If any other profile adds something this profile accepts the change automatically.
 
 
 `tpws` socks proxy mode switch
@@ -1009,7 +1011,7 @@ It's advised also to remove these ports from `connbytes`-limited interception li
 NFQWS_OPT="
 --filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
 --filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
---filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST>
+--filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST_NOAUTO>
 "
 ```
 
@@ -1199,7 +1201,8 @@ Note that DNS check is mostly Russia targeted. It checks several pre-defined blo
 verifies system DNS answers with public DNS answers. Because ISP can block public DNS or redirect any DNS queries
 to their servers `blockcheck.sh` also checks that all returned answers are unique. Usually if DNS is blocked
 ISP returns single ip for all blocked domains to redirect you to their "access denied" page.
-`blockcheck.sh` works in Linux and FreeBSD.
+DoH servers are used automatically for checks if DNS spoof is detected.
+`blockcheck.sh` works on all systems supported by `zapret`.
 
 ### desktop linux system
 
