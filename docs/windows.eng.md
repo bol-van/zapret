@@ -71,7 +71,7 @@ NLM networks are adapter independent. Usually MAC address of the default router 
 That's why NLM is more universal than `ssid-filter`.
 
 `Cygwin` shell does not run binaries if their directory has it's own copy of `cygwin1.dll`.
-That's why exists separate standalone version in `binaries/win64/zapret-tpws`.
+If you want to run `winws` from `cygwin` delete, rename or move `cygwin1.dll`.
 `Cygwin` is required for `blockcheck.sh` support but `winws` itself can be run standalone without cygwin.
 
 How to get `windows 7` and `winws` compatible `cygwin` :
@@ -80,12 +80,10 @@ curl -O https://www.cygwin.com/setup-x86_64.exe
 setup-x86_64.exe --allow-unsupported-windows --no-verify --site http://ctm.crouchingtigerhiddenfruitbat.org/pub/cygwin/circa/64bit/2024/01/30/231215
 ```
 You must choose to install `curl`. To compile from sources install `gcc-core`,`make`,`zlib-devel`.
-Make from directory `nfq` using `make cygwin`.
+Make from directory `nfq` using `make cygwin64` or `make cygwin32` for 64 and 32 bit versions.
 
-`winws` requires `cygwin1.dll`, `windivert.dll`, `windivert64.sys`. You can take them from `binaries/win64/zapret-winws`.
-
-32-bit x86 version can be build from 32-bit cygwin using `make cygwin32`.
-`windivert.dll` and `windivert32.sys` can be taken from [windivert 2.2.2 archive](https://reqrypt.org/download)
+`winws` requires `cygwin1.dll`, `windivert.dll`, `windivert64.sys` or `windivert32.sys`.
+You can take them from `binaries/win64` or `binaries/win32`.
 
 There's no `arm64` signed `windivert` driver and no `cygwin`.
 But it's possible to use unsigned driver version in test mode and user mode components with x64 emulation.
@@ -122,8 +120,12 @@ cd "C:\\Users\\vasya"
 cd "C:/Users/vasya"
 cd "/cygdrive/c/Users/vasya"
 ```
+`Cygwin` shell does not run binaries if their directory has it's own copy of `cygwin1.dll`.
+If you want to run `winws` from `cygwin` delete, rename or move `cygwin1.dll`.
+
 `Cygwin` is required only for `blockcheck.sh`. Standalone `winws` can be run without it.
 
+To simplify things it's advised to use `zapret-win-bundle`.
 
 ### auto start
 

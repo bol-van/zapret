@@ -106,10 +106,9 @@ network locations в win10/11. Кое-что есть в powershell.
 Если в путях присутствуют национальные символы, то при вызове winws из cmd или bat кодировку нужно использовать OEM.
 Для русского языка это 866. Пути с пробелами нужно брать в кавычки.
 
-Существует неочевидный момент, каcаемый запуска winws из cygwin шелла. Если в директории, где находится nfqws, находится
-копия cygwin1.dll, winws не запустится. Поэтому в binaries/win64 существует директория zapret-winws, содержащая полный
-комплект для запуска без cygwin. Его вы и берете для повседневного использования.
-Если нужен запуск под cygwin, то следует запускать из binaries/win64. Это нужно для работы blockcheck.
+Существует неочевидный момент, каcаемый запуска winws из cygwin шелла. Если в директории, где находится winws, находится
+копия cygwin1.dll, winws не запустится.
+Если нужен запуск под cygwin, то следует удалить или переместить cygwin1.dll из binaries/win64. Это нужно для работы blockcheck.
 Из cygwin шелла можно посылать winws сигналы через kill точно так же, как в *nix.
 
 Как получить совместимый с windows 7 и winws cygwin :
@@ -118,11 +117,9 @@ setup-x86_64.exe --allow-unsupported-windows --no-verify --site http://ctm.crouc
 Следует выбрать установку curl.
 
 Для сборки из исходников требуется gcc-core,make,zlib-devel.
-Собирать из директории nfq командой "make cygwin".
-winws требует cygwin1.dll, windivert.dll, windivert64.sys. Их можно взять из binaries/win64/zapret-winws.
-
-32-битную x86 версию можно собрать из 32-битного cygwin командой "make cygwin32".
-windivert.dll и windivert32.sys можно взять из комплекта windivert 2.2.2 : https://reqrypt.org/download
+Собирать из директории nfq командой "make cygwin64" или "make cygwin32" для 64 и 32 битных версий соответственно.
+winws требует cygwin1.dll, windivert.dll, windivert64.sys или windivert32.sys.
+Их можно взять из binaries/win64 и binaries/win32.
 
 Для arm64 windows нет подписанного драйвера windivert и нет cygwin.
 Однако, эмуляция x64 windows 11 позволяет использовать все, кроме WinDivert64.sys без изменений.
@@ -172,10 +169,15 @@ blockcheck.sh написан на posix shell и требует некоторы
 Корректный вариант 1 : cd "C:\\Users\\vasya"
 Корректный вариант 2 : cd "C:/Users/vasya"
 Корректный вариант 3 : cd "/cygdrive/c/Users/vasya"
+Существует неочевидный момент, каcаемый запуска winws из cygwin шелла. Если в директории, где находится winws, находится
+копия cygwin1.dll, winws не запустится. Нужно переименовать файл cygwin1.dll.
 Далее все как в *nix : 1 раз ./install_bin.sh , затем ./blockcheck.sh.
 WSL использовать нельзя, это не то же самое.
 
 cygwin для обычной работы winws не нужен.
+
+Однако, хотя такой способ и работает, использование winws сильно облегчает zapret-win-bundle.
+Там нет проблемы с cygwin.dll.
 
 автозапуск winws
 ----------------
