@@ -1,1 +1,0 @@
-%~dp0killall -HUP winws
