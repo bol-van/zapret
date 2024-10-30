@@ -80,6 +80,7 @@ struct desync_profile
 	hostfail_pool *hostlist_auto_fail_counters;
 };
 
+#define PROFILE_IPSETS_ABSENT(dp) (!LIST_FIRST(&dp->ips_collection) && !LIST_FIRST(&dp->ips_collection_exclude))
 #define PROFILE_IPSETS_EMPTY(dp) (ipset_collection_is_empty(&dp->ips_collection) && ipset_collection_is_empty(&dp->ips_collection_exclude))
 #define PROFILE_HOSTLISTS_EMPTY(dp) (hostlist_collection_is_empty(&dp->hl_collection) && hostlist_collection_is_empty(&dp->hl_collection_exclude))
 

@@ -225,7 +225,7 @@ static bool IpsetCheck_(const struct ipset_collection_head *ips, const struct ip
 
 bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6)
 {
-	if (PROFILE_IPSETS_EMPTY(dp)) return true;
+	if (PROFILE_IPSETS_ABSENT(dp)) return true;
 	VPRINT("* ipset check for profile %d\n",dp->n);
 	return IpsetCheck_(&dp->ips_collection,&dp->ips_collection_exclude,ipv4,ipv6);
 }
