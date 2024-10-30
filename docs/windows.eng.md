@@ -164,4 +164,4 @@ unix2dos winws.log
 
 `winws.log` will be in `cygwin/home/<username>`. `unix2dos` helps with `windows 7` notepad. It's not necessary in `Windows 10` and later.
 
-Pre-compiled 32-bit binaries can be downloaded [here](https://github.com/bol-van/zapret-win32)
+Because 32-bit systems are rare nowadays `zapret-win-bundle` exists only for `Windows x64/arm64`.
