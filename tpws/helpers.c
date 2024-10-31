@@ -10,11 +10,18 @@
 #include <ifaddrs.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <wordexp.h>
+#include <stdlib.h>
 
 void rtrim(char *s)
 {
 	if (s)
 		for (char *p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--) *p = '\0';
+}
+
+void replace_char(char *s, char from, char to)
+{
+	for(;*s;s++) if (*s==from) *s=to;
 }
 
 char *strncasestr(const char *s,const char *find, size_t slen)
@@ -36,6 +43,24 @@ char *strncasestr(const char *s,const char *find, size_t slen)
 		s--;
 	}
 	return (char *)s;
+}
+
+bool load_file(const char *filename, void *buffer, size_t *buffer_size)
+{
+	FILE *F;
+
+	F = fopen(filename, "rb");
+	if (!F) return false;
+
+	*buffer_size = fread(buffer, 1, *buffer_size, F);
+	if (ferror(F))
+	{
+		fclose(F);
+		return false;
+	}
+
+	fclose(F);
+	return true;
 }
 
 bool append_to_list_file(const char *filename, const char *s)
@@ -394,4 +419,49 @@ bool parse_cidr6(char *s, struct cidr6 *cidr)
 	b = (inet_pton(AF_INET6, s, &cidr->addr)==1);
 	if (p) *p=d; // restore char
 	return b;
+}
+
+
+void free_command_line(char **argv, int argc)
+{
+	int i;
+	if (argv)
+	{
+		for (i = 0; i < argc; i++)
+			if (argv[i]) free(argv[i]);
+		free(argv);
+	}
+}
+
+char **split_command_line(const char *cmdline, int *argc)
+{
+	int i;
+	char **argv = NULL;
+	wordexp_t p;
+
+	*argc=0;
+
+	// Note! This expands shell variables.
+	if (!cmdline || wordexp(cmdline, &p, WRDE_NOCMD))
+		return NULL;
+
+	if (!(argv = malloc(p.we_wordc * sizeof(char *))))
+	{
+		wordfree(&p);
+		return NULL;
+	}
+
+	for (i = 0; i < p.we_wordc; i++)
+	{
+		if (!(argv[i] = strdup(p.we_wordv[i])))
+		{
+			wordfree(&p);
+			free_command_line(argv,i);
+			return NULL;
+		}
+	}
+	*argc=i;
+
+	wordfree(&p);
+	return argv;
 }

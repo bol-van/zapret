@@ -46,6 +46,8 @@
 #define CTRACK_T_EST	300
 #define CTRACK_T_UDP	60
 
+#define MAX_CONFIG_FILE_SIZE 16384
+
 struct params_s params;
 #ifdef __CYGWIN__
 bool bQuit=false;
@@ -550,8 +552,17 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 
 
 
+static void cleanup_args()
+{
+	free_command_line(params.argv,params.argc);
+	params.argv = NULL;
+	params.argc = 0;
+}
+
 static void cleanup_params(void)
 {
+	cleanup_args();
+
 	ConntrackPoolDestroy(&params.conntrack);
 
 	dp_list_destroy(&params.desync_profiles);
@@ -842,6 +853,7 @@ static unsigned int hash_jen(const void *data,unsigned int len)
 static void exithelp(void)
 {
 	printf(
+		" @<config_file>\t\t\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 		" --debug=0|1|syslog|@<filename>\n"
 #ifdef __linux__
 		" --qnum=<nfqueue_number>\n"
@@ -1035,6 +1047,34 @@ int main(int argc, char **argv)
 		params.droproot = true;
 	}
 #endif
+
+	if (argc>=2 && argv[1][0]=='@')
+	{
+		// config from a file
+
+		char buf[MAX_CONFIG_FILE_SIZE];
+		buf[0]='x';	// fake argv[0]
+		buf[1]=' ';
+		size_t bufsize=sizeof(buf)-3;
+		if (!load_file(argv[1]+1,buf+2,&bufsize))
+		{
+			DLOG_ERR("could not load config file '%s'\n",argv[1]+1);
+			exit_clean(1);
+		}
+		buf[bufsize+2]=0;
+		// wordexp fails if it sees \t \n \r between args
+		replace_char(buf,'\n',' ');
+		replace_char(buf,'\r',' ');
+		replace_char(buf,'\t',' ');
+		params.argv = split_command_line(buf,&params.argc);
+		if (!params.argv)
+		{
+			DLOG_ERR("failed to split command line options from file '%s'\n",argv[1]+1);
+			exit_clean(1);
+		}
+		argv=params.argv;
+		argc=params.argc;
+	}
 
 	const struct option long_options[] = {
 		{"debug",optional_argument,0,0},	// optidx=0
@@ -1782,6 +1822,10 @@ int main(int argc, char **argv)
 #endif
 		}
 	}
+
+	// do not need args from file anymore
+	cleanup_args();
+	argv=NULL; argc=0;
 	
 #ifdef __linux__
 	if (params.qnum<0)

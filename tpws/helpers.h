@@ -16,8 +16,10 @@ typedef union
 } sockaddr_in46;
 
 void rtrim(char *s);
+void replace_char(char *s, char from, char to);
 char *strncasestr(const char *s,const char *find, size_t slen);
 
+bool load_file(const char *filename,void *buffer,size_t *buffer_size);
 bool append_to_list_file(const char *filename, const char *s);
 
 void ntop46(const struct sockaddr *sa, char *str, size_t len);
@@ -110,3 +112,6 @@ static inline const struct in6_addr *mask_from_preflen6(uint8_t preflen)
 {
 	return ip6_mask+preflen;
 }
+
+void free_command_line(char **argv, int argc);
+char **split_command_line(const char *cmdline, int *argc);

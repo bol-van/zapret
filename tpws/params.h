@@ -79,6 +79,9 @@ void dp_list_destroy(struct desync_profile_list_head *head);
 
 struct params_s
 {
+	char **argv; // for file based config
+	int argc;
+
 	int debug;
 	enum log_target debug_target;
 	char debug_logfile[PATH_MAX];

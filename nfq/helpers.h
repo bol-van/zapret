@@ -18,9 +18,10 @@ typedef union
 } sockaddr_in46;
 
 void rtrim(char *s);
+void replace_char(char *s, char from, char to);
+char *strncasestr(const char *s,const char *find, size_t slen);
 
 void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit);
-char *strncasestr(const char *s,const char *find, size_t slen);
 bool load_file(const char *filename,void *buffer,size_t *buffer_size);
 bool load_file_nonempty(const char *filename,void *buffer,size_t *buffer_size);
 bool save_file(const char *filename, const void *buffer, size_t buffer_size);
@@ -106,3 +107,6 @@ static inline const struct in6_addr *mask_from_preflen6(uint8_t preflen)
 {
 	return ip6_mask+preflen;
 }
+
+void free_command_line(char **argv, int argc);
+char **split_command_line(const char *cmdline, int *argc);

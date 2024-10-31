@@ -95,6 +95,9 @@ bool dp_list_have_autohostlist(struct desync_profile_list_head *head);
 
 struct params_s
 {
+	char **argv; // for file based config
+	int argc;
+
 	enum log_target debug_target;
 	char debug_logfile[PATH_MAX];
 	bool debug;

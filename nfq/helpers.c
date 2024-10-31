@@ -8,6 +8,8 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <wordexp.h>
+#include <stdlib.h>
 
 #include "params.h"
 
@@ -17,20 +19,9 @@ void rtrim(char *s)
 		for (char *p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--) *p = '\0';
 }
 
-void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
+void replace_char(char *s, char from, char to)
 {
-	size_t k;
-	bool bcut = false;
-	if (size > limit)
-	{
-		size = limit;
-		bcut = true;
-	}
-	if (!size) return;
-	for (k = 0; k < size; k++) DLOG("%02X ", data[k]);
-	DLOG(bcut ? "... : " : ": ");
-	for (k = 0; k < size; k++) DLOG("%c", data[k] >= 0x20 && data[k] <= 0x7F ? (char)data[k] : '.');
-	if (bcut) DLOG(" ...");
+	for(;*s;s++) if (*s==from) *s=to;
 }
 
 char *strncasestr(const char *s, const char *find, size_t slen)
@@ -53,6 +44,23 @@ char *strncasestr(const char *s, const char *find, size_t slen)
 	}
 	return (char *)s;
 }
+
+void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
+{
+	size_t k;
+	bool bcut = false;
+	if (size > limit)
+	{
+		size = limit;
+		bcut = true;
+	}
+	if (!size) return;
+	for (k = 0; k < size; k++) DLOG("%02X ", data[k]);
+	DLOG(bcut ? "... : " : ": ");
+	for (k = 0; k < size; k++) DLOG("%c", data[k] >= 0x20 && data[k] <= 0x7F ? (char)data[k] : '.');
+	if (bcut) DLOG(" ...");
+}
+
 
 bool load_file(const char *filename, void *buffer, size_t *buffer_size)
 {
@@ -496,4 +504,49 @@ bool parse_cidr6(char *s, struct cidr6 *cidr)
 	b = (inet_pton(AF_INET6, s, &cidr->addr)==1);
 	if (p) *p=d; // restore char
 	return b;
+}
+
+
+void free_command_line(char **argv, int argc)
+{
+	int i;
+	if (argv)
+	{
+		for (i = 0; i < argc; i++)
+			if (argv[i]) free(argv[i]);
+		free(argv);
+	}
+}
+
+char **split_command_line(const char *cmdline, int *argc)
+{
+	int i;
+	char **argv = NULL;
+	wordexp_t p;
+
+	*argc=0;
+
+	// Note! This expands shell variables.
+	if (!cmdline || wordexp(cmdline, &p, WRDE_NOCMD))
+		return NULL;
+
+	if (!(argv = malloc(p.we_wordc * sizeof(char *))))
+	{
+		wordfree(&p);
+		return NULL;
+	}
+
+	for (i = 0; i < p.we_wordc; i++)
+	{
+		if (!(argv[i] = strdup(p.we_wordv[i])))
+		{
+			wordfree(&p);
+			free_command_line(argv,i);
+			return NULL;
+		}
+	}
+	*argc=i;
+
+	wordfree(&p);
+	return argv;
 }
