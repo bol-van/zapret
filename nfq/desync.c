@@ -849,7 +849,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		size_t fake_size;
 		char host[256];
 		bool bHaveHost=false;
-		uint8_t *p, *phost;
+		uint8_t *p, *phost=NULL;
 		const uint8_t *rdata_payload = data_payload;
 		size_t rlen_payload = len_payload;
 		size_t split_pos;
@@ -1097,7 +1097,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		}
 
 		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
-
 		if ((l7proto == HTTP) && (dp->hostcase || dp->hostnospace || dp->domcase) && HttpFindHost(&phost,data_payload,len_payload))
 		{
 			if (dp->hostcase)
