@@ -441,58 +441,62 @@ check_prerequisites()
 	}
 
 	local prog progs='curl'
-	case "$UNAME" in
-		Linux)
-			case "$FWTYPE" in
-				iptables)
-					progs="$progs iptables ip6tables"
-					ipt_has_nfq || {
-						echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
+	[ "$SKIP_PKTWS" = 1 ] || {
+		case "$UNAME" in
+			Linux)
+				case "$FWTYPE" in
+					iptables)
+						ipt_has_nfq || {
+							echo NFQUEUE iptables or ip6tables target is missing. pls install modules.
+							exitp 6
+						}
+						progs="$progs iptables ip6tables"
+						;;
+					nftables)
+						nft_has_nfq || {
+							echo nftables queue support is not available. pls install modules.
+							exitp 6
+						}
+						progs="$progs nft"
+						;;
+				esac
+				;;
+			FreeBSD)
+				freebsd_modules_loaded ipfw ipdivert || {
+					echo ipfw or ipdivert kernel module not loaded
 						exitp 6
-					}
-					;;
-				nftables)
-					nft_has_nfq || {
-						echo nftables queue support is not available. pls install modules.
-						exitp 6
-					}
-					;;
-			esac
-			;;
-		FreeBSD)
-			progs="$progs ipfw"
-			freebsd_modules_loaded ipfw ipdivert || {
-				echo ipfw or ipdivert kernel module not loaded
-				exitp 6
-			}
-			[ "$(sysctl -qn net.inet.ip.fw.enable)" = 0 -o "$(sysctl -qn net.inet6.ip6.fw.enable)" = 0 ] && {
-				echo ipfw is disabled. use : ipfw enable firewall
-				exitp 6
-			}
-			pf_is_avail && {
-				pf_save
-				[ "$SUBSYS" = "pfSense" ] && {
-					# pfsense's ipfw may not work without these workarounds
-					sysctl net.inet.ip.pfil.outbound=ipfw,pf 2>/dev/null
-					sysctl net.inet.ip.pfil.inbound=ipfw,pf 2>/dev/null
-					sysctl net.inet6.ip6.pfil.outbound=ipfw,pf 2>/dev/null
-					sysctl net.inet6.ip6.pfil.inbound=ipfw,pf 2>/dev/null
-					pfctl -qd
-					pfctl -qe
-					pf_restore
 				}
-			}
-			;;
-		OpenBSD|Darwin)
-			progs="$progs pfctl"
-			pf_is_avail || {
-				echo pf is not available
-				exitp 6
-			}
-			# no divert sockets in MacOS
-			[ "$UNAME" = "Darwin" ] && SKIP_PKTWS=1
-			pf_save
-			;;
+				[ "$(sysctl -qn net.inet.ip.fw.enable)" = 0 -o "$(sysctl -qn net.inet6.ip6.fw.enable)" = 0 ] && {
+					echo ipfw is disabled. use : ipfw enable firewall
+					exitp 6
+				}
+				pf_is_avail && {
+					pf_save
+					[ "$SUBSYS" = "pfSense" ] && {
+						# pfsense's ipfw may not work without these workarounds
+						sysctl net.inet.ip.pfil.outbound=ipfw,pf 2>/dev/null
+						sysctl net.inet.ip.pfil.inbound=ipfw,pf 2>/dev/null
+						sysctl net.inet6.ip6.pfil.outbound=ipfw,pf 2>/dev/null
+						sysctl net.inet6.ip6.pfil.inbound=ipfw,pf 2>/dev/null
+						pfctl -qd
+						pfctl -qe
+						pf_restore
+					}
+				}
+				progs="$progs ipfw"
+				;;
+			OpenBSD|Darwin)
+				pf_is_avail || {
+					echo pf is not available
+					exitp 6
+				}
+				pf_save
+				progs="$progs pfctl"
+				;;
+		esac
+	}
+
+	case "$UNAME" in
 		CYGWIN)
 			SKIP_TPWS=1
 			;;
@@ -915,7 +919,9 @@ pktws_start()
 }
 tpws_start()
 {
-	"$TPWS" --uid $TPWS_UID:$TPWS_GID --socks --bind-addr=127.0.0.1 --port=$SOCKS_PORT "$@" >/dev/null &
+	local uid
+	[ -n "$HAVE_ROOT" ] && uid="--uid $TPWS_UID:$TPWS_GID"
+	"$TPWS" $uid --socks --bind-addr=127.0.0.1 --port=$SOCKS_PORT "$@" >/dev/null &
 	PID=$!
 	# give some time to initialize
 	minsleep
@@ -1942,7 +1948,9 @@ fsleep_setup
 fix_sbin_path
 check_system
 check_already
-[ "$UNAME" = CYGWIN ] || require_root
+# no divert sockets in MacOS
+[ "$UNAME" = "Darwin" ] && SKIP_PKTWS=1
+[ "$UNAME" != CYGWIN  -a "$SKIP_PKTWS" != 1 ] && require_root
 check_prerequisites
 trap sigint_cleanup INT
 check_dns

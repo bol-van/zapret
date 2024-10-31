@@ -352,3 +352,5 @@ nfqws,tpws: hostlist/ipset auto reload on file change. no more HUP.
 nfqws,tpws: --filter-tcp, --filter-udp take comma separated port range list
 config: <HOSTLIST_NOAUTO> marker
 binaries: remove zapret-winws. add win32.
+blockcheck, install_easy.sh: preserve user environment variables during elevation
+blockcheck: do not require root if SKIP_PKTWS=1

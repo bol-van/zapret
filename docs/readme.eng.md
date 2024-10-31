@@ -935,7 +935,7 @@ To use standard updatable hostlists from the `ipset` dir use `<HOSTLIST>` placeh
 with hostlist parameters if `MODE_FILTER` variable enables hostlists and is removed otherwise.
 Standard hostlists are expected in final (fallback) strategies closing groups of filter parameters.
 Don't use `<HOSTLIST>` in highly specialized profiles. Use your own filter or hostlist(s).
-`<HOSTLIST_NOAUTO>` marker uses standard autohostlist as usual hostlist thus disabling auto additions in this profile.
+`<HOSTLIST_AUTO>` marker uses standard autohostlist as usual hostlist thus disabling auto additions in this profile.
 If any other profile adds something this profile accepts the change automatically.
 
 
