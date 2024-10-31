@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/queue.h>
+#include <wordexp.h>
 
 #define TLS_PARTIALS_ENABLE	true
 
@@ -95,8 +96,7 @@ bool dp_list_have_autohostlist(struct desync_profile_list_head *head);
 
 struct params_s
 {
-	char **argv; // for file based config
-	int argc;
+	wordexp_t wexp; // for file based config
 
 	enum log_target debug_target;
 	char debug_logfile[PATH_MAX];

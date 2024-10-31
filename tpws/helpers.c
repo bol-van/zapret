@@ -10,8 +10,6 @@
 #include <ifaddrs.h>
 #include <time.h>
 #include <sys/stat.h>
-#include <wordexp.h>
-#include <stdlib.h>
 
 void rtrim(char *s)
 {
@@ -419,49 +417,4 @@ bool parse_cidr6(char *s, struct cidr6 *cidr)
 	b = (inet_pton(AF_INET6, s, &cidr->addr)==1);
 	if (p) *p=d; // restore char
 	return b;
-}
-
-
-void free_command_line(char **argv, int argc)
-{
-	int i;
-	if (argv)
-	{
-		for (i = 0; i < argc; i++)
-			if (argv[i]) free(argv[i]);
-		free(argv);
-	}
-}
-
-char **split_command_line(const char *cmdline, int *argc)
-{
-	int i;
-	char **argv = NULL;
-	wordexp_t p;
-
-	*argc=0;
-
-	// Note! This expands shell variables.
-	if (!cmdline || wordexp(cmdline, &p, WRDE_NOCMD))
-		return NULL;
-
-	if (!(argv = malloc(p.we_wordc * sizeof(char *))))
-	{
-		wordfree(&p);
-		return NULL;
-	}
-
-	for (i = 0; i < p.we_wordc; i++)
-	{
-		if (!(argv[i] = strdup(p.we_wordv[i])))
-		{
-			wordfree(&p);
-			free_command_line(argv,i);
-			return NULL;
-		}
-	}
-	*argc=i;
-
-	wordfree(&p);
-	return argv;
 }

@@ -112,6 +112,3 @@ static inline const struct in6_addr *mask_from_preflen6(uint8_t preflen)
 {
 	return ip6_mask+preflen;
 }
-
-void free_command_line(char **argv, int argc);
-char **split_command_line(const char *cmdline, int *argc);

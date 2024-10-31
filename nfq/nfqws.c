@@ -554,9 +554,7 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 
 static void cleanup_args()
 {
-	free_command_line(params.argv,params.argc);
-	params.argv = NULL;
-	params.argc = 0;
+	wordfree(&params.wexp);
 }
 
 static void cleanup_params(void)
@@ -1066,14 +1064,13 @@ int main(int argc, char **argv)
 		replace_char(buf,'\n',' ');
 		replace_char(buf,'\r',' ');
 		replace_char(buf,'\t',' ');
-		params.argv = split_command_line(buf,&params.argc);
-		if (!params.argv)
+		if (wordexp(buf, &params.wexp, WRDE_NOCMD))
 		{
 			DLOG_ERR("failed to split command line options from file '%s'\n",argv[1]+1);
 			exit_clean(1);
 		}
-		argv=params.argv;
-		argc=params.argc;
+		argv=params.wexp.we_wordv;
+		argc=params.wexp.we_wordc;
 	}
 
 	const struct option long_options[] = {

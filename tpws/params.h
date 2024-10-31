@@ -6,6 +6,8 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <time.h>
+#include <wordexp.h>
+
 #include "tpws.h"
 #include "pools.h"
 #include "helpers.h"
@@ -79,8 +81,7 @@ void dp_list_destroy(struct desync_profile_list_head *head);
 
 struct params_s
 {
-	char **argv; // for file based config
-	int argc;
+	wordexp_t wexp; // for file based config
 
 	int debug;
 	enum log_target debug_target;
