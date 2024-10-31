@@ -128,7 +128,7 @@ standard_mode_daemons()
 		run_tpws_socks 2 "$opt"
 	}
 	[ "$NFQWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$NFQWS_OPT" && {
-		opt="--qnum=$QNUM $NFQWS_OPT"
+		opt="--qnum=$QNUM $NFQWS_OPT_BASE $NFQWS_OPT"
 		filter_apply_hostlist_target opt
 		run_daemon 3 "$NFQWS" "$opt"
 	}
