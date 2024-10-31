@@ -164,7 +164,7 @@ standard_mode_daemons()
 		[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
 			opt="--socks --user=$WS_USER --port=$TPPORT_SOCKS"
 			tpws_apply_socks_binds opt
-			opt="$opt $TPWS_OPT"
+			opt="$opt $TPWS_SOCKS_OPT"
 			filter_apply_hostlist_target opt
 			do_daemon $1 2 "$TPWS" "$opt"
 		}

@@ -291,7 +291,7 @@ standard_mode_daemons()
 		do_tpws $1 1 "$opt"
 	}
 	[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
-		opt="--port=$TPPORT_SOCKS $TPWS_OPT"
+		opt="--port=$TPPORT_SOCKS $TPWS_SOCKS_OPT"
 		filter_apply_hostlist_target opt
 		do_tpws_socks $1 2 "$opt"
 	}
