@@ -350,6 +350,7 @@ blockcheck: restring fooling to testing domain's IPs
 nfqws,tpws: internal hostlist deduplication to save RAM
 nfqws,tpws: hostlist/ipset auto reload on file change. no more HUP.
 nfqws,tpws: --filter-tcp, --filter-udp take comma separated port range list
+nfqws,tpws: @<config_file> - read config from a file
 config: <HOSTLIST_NOAUTO> marker
 binaries: remove zapret-winws. add win32.
 blockcheck, install_easy.sh: preserve user environment variables during elevation
