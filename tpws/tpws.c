@@ -122,7 +122,7 @@ static int get_default_ttl(void)
 static void exithelp(void)
 {
 	printf(
-		" @<config_file>\t\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
+		" @<config_file>|$<config_file>\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 		" --bind-addr=<v4_addr>|<v6_addr>\t; for v6 link locals append %%interface_name\n"
 		" --bind-iface4=<interface_name>\t\t; bind to the first ipv4 addr of interface\n"
 		" --bind-iface6=<interface_name>\t\t; bind to the first ipv6 addr of interface\n"
@@ -426,7 +426,7 @@ void parse_params(int argc, char *argv[])
 	dp = &dpl->dp;
 	dp->n = ++desync_profile_count;
 
-	if (argc>=2 && argv[1][0]=='@')
+	if (argc>=2 && (argv[1][0]=='@' || argv[1][0]=='$'))
 	{
 		config_from_file(argv[1]+1);
 		argv=params.wexp.we_wordv;

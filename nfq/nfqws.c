@@ -851,7 +851,7 @@ static unsigned int hash_jen(const void *data,unsigned int len)
 static void exithelp(void)
 {
 	printf(
-		" @<config_file>\t\t\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
+		" @<config_file>|$<config_file>\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 		" --debug=0|1|syslog|@<filename>\n"
 #ifdef __linux__
 		" --qnum=<nfqueue_number>\n"
@@ -1070,7 +1070,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	if (argc>=2 && argv[1][0]=='@')
+	if (argc>=2 && (argv[1][0]=='@' || argv[1][0]=='$'))
 	{
 		config_from_file(argv[1]+1);
 		argv=params.wexp.we_wordv;
