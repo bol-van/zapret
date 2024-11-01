@@ -982,6 +982,30 @@ bool parse_tlspos(const char *s, enum tlspos *pos)
 	return true;
 }
 
+static void config_from_file(const char *filename)
+{
+	// config from a file
+	char buf[MAX_CONFIG_FILE_SIZE];
+	buf[0]='x';	// fake argv[0]
+	buf[1]=' ';
+	size_t bufsize=sizeof(buf)-3;
+	if (!load_file(filename,buf+2,&bufsize))
+	{
+		DLOG_ERR("could not load config file '%s'\n",filename);
+		exit_clean(1);
+	}
+	buf[bufsize+2]=0;
+	// wordexp fails if it sees \t \n \r between args
+	replace_char(buf,'\n',' ');
+	replace_char(buf,'\r',' ');
+	replace_char(buf,'\t',' ');
+	if (wordexp(buf, &params.wexp, WRDE_NOCMD))
+	{
+		DLOG_ERR("failed to split command line options from file '%s'\n",filename);
+		exit_clean(1);
+	}
+}
+
 int main(int argc, char **argv)
 {
 #ifdef __CYGWIN__
@@ -1048,27 +1072,7 @@ int main(int argc, char **argv)
 
 	if (argc>=2 && argv[1][0]=='@')
 	{
-		// config from a file
-
-		char buf[MAX_CONFIG_FILE_SIZE];
-		buf[0]='x';	// fake argv[0]
-		buf[1]=' ';
-		size_t bufsize=sizeof(buf)-3;
-		if (!load_file(argv[1]+1,buf+2,&bufsize))
-		{
-			DLOG_ERR("could not load config file '%s'\n",argv[1]+1);
-			exit_clean(1);
-		}
-		buf[bufsize+2]=0;
-		// wordexp fails if it sees \t \n \r between args
-		replace_char(buf,'\n',' ');
-		replace_char(buf,'\r',' ');
-		replace_char(buf,'\t',' ');
-		if (wordexp(buf, &params.wexp, WRDE_NOCMD))
-		{
-			DLOG_ERR("failed to split command line options from file '%s'\n",argv[1]+1);
-			exit_clean(1);
-		}
+		config_from_file(argv[1]+1);
 		argv=params.wexp.we_wordv;
 		argc=params.wexp.we_wordc;
 	}
