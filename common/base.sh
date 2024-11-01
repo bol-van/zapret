@@ -400,6 +400,7 @@ check_bad_ws_options()
 	# $2 - nfqws/tpws options
 	if [ "$1" = 1 ] && has_bad_ws_options "$2"; then
 		echo "!!! REFUSING TO USE BAD OPTIONS : $2"
+		help_bad_ws_options
 		return 1
 	else
 		return 0
@@ -408,8 +409,7 @@ check_bad_ws_options()
 help_bad_ws_options()
 {
 	echo "WARNING ! you have specified --ipset option"
-	echo "WARNING ! it would work but on $UNAME it's not the best option"
+	echo "WARNING ! it would work but on ${UNAME:-$(uname)} it's not the best option"
 	echo "WARNING ! you should use kernel mode sets. they are much more efficient."
 	echo "WARNING ! to use ipsets you have to write your own custom script"
-	echo "WARNING ! installer will stop here to prevent distribution of easy to use but bad copy-paste solutions"
 }
