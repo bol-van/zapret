@@ -51,7 +51,7 @@ static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, con
 		// profile without hostlist filter wins
 		return true;
 	else if (hostname)
-		// without known hostname first profile matching l3/l4/l7 filter and without hostlist filter wins
+		// if hostlists are present profile matches only if hostname is known and satisfy profile hostlists
 		return HostlistCheck(dp, hostname, NULL, true);
 
 	return false;
