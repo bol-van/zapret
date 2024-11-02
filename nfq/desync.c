@@ -179,7 +179,7 @@ static bool dp_match(
 		return true;
 	else
 	{
-		// without known hostname first profile matching l3/l4/l7 filter and without hostlist filter wins
+		// if hostlists are present profile matches only if hostname is known and satisfy profile hostlists
 		if (hostname)
 		{
 			if (bCheckDone) *bCheckDone = true;
