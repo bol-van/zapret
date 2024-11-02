@@ -171,7 +171,7 @@ static bool dp_match(
 		// target ip does not match
 		return false;
 
-	// autohostlist profile matching l3/l4 filter always win
+	// autohostlist profile matching l3/l4/l7 filter always win
 	if (dp->hostlist_auto) return true;
 
 	if (PROFILE_HOSTLISTS_EMPTY(dp))
@@ -179,7 +179,7 @@ static bool dp_match(
 		return true;
 	else
 	{
-		// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
+		// without known hostname first profile matching l3/l4/l7 filter and without hostlist filter wins
 		if (hostname)
 		{
 			if (bCheckDone) *bCheckDone = true;

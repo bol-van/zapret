@@ -44,14 +44,14 @@ static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, con
 		// target ip does not match
 		return false;
 
-	// autohostlist profile matching l3/l4 filter always win
+	// autohostlist profile matching l3/l4/l7 filter always win
 	if (dp->hostlist_auto) return true;
 
 	if (PROFILE_HOSTLISTS_EMPTY(dp))
 		// profile without hostlist filter wins
 		return true;
 	else if (hostname)
-		// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
+		// without known hostname first profile matching l3/l4/l7 filter and without hostlist filter wins
 		return HostlistCheck(dp, hostname, NULL, true);
 
 	return false;
