@@ -364,7 +364,8 @@ static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
 	return true;
 }
 
-static void config_from_file(const char *filename)
+// no static to not allow optimizer to inline this func (save stack)
+void config_from_file(const char *filename)
 {
 	// config from a file
 	char buf[MAX_CONFIG_FILE_SIZE];
