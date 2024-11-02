@@ -1,3 +1,9 @@
+# Multilanguage README
+___
+[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/bol-van/zapret/tree/master/docs/README.en.md)
+[![ru](https://img.shields.io/badge/lang-ru-green.svg)](https://github.com/bol-van/zapret/tree/master/README.md)
+
+
 ## What is it for
 
 A stand-alone (without 3rd party servers) DPI circumvention tool.
@@ -302,7 +308,7 @@ Split mode is very similar to disorder but without segment reordering :
 
 Mode `split2` disables sending of fake segments. It can be used as a faster alternative to --wsize.
 
-In `disorder2` and 'split2` modes no fake packets are sent, so ttl and fooling options are not required.
+In `disorder2` and `split2` modes no fake packets are sent, so ttl and fooling options are not required.
 
 `seqovl` adds to the first sent original segment (1st for split, 2nd for disorder) seqovl bytes to the beginning and decreases
 sequence number.
@@ -477,7 +483,7 @@ to extract the host name. But it works with auto hostlist profiles.
 `--dpi-desync-cutoff` allows you to set the threshold at which it stops applying dpi-desync.
 Can be prefixed with 'n', 'd', 's' symbol the same way as `--wssize-cutoff`.
 Useful with `--dpi-desync-any-protocol=1`.
-If the connection falls out of the conntrack and --dpi-desync-cutoff is set, dpi desync will not be applied.
+If the connection falls out of the conntrack and `--dpi-desync-cutoff` is set, `dpi desync` will not be applied.
 
 Set conntrack timeouts appropriately.
 
