@@ -155,7 +155,7 @@ follows all standards. For example, we are routed to squid. Connection goes thro
 ## nfqws
 
 This program is a packet modifier and a NFQUEUE queue handler.
-For BSD systems there is dvtws. Its built from the same source and has almost the same parameters (see bsd.eng.md).
+For BSD systems there is dvtws. Its built from the same source and has almost the same parameters (see bsd.en.md).
 nfqws takes the following parameters:
 
 ```
@@ -1280,11 +1280,11 @@ Now its possible to run `/data/local/tmp/zapret/tpws` from any app such as taske
 
 ### FreeBSD, OpenBSD, MacOS
 
-see docs/bsd.eng.md
+see docs/bsd.en.md
 
 ### Windows (WSL)
 
-see docs/windows.eng.md
+see docs/windows.en.md
 
 ### Other devices
 
