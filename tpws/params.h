@@ -6,7 +6,9 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <time.h>
+#ifndef __OpenBSD__
 #include <wordexp.h>
+#endif
 
 #include "tpws.h"
 #include "pools.h"
@@ -81,7 +83,9 @@ void dp_list_destroy(struct desync_profile_list_head *head);
 
 struct params_s
 {
+#ifndef __OpenBSD__
 	wordexp_t wexp; // for file based config
+#endif
 
 	int debug;
 	enum log_target debug_target;
