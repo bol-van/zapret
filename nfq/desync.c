@@ -151,6 +151,8 @@ static bool dp_match(
 	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto,
 	bool *bCheckDone, bool *bCheckResult, bool *bExcluded)
 {
+	bool bHostlistsEmpty;
+
 	if (bCheckDone) *bCheckDone = false;
 
 	if (!HostlistsReloadCheckForProfile(dp)) return false;
@@ -164,7 +166,8 @@ static bool dp_match(
 	if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
 		// L7 filter does not match
 		return false;
-	if (!dp->hostlist_auto && !hostname && !PROFILE_HOSTLISTS_EMPTY(dp))
+	bHostlistsEmpty = PROFILE_HOSTLISTS_EMPTY(dp);
+	if (!dp->hostlist_auto && !hostname && !bHostlistsEmpty)
 		// avoid cpu consuming ipset check. profile cannot win if regular hostlists are present without auto hostlist and hostname is unknown.
 		return false;
 	if (!IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL))
@@ -174,7 +177,7 @@ static bool dp_match(
 	// autohostlist profile matching l3/l4/l7 filter always win
 	if (dp->hostlist_auto) return true;
 
-	if (PROFILE_HOSTLISTS_EMPTY(dp))
+	if (bHostlistsEmpty)
 		// profile without hostlist filter wins
 		return true;
 	else
