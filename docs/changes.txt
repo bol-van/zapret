@@ -355,3 +355,7 @@ config: <HOSTLIST_NOAUTO> marker
 binaries: remove zapret-winws. add win32.
 blockcheck, install_easy.sh: preserve user environment variables during elevation
 blockcheck: do not require root if SKIP_PKTWS=1
+
+v68:
+
+readme.md : move russian version to markdown
