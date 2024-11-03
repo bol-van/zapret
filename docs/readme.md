@@ -1351,57 +1351,57 @@ option headers`. Или сделать так, чтобы он не мог ра�
 **ПРИМЕРЫ БЛОКИРОВКИ ТОЛЬКО ПО ДОМЕНУ БЕЗ БЛОКА ПО IP**
 
 ```
-> testing iana.org on it's original\
-!!!!! AVAILABLE !!!!!\
-> testing rutracker.org on 192.0.43.8 (iana.org)\
-curl: (28) Operation timed out after 1002 milliseconds with 0 bytes received\
-> testing iana.org on 172.67.182.196 (rutracker.org)\
-HTTP/1.1 409 Conflict\
-> testing iana.org on 104.21.32.39 (rutracker.org)\
-HTTP/1.1 409 Conflict\
+> testing iana.org on it's original
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+curl: (28) Operation timed out after 1002 milliseconds with 0 bytes received
+> testing iana.org on 172.67.182.196 (rutracker.org)
+HTTP/1.1 409 Conflict
+> testing iana.org on 104.21.32.39 (rutracker.org)
+HTTP/1.1 409 Conflict
 
-> testing iana.org on it's original ip\
-!!!!! AVAILABLE !!!!!\
-> testing rutracker.org on 192.0.43.8 (iana.org)\
-curl: (28) Connection timed out after 1001 milliseconds\
-> testing iana.org on 172.67.182.196 (rutracker.org)\
-curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure\
-> testing iana.org on 104.21.32.39 (rutracker.org)\
-curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure\
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+curl: (28) Connection timed out after 1001 milliseconds
+> testing iana.org on 172.67.182.196 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
+> testing iana.org on 104.21.32.39 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
 
-> testing iana.org on it's original ip\
-!!!!! AVAILABLE !!!!!\
-> testing rutracker.org on 192.0.43.8 (iana.org)\
-HTTP/1.1 307 Temporary Redirect\
-Location: https://www.gblnet.net/blocked.php\
-> testing iana.org on 172.67.182.196 (rutracker.org)\
-HTTP/1.1 409 Conflict\
-> testing iana.org on 104.21.32.39 (rutracker.org)\
-HTTP/1.1 409 Conflict\
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+HTTP/1.1 307 Temporary Redirect
+Location: https://www.gblnet.net/blocked.php
+> testing iana.org on 172.67.182.196 (rutracker.org)
+HTTP/1.1 409 Conflict
+> testing iana.org on 104.21.32.39 (rutracker.org)
+HTTP/1.1 409 Conflict
 
-> testing iana.org on it's original ip\
-!!!!! AVAILABLE !!!!!\
-> testing rutracker.org on 192.0.43.8 (iana.org)\
-curl: (35) Recv failure: Connection reset by peer\
-> testing iana.org on 172.67.182.196 (rutracker.org)\
-curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure\
-> testing iana.org on 104.21.32.39 (rutracker.org)\
-curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure\
+> testing iana.org on it's original ip
+!!!!! AVAILABLE !!!!!
+> testing rutracker.org on 192.0.43.8 (iana.org)
+curl: (35) Recv failure: Connection reset by peer
+> testing iana.org on 172.67.182.196 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
+> testing iana.org on 104.21.32.39 (rutracker.org)
+curl: (35) OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failure
 ```
 
 
 **ПРИМЕР ПОЛНОГО IP БЛОКА ИЛИ БЛОКА TCP ПОРТА ПРИ ОТСУТСТВИИ БЛОКА ПО ДОМЕНУ**
 
 ```
-* port block tests ipv4 startmail.com:80\
-  ncat -z -w 1 145.131.90.136 80\
-  145.131.90.136 does not connect. netcat code 1\
-  ncat -z -w 1 145.131.90.152 80\
+* port block tests ipv4 startmail.com:80
+  ncat -z -w 1 145.131.90.136 80
+  145.131.90.136 does not connect. netcat code 1
+  ncat -z -w 1 145.131.90.152 80
   145.131.90.152 does not connect. netcat code 1
 
 * curl_test_http ipv4 startmail.com
-- checking without DPI bypass\
-  curl: (28) Connection timed out after 2002 milliseconds\
+- checking without DPI bypass
+  curl: (28) Connection timed out after 2002 milliseconds
   UNAVAILABLE code=28
 
 - IP block tests (requires manual interpretation)
@@ -1485,7 +1485,7 @@ TPWS_SOCKS_OPT="
 ***Какие tcp порты следует перенаправлять на tpws***\
 `TPWS_PORTS=80,443`
 
-***Параметры tpws для прозрачного режима***\
+***Параметры tpws для прозрачного режима***
 ```
 TPWS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
@@ -1504,7 +1504,7 @@ NFQWS_PORTS_TCP=80,443
 NFQWS_PORTS_UDP=443
 ```
 
-***Сколько начальных входящих и исходящих пакетов нужно перенаправлять на nfqws по каждому направлению***\
+***Сколько начальных входящих и исходящих пакетов нужно перенаправлять на nfqws по каждому направлению***
 ```
 NFQWS_TCP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
 NFQWS_TCP_PKT_IN=3
@@ -1718,7 +1718,7 @@ ___
 
 custom скрипты - это маленькие shell программы, управляющие нестандартными режимами применения zapret
 или частными случаями, которые не могут быть интегрированы в основную часть без загромождения и замусоривания кода.
-Для применеия custom следует помещать файлы в следующие директории в зависимости от вашей системы:\
+Для применеия custom следует помещать файлы в следующие директории в зависимости от вашей системы:
 ```
 /opt/zapret/init.d/sysv/custom.d
 /opt/zapret/init.d/openwrt/custom.d
