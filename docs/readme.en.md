@@ -1308,3 +1308,10 @@ Dont ask me how to do it. Its different for all firmwares and requires studying.
 Find manual or reverse engineer yourself.
 Check for race conditions. Firmware can clear or modify iptables after your startup script.
 If this is the case then run another script in background and add some delay there.
+
+## Donations
+
+Are welcome here :
+
+<img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT 0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
+<img src=https://cdn-icons-png.flaticon.com/16/5968/5968260.png  alt="USDT" style="vertical-align: middle;"/> BTC bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve
