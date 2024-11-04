@@ -19,7 +19,8 @@ check_need_to_reload_tpws6()
 	# interface ifsets (wanif, wanif6, lanif) can be reloaded independently
 	check_lan
 	RELOAD_TPWS6=
-	[ "$ACTION" = "ifup" -a "$TPWS_ENABLE" = 1 -a "$DISABLE_IPV6" != 1 -a -n "$IS_LAN" ] && RELOAD_TPWS6=1
+	[ "$ACTION" = "ifup" -a "$DISABLE_IPV6" != 1 -a -n "$IS_LAN" ] && \
+		if [ "$TPWS_ENABLE" = 1 ] || dir_is_not_empty "$CUSTOM_DIR/custom.d"; then RELOAD_TPWS6=1; fi
 }
 
 
@@ -33,15 +34,16 @@ check_need_to_reload_tpws6()
 	fi
 	ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
 	ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+	CUSTOM_DIR="$ZAPRET_RW/init.d/openwrt"
 	. "$ZAPRET_CONFIG"
+	. "$ZAPRET_BASE/common/base.sh"
+	. "$ZAPRET_BASE/common/fwtype.sh"
 
 	check_need_to_reload_tpws6
 	[ -n "$RELOAD_TPWS6" ] && {
 		logger -t zapret restarting daemons due to $ACTION of $INTERFACE to update tpws6 dnat target
 		"$ZAPRET" restart_daemons
 	}
-	. "$ZAPRET_BASE/common/base.sh"
-	. "$ZAPRET_BASE/common/fwtype.sh"
 	linux_fwtype
 	case "$FWTYPE" in
 		nftables)
