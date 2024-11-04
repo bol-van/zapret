@@ -11,11 +11,15 @@ tpws в режиме socks можно запускать под более-ме�
 
 Установить WSL : 
  `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all`
+
 Скопировать на целевую систему `binaries/x86_64/tpws_wsl.tgz`.
+
 Выполнить :
  `wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz`
+
 Запустить :
  `wsl -d tpws --exec /tpws --uid=1 --no-resolve --socks --bind-addr=127.0.0.1 --port=1080 <параметры_дурения>`
+
 Прописать socks `127.0.0.1:1080` в браузер или другую программу.
 
 Удаление : `wsl --unregister tpws`
