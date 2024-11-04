@@ -757,9 +757,9 @@ tpws - это transparent proxy.
 --bind-wait-ifup=<sec		; ждать до N секунд появления и поднятия интерфейса
 --bind-wait-ip=<sec>		; ждать до N секунд получения IP адреса (если задан --bind-wait-ifup - время идет после поднятия интерфейса)
 --bind-wait-ip-linklocal=<sec>
-; имеет смысл только при задании --bind-wait-ip
-; --bind-linklocal=unwanted	: согласиться на LL после N секунд
-; --bind-linklocal=prefer	: согласиться на global address после N секунд
+				; имеет смысл только при задании --bind-wait-ip
+				; --bind-linklocal=unwanted	: согласиться на LL после N секунд
+				; --bind-linklocal=prefer	: согласиться на global address после N секунд
 --bind-wait-only		; подождать все бинды и выйти. результат 0 в случае успеха, иначе не 0.
 --connect-bind-addr		; с какого адреса подключаться во внешнюю сеть. может быть ipv4 или ipv6 адрес
 				; если указан ipv6 link local, то требуется указать с какого он интерфейса : fe80::1%br-lan
