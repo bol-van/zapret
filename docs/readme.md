@@ -1,11 +1,12 @@
 # zapret v.67
 
-# Multilanguage README
+# Multilanguage/Мультиязычный README
 
 [![en](https://img.shields.io/badge/lang-en-red.svg)](./readme.en.md)
 [![ru](https://img.shields.io/badge/lang-ru-green.svg)](./readme.md)
 
 ***
+
 - [Зачем это нужно](#зачем-это-нужно)
 - [Быстрый старт](#быстрый-старт)
 - [Как это работает](#как-это-работает)
@@ -2169,7 +2170,7 @@ VPS можно прибрести в множестве мест. Существ
 
 ## Поддержать разработчика
 
-[Реквизиты](https://github.com/bol-van/zapret/issues/590):
+Реквизиты :
 
 <img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT 0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
 
