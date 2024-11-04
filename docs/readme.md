@@ -6,7 +6,8 @@
 [![ru](https://img.shields.io/badge/lang-ru-green.svg)](./readme.md)
 
 ***
-
+- [zapret v.67](#zapret-v67)
+- [Multilanguage README](#multilanguage-readme)
   - [Зачем это нужно](#зачем-это-нужно)
   - [Быстрый старт](#быстрый-старт)
   - [Как это работает](#как-это-работает)
@@ -66,7 +67,7 @@ VPN.
 
 > *Linux/openwrt:* [docs/quick_start.txt](./quick_start.txt)
 >
->*Windows:* [docs/quick_start_windows.txt](./quick_start_windows.txt)
+>*Windows:* [docs/quick_start_windows.md](./quick_start_windows.md)
 
 ## Как это работает
 
@@ -2173,4 +2174,5 @@ VPS можно прибрести в множестве мест. Существ
 [Реквизиты](https://github.com/bol-van/zapret/issues/590):
 
 <img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT 0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
+
 <img src=https://cdn-icons-png.flaticon.com/16/5968/5968260.png  alt="USDT" style="vertical-align: middle;"/> BTC bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve
