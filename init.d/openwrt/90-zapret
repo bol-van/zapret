@@ -19,7 +19,7 @@ check_need_to_reload_tpws6()
 	# interface ifsets (wanif, wanif6, lanif) can be reloaded independently
 	check_lan
 	RELOAD_TPWS6=
-	[ "$ACTION" = "ifup" -a "$DISABLE_IPV6" != 1 -a -n "$IS_LAN" ] && [ "$MODE" = "tpws" -o "$MODE" = "custom" ] && RELOAD_TPWS6=1
+	[ "$ACTION" = "ifup" -a "$TPWS_ENABLE" = 1 -a "$DISABLE_IPV6" != 1 -a -n "$IS_LAN" ] && RELOAD_TPWS6=1
 }
 
 
