@@ -129,7 +129,8 @@ network locations в win10/11. Кое-что есть в **powershell**.
 Из cygwin шелла можно посылать winws сигналы через `kill` точно так же, как в `*nix`.
 
 Как получить совместимый с windows 7 и winws cygwin :
-`curl -O https://www.cygwin.com/setup-x86_64.exe` \
+
+`curl -O https://www.cygwin.com/setup-x86_64.exe`
 
 `setup-x86_64.exe --allow-unsupported-windows --no-verify --site http://ctm.crouchingtigerhiddenfruitbat.org/pub/cygwin/circa/64bit/2024/01/30/231215`
 
