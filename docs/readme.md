@@ -95,7 +95,7 @@ VPN.
 Существует и более продвинутая магия, направленная на преодоление DPI на пакетном уровне.
 
 Подробнее про DPI:\
-https://habr.com/ru/post/335436 или https://web.archive.org/web/20230331233644 \
+https://habr.com/ru/post/335436 или https://web.archive.org/web/20230331233644/https://habr.com/ru/post/335436/ \
 https://geneva.cs.umd.edu/papers/geneva_ccs19.pdf
 
 ## Что сейчас происходит в России
