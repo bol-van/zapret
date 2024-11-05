@@ -1,8 +1,46 @@
-# Multilanguage README
+# zapret v.67
+
+# Multilanguage/Мультиязычный README
 ___
 [![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/bol-van/zapret/tree/master/docs/readme.en.md)
 [![ru](https://img.shields.io/badge/lang-ru-green.svg)](https://github.com/bol-van/zapret/tree/master/docs/readme.md)
 
+***
+
+- [What is it for](#what-is-it-for)
+- [How it works](#how-it-works)
+- [How to put this into practice in the linux system](#how-to-put-this-into-practice-in-the-linux-system)
+- [ip6tables](#ip6tables)
+- [nftables](#nftables)
+- [When it will not work](#when-it-will-not-work)
+- [nfqws](#nfqws)
+  - [DPI desync attack](#dpi-desync-attack)
+  - [DPI desync combos](#dpi-desync-combos)
+  - [SYNACK mode](#synack-mode)
+  - [SYNDATA mode](#syndata-mode)
+  - [Virtual Machines](#virtual-machines)
+  - [CONNTRACK](#conntrack)
+  - [Reassemble](#reassemble)
+  - [UDP support](#udp-support)
+  - [IP fragmentation](#ip-fragmentation)
+  - [multiple strategies](#multiple-strategies)
+- [tpws](#tpws)
+  - [multiple strategies](#multiple-strategies-1)
+- [Ways to get a list of blocked IP](#ways-to-get-a-list-of-blocked-ip)
+- [Domain name filtering](#domain-name-filtering)
+- [**autohostlist** mode](#autohostlist-mode)
+- [Choosing parameters](#choosing-parameters)
+- [Screwing to the firewall control system or your launch system](#screwing-to-the-firewall-control-system-or-your-launch-system)
+- [Installation](#installation)
+  - [Checking ISP](#checking-isp)
+  - [desktop linux system](#desktop-linux-system)
+  - [OpenWRT](#openwrt)
+  - [Android](#android)
+  - [FreeBSD, OpenBSD, MacOS](#freebsd-openbsd-macos)
+  - [Windows (WSL)](#windows-wsl)
+  - [Other devices](#other-devices)
+- [Donations](#donations)
+***
 
 ## What is it for
 
@@ -155,7 +193,7 @@ follows all standards. For example, we are routed to squid. Connection goes thro
 ## nfqws
 
 This program is a packet modifier and a NFQUEUE queue handler.
-For BSD systems there is dvtws. Its built from the same source and has almost the same parameters (see bsd.en.md).
+For BSD systems there is dvtws. Its built from the same source and has almost the same parameters (see [bsd.en.md](./bsd.en.md)).
 nfqws takes the following parameters:
 
 ```
@@ -1280,11 +1318,11 @@ Now its possible to run `/data/local/tmp/zapret/tpws` from any app such as taske
 
 ### FreeBSD, OpenBSD, MacOS
 
-see docs/bsd.en.md
+see [docs/bsd.en.md](./bsd.en.md)
 
 ### Windows (WSL)
 
-see docs/windows.en.md
+see [docs/windows.en.md](./windows.en.md)
 
 ### Other devices
 
@@ -1314,4 +1352,5 @@ If this is the case then run another script in background and add some delay the
 Are welcome here :
 
 <img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT 0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
+
 <img src=https://cdn-icons-png.flaticon.com/16/5968/5968260.png  alt="USDT" style="vertical-align: middle;"/> BTC bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve

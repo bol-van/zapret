@@ -66,7 +66,7 @@ VPN.
 
 > *Linux/openwrt:* [docs/quick_start.txt](./quick_start.txt)
 >
->*Windows:* [docs/quick_start_windows.txt](./quick_start_windows.txt)
+>*Windows:* [docs/quick_start_windows.md](./quick_start_windows.md)
 
 ## Как это работает
 
@@ -2058,7 +2058,7 @@ curl: (7) Failed to connect to www.ru port 80: Host is unreachable
 
 ## Windows
 
-Описано в [docs/windows.txt](./windows.txt)
+Описано в [docs/windows.md](./windows.md)
 
 
 ## Другие прошивки
