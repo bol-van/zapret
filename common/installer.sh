@@ -689,6 +689,7 @@ removable_pkgs_openwrt()
 
 remove_extra_pkgs_openwrt()
 {
+	local PKGS
 	echo \* remove dependencies
 	removable_pkgs_openwrt
 	echo these packages may have been installed by install_easy.sh : $PKGS
