@@ -1318,11 +1318,11 @@ Now its possible to run `/data/local/tmp/zapret/tpws` from any app such as taske
 
 ### FreeBSD, OpenBSD, MacOS
 
-see [docs/bsd.en.md](./bsd.en.md)
+see [BSD documentation](./bsd.en.md)
 
 ### Windows (WSL)
 
-see [docs/windows.en.md](./windows.en.md)
+see [Windows documentation](./windows.en.md)
 
 ### Other devices
 

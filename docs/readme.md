@@ -239,7 +239,7 @@ NFQUEUE работает без изменений.
 ## nfqws
 
 Эта программа - модификатор пакетов и обработчик очереди NFQUEUE. Для BSD систем существует адаптированный вариант -
-dvtws, собираемый из тех же исходников (см. [bsd.txt](./bsd.txt)).
+dvtws, собираемый из тех же исходников (см. [документация BSD](./bsd.md)).
 
 ```
 @<config_file>|$<config_file>			; читать конфигурацию из файла. опция должна быть первой. остальные опции игнорируются.
@@ -1178,7 +1178,7 @@ mdig --family=6 --dns-make-query=rutracker.org | curl --data-binary @- -H "Conte
 
 В системе запуска это обыграно следующим образом.
 Присутствуют 2 include списка :
-`ipset/zapret-hosts-users.txt.gz` или `ipset/zapret-hosts-users.txt`, 
+`ipset/zapret-hosts-users.txt.gz` или `ipset/zapret-hosts-users.txt`,
 `ipset/zapret-hosts.txt.gz` или `ipset/zapret-hosts.txt`
 и 1 exclude список
 `ipset/zapret-hosts-users-exclude.txt.gz` или `ipset/zapret-hosts-users-exclude.txt`
@@ -2053,11 +2053,11 @@ curl: (7) Failed to connect to www.ru port 80: Host is unreachable
 
 ## FreeBSD, OpenBSD, MacOS
 
-Описано в [docs/bsd.txt](./bsd.txt)
+Описано в [документации BSD](./bsd.md)
 
 ## Windows
 
-Описано в [docs/windows.md](./windows.md)
+Описано в [документации Windows](./windows.md)
 
 
 ## Другие прошивки
