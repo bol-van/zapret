@@ -362,3 +362,4 @@ readme.md : move russian version to markdown
 nfqws,tpws: use alternate $ sign for $<config_file>
 repo: binaries removed from repo. git actions binaries build in releases.
 uninstall_easy.sh: offer to remove dependencies in openwrt
+install_easy.sh: allow to download lists in autohostlist filter mode

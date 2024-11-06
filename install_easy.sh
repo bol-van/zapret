@@ -206,12 +206,12 @@ select_mode()
 
 select_getlist()
 {
-	if [ "$MODE_FILTER" = "ipset" -o "$MODE_FILTER" = "hostlist" ]; then
+	if [ "$MODE_FILTER" = "ipset" -o "$MODE_FILTER" = "hostlist" -o "$MODE_FILTER" = "autohostlist" ]; then
 		local D=N
 		[ -n "$GETLIST" ] && D=Y
 		echo
 		if ask_yes_no $D "do you want to auto download ip/host list"; then
-			if [ "$MODE_FILTER" = "hostlist" ] ; then
+			if [ "$MODE_FILTER" = "hostlist" -o "$MODE_FILTER" = "autohostlist" ] ; then
 				GETLISTS="get_refilter_domains.sh get_antizapret_domains.sh get_reestr_resolvable_domains.sh get_reestr_hostlist.sh"
 				GETLIST_DEF="get_antizapret_domains.sh"
 			else
