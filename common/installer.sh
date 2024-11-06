@@ -682,6 +682,19 @@ check_prerequisites_linux()
 	fi
 }
 
+removable_pkgs_openwrt()
+{
+	PKGS="iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra ip6tables-mod-nat ip6tables-extra kmod-nft-queue gzip coreutils-sort coreutils-sleep curl"
+}
+
+remove_extra_pkgs_openwrt()
+{
+	echo \* remove dependencies
+	removable_pkgs_openwrt
+	echo these packages may have been installed by install_easy.sh : $PKGS
+	ask_yes_no N "do you want to remove them" && opkg remove --autoremove $PKGS
+}
+
 check_prerequisites_openwrt()
 {
 	echo \* checking prerequisites

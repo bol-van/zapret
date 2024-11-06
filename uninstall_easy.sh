@@ -72,6 +72,9 @@ remove_openwrt()
 	nft_del_table
 	restart_openwrt_firewall
 	crontab_del
+	remove_extra_pkgs_openwrt
+	echo
+	echo to fully remove zapret : rm -r \"$ZAPRET_BASE\"
 }
 
 remove_macos()
