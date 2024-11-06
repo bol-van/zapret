@@ -1351,6 +1351,12 @@ If this is the case then run another script in background and add some delay the
 
 Are welcome here :
 
-<img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT 0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
+<img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT
+```
+0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
+```
 
-<img src=https://cdn-icons-png.flaticon.com/16/5968/5968260.png  alt="USDT" style="vertical-align: middle;"/> BTC bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve
+<img src=https://cdn-icons-png.flaticon.com/16/5968/5968260.png  alt="USDT" style="vertical-align: middle;"/> BTC
+```
+bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve
+```
