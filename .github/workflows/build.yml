@@ -361,8 +361,10 @@ jobs:
       - name: Create release bundles
         run: |
           rm -rf zapret/.git*
-          tar -czf zapret-${{ github.ref_name }}.tar.gz zapret
-          zip -qr zapret-${{ github.ref_name }}.zip zapret
+          rm -rf zapret-${{ github.ref_name }}
+          cp -R zapret zapret-${{ github.ref_name }}
+          tar -czf zapret-${{ github.ref_name }}.tar.gz zapret-${{ github.ref_name }}
+          zip -qr zapret-${{ github.ref_name }}.zip zapret-${{ github.ref_name }}
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
