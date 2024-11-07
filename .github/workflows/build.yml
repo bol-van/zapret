@@ -288,17 +288,19 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    env:
+      repo_dir: zapret-${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: zapret
+          path: ${{ env.repo_dir }}
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         id: bins
         with:
-          path: zapret/binaries
+          path: ${{ env.repo_dir }}/binaries
           pattern: zapret-*
 
       - name: Install upx
@@ -360,11 +362,9 @@ jobs:
 
       - name: Create release bundles
         run: |
-          rm -rf zapret/.git*
-          rm -rf zapret-${{ github.ref_name }}
-          cp -R zapret zapret-${{ github.ref_name }}
-          tar -czf zapret-${{ github.ref_name }}.tar.gz zapret-${{ github.ref_name }}
-          zip -qr zapret-${{ github.ref_name }}.zip zapret-${{ github.ref_name }}
+          rm -rf ${{ env.repo_dir }}/.git*
+          tar -czf ${{ env.repo_dir }}.tar.gz ${{ env.repo_dir }}
+          zip -qr ${{ env.repo_dir }}.zip ${{ env.repo_dir }}
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
