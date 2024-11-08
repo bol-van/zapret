@@ -217,8 +217,9 @@ ipfrag2 desync mode.
 
 There's autostart script example in `init.d/pfsense`. It should be placed to
 `/usr/local/etc/rc.d` and edited. Write your ipfw rules and daemon start
-commands. Because git is absent the most convinient way to copy files is ssh.
-curl is present by default.
+commands.
+curl is present by default. You can use it to download `tar.gz` release directly from github.
+Or you can copy files using sftp.
 
 Copy zip with zapret files to `/opt` and unpack there as it's done in other
 systems. In this case run `dvtws` as `/opt/zapret/nfq/dvtws`. Or just copy
@@ -227,9 +228,6 @@ present. It's possible to renew lists.
 
 If you dont like poverty of default repos its possible to enable FreeBSD repo.
 Change `no` to `yes` in `/usr/local/etc/pkg/repos/FreeBSD.conf` and `/usr/local/etc/pkg/repos/pfSense.conf`.
-Then it becomes possible to install all the required software including git to download
-zapret from github directly.
-
 
 `/usr/local/etc/rc.d/zapret.sh` (chmod 755)
 ```
