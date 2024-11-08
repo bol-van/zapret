@@ -64,8 +64,8 @@ VPN.
 
 ## Быстрый старт
 
-- Linux/openWrt: [Документация](./quick_start.md)
-- Windows: [Документация](./quick_start_windows.md)
+- [Linux/openWrt](./quick_start.md)
+- [Windows](./quick_start_windows.md)
 
 ## Как это работает
 
