@@ -47,7 +47,7 @@ ___
 A stand-alone (without 3rd party servers) DPI circumvention tool.
 May allow to bypass http(s) website blocking or speed shaping, resist signature tcp/udp protocol discovery.
 
-The project is mainly aimed at the Russian audience to fight russian regulator named "Roskomnadzor".
+The project is mainly aimed at the Russian audience.
 Some features of the project are russian reality specific (such as getting list of sites
 blocked by Roskomnadzor), but most others are common.
 
