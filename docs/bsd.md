@@ -18,7 +18,7 @@
     * [PF в FreeBSD](#pf-в-freebsd)
     * [pfsense](#pfsense)
 * [OpenBSD](#openbsd)
-    * [tpws bind на ipv4](#tpws-бинд-на-ipv4)
+    * [tpws bind на ipv4](#tpws-bind-на-ipv4)
     * [tpws для проходящего трафика](#tpws-для-проходящего-трафика)
     * [Запуск dvtws](#запуск-dvtws)
     * [Проблемы с badsum](#проблемы-с-badsum)
