@@ -2178,8 +2178,6 @@ VPS можно прибрести в множестве мест. Существ
 
 ## Поддержать разработчика
 
-[Реквизиты](https://github.com/bol-van/zapret/issues/590):
-
 <img src=https://cdn-icons-png.flaticon.com/16/14446/14446252.png alt="USDT" style="vertical-align: middle;"/> USDT
 ```
 0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E
