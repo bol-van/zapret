@@ -25,7 +25,11 @@ check_dir()
 				# find does not use its own shell exec
 				# it uses execvp(). in musl libc it does not call shell, in glibc it DOES call /bin/sh
 				# that's why prefer bash or zsh if present. otherwise it's our last chance
-				out=$(echo 0.0.0.0 | find "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
+				local FIND=find
+				if ! exists find && exists busybox; then
+					FIND="busybox find"
+				fi
+				out=$(echo 0.0.0.0 | $FIND "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
 			fi
 			[ -n "$out" ]
 		else
