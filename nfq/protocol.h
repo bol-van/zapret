@@ -35,7 +35,7 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK);
 bool TLSHelloExtractHost(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK);
 bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *host, size_t len_host, bool bPartialIsOK);
-enum tlspos { tlspos_none = 0, tlspos_sni, tlspos_sniext, tlspos_pos };
+enum tlspos { tlspos_none = 0, tlspos_sni, tlspos_sniext, tlspos_snisld, tlspos_pos };
 size_t TLSPos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls, size_t sz, uint8_t type);
 
 bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len);

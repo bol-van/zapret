@@ -183,7 +183,7 @@ static void exithelp(void)
 		" --hostlist-auto-debug=<logfile>\t; debug auto hostlist positives\n"
 		"\nTAMPER:\n"
 		" --split-http-req=method|host\t\t; split at specified logical part of plain http request\n"
-		" --split-tls=sni|sniext\t\t\t; split at specified logical part of TLS ClientHello\n"
+		" --split-tls=sni|sniext|snisld\t\t; split at specified logical part of TLS ClientHello\n"
 		" --split-pos=<numeric_offset>\t\t; split at specified pos. split-http-req or split-tls take precedence for http.\n"
 		" --split-any-protocol\t\t\t; split not only http and https\n"
 #if defined(BSD) && !defined(__APPLE__)
@@ -203,7 +203,7 @@ static void exithelp(void)
 		" --methodspace\t\t\t\t; add extra space after method\n"
 		" --methodeol\t\t\t\t; add end-of-line before method\n"
 		" --unixeol\t\t\t\t; replace 0D0A to 0A\n"
-		" --tlsrec=sni|sniext\t\t\t; make 2 TLS records. split at specified logical part. don't split if SNI is not present\n"
+		" --tlsrec=sni|sniext|snisld\t\t; make 2 TLS records. split at specified logical part. don't split if SNI is not present\n"
 		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n"
 #ifdef __linux__
 		" --mss=<int>\t\t\t\t; set client MSS. forces server to split messages but significantly decreases speed !\n"
@@ -292,6 +292,8 @@ bool parse_tlspos(const char *s, enum tlspos *pos)
 		*pos = tlspos_sni;
 	else if (!strcmp(s, "sniext"))
 		*pos = tlspos_sniext;
+	else if (!strcmp(s, "snisld"))
+		*pos = tlspos_snisld;
 	else
 		return false;
 	return true;

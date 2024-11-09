@@ -1270,7 +1270,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							seg_len = dis->len_payload-split_pos;
 						}
 
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(net32_add(dis->tcp->th_seq,split_pos),-dp->desync_seqovl), dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(dis->tcp->th_seq , split_pos - dp->desync_seqovl), dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
 								ttl_orig,IP4_TOS(dis->ip),IP6_FLOW(dis->ip6),
 								fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 								seg, seg_len, pkt1, &pkt1_len))
