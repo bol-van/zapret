@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <pthread.h>
 #include <getopt.h>
 #ifdef _WIN32
@@ -21,7 +20,9 @@
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <ws2tcpip.h>
+#include <fcntl.h>
 #else
+#include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -364,6 +365,9 @@ int dns_make_query(const char *dom, char family)
 		fprintf(stderr, "could not make DNS query\n");
 		return 1;
 	}
+#ifdef _WIN32
+	_setmode(_fileno(stdout), _O_BINARY);
+#endif
 	if (fwrite(q,l,1,stdout)!=1)
 	{
 		fprintf(stderr, "could not write DNS query blob to stdout\n");
@@ -422,6 +426,9 @@ int dns_parse_query()
 {
 	uint8_t a[1500];
 	size_t l;
+#ifdef _WIN32
+	_setmode(_fileno(stdin), _O_BINARY);
+#endif
 	l = fread(a,1,sizeof(a),stdin);
 	if (!l || !feof(stdin))
 	{
