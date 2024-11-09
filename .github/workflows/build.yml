@@ -24,8 +24,8 @@ jobs:
         include:
           - arch: arm64
             tool: aarch64-unknown-linux-musl
-          - arch: arm
-            tool: arm-unknown-linux-musleabi
+          # - arch: arm
+          #  tool: arm-unknown-linux-musleabi
           # - arch: armhf
           #   tool: arm-unknown-linux-musleabihf
           # - arch: armv7
@@ -34,22 +34,22 @@ jobs:
           #   tool: armv7-unknown-linux-musleabihf
           # - arch: mips64el
           #   tool: mips64el-unknown-linux-musl
-          - arch: mips64
-            tool: mips64-unknown-linux-musl
+          # - arch: mips64
+          #   tool: mips64-unknown-linux-musl
           # - arch: mipsel
           #   tool: mipsel-unknown-linux-musl
-          - arch: mipselsf
-            tool: mipsel-unknown-linux-muslsf
+          # - arch: mipselsf
+          #   tool: mipsel-unknown-linux-muslsf
           # - arch: mips
           #   tool: mips-unknown-linux-musl
-          - arch: mipssf
-            tool: mips-unknown-linux-muslsf
+          # - arch: mipssf
+          #   tool: mips-unknown-linux-muslsf
           # - arch: ppc64
           #   tool: powerpc64-unknown-linux-musl
-          - arch: ppc
-            tool: powerpc-unknown-linux-musl
-          - arch: x86
-            tool: i586-unknown-linux-musl
+          # - arch: ppc
+          #   tool: powerpc-unknown-linux-musl
+          # - arch: x86
+          #   tool: i586-unknown-linux-musl
           - arch: x86_64
             tool: x86_64-unknown-linux-musl
     steps:
