@@ -974,7 +974,7 @@ curl_test()
 			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
 		else
 			code=$?
-			[ "$SCANLEVEL" = quick ] && break
+			[ "$SCANLEVEL" != force ] && break
 		fi
 	done
 	[ "$4" = detail ] || {
