@@ -210,14 +210,20 @@ bool proto_check_tcp(const uint8_t *data, size_t len);
 void proto_skip_tcp(uint8_t **data, size_t *len);
 bool proto_check_udp(const uint8_t *data, size_t len);
 void proto_skip_udp(uint8_t **data, size_t *len);
-void proto_dissect_l3l4(
-	uint8_t *data, size_t len,
-	struct ip **ip, struct ip6_hdr **ip6,
-	uint8_t *proto,
-	struct tcphdr **tcp,
-	struct udphdr **udp,
-	size_t *transport_len,
-	uint8_t **data_payload, size_t *len_payload);
+struct dissect
+{
+	uint8_t *data_pkt;
+	size_t len_pkt;
+	struct ip *ip;
+	struct ip6_hdr *ip6;
+	uint8_t proto;
+	struct tcphdr *tcp;
+	struct udphdr *udp;
+	size_t transport_len;
+	uint8_t *data_payload;
+	size_t len_payload;
+};
+void proto_dissect_l3l4(uint8_t *data, size_t len,struct dissect *dis);
 
 bool tcp_synack_segment(const struct tcphdr *tcphdr);
 bool tcp_syn_segment(const struct tcphdr *tcphdr);

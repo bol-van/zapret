@@ -869,60 +869,49 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t *
 	// we have garbage
 }
 
-void proto_dissect_l3l4(
-	uint8_t *data, size_t len,
-	struct ip **ip, struct ip6_hdr **ip6,
-	uint8_t *proto,
-	struct tcphdr **tcp,
-	struct udphdr **udp,
-	size_t *transport_len,
-	uint8_t **data_payload, size_t *len_payload)
+void proto_dissect_l3l4(uint8_t *data, size_t len,struct dissect *dis)
 {
-	*ip = NULL;
-	*ip6 = NULL;
-	*proto = 0;
-	*tcp = NULL;
-	*transport_len = 0;
-	*udp = NULL;
-	*data_payload = NULL;
-	*len_payload = 0;
-	
+	memset(dis,0,sizeof(*dis));
+
+	dis->data_pkt = data;
+	dis->len_pkt = len;
+
 	if (proto_check_ipv4(data, len))
 	{
-		*ip = (struct ip *) data;
-		*proto = (*ip)->ip_p;
+		dis->ip = (struct ip *) data;
+		dis->proto = dis->ip->ip_p;
 		proto_skip_ipv4(&data, &len);
 	}
 	else if (proto_check_ipv6(data, len))
 	{
-		*ip6 = (struct ip6_hdr *) data;
-		proto_skip_ipv6(&data, &len, proto, NULL);
+		dis->ip6 = (struct ip6_hdr *) data;
+		proto_skip_ipv6(&data, &len, &dis->proto, NULL);
 	}
 	else
 	{
 		return;
 	}
 
-	if (*proto==IPPROTO_TCP && proto_check_tcp(data, len))
+	if (dis->proto==IPPROTO_TCP && proto_check_tcp(data, len))
 	{
-		*tcp = (struct tcphdr *) data;
-		*transport_len = len;
+		dis->tcp = (struct tcphdr *) data;
+		dis->transport_len = len;
 
 		proto_skip_tcp(&data, &len);
 
-		*data_payload = data;
-		*len_payload = len;
+		dis->data_payload = data;
+		dis->len_payload = len;
 
 	}
-	else if (*proto==IPPROTO_UDP && proto_check_udp(data, len))
+	else if (dis->proto==IPPROTO_UDP && proto_check_udp(data, len))
 	{
-		*udp = (struct udphdr *) data;
-		*transport_len = len;
-		
+		dis->udp = (struct udphdr *) data;
+		dis->transport_len = len;
+
 		proto_skip_udp(&data, &len);
 
-		*data_payload = data;
-		*len_payload = len;
+		dis->data_payload = data;
+		dis->len_payload = len;
 	}
 }
 
