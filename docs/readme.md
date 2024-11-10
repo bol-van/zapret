@@ -1341,7 +1341,8 @@ DOH_SERVER - конкретный DoH URL, отказ от поиска
 CURL - замена программы curl
 ```
 
-Пример запуска с переменными: `SECURE_DNS=1 SKIP_TPWS=1 CURL_MAX_TIME=1 CURL=/tmp/curl ./blockcheck.sh`
+Пример запуска с переменными:\
+`SECURE_DNS=1 SKIP_TPWS=1 CURL_MAX_TIME=1 CURL=/tmp/curl ./blockcheck.sh`
 
 **СКАН ПОРТОВ**\
 Если в системе присутствует совместимый `netcat` (ncat от nmap или openbsd ncat. в openwrt по умолчанию нет),
