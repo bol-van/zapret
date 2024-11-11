@@ -673,10 +673,7 @@ static bool parse_l7_list(char *opt, uint32_t *l7)
 			*l7 |= L7_PROTO_UNKNOWN;
 		else return false;
 
-		if (e)
-		{
-			*e++=c;
-		}
+		if (e) *e++=c;
 		p = e;
 	}
 	return true;
@@ -723,14 +720,172 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 			*ipv6 = true;
 		else return false;
 
-		if (e)
-		{
-			*e++=c;
-		}
+		if (e) *e++=c;
 		p = e;
 	}
 	return true;
 }
+
+static bool parse_httpreqpos(const char *s, struct split_pos *sp)
+{
+	if (!strcmp(s, "method"))
+	{
+		sp->marker = PM_HTTP_METHOD;
+		sp->pos=2;
+	}
+	else if (!strcmp(s, "host"))
+	{
+		sp->marker = PM_HOST;
+		sp->pos=1;
+	}
+	else
+		return false;
+	return true;
+}
+static bool parse_tlspos(const char *s, struct split_pos *sp)
+{
+	if (!strcmp(s, "sni"))
+	{
+		sp->marker = PM_HOST;
+		sp->pos=1;
+	}
+	else if (!strcmp(s, "sniext"))
+	{
+		sp->marker = PM_SNI_EXT;
+		sp->pos=0;
+	}
+	else if (!strcmp(s, "snisld"))
+	{
+		sp->marker = PM_HOST_MIDSLD;
+		sp->pos=1;
+	}
+	else
+		return false;
+	return true;
+}
+
+static bool parse_int16(const char *p, int16_t *v)
+{
+	if (*p=='+' || *p=='-' || *p>='0' && *p<='9')
+	{
+		int i = atoi(p);
+		*v = (int16_t)i;
+		return *v==i; // check overflow
+	}
+	return false;
+}
+static bool parse_posmarker(const char *opt, uint8_t *posmarker)
+{
+	if (!strcmp(opt,"host"))
+		*posmarker = PM_HOST;
+	else if (!strcmp(opt,"endhost"))
+		*posmarker = PM_HOST_END;
+	else if (!strcmp(opt,"sld"))
+		*posmarker = PM_HOST_SLD;
+	else if (!strcmp(opt,"midsld"))
+		*posmarker = PM_HOST_MIDSLD;
+	else if (!strcmp(opt,"endsld"))
+		*posmarker = PM_HOST_ENDSLD;
+	else if (!strcmp(opt,"method"))
+		*posmarker = PM_HTTP_METHOD;
+	else if (!strcmp(opt,"sniext"))
+		*posmarker = PM_SNI_EXT;
+	else
+		return false;
+	return true;
+}
+static bool parse_split_pos(char *opt, struct split_pos *split)
+{
+	if (parse_int16(opt,&split->pos))
+	{
+		split->marker = PM_ABS;
+		return !!split->pos;
+	}
+	else
+	{
+		char c,*p=opt;
+		bool b;
+
+		for (; *opt && *opt!='+' && *opt!='-'; opt++);
+		c=*opt; *opt=0;
+		b=parse_posmarker(p,&split->marker);
+		*opt=c;
+		if (!b) return false;
+		if (*opt)
+			return parse_int16(opt,&split->pos);
+		else
+			split->pos = 0;
+	}
+	return true;
+}
+static bool parse_split_pos_list(char *opt, struct split_pos *splits, int splits_size, int *split_count)
+{
+	char c,*e,*p;
+
+	for (p=opt, *split_count=0 ; p && *split_count<splits_size ; (*split_count)++)
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+		if (!parse_split_pos(p,splits+*split_count)) return false;
+		if (e) *e++=c;
+		p = e;
+	}
+	if (p) return false; // too much splits
+	return true;
+}
+static void split_compat(struct desync_profile *dp)
+{
+	// make it mostly compatible with old versions
+	int i;
+	dp->split_unknown.marker=PM_ABS;
+	dp->split_unknown.pos=2;
+	for (i=0;i<dp->split_count;i++)
+	{
+		if (dp->splits[i].marker==PM_ABS)
+		{
+			dp->split_unknown.pos=dp->splits[i].pos;
+			break;
+		}
+	}
+	if (SPLIT_POS_EMPTY(&dp->split_http))
+	{
+		dp->split_http=dp->split_unknown;
+		for (i=0;i<dp->split_count;i++)
+			if (IsHostMarker(dp->splits[i].marker) || dp->splits[i].marker==PM_HTTP_METHOD)
+			{
+				dp->split_http = dp->splits[i];
+				break;
+			}
+	}
+	if (SPLIT_POS_EMPTY(&dp->split_tls))
+	{
+		dp->split_tls=dp->split_unknown;
+		for (i=0;i<dp->split_count;i++)
+			if (IsHostMarker(dp->splits[i].marker) || dp->splits[i].marker==PM_SNI_EXT)
+			{
+				dp->split_tls = dp->splits[i];
+				break;
+			}
+	}
+}
+static void SplitDebug(void)
+{
+	struct desync_profile_list *dpl;
+	const struct desync_profile *dp;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+	{
+		dp = &dpl->dp;
+		DLOG("profile %d split_http %s %d\n",dp->n,posmarker_name(dp->split_http.marker),dp->split_http.pos);
+		DLOG("profile %d split_tls %s %d\n",dp->n,posmarker_name(dp->split_tls.marker),dp->split_tls.pos);
+		DLOG("profile %d split_unknown %s %d\n",dp->n,posmarker_name(dp->split_unknown.marker),dp->split_unknown.pos);
+		for(int x=0;x<dp->split_count;x++)
+			DLOG("profile %d multisplit %s %d\n",dp->n,posmarker_name(dp->splits[x].marker),dp->splits[x].pos);
+	}
+}
+
 
 #ifdef __CYGWIN__
 static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *buf, size_t len)
@@ -757,10 +912,7 @@ static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *bu
 		if (n) strncat(buf," or ",len-strlen(buf)-1);
 		strncat(buf, s1, len-strlen(buf)-1);
 
-		if (e)
-		{
-			*e++=c;
-		}
+		if (e) *e++=c;
 		p = e;
 	}
 	strncat(buf, ")", len-strlen(buf)-1);
@@ -912,7 +1064,9 @@ static void exithelp(void)
 		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes :\n"
+		"\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
+		"\t\t\t\t\t\t; disorder disorder2 split split2 multisplit multidisorder ipfrag2 udplen tamper\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -925,9 +1079,9 @@ static void exithelp(void)
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
-		" --dpi-desync-split-http-req=method|host\t; split at specified logical part of plain http request\n"
-		" --dpi-desync-split-tls=sni|sniext|snisld\t; split at specified logical part of TLS ClientHello\n"
+		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions. markers: method,host,endhost,sld,endsld,midsld,sniext\n"
+		"\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
+		"\t\t\t\t\t\t; single split takes first l7-protocol-compatible parameter if present, first abs value otherwise\n"
 		" --dpi-desync-split-seqovl=<int>\t\t; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
@@ -953,7 +1107,6 @@ static void exithelp(void)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
 		AUTOTTL_DEFAULT_DELTA,AUTOTTL_DEFAULT_MIN,AUTOTTL_DEFAULT_MAX,
-		DPI_DESYNC_MAX_FAKE_LEN,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
 		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
@@ -965,29 +1118,6 @@ static void exithelp_clean(void)
 {
 	cleanup_params();
 	exithelp();
-}
-
-bool parse_httpreqpos(const char *s, enum httpreqpos *pos)
-{
-	if (!strcmp(s, "method"))
-		*pos = httpreqpos_method;
-	else if (!strcmp(s, "host"))
-		*pos = httpreqpos_host;
-	else
-		return false;
-	return true;
-}
-bool parse_tlspos(const char *s, enum tlspos *pos)
-{
-	if (!strcmp(s, "sni"))
-		*pos = tlspos_sni;
-	else if (!strcmp(s, "sniext"))
-		*pos = tlspos_sniext;
-	else if (!strcmp(s, "snisld"))
-		*pos = tlspos_snisld;
-	else
-		return false;
-	return true;
 }
 
 #ifndef __OpenBSD__
@@ -1447,21 +1577,27 @@ int main(int argc, char **argv)
 			dp->desync_skip_nosni = !optarg || atoi(optarg);
 			break;
 		case 23: /* dpi-desync-split-pos */
-			if (sscanf(optarg,"%u",&dp->desync_split_pos)<1 || dp->desync_split_pos<1)
 			{
-				DLOG_ERR("dpi-desync-split-pos is not valid\n");
-				exit_clean(1);
+				int ct;
+				if (!parse_split_pos_list(optarg,dp->splits+dp->split_count,MAX_SPLITS-dp->split_count,&ct))
+				{
+					DLOG_ERR("could not parse split pos list or too much positions (before parsing - %u, max - %u) : %s\n",dp->split_count,MAX_SPLITS,optarg);
+					exit_clean(1);
+				}
+				dp->split_count += ct;
 			}
 			break;
 		case 24: /* dpi-desync-split-http-req */
-			if (!parse_httpreqpos(optarg, &dp->desync_split_http_req))
+			// obsolete arg
+			if (!parse_httpreqpos(optarg, &dp->split_http))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-http-req\n");
 				exit_clean(1);
 			}
 			break;
 		case 25: /* dpi-desync-split-tls */
-			if (!parse_tlspos(optarg, &dp->desync_split_tls))
+			// obsolete arg
+			if (!parse_tlspos(optarg, &dp->split_tls))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-tls\n");
 				exit_clean(1);
@@ -1919,8 +2055,7 @@ int main(int argc, char **argv)
 			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
 			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
-		if (dp->desync_split_tls==tlspos_none && dp->desync_split_pos) dp->desync_split_tls=tlspos_pos;
-		if (dp->desync_split_http_req==httpreqpos_none && dp->desync_split_pos) dp->desync_split_http_req=httpreqpos_pos;
+		split_compat(dp);
 	}
 
 	if (!LoadAllHostLists())
@@ -1937,6 +2072,9 @@ int main(int argc, char **argv)
 	DLOG("\nlists summary:\n");
 	HostlistsDebug();
 	IpsetsDebug();
+
+	DLOG("\nsplits summary:\n");
+	SplitDebug();
 	DLOG("\n");
 
 	if (daemon) daemonize();

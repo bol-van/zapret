@@ -40,6 +40,14 @@
 
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
+struct split_pos
+{
+	int16_t pos;
+	uint8_t marker;
+};
+#define SPLIT_POS_EMPTY(sp) ((sp)->marker==PM_ABS && (sp)->pos==0)
+#define MAX_SPLITS	64
+
 struct desync_profile
 {
 	int n;	// number of the profile
@@ -53,9 +61,14 @@ struct desync_profile
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
-	unsigned int desync_repeats,desync_split_pos,desync_seqovl,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
-	enum httpreqpos desync_split_http_req;
-	enum tlspos desync_split_tls;
+	unsigned int desync_repeats,desync_seqovl,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
+
+	// multisplit
+	struct split_pos splits[MAX_SPLITS];
+	int split_count;
+	// single split pos cache
+	struct split_pos split_http,split_tls,split_unknown;
+
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;

@@ -11,6 +11,27 @@
 
 #include "params.h"
 
+int unique_size_t(size_t *pu, int ct)
+{
+	int i, j, u;
+	for (i = j = 0; j < ct; i++)
+	{
+		u = pu[j++];
+		for (; j < ct && pu[j] == u; j++);
+		pu[i] = u;
+	}
+	return i;
+}
+static int cmp_size_t(const void * a, const void * b)
+{
+	return *(size_t*)a < *(size_t*)b ? -1 : *(size_t*)a > *(size_t*)b;
+}
+void qsort_size_t(size_t *array,size_t ct)
+{
+	qsort(array,ct,sizeof(*array),cmp_size_t);
+}
+
+
 void rtrim(char *s)
 {
 	if (s)
