@@ -7,6 +7,22 @@
 #include <arpa/inet.h>
 #include <string.h>
 
+// find N level domain
+static bool FindNLD(const uint8_t *dom, size_t dlen, int level, const uint8_t **p, size_t *len)
+{
+	int i;
+	const uint8_t *p1,*p2;
+	for (i=1,p2=dom+dlen;i<level;i++)
+	{
+		for (p2--; p2>dom && *p2!='.'; p2--);
+		if (p2<=dom) return false;
+	}
+	for (p1=p2-1 ; p1>dom && *p1!='.'; p1--);
+	if (*p1=='.') p1++;
+	if (p) *p = p1;
+	if (len) *len = p2-p1;
+	return true;
+}
 
 const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS /","PUT /","DELETE /","CONNECT /","TRACE /",NULL };
 const char *HttpMethod(const uint8_t *data, size_t len)
@@ -116,17 +132,6 @@ bool HttpExtractHost(const uint8_t *data, size_t len, char *host, size_t len_hos
 {
 	return HttpExtractHeader(data, len, "\nHost:", host, len_host);
 }
-const char *HttpFind2ndLevelDomain(const char *host)
-{
-	const char *p=NULL;
-	if (*host)
-	{
-		for (p = host + strlen(host)-1; p>host && *p!='.'; p--);
-		if (*p=='.') for (p--; p>host && *p!='.'; p--);
-		if (*p=='.') p++;
-	}
-	return p;
-}
 // DPI redirects are global redirects to another domain
 bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *host)
 {
@@ -157,10 +162,11 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 	// somethinkg like : censor.net
 	
 	// extract 2nd level domains
+	const char *dhost, *drhost;
+	if (!FindNLD((uint8_t*)host,strlen(host),2,(const uint8_t**)&dhost,NULL) || !FindNLD((uint8_t*)redirect_host,strlen(redirect_host),2,(const uint8_t**)&drhost,NULL))
+		return false;
 
-	const char *dhost = HttpFind2ndLevelDomain(host);
-	const char *drhost = HttpFind2ndLevelDomain(redirect_host);
-	
+	// compare 2nd level domains		
 	return strcasecmp(dhost, drhost)!=0;
 }
 size_t HttpPos(enum httpreqpos tpos_type, size_t hpos_pos, const uint8_t *http, size_t sz)
@@ -295,15 +301,24 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 	if (reclen<len) len=reclen; // correct len if it has more data than the first tls record has
 	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext, bPartialIsOK);
 }
+static bool TLSAdvanceToHostInSNI(const uint8_t **ext, size_t *elen, size_t *slen)
+{
+	// u16	data+0 - name list length
+	// u8	data+2 - server name type. 0=host_name
+	// u16	data+3 - server name length
+	if (*elen < 5 || (*ext)[2] != 0) return false;
+	*slen = pntoh16(*ext + 3);
+	*ext += 5; *elen -= 5;
+	return *slen <= *elen;
+}
 static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, size_t len_host)
 {
 	// u16	data+0 - name list length
 	// u8	data+2 - server name type. 0=host_name
 	// u16	data+3 - server name length
-	if (elen < 5 || ext[2] != 0) return false;
-	size_t slen = pntoh16(ext + 3);
-	ext += 5; elen -= 5;
-	if (slen < elen) return false;
+	size_t slen;
+	if (!TLSAdvanceToHostInSNI(&ext,&elen,&slen))
+		return false;
 	if (host && len_host)
 	{
 		if (slen >= len_host) slen = len_host - 1;
@@ -328,20 +343,44 @@ bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *hos
 	if (!TLSFindExtInHandshake(data, len, 0, &ext, &elen, bPartialIsOK)) return false;
 	return TLSExtractHostFromExt(ext, elen, host, len_host);
 }
+
+// find N level domain in SNI
+static bool TLSHelloFindNLDInSNI(const uint8_t *ext, size_t elen, int level, const uint8_t **p, size_t *len)
+{
+	size_t slen;
+	return TLSAdvanceToHostInSNI(&ext,&elen,&slen) && FindNLD(ext,slen,level,p,len);
+}
+// find the middle of second level domain (SLD) in SNI ext : www.sobaka.ru => aka.ru
+// return false if SNI ext is bad or SLD is not found
+static bool TLSHelloFindMiddleOfSLDInSNI(const uint8_t *ext, size_t elen, const uint8_t **p)
+{
+	size_t len;
+	if (!TLSHelloFindNLDInSNI(ext,elen,2,p,&len))
+		return false;
+	// in case of one letter SLD (x.com) we split at '.' to prevent appearance of the whole SLD
+	*p = (len==1) ? *p+1 : *p+len/2;
+	return true;
+}
 size_t TLSPos(enum tlspos tpos_type, size_t tpos_pos, const uint8_t *tls, size_t sz, uint8_t type)
 {
 	size_t elen;
-	const uint8_t *ext;
+	const uint8_t *ext, *p;
 	switch(tpos_type)
 	{
 		case tlspos_sni:
 		case tlspos_sniext:
 			if (TLSFindExt(tls,sz,0,&ext,&elen,false))
 				return (tpos_type==tlspos_sni) ? ext-tls+6 : ext-tls+1;
-			// fall through
+			break;
+		case tlspos_snisld:
+			if (TLSFindExt(tls,sz,0,&ext,&elen,false))
+				if (TLSHelloFindMiddleOfSLDInSNI(ext,elen,&p))
+					return p-tls;
+			break;
 		case tlspos_pos:
-			return tpos_pos<sz ? tpos_pos : 0;
+			break;
 		default:
 			return 0;
 	}
+	return tpos_pos<sz ? tpos_pos : 0;
 }

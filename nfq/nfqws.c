@@ -927,7 +927,7 @@ static void exithelp(void)
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
 		" --dpi-desync-split-pos=<1..%u>\t\t; data payload split position\n"
 		" --dpi-desync-split-http-req=method|host\t; split at specified logical part of plain http request\n"
-		" --dpi-desync-split-tls=sni|sniext\t\t; split at specified logical part of TLS ClientHello\n"
+		" --dpi-desync-split-tls=sni|sniext|snisld\t; split at specified logical part of TLS ClientHello\n"
 		" --dpi-desync-split-seqovl=<int>\t\t; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
@@ -983,6 +983,8 @@ bool parse_tlspos(const char *s, enum tlspos *pos)
 		*pos = tlspos_sni;
 	else if (!strcmp(s, "sniext"))
 		*pos = tlspos_sniext;
+	else if (!strcmp(s, "snisld"))
+		*pos = tlspos_snisld;
 	else
 		return false;
 	return true;

@@ -1,5 +1,5 @@
 CC ?= cc
-CFLAGS += -std=gnu99 -s -O3
+CFLAGS += -std=gnu99 -s -Os
 LIBS = -lz -lpthread
 SRC_FILES = *.c
 
