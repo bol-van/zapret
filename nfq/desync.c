@@ -1110,6 +1110,14 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			return verdict;
 		}
 
+		if (params.debug)
+		{
+			char s1[48],s2[48];
+			ntop46_port((struct sockaddr *)&src, s1, sizeof(s1));
+			ntop46_port((struct sockaddr *)&dst, s2, sizeof(s2));
+			DLOG("dpi desync src=%s dst=%s\n",s1,s2);
+		}
+
 		const struct split_pos *spos;
 		switch(l7proto)
 		{
@@ -1161,14 +1169,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		// we do not need reasm buffer anymore
 		reasm_orig_cancel(ctrack);
 		rdata_payload=NULL;
-
-		if (params.debug)
-		{
-			char s1[48],s2[48];
-			ntop46_port((struct sockaddr *)&src, s1, sizeof(s1));
-			ntop46_port((struct sockaddr *)&dst, s2, sizeof(s2));
-			DLOG("dpi desync src=%s dst=%s\n",s1,s2);
-		}
 
 		if (!split_pos || split_pos>rlen_payload) split_pos=1;
 		split_pos=pos_normalize(split_pos,reasm_offset,dis->len_payload);
