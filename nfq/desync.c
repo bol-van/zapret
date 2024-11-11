@@ -607,31 +607,6 @@ static void autottl_discover(t_ctrack *ctrack, bool bIpv6)
 	}
 }
 
-static size_t resolve_split(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct split_pos *sp)
-{
-	switch(l7proto)
-	{
-		case HTTP:
-			return HttpPos(sp->marker, sp->pos, data, sz);
-		case TLS:
-			return TLSPos(sp->marker, sp->pos, data, sz);
-		default:
-			return AnyProtoPos(sp->marker, sp->pos, data, sz);
-	}
-}
-static void resolve_multisplit(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct desync_profile *dp, size_t *pos, int *pos_count)
-{
-	int i,j;
-	for(i=j=0;i<dp->split_count;i++)
-	{
-		pos[j] = resolve_split(data,sz,l7proto,dp->splits+i);
-		if (pos[j]) j++;
-	}
-	qsort_size_t(pos, j);
-	j=unique_size_t(pos, j);
-	*pos_count=j;
-}
-
 static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, struct dissect *dis)
 {
 	uint8_t verdict=VERDICT_PASS;
@@ -1157,7 +1132,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		if (dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_MULTIDISORDER)
 		{
 			split_pos=0;
-			resolve_multisplit(rdata_payload, rlen_payload, l7proto, dp, multisplit_pos, &multisplit_count);
+			ResolveMultiPos(rdata_payload, rlen_payload, l7proto, dp->splits, dp->split_count, multisplit_pos, &multisplit_count);
 			if (params.debug)
 			{
 				if (multisplit_count)
@@ -1174,7 +1149,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			dp->desync_mode2==DESYNC_SPLIT || dp->desync_mode2==DESYNC_SPLIT2 || dp->desync_mode2==DESYNC_DISORDER || dp->desync_mode2==DESYNC_DISORDER2)
 		{
 			multisplit_count=0;
-			split_pos = resolve_split(rdata_payload, rlen_payload, l7proto, spos);
+			split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, spos);
 			DLOG("regular split pos: %zu\n",split_pos);
 		}
 		else

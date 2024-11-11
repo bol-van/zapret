@@ -12,29 +12,6 @@ static void ut_oom_recover(void *elem)
 	oom = true;
 }
 
-const char *l7proto_str(t_l7proto l7)
-{
-	switch(l7)
-	{
-		case HTTP: return "http";
-		case TLS: return "tls";
-		case QUIC: return "quic";
-		case WIREGUARD: return "wireguard";
-		case DHT: return "dht";
-		default: return "unknown";
-	}
-}
-bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
-{
-	return  (l7proto==UNKNOWN && (filter_l7 & L7_PROTO_UNKNOWN)) ||
-		(l7proto==HTTP && (filter_l7 & L7_PROTO_HTTP)) ||
-		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS)) ||
-		(l7proto==QUIC && (filter_l7 & L7_PROTO_QUIC)) ||
-		(l7proto==WIREGUARD && (filter_l7 & L7_PROTO_WIREGUARD)) ||
-		(l7proto==DHT && (filter_l7 & L7_PROTO_DHT));
-}
-
-
 static const char *connstate_s[]={"SYN","ESTABLISHED","FIN"};
 
 static void connswap(const t_conn *c, t_conn *c2)

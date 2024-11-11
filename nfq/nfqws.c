@@ -2048,6 +2048,13 @@ int main(int argc, char **argv)
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
+
+		if (!dp->split_count && (dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_MULTIDISORDER))
+		{
+			DLOG_ERR("multisplit requires explicit split pos\n");
+			exit_clean(1);
+		}
+
 		// not specified - use desync_ttl value instead
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;

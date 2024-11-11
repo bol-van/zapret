@@ -4,8 +4,6 @@
 // this conntrack is not bullet-proof
 // its designed to satisfy dpi desync needs only
 
-#include "packet_queue.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <ctype.h>
@@ -19,6 +17,8 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
+#include "packet_queue.h"
+#include "protocol.h"
 
 //#define HASH_BLOOM 20
 #define HASH_NONFATAL_OOM 1
@@ -52,16 +52,6 @@ typedef struct {
 // ESTABLISHED - any except SYN or SYN/ACK received
 // FIN - FIN or RST received
 typedef enum {SYN=0, ESTABLISHED, FIN} t_connstate;
-
-typedef enum {UNKNOWN=0, HTTP, TLS, QUIC, WIREGUARD, DHT} t_l7proto;
-#define L7_PROTO_HTTP		0x00000001
-#define L7_PROTO_TLS		0x00000002
-#define L7_PROTO_QUIC		0x00000004
-#define L7_PROTO_WIREGUARD	0x00000008
-#define L7_PROTO_DHT		0x00000010
-#define L7_PROTO_UNKNOWN	0x80000000
-const char *l7proto_str(t_l7proto l7);
-bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7);
 
 typedef struct
 {

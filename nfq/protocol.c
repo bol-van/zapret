@@ -24,6 +24,27 @@ static bool FindNLD(const uint8_t *dom, size_t dlen, int level, const uint8_t **
 	return true;
 }
 
+const char *l7proto_str(t_l7proto l7)
+{
+	switch(l7)
+	{
+		case HTTP: return "http";
+		case TLS: return "tls";
+		case QUIC: return "quic";
+		case WIREGUARD: return "wireguard";
+		case DHT: return "dht";
+		default: return "unknown";
+	}
+}
+bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
+{
+	return  (l7proto==UNKNOWN && (filter_l7 & L7_PROTO_UNKNOWN)) ||
+		(l7proto==HTTP && (filter_l7 & L7_PROTO_HTTP)) ||
+		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS)) ||
+		(l7proto==QUIC && (filter_l7 & L7_PROTO_QUIC)) ||
+		(l7proto==WIREGUARD && (filter_l7 & L7_PROTO_WIREGUARD)) ||
+		(l7proto==DHT && (filter_l7 & L7_PROTO_DHT));
+}
 
 #define PM_ABS		0
 #define PM_HOST		1
@@ -103,6 +124,30 @@ static size_t HostPos(uint8_t posmarker, int16_t pos, const uint8_t *data, size_
 			break;
 	}
 	return CheckPos(sz,offset);
+}
+size_t ResolvePos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct split_pos *sp)
+{
+	switch(l7proto)
+	{
+		case HTTP:
+			return HttpPos(sp->marker, sp->pos, data, sz);
+		case TLS:
+			return TLSPos(sp->marker, sp->pos, data, sz);
+		default:
+			return AnyProtoPos(sp->marker, sp->pos, data, sz);
+	}
+}
+void ResolveMultiPos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct split_pos *splits, int split_count, size_t *pos, int *pos_count)
+{
+	int i,j;
+	for(i=j=0;i<split_count;i++)
+	{
+		pos[j] = ResolvePos(data,sz,l7proto,splits+i);
+		if (pos[j]) j++;
+	}
+	qsort_size_t(pos, j);
+	j=unique_size_t(pos, j);
+	*pos_count=j;
 }
 
 

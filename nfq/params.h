@@ -38,15 +38,9 @@
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
 
-enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
-
-struct split_pos
-{
-	int16_t pos;
-	uint8_t marker;
-};
-#define SPLIT_POS_EMPTY(sp) ((sp)->marker==PM_ABS && (sp)->pos==0)
 #define MAX_SPLITS	64
+
+enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
 struct desync_profile
 {
