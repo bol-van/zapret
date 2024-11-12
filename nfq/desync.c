@@ -1118,7 +1118,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("dpi desync src=%s dst=%s\n",s1,s2);
 		}
 
-		const struct split_pos *spos;
+		const struct proto_pos *spos;
 		switch(l7proto)
 		{
 			case HTTP:
@@ -1152,6 +1152,27 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				else
 					DLOG("all multisplit pos are outside of this packet\n");
 			}
+			if (multisplit_count)
+			{
+				int j;
+				for (i=j=0;i<multisplit_count;i++)
+				{
+					multisplit_pos[j]=pos_normalize(multisplit_pos[i],reasm_offset,dis->len_payload);
+					if (multisplit_pos[j]) j++;
+				}
+				multisplit_count=j;
+				if (params.debug)
+				{
+					if (multisplit_count)
+					{
+						DLOG("normalized multisplit pos: ");
+						for (i=0;i<multisplit_count;i++) DLOG("%zu ",multisplit_pos[i]);
+						DLOG("\n");
+					}
+					else
+						DLOG("all multisplit pos are outside of this packet\n");
+				}
+			}
 		}
 		else if (dp->desync_mode==DESYNC_SPLIT || dp->desync_mode==DESYNC_SPLIT2 || dp->desync_mode==DESYNC_DISORDER || dp->desync_mode==DESYNC_DISORDER2 ||
 			dp->desync_mode2==DESYNC_SPLIT || dp->desync_mode2==DESYNC_SPLIT2 || dp->desync_mode2==DESYNC_DISORDER || dp->desync_mode2==DESYNC_DISORDER2)
@@ -1159,6 +1180,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			multisplit_count=0;
 			split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, spos);
 			DLOG("regular split pos: %zu\n",split_pos);
+			if (!split_pos || split_pos>rlen_payload) split_pos=1;
+			split_pos=pos_normalize(split_pos,reasm_offset,dis->len_payload);
+			if (split_pos)
+				DLOG("normalized regular split pos : %zu\n",split_pos);
+			else
+				DLOG("regular split pos is outside of this packet\n");
 		}
 		else
 		{
@@ -1169,34 +1196,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		// we do not need reasm buffer anymore
 		reasm_orig_cancel(ctrack);
 		rdata_payload=NULL;
-
-		if (!split_pos || split_pos>rlen_payload) split_pos=1;
-		split_pos=pos_normalize(split_pos,reasm_offset,dis->len_payload);
-		if (split_pos)
-			DLOG("normalized regular split pos : %zu\n",split_pos);
-		else
-			DLOG("regular split pos is outside of this packet\n");
-		if (multisplit_count)
-		{
-			int j;
-			for (i=j=0;i<multisplit_count;i++)
-			{
-				multisplit_pos[j]=pos_normalize(multisplit_pos[i],reasm_offset,dis->len_payload);
-				if (multisplit_pos[j]) j++;
-			}
-			multisplit_count=j;
-			if (params.debug)
-			{
-				if (multisplit_count)
-				{
-					DLOG("normalized multisplit pos: ");
-					for (i=0;i<multisplit_count;i++) DLOG("%zu ",multisplit_pos[i]);
-					DLOG("\n");
-				}
-				else
-					DLOG("all multisplit pos are outside of this packet\n");
-			}
-		}
 
 		uint32_t fooling_orig = FOOL_NONE;
 		bool bFake = false;

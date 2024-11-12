@@ -125,7 +125,7 @@ static size_t HostPos(uint8_t posmarker, int16_t pos, const uint8_t *data, size_
 	}
 	return CheckPos(sz,offset);
 }
-size_t ResolvePos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct split_pos *sp)
+size_t ResolvePos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct proto_pos *sp)
 {
 	switch(l7proto)
 	{
@@ -137,7 +137,7 @@ size_t ResolvePos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struc
 			return AnyProtoPos(sp->marker, sp->pos, data, sz);
 	}
 }
-void ResolveMultiPos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct split_pos *splits, int split_count, size_t *pos, int *pos_count)
+void ResolveMultiPos(const uint8_t *data, size_t sz, t_l7proto l7proto, const struct proto_pos *splits, int split_count, size_t *pos, int *pos_count)
 {
 	int i,j;
 	for(i=j=0;i<split_count;i++)

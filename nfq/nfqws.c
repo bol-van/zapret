@@ -726,7 +726,7 @@ static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
 	return true;
 }
 
-static bool parse_httpreqpos(const char *s, struct split_pos *sp)
+static bool parse_httpreqpos(const char *s, struct proto_pos *sp)
 {
 	if (!strcmp(s, "method"))
 	{
@@ -742,7 +742,7 @@ static bool parse_httpreqpos(const char *s, struct split_pos *sp)
 		return false;
 	return true;
 }
-static bool parse_tlspos(const char *s, struct split_pos *sp)
+static bool parse_tlspos(const char *s, struct proto_pos *sp)
 {
 	if (!strcmp(s, "sni"))
 	{
@@ -794,7 +794,7 @@ static bool parse_posmarker(const char *opt, uint8_t *posmarker)
 		return false;
 	return true;
 }
-static bool parse_split_pos(char *opt, struct split_pos *split)
+static bool parse_split_pos(char *opt, struct proto_pos *split)
 {
 	if (parse_int16(opt,&split->pos))
 	{
@@ -818,7 +818,7 @@ static bool parse_split_pos(char *opt, struct split_pos *split)
 	}
 	return true;
 }
-static bool parse_split_pos_list(char *opt, struct split_pos *splits, int splits_size, int *split_count)
+static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits_size, int *split_count)
 {
 	char c,*e,*p;
 
@@ -850,7 +850,7 @@ static void split_compat(struct desync_profile *dp)
 			break;
 		}
 	}
-	if (SPLIT_POS_EMPTY(&dp->split_http))
+	if (PROTO_POS_EMPTY(&dp->split_http))
 	{
 		dp->split_http=dp->split_unknown;
 		for (i=0;i<dp->split_count;i++)
@@ -860,7 +860,7 @@ static void split_compat(struct desync_profile *dp)
 				break;
 			}
 	}
-	if (SPLIT_POS_EMPTY(&dp->split_tls))
+	if (PROTO_POS_EMPTY(&dp->split_tls))
 	{
 		dp->split_tls=dp->split_unknown;
 		for (i=0;i<dp->split_count;i++)
