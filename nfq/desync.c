@@ -1280,7 +1280,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						to = i==multisplit_count ? dis->len_payload : multisplit_pos[i];
 
-						seqovl = dp->desync_seqovl;
+						// do seqovl only to the first packet
+						// otherwise it's prone to race condition on server side
+						// what happens first : server pushes socket buffer to process or another packet with seqovl arrives
+						seqovl = i==0 ? dp->desync_seqovl : 0;
 #ifdef __linux__
 // only linux return error if MTU is exceeded
 						for(;;seqovl=0)
