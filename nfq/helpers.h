@@ -17,6 +17,9 @@ typedef union
 	char _align[32];		// force 16-byte alignment for ip6_and int128 ops
 } sockaddr_in46;
 
+int unique_size_t(size_t *pu, int ct);
+void qsort_size_t(size_t *array,size_t ct);
+
 void rtrim(char *s);
 void replace_char(char *s, char from, char to);
 char *strncasestr(const char *s,const char *find, size_t slen);

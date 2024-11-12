@@ -169,7 +169,6 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 
 	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
 	entry->dp.desync_skip_nosni = true;
-	entry->dp.desync_split_pos = 2;
 	entry->dp.desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
 	entry->dp.desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
 	entry->dp.desync_repeats = 1;

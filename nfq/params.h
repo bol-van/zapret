@@ -38,6 +38,8 @@
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
 
+#define MAX_SPLITS	64
+
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
 struct desync_profile
@@ -53,9 +55,14 @@ struct desync_profile
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
-	unsigned int desync_repeats,desync_split_pos,desync_seqovl,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
-	enum httpreqpos desync_split_http_req;
-	enum tlspos desync_split_tls;
+	unsigned int desync_repeats,desync_seqovl,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
+
+	// multisplit
+	struct proto_pos splits[MAX_SPLITS];
+	int split_count;
+	// single split pos cache
+	struct proto_pos split_http,split_tls,split_unknown;
+
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;

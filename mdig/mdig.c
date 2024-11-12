@@ -424,7 +424,7 @@ bool dns_parse_print(const uint8_t *a, size_t len)
 }
 int dns_parse_query()
 {
-	uint8_t a[1500];
+	uint8_t a[8192];
 	size_t l;
 #ifdef _WIN32
 	_setmode(_fileno(stdin), _O_BINARY);
