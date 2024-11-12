@@ -1066,7 +1066,7 @@ static void exithelp(void)
 		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
 		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes :\n"
 		"\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
-		"\t\t\t\t\t\t; disorder disorder2 split split2 multisplit multidisorder ipfrag2 udplen tamper\n"
+		"\t\t\t\t\t\t; disorder2 split2 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
