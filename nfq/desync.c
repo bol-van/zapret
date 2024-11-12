@@ -1179,6 +1179,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			multisplit_count=0;
 			split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, spos);
+			if (!split_pos) split_pos = dp->split_unknown.pos;
 			DLOG("regular split pos: %zu\n",split_pos);
 			if (!split_pos || split_pos>rlen_payload) split_pos=1;
 			split_pos=pos_normalize(split_pos,reasm_offset,dis->len_payload);
