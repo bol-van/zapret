@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
 
+#include <string.h>
+#include <errno.h>
+
 #include "desync.h"
 #include "protocol.h"
 #include "params.h"
@@ -7,9 +10,6 @@
 #include "hostlist.h"
 #include "ipset.h"
 #include "conntrack.h"
-
-#include <string.h>
-
 
 const char *fake_http_request_default = "GET / HTTP/1.1\r\nHost: www.iana.org\r\n"
                                         "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0\r\n"
@@ -1179,6 +1179,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			multisplit_count=0;
 			split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, spos);
+			if (!split_pos) split_pos = dp->split_unknown.pos;
 			DLOG("regular split pos: %zu\n",split_pos);
 			if (!split_pos || split_pos>rlen_payload) split_pos=1;
 			split_pos=pos_normalize(split_pos,reasm_offset,dis->len_payload);
@@ -1273,22 +1274,65 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_MULTISPLIT:
 				if (multisplit_count)
 				{
-					size_t from,to;
+					uint8_t ovlseg[DPI_DESYNC_MAX_FAKE_LEN+100], *seg;
+					size_t seg_len,from,to;
+					unsigned int seqovl;
 					for (i=0,from=0 ; i<=multisplit_count ; i++)
 					{
 						to = i==multisplit_count ? dis->len_payload : multisplit_pos[i];
 
-						pkt1_len = sizeof(pkt1);
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig,
-								net32_add(dis->tcp->th_seq,from), dis->tcp->th_ack,
-								dis->tcp->th_win, scale_factor, timestamps,ttl_orig,IP4_TOS(dis->ip),IP6_FLOW(dis->ip6),
-								fooling_orig,0,0,
-								dis->data_payload+from, to-from, pkt1, &pkt1_len))
-							return verdict;
-						DLOG("sending multisplit part %d %zu-%zu len=%zu : ",i+1,from,to-1,to-from);
-						hexdump_limited_dlog(dis->data_payload+from,to-from,PKTDATA_MAXDUMP); DLOG("\n");
-						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
-							return verdict;
+						// do seqovl only to the first packet
+						// otherwise it's prone to race condition on server side
+						// what happens first : server pushes socket buffer to process or another packet with seqovl arrives
+						seqovl = i==0 ? dp->desync_seqovl : 0;
+#ifdef __linux__
+// only linux return error if MTU is exceeded
+						for(;;seqovl=0)
+						{
+#endif
+							if (seqovl)
+							{
+								seg_len = to-from+seqovl;
+								if (seg_len>sizeof(ovlseg))
+								{
+									DLOG("seqovl is too large");
+									return verdict;
+								}
+								fill_pattern(ovlseg,seqovl,dp->seqovl_pattern,sizeof(dp->seqovl_pattern));
+								memcpy(ovlseg+seqovl,dis->data_payload+from,to-from);
+								seg = ovlseg;
+							}
+							else
+							{
+								seqovl = 0;
+								seg = dis->data_payload+from;
+								seg_len = to-from;
+							}
+
+							pkt1_len = sizeof(pkt1);
+							if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig,
+									net32_add(dis->tcp->th_seq,from-seqovl), dis->tcp->th_ack,
+									dis->tcp->th_win, scale_factor, timestamps,ttl_orig,IP4_TOS(dis->ip),IP6_FLOW(dis->ip6),
+									fooling_orig,0,0,
+									seg, seg_len, pkt1, &pkt1_len))
+								return verdict;
+							DLOG("sending multisplit part %d %zu-%zu len=%zu seqovl=%u : ",i+1,from,to-1,to-from,seqovl);
+							hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
+							if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+							{
+#ifdef __linux__
+								if (errno==EMSGSIZE && seqovl)
+								{
+									DLOG("MTU exceeded. cancelling seqovl.\n");
+									continue;
+								}
+#endif
+								return verdict;
+							}
+#ifdef __linux__
+							break;
+						}
+#endif
 
 						from = to;
 					}
@@ -1298,20 +1342,44 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_MULTIDISORDER:
 				if (multisplit_count)
 				{
-					size_t from,to;
+					uint8_t ovlseg[DPI_DESYNC_MAX_FAKE_LEN+100], *seg;
+					size_t seg_len,from,to;
+					unsigned int seqovl;
 					for (i=multisplit_count-1,to=dis->len_payload ; i>=-1 ; i--)
 					{
 						from = i>=0 ? multisplit_pos[i] : 0;
 
+						seg = dis->data_payload+from;
+						seg_len = to-from;
+						seqovl = 0;
+						if (i>=0 && dp->desync_seqovl)
+						{
+							if (dp->desync_seqovl>=from)
+								DLOG("seqovl>=split_pos (%u>=%zu). cancelling seqovl for part %d.\n",dp->desync_seqovl,from,i+2);
+							else
+							{
+								seqovl = dp->desync_seqovl;
+								seg_len = to-from+seqovl;
+								if (seg_len>sizeof(ovlseg))
+								{
+									DLOG("seqovl is too large");
+									return verdict;
+								}
+								fill_pattern(ovlseg,seqovl,dp->seqovl_pattern,sizeof(dp->seqovl_pattern));
+								memcpy(ovlseg+seqovl,dis->data_payload+from,to-from);
+								seg = ovlseg;
+							}
+						}
+
 						pkt1_len = sizeof(pkt1);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig,
-								net32_add(dis->tcp->th_seq,from), dis->tcp->th_ack,
+								net32_add(dis->tcp->th_seq,from-seqovl), dis->tcp->th_ack,
 								dis->tcp->th_win, scale_factor, timestamps,ttl_orig,IP4_TOS(dis->ip),IP6_FLOW(dis->ip6),
 								fooling_orig,0,0,
-								dis->data_payload+from, to-from, pkt1, &pkt1_len))
+								seg, seg_len, pkt1, &pkt1_len))
 							return verdict;
-						DLOG("sending multisplit part %d %zu-%zu len=%zu : ",i+2,from,to-1,to-from);
-						hexdump_limited_dlog(dis->data_payload+from,to-from,PKTDATA_MAXDUMP); DLOG("\n");
+						DLOG("sending multisplit part %d %zu-%zu len=%zu seqovl=%u : ",i+2,from,to-1,to-from,seqovl);
+						hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
 						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 							return verdict;
 
@@ -1423,34 +1491,53 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							return verdict;
 					}
 
-					if (dp->desync_seqovl)
+					unsigned int seqovl = dp->desync_seqovl;
+#ifdef __linux__
+// only linux return error if MTU is exceeded
+					for(;;seqovl=0)
 					{
-						seg_len = split_pos+dp->desync_seqovl;
-						if (seg_len>sizeof(ovlseg))
+#endif
+						if (seqovl)
 						{
-							DLOG("seqovl is too large");
+							seg_len = split_pos+seqovl;
+							if (seg_len>sizeof(ovlseg))
+							{
+								DLOG("seqovl is too large");
+								return verdict;
+							}
+							fill_pattern(ovlseg,seqovl,dp->seqovl_pattern,sizeof(dp->seqovl_pattern));
+							memcpy(ovlseg+seqovl,dis->data_payload,split_pos);
+							seg = ovlseg;
+						}
+						else
+						{
+							seg = dis->data_payload;
+							seg_len = split_pos;
+						}
+
+						pkt1_len = sizeof(pkt1);
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(dis->tcp->th_seq,-seqovl), dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
+								ttl_orig,IP4_TOS(dis->ip),IP6_FLOW(dis->ip6),
+								fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
+								seg, seg_len, pkt1, &pkt1_len))
+							return verdict;
+						DLOG("sending 1st tcp segment 0-%zu len=%zu seqovl=%u : ",split_pos-1, split_pos, seqovl);
+						hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
+						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+						{
+#ifdef __linux__
+							if (errno==EMSGSIZE && seqovl)
+							{
+								DLOG("MTU exceeded. cancelling seqovl.\n");
+								continue;
+							}
+#endif
 							return verdict;
 						}
-						fill_pattern(ovlseg,dp->desync_seqovl,dp->seqovl_pattern,sizeof(dp->seqovl_pattern));
-						memcpy(ovlseg+dp->desync_seqovl,dis->data_payload,split_pos);
-						seg = ovlseg;
+#ifdef __linux__
+						break;
 					}
-					else
-					{
-						seg = dis->data_payload;
-						seg_len = split_pos;
-					}
-
-					pkt1_len = sizeof(pkt1);
-					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(dis->tcp->th_seq,-dp->desync_seqovl), dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
-							ttl_orig,IP4_TOS(dis->ip),IP6_FLOW(dis->ip6),
-							fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
-							seg, seg_len, pkt1, &pkt1_len))
-						return verdict;
-					DLOG("sending 1st tcp segment 0-%zu len=%zu seqovl=%u : ",split_pos-1, split_pos, dp->desync_seqovl);
-					hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
-					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
-						return verdict;
+#endif
 
 					if (desync_mode==DESYNC_FAKEDSPLIT)
 					{
@@ -1524,6 +1611,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 		if (bFake)
 		{
+			// if we are here original message was not sent in any form
+			// allowing system to pass the message to queue can result in unpredicted send order
 			DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", dis->len_pkt, dis->len_payload);
 			verdict_tcp_csum_fix(verdict, dis->tcp, dis->transport_len, dis->ip, dis->ip6);
 			if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , dis->data_pkt, dis->len_pkt))
