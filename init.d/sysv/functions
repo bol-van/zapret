@@ -169,20 +169,16 @@ run_daemon()
 	local DAEMONBASE="$(basename "$2")"
 	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
-	if exists start-stop-daemon ; then
-		start-stop-daemon -S -p "$PIDFILE" -m -b -x "$2" -- $3
+	if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
+		echo already running
 	else
-		if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
-			echo already running
+		"$2" $3 >/dev/null &
+		PID=$!
+		if [ -n "$PID" ]; then
+			echo $PID >$PIDFILE
 		else
-			"$2" $3 >/dev/null 2>/dev/null &
-			PID=$!
-			if [ -n "$PID" ]; then
-				echo $PID >$PIDFILE
-			else
-				echo could not start daemon $1 : $2 $3
-				false
-			fi
+			echo could not start daemon $1 : $2 $3
+			false
 		fi
 	fi
 }
