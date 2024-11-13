@@ -1129,17 +1129,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				fake_size = dp->fake_unknown_size;
 				break;
 		}
-		const struct proto_pos defpos={marker:PM_ABS,pos:2};
 		if (dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_MULTIDISORDER)
 		{
 			split_pos=0;
 			ResolveMultiPos(rdata_payload, rlen_payload, l7proto, dp->splits, dp->split_count, multisplit_pos, &multisplit_count);
-			if (!multisplit_count)
-			{
-				multisplit_pos[multisplit_count] = ResolvePos(rdata_payload, rlen_payload, l7proto, &defpos);
-				if (!multisplit_pos[multisplit_count]) multisplit_pos[multisplit_count] = 1;
-				multisplit_count++;
-			}
 			if (params.debug)
 			{
 				if (multisplit_count)
@@ -1185,7 +1178,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				for(i=0,split_pos=0;i<dp->split_count && !split_pos;i++)
 					if (dp->splits[i].marker==PM_ABS)
 						split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, dp->splits+i);
-			if (!split_pos) split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &defpos);
 			if (!split_pos) split_pos = 1;
 			DLOG("regular split pos: %zu\n",split_pos);
 			if (!split_pos || split_pos>rlen_payload) split_pos=1;

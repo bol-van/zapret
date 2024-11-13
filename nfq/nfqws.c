@@ -836,6 +836,16 @@ static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits
 	if (p) return false; // too much splits
 	return true;
 }
+static void split_compat(struct desync_profile *dp)
+{
+	if (!dp->split_count)
+	{
+		dp->splits[dp->split_count].marker = PM_ABS;
+		dp->splits[dp->split_count].pos = 2;
+		dp->split_count++;
+	}
+}
+
 static void SplitDebug(void)
 {
 	struct desync_profile_list *dpl;
@@ -2032,6 +2042,7 @@ int main(int argc, char **argv)
 			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
 			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+		split_compat(dp);
 	}
 
 	if (!LoadAllHostLists())
