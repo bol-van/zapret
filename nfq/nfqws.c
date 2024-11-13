@@ -2043,7 +2043,6 @@ int main(int argc, char **argv)
 		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
 			DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", dp->hostlist_auto->filename);
 #endif
-		
 	}
 
 	if (!LoadAllHostLists())
