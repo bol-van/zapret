@@ -757,7 +757,7 @@ static bool parse_tlspos(const char *s, struct proto_pos *sp)
 	else if (!strcmp(s, "snisld"))
 	{
 		sp->marker = PM_HOST_MIDSLD;
-		sp->pos=1;
+		sp->pos=0;
 	}
 	else
 		return false;
