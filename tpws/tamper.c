@@ -8,22 +8,6 @@
 #include "protocol.h"
 #include "helpers.h"
 
-const char *l7proto_str(t_l7proto l7)
-{
-	switch(l7)
-	{
-		case HTTP: return "http";
-		case TLS: return "tls";
-		default: return "unknown";
-	}
-}
-static bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
-{
-	return  (l7proto==UNKNOWN && (filter_l7 & L7_PROTO_UNKNOWN)) ||
-		(l7proto==HTTP && (filter_l7 & L7_PROTO_HTTP)) ||
-		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS));
-}
-
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
 	bool bHostlistsEmpty;
@@ -87,11 +71,10 @@ void apply_desync_profile(t_ctrack *ctrack, const struct sockaddr *dest)
 
 
 // segment buffer has at least 5 extra bytes to extend data block
-void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *split_pos, uint8_t *split_flags)
+void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *multisplit_pos, int *multisplit_count, uint8_t *split_flags)
 {
 	uint8_t *p, *pp, *pHost = NULL;
-	size_t method_len = 0, pos;
-	size_t tpos, spos;
+	size_t method_len = 0, pos, tpos, orig_size=*size;
 	const char *method;
 	bool bHaveHost = false;
 	char *pc, Host[256];
@@ -116,8 +99,8 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 		return;
 	}
 
-	*split_pos=0;
-	*split_flags=0;
+	if (multisplit_count) *multisplit_count=0;
+	if (split_flags) *split_flags=0;
 
 	if ((method = HttpMethod(segment,*size)))
 	{
@@ -193,7 +176,6 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 			return;
 		}
 	}
-
 	switch(l7proto)
 	{
 		case HTTP:
@@ -325,22 +307,26 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 					pHost = NULL; // invalidate
 				}
 			}
-			*split_pos = HttpPos(ctrack->dp->split_http_req, ctrack->dp->split_pos, segment, *size);
-			if (ctrack->dp->disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
-			if (ctrack->dp->oob_http) *split_flags |= SPLIT_FLAG_OOB;
+			if (multisplit_pos) ResolveMultiPos(segment, *size, l7proto, ctrack->dp->splits, ctrack->dp->split_count, multisplit_pos, multisplit_count);
+			if (split_flags)
+			{
+				if (ctrack->dp->disorder_http) *split_flags |= SPLIT_FLAG_DISORDER;
+				if (ctrack->dp->oob_http) *split_flags |= SPLIT_FLAG_OOB;
+			}
 			break;
 
 		case TLS:
-			spos = TLSPos(ctrack->dp->split_tls, ctrack->dp->split_pos, segment, *size, 0);
+			if (multisplit_pos) ResolveMultiPos(segment, *size, l7proto, ctrack->dp->splits, ctrack->dp->split_count, multisplit_pos, multisplit_count);
 			if ((5+*size)<=segment_buffer_size)
 			{
-				tpos = TLSPos(ctrack->dp->tlsrec, ctrack->dp->tlsrec_pos+5, segment, *size, 0);
+				tpos = ResolvePos(segment, *size, l7proto, &ctrack->dp->tlsrec);
 				if (tpos>5)
 				{
 					// construct 2 TLS records from one
 					uint16_t l = pntoh16(segment+3); // length
 					if (l>=2)
 					{
+						int i;
 						// length is checked in IsTLSClientHello and cannot exceed buffer size
 						if ((tpos-5)>=l) tpos=5+1;
 						VPRINT("making 2 TLS records at pos %zu\n",tpos);
@@ -351,27 +337,40 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 						phton16(segment+tpos+3,l-(tpos-5));
 						phton16(segment+3,tpos-5);
 						*size += 5;
-						// split pos present and it is not before tlsrec split. increase split pos by tlsrec header size (5 bytes)
-						if (spos && spos>=tpos) spos+=5;
+						// fix split positions after tlsrec. increase split pos by tlsrec header size (5 bytes)
+						if (multisplit_pos)
+							for(i=0;i<*multisplit_count;i++)
+								if (multisplit_pos[i]>tpos) multisplit_pos[i]+=5;
 					}
 				}
 			}
-
-			if (spos && spos < *size)
-				*split_pos = spos;
-
-			if (ctrack->dp->disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
-			if (ctrack->dp->oob_tls) *split_flags |= SPLIT_FLAG_OOB;
-			
+			if (split_flags)
+			{
+				if (ctrack->dp->disorder_tls) *split_flags |= SPLIT_FLAG_DISORDER;
+				if (ctrack->dp->oob_tls) *split_flags |= SPLIT_FLAG_OOB;
+			}
 			break;
 
 		default:
-			if (ctrack->dp->split_any_protocol && ctrack->dp->split_pos < *size)
-				*split_pos = ctrack->dp->split_pos;
+			if (multisplit_pos && ctrack->dp->split_any_protocol)
+				ResolveMultiPos(segment, *size, l7proto, ctrack->dp->splits, ctrack->dp->split_count, multisplit_pos, multisplit_count);
 	}
-		
-	if (ctrack->dp->disorder) *split_flags |= SPLIT_FLAG_DISORDER;
-	if (ctrack->dp->oob) *split_flags |= SPLIT_FLAG_OOB;
+
+	if (split_flags)
+	{
+		if (ctrack->dp->disorder) *split_flags |= SPLIT_FLAG_DISORDER;
+		if (ctrack->dp->oob) *split_flags |= SPLIT_FLAG_OOB;
+	}
+	if (orig_size!=*size)
+	{
+		VPRINT("segment size changed: %zu -> %zu\n", orig_size, *size);
+	}
+	if (params.debug && multisplit_count && *multisplit_count)
+	{
+		VPRINT("multisplit pos: ");
+		for (int i=0;i<*multisplit_count;i++) VPRINT("%zu ",multisplit_pos[i]);
+		VPRINT("\n");
+	}
 }
 
 static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)

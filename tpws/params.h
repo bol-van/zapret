@@ -29,6 +29,8 @@ struct bind_s
 	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 };
 
+#define MAX_SPLITS	16
+
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
 struct desync_profile
@@ -38,15 +40,15 @@ struct desync_profile
 	bool hostcase, hostdot, hosttab, hostnospace, methodspace, methodeol, unixeol, domcase;
 	int hostpad;
 	char hostspell[4];
-	enum httpreqpos split_http_req;
-	enum tlspos tlsrec;
-	int tlsrec_pos;
-	enum tlspos split_tls;
 	bool split_any_protocol;
-	int split_pos;
 	bool disorder, disorder_http, disorder_tls;
 	bool oob, oob_http, oob_tls;
 	uint8_t oob_byte;
+
+	// multisplit
+	struct proto_pos splits[MAX_SPLITS];
+	int split_count;
+	struct proto_pos tlsrec;
 
 	int mss;
 
@@ -140,6 +142,7 @@ int DLOG_CONDUP(const char *format, ...);
 int DLOG_ERR(const char *format, ...);
 int DLOG_PERROR(const char *s);
 int HOSTLIST_DEBUGLOG_APPEND(const char *format, ...);
+void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit);
 
 #define VPRINT(format, ...) DLOG(format, 1, ##__VA_ARGS__)
 #define DBGPRINT(format, ...) DLOG(format, 2, ##__VA_ARGS__)

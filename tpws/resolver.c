@@ -221,7 +221,7 @@ bool resolver_init(int threads, int fd_signal_pipe)
 	if (pthread_attr_init(&attr)) goto ex;
 	// set minimum thread stack size
 
-	if (pthread_attr_setstacksize(&attr,PTHREAD_STACK_MIN>20480 ? PTHREAD_STACK_MIN : 20480))
+	if (pthread_attr_setstacksize(&attr,PTHREAD_STACK_MIN>32768 ? PTHREAD_STACK_MIN : 32768))
 	{
 		pthread_attr_destroy(&attr);
 		goto ex;
