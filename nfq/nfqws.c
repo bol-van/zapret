@@ -752,7 +752,7 @@ static bool parse_tlspos(const char *s, struct proto_pos *sp)
 	else if (!strcmp(s, "sniext"))
 	{
 		sp->marker = PM_SNI_EXT;
-		sp->pos=0;
+		sp->pos=1;
 	}
 	else if (!strcmp(s, "snisld"))
 	{
@@ -836,41 +836,6 @@ static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits
 	if (p) return false; // too much splits
 	return true;
 }
-static void split_compat(struct desync_profile *dp)
-{
-	// make it mostly compatible with old versions
-	int i;
-	dp->split_unknown.marker=PM_ABS;
-	dp->split_unknown.pos=2;
-	for (i=0;i<dp->split_count;i++)
-	{
-		if (dp->splits[i].marker==PM_ABS)
-		{
-			dp->split_unknown.pos=dp->splits[i].pos;
-			break;
-		}
-	}
-	if (PROTO_POS_EMPTY(&dp->split_http))
-	{
-		dp->split_http=dp->split_unknown;
-		for (i=0;i<dp->split_count;i++)
-			if (IsHostMarker(dp->splits[i].marker) || dp->splits[i].marker==PM_HTTP_METHOD)
-			{
-				dp->split_http = dp->splits[i];
-				break;
-			}
-	}
-	if (PROTO_POS_EMPTY(&dp->split_tls))
-	{
-		dp->split_tls=dp->split_unknown;
-		for (i=0;i<dp->split_count;i++)
-			if (IsHostMarker(dp->splits[i].marker) || dp->splits[i].marker==PM_SNI_EXT)
-			{
-				dp->split_tls = dp->splits[i];
-				break;
-			}
-	}
-}
 static void SplitDebug(void)
 {
 	struct desync_profile_list *dpl;
@@ -878,9 +843,6 @@ static void SplitDebug(void)
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
-		DLOG("profile %d split_http %s %d\n",dp->n,posmarker_name(dp->split_http.marker),dp->split_http.pos);
-		DLOG("profile %d split_tls %s %d\n",dp->n,posmarker_name(dp->split_tls.marker),dp->split_tls.pos);
-		DLOG("profile %d split_unknown %s %d\n",dp->n,posmarker_name(dp->split_unknown.marker),dp->split_unknown.pos);
 		for(int x=0;x<dp->split_count;x++)
 			DLOG("profile %d multisplit %s %d\n",dp->n,posmarker_name(dp->splits[x].marker),dp->splits[x].pos);
 	}
@@ -1066,7 +1028,7 @@ static void exithelp(void)
 		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
 		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes :\n"
 		"\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
-		"\t\t\t\t\t\t; disorder2 split2 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper\n"
+		"\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -1079,9 +1041,10 @@ static void exithelp(void)
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions. markers: method,host,endhost,sld,endsld,midsld,sniext\n"
+		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
+		"\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
 		"\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
-		"\t\t\t\t\t\t; single split takes first l7-protocol-compatible parameter if present, first abs value otherwise\n"
+		"\t\t\t\t\t\t; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise\n"
 		" --dpi-desync-split-seqovl=<int>\t\t; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
@@ -1589,19 +1552,33 @@ int main(int argc, char **argv)
 			break;
 		case 24: /* dpi-desync-split-http-req */
 			// obsolete arg
-			if (!parse_httpreqpos(optarg, &dp->split_http))
+			DLOG_CONDUP("WARNING ! --dpi-desync-split-http-req is deprecated. use --dpi-desync-split-pos with markers.\n",MAX_SPLITS);
+			if (dp->split_count>=MAX_SPLITS)
+			{
+				DLOG_ERR("Too much splits. max splits: %u\n",MAX_SPLITS);
+				exit_clean(1);
+			}
+			if (!parse_httpreqpos(optarg, dp->splits + dp->split_count))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-http-req\n");
 				exit_clean(1);
 			}
+			dp->split_count++;
 			break;
 		case 25: /* dpi-desync-split-tls */
 			// obsolete arg
-			if (!parse_tlspos(optarg, &dp->split_tls))
+			DLOG_CONDUP("WARNING ! --dpi-desync-split-tls is deprecated. use --dpi-desync-split-pos with markers.\n",MAX_SPLITS);
+			if (dp->split_count>=MAX_SPLITS)
+			{
+				DLOG_ERR("Too much splits. max splits: %u\n",MAX_SPLITS);
+				exit_clean(1);
+			}
+			if (!parse_tlspos(optarg, dp->splits + dp->split_count))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-tls\n");
 				exit_clean(1);
 			}
+			dp->split_count++;
 			break;
 		case 26: /* dpi-desync-split-seqovl */
 			if (sscanf(optarg,"%u",&dp->desync_seqovl)<1)
@@ -2048,13 +2025,6 @@ int main(int argc, char **argv)
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
-
-		if (!dp->split_count && (dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_MULTIDISORDER))
-		{
-			DLOG_ERR("multisplit requires explicit split pos\n");
-			exit_clean(1);
-		}
-
 		// not specified - use desync_ttl value instead
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
@@ -2062,7 +2032,6 @@ int main(int argc, char **argv)
 			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
 			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
-		split_compat(dp);
 	}
 
 	if (!LoadAllHostLists())

@@ -60,8 +60,6 @@ struct desync_profile
 	// multisplit
 	struct proto_pos splits[MAX_SPLITS];
 	int split_count;
-	// single split pos cache
-	struct proto_pos split_http,split_tls,split_unknown;
 
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
