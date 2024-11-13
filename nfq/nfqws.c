@@ -1305,10 +1305,6 @@ int main(int argc, char **argv)
 						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
 						exit_clean(1);
 					}
-#ifndef __CYGWIN__
-					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
-						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
-#endif
 					params.debug = true;
 					params.debug_target = LOG_TARGET_FILE;
 				}
@@ -1741,10 +1737,6 @@ int main(int argc, char **argv)
 					DLOG_ERR("gzipped auto hostlists are not supported\n");
 					exit_clean(1);
 				}
-#ifndef __CYGWIN__
-				if (params.droproot && chown(optarg, params.uid, -1))
-					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
-#endif
 			}
 			if (!(dp->hostlist_auto=RegisterHostlist(dp, false, optarg)))
 			{
@@ -2032,6 +2024,10 @@ int main(int argc, char **argv)
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
 	
+#ifndef __CYGWIN__
+	if (params.debug_target == LOG_TARGET_FILE && params.droproot && chown(params.debug_logfile, params.uid, -1))
+		fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
+#endif
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
@@ -2043,6 +2039,11 @@ int main(int argc, char **argv)
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
 			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		split_compat(dp);
+#ifndef __CYGWIN__
+		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
+			DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", dp->hostlist_auto->filename);
+#endif
+		
 	}
 
 	if (!LoadAllHostLists())
