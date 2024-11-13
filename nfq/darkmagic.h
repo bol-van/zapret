@@ -22,6 +22,7 @@
 #endif
 
 #ifdef __CYGWIN__
+#define INITGUID
 #include "windivert/windivert.h"
 #endif
 
