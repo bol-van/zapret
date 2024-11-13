@@ -55,7 +55,7 @@ TPPORT_SOCKS=987
 # <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 TPWS_SOCKS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
---filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+--filter-tcp=443 --split-pos=midsld --disorder <HOSTLIST>
 "
 
 TPWS_ENABLE=0
@@ -65,7 +65,7 @@ TPWS_PORTS=80,443
 # <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 TPWS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
---filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+--filter-tcp=443 --split-pos=midsld --disorder <HOSTLIST>
 "
 
 NFQWS_ENABLE=0
@@ -89,8 +89,8 @@ NFQWS_UDP_PKT_IN=0
 # hostlist markers are replaced to empty string if MODE_FILTER does not satisfy
 # <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
 NFQWS_OPT="
---filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
---filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=80 --dpi-desync=fake,multisplit --dpi-desync-split-pos=method+2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=443 --dpi-desync=fake,multidisorder --dpi-desync-split-pos=midsld --dpi-desync-fooling=md5sig <HOSTLIST> --new
 --filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST_NOAUTO>
 "
 
