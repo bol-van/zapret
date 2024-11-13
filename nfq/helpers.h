@@ -24,7 +24,6 @@ void rtrim(char *s);
 void replace_char(char *s, char from, char to);
 char *strncasestr(const char *s,const char *find, size_t slen);
 
-void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit);
 bool load_file(const char *filename,void *buffer,size_t *buffer_size);
 bool load_file_nonempty(const char *filename,void *buffer,size_t *buffer_size);
 bool save_file(const char *filename, const void *buffer, size_t buffer_size);
@@ -39,9 +38,6 @@ bool pton6_port(const char *s, struct sockaddr_in6 *sa);
 uint16_t saport(const struct sockaddr *sa);
 
 bool seq_within(uint32_t s, uint32_t s1, uint32_t s2);
-
-void dbgprint_socket_buffers(int fd);
-bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);
 
 uint64_t pntoh64(const void *p);
 void phton64(uint8_t *p, uint64_t v);

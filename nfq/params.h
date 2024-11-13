@@ -148,3 +148,4 @@ int DLOG_ERR(const char *format, ...);
 int DLOG_PERROR(const char *s);
 int DLOG_CONDUP(const char *format, ...);
 int HOSTLIST_DEBUGLOG_APPEND(const char *format, ...);
+void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit);

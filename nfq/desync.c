@@ -2163,7 +2163,7 @@ static void packet_debug(bool replay, const struct dissect *dis)
 			char s[80];
 			str_tcphdr(s,sizeof(s),dis->tcp);
 			DLOG(" %s\n",s);
-			if (dis->len_payload) { DLOG("TCP: len=%zu : ",dis->len_payload); hexdump_limited_dlog(dis->data_payload, dis->len_payload, 32); DLOG("\n"); }
+			if (dis->len_payload) { DLOG("TCP: len=%zu : ",dis->len_payload); hexdump_limited_dlog(dis->data_payload, dis->len_payload, PKTDATA_MAXDUMP); DLOG("\n"); }
 
 		}
 		else if (dis->udp)
@@ -2171,7 +2171,7 @@ static void packet_debug(bool replay, const struct dissect *dis)
 			char s[30];
 			str_udphdr(s,sizeof(s),dis->udp);
 			DLOG(" %s\n",s);
-			if (dis->len_payload) { DLOG("UDP: len=%zu : ",dis->len_payload); hexdump_limited_dlog(dis->data_payload, dis->len_payload, 32); DLOG("\n"); }
+			if (dis->len_payload) { DLOG("UDP: len=%zu : ",dis->len_payload); hexdump_limited_dlog(dis->data_payload, dis->len_payload, PKTDATA_MAXDUMP); DLOG("\n"); }
 		}
 		else
 			DLOG("\n");

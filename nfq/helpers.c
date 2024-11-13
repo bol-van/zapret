@@ -5,11 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <sys/stat.h>
 #include <libgen.h>
-
-#include "params.h"
 
 int unique_size_t(size_t *pu, int ct)
 {
@@ -62,22 +61,6 @@ char *strncasestr(const char *s, const char *find, size_t slen)
 		s--;
 	}
 	return (char *)s;
-}
-
-void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
-{
-	size_t k;
-	bool bcut = false;
-	if (size > limit)
-	{
-		size = limit;
-		bcut = true;
-	}
-	if (!size) return;
-	for (k = 0; k < size; k++) DLOG("%02X ", data[k]);
-	DLOG(bcut ? "... : " : ": ");
-	for (k = 0; k < size; k++) DLOG("%c", data[k] >= 0x20 && data[k] <= 0x7F ? (char)data[k] : '.');
-	if (bcut) DLOG(" ...");
 }
 
 
@@ -220,38 +203,6 @@ uint16_t saport(const struct sockaddr *sa)
 		     sa->sa_family==AF_INET6 ? ((struct sockaddr_in6*)sa)->sin6_port : 0);
 }
 
-void dbgprint_socket_buffers(int fd)
-{
-	if (params.debug)
-	{
-		int v;
-		socklen_t sz;
-		sz = sizeof(int);
-		if (!getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &v, &sz))
-			DLOG("fd=%d SO_RCVBUF=%d\n", fd, v);
-			sz = sizeof(int);
-		if (!getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &v, &sz))
-			DLOG("fd=%d SO_SNDBUF=%d\n", fd, v);
-	}
-}
-bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
-{
-	DLOG("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n", fd, rcvbuf, sndbuf);
-	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) < 0)
-	{
-		DLOG_PERROR("setsockopt (SO_RCVBUF)");
-		close(fd);
-		return false;
-	}
-	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) < 0)
-	{
-		DLOG_PERROR("setsockopt (SO_SNDBUF)");
-		close(fd);
-		return false;
-	}
-	dbgprint_socket_buffers(fd);
-	return true;
-}
 
 uint64_t pntoh64(const void *p)
 {
