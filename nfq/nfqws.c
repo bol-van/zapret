@@ -2023,7 +2023,7 @@ int main(int argc, char **argv)
 #ifndef __CYGWIN__
 	if (params.debug_target == LOG_TARGET_FILE && params.droproot && chown(params.debug_logfile, params.uid, -1))
 		fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
-	if (params.droproot && chown(params.hostlist_auto_debuglog, params.uid, -1))
+	if (params.droproot && *params.hostlist_auto_debuglog && chown(params.hostlist_auto_debuglog, params.uid, -1))
 		DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", params.hostlist_auto_debuglog);
 #endif
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
