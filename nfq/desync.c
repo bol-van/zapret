@@ -840,7 +840,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		uint8_t *p, *phost=NULL;
 		const uint8_t *rdata_payload = dis->data_payload;
 		size_t rlen_payload = dis->len_payload;
-		size_t split_pos;
+		size_t split_pos, seqovl_pos;
 		size_t multisplit_pos[MAX_SPLITS];
 		int multisplit_count;
 		int i;
@@ -1165,6 +1165,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						DLOG("all multisplit pos are outside of this packet\n");
 				}
 			}
+			seqovl_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &dp->seqovl);
 		}
 		else if (dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER)
 		{
@@ -1186,12 +1187,15 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				DLOG("normalized regular split pos : %zu\n",split_pos);
 			else
 				DLOG("regular split pos is outside of this packet\n");
+			seqovl_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &dp->seqovl);
 		}
 		else
 		{
 			multisplit_count=0;
-			split_pos = 0;
+			split_pos = seqovl_pos = 0;
 		}
+		seqovl_pos = pos_normalize(seqovl_pos,reasm_offset,dis->len_payload);
+		if (seqovl_pos)	DLOG("normalized seqovl pos : %zu\n",seqovl_pos);
 
 		// we do not need reasm buffer anymore
 		reasm_orig_cancel(ctrack);
@@ -1283,7 +1287,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						// do seqovl only to the first packet
 						// otherwise it's prone to race condition on server side
 						// what happens first : server pushes socket buffer to process or another packet with seqovl arrives
-						seqovl = i==0 ? dp->desync_seqovl : 0;
+						seqovl = i==0 ? seqovl_pos : 0;
 #ifdef __linux__
 // only linux return error if MTU is exceeded
 						for(;;seqovl=0)
@@ -1356,11 +1360,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						// real observations revealed that server can receive overlap junk instead of real data
 						if (i==0)
 						{
-							if (dp->desync_seqovl>=from)
+							if (seqovl_pos>=from)
 								DLOG("seqovl>=split_pos (%u>=%zu). cancelling seqovl for part %d.\n",seqovl,from,i+2);
 							else
 							{
-								seqovl = dp->desync_seqovl;
+								seqovl = seqovl_pos;
 								seg_len = to-from+seqovl;
 								if (seg_len>sizeof(ovlseg))
 								{
@@ -1397,13 +1401,13 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					size_t seg_len;
 					unsigned int seqovl;
 
-					if (dp->desync_seqovl>=split_pos)
+					if (seqovl_pos>=split_pos)
 					{
-						DLOG("seqovl>=split_pos (%u>=%zu). cancelling seqovl.\n",dp->desync_seqovl,split_pos);
+						DLOG("seqovl>=split_pos (%u>=%zu). cancelling seqovl.\n",seqovl_pos,split_pos);
 						seqovl = 0;
 					}
 					else
-						seqovl = dp->desync_seqovl;
+						seqovl = seqovl_pos;
 
 					if (split_pos<dis->len_payload)
 					{
@@ -1484,7 +1488,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
 						return verdict;
 
-					unsigned int seqovl = dp->desync_seqovl;
+					unsigned int seqovl = seqovl_pos;
 #ifdef __linux__
 // only linux return error if MTU is exceeded
 					for(;;seqovl=0)

@@ -855,6 +855,7 @@ static void SplitDebug(void)
 		dp = &dpl->dp;
 		for(int x=0;x<dp->split_count;x++)
 			DLOG("profile %d multisplit %s %d\n",dp->n,posmarker_name(dp->splits[x].marker),dp->splits[x].pos);
+		if (!PROTO_POS_EMPTY(&dp->seqovl)) DLOG("profile %d seqovl %s %d\n",dp->n,posmarker_name(dp->seqovl.marker),dp->seqovl.pos);
 	}
 }
 
@@ -1055,7 +1056,7 @@ static void exithelp(void)
 		"\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
 		"\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
 		"\t\t\t\t\t\t; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise\n"
-		" --dpi-desync-split-seqovl=<int>\t\t; use sequence overlap before first sent original split segment\n"
+		" --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
@@ -1589,9 +1590,9 @@ int main(int argc, char **argv)
 			dp->split_count++;
 			break;
 		case 26: /* dpi-desync-split-seqovl */
-			if (sscanf(optarg,"%u",&dp->desync_seqovl)<1)
+			if (!parse_split_pos(optarg, &dp->seqovl))
 			{
-				DLOG_ERR("dpi-desync-split-seqovl is not valid\n");
+				DLOG_ERR("Invalid argument for dpi-desync-split-seqovl\n");
 				exit_clean(1);
 			}
 			break;

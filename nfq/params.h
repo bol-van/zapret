@@ -55,11 +55,12 @@ struct desync_profile
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
-	unsigned int desync_repeats,desync_seqovl,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
+	unsigned int desync_repeats,desync_ipfrag_pos_tcp,desync_ipfrag_pos_udp;
 
 	// multisplit
 	struct proto_pos splits[MAX_SPLITS];
 	int split_count;
+	struct proto_pos seqovl;
 
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
