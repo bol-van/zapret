@@ -1050,7 +1050,7 @@ static void exithelp(void)
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
-		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
+		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
 		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
 		"\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
 		"\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
