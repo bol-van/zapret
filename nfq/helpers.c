@@ -367,14 +367,14 @@ void fill_random_az09(uint8_t *p,size_t sz)
 	}
 }
 
-bool cd_to_exe_dir(const char *argv0)
+bool set_env_exedir(const char *argv0)
 {
 	char *s,*d;
 	bool bOK=false;
 	if ((s = strdup(argv0)))
 	{
 		if ((d = dirname(s)))
-			bOK = !chdir(d);
+			setenv("EXEDIR",s,1);
 		free(s);
 	}
 	return bOK;

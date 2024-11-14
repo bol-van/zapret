@@ -75,7 +75,7 @@ void fill_random_bytes(uint8_t *p,size_t sz);
 void fill_random_az(uint8_t *p,size_t sz);
 void fill_random_az09(uint8_t *p,size_t sz);
 
-bool cd_to_exe_dir(const char *argv0);
+bool set_env_exedir(const char *argv0);
 
 
 struct cidr4

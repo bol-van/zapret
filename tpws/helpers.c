@@ -10,6 +10,7 @@
 #include <ifaddrs.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <libgen.h>
 
 #include "helpers.h"
 
@@ -346,6 +347,20 @@ bool pf_parse(const char *s, port_filter *pf)
 bool pf_is_empty(const port_filter *pf)
 {
 	return !pf->neg && !pf->from && !pf->to;
+}
+
+
+bool set_env_exedir(const char *argv0)
+{
+	char *s,*d;
+	bool bOK=false;
+	if ((s = strdup(argv0)))
+	{
+		if ((d = dirname(s)))
+			setenv("EXEDIR",s,1);
+		free(s);
+	}
+	return bOK;
 }
 
 

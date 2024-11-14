@@ -1122,6 +1122,8 @@ void config_from_file(const char *filename)
 
 int main(int argc, char **argv)
 {
+	set_env_exedir(argv[0]);
+
 #ifdef __CYGWIN__
 	if (service_run(argc, argv))
 	{

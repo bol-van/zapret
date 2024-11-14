@@ -73,6 +73,8 @@ bool pf_in_range(uint16_t port, const port_filter *pf);
 bool pf_parse(const char *s, port_filter *pf);
 bool pf_is_empty(const port_filter *pf);
 
+bool set_env_exedir(const char *argv0);
+
 #ifndef IN_LOOPBACK
 #define IN_LOOPBACK(a)          ((((uint32_t) (a)) & 0xff000000) == 0x7f000000)
 #endif
