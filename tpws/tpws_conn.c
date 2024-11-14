@@ -24,8 +24,6 @@
 #include "helpers.h"
 #include "hostlist.h"
 
-#define PKTDATA_MAXDUMP 32
-
 // keep separate legs counter. counting every time thousands of legs can consume cpu
 static int legs_local, legs_remote;
 /*
@@ -91,11 +89,6 @@ static bool socks_send_rep(uint8_t ver, int fd, uint8_t rep5)
 static bool socks_send_rep_errno(uint8_t ver, int fd, int errn)
 {
 	return ver==5 ? socks5_send_rep_errno(fd,errn) : socks4_send_rep_errno(fd, errn);
-}
-
-static void packet_debug(const uint8_t *data, size_t sz)
-{
-	hexdump_limited_dlog(data, sz, PKTDATA_MAXDUMP); VPRINT("\n");
 }
 
 

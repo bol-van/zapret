@@ -8,6 +8,13 @@
 #include "protocol.h"
 #include "helpers.h"
 
+#define PKTDATA_MAXDUMP 32
+
+void packet_debug(const uint8_t *data, size_t sz)
+{
+	hexdump_limited_dlog(data, sz, PKTDATA_MAXDUMP); VPRINT("\n");
+}
+
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
 	bool bHostlistsEmpty;
@@ -327,6 +334,7 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 					if (l>=2)
 					{
 						int i;
+						size_t dlen;
 						// length is checked in IsTLSClientHello and cannot exceed buffer size
 						if ((tpos-5)>=l) tpos=5+1;
 						VPRINT("making 2 TLS records at pos %zu\n",tpos);
@@ -337,6 +345,11 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 						phton16(segment+tpos+3,l-(tpos-5));
 						phton16(segment+3,tpos-5);
 						*size += 5;
+						VPRINT("-2nd TLS record: ");
+						dlen = tpos<16 ? tpos : 16;
+						packet_debug(segment+tpos-dlen,dlen);
+						VPRINT("+2nd TLS record: ");
+						packet_debug(segment+tpos,*size-tpos);
 						// fix split positions after tlsrec. increase split pos by tlsrec header size (5 bytes)
 						if (multisplit_pos)
 							for(i=0;i<*multisplit_count;i++)

@@ -28,3 +28,5 @@ void tamper_in(t_ctrack *ctrack, const struct sockaddr *client, uint8_t *segment
 void rst_in(t_ctrack *ctrack, const struct sockaddr *client);
 // local leg closed connection (timeout waiting response ?)
 void hup_out(t_ctrack *ctrack, const struct sockaddr *client);
+
+void packet_debug(const uint8_t *data, size_t sz);
