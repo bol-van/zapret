@@ -499,6 +499,16 @@ void config_from_file(const char *filename)
 }
 #endif
 
+#ifndef __linux__
+static bool check_oob_disorder(const struct desync_profile *dp)
+{
+	return !(
+		dp->oob && (dp->disorder || dp->disorder_http || dp->disorder_tls) ||
+		dp->oob_http && (dp->disorder || dp->disorder_http) ||
+		dp->oob_tls && (dp->disorder || dp->disorder_tls));
+}
+#endif
+
 void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
@@ -840,6 +850,13 @@ void parse_params(int argc, char *argv[])
 			}
 			else
 				dp->disorder = true;
+#ifndef __linux__
+			if (!check_oob_disorder(dp))
+			{
+				DLOG_ERR("--oob and --disorder work simultaneously only in linux. in this system it's guaranteed to fail.\n");
+				exit_clean(1);
+			}
+#endif
 			break;
 		case 28: /* oob */
 			if (optarg)
@@ -854,6 +871,13 @@ void parse_params(int argc, char *argv[])
 			}
 			else
 				dp->oob = true;
+#ifndef __linux__
+			if (!check_oob_disorder(dp))
+			{
+				DLOG_ERR("--oob and --disorder work simultaneously only in linux. in this system it's guaranteed to fail.\n");
+				exit_clean(1);
+			}
+#endif
 			break;
 		case 29: /* oob-data */
 			{
