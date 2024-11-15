@@ -1213,13 +1213,13 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			// split seqovl only uses absolute positive values
 			seqovl_pos = (dp->seqovl.marker==PM_ABS && dp->seqovl.pos>0) ? dp->seqovl.pos : 0;
-			if (seqovl_pos)	DLOG("seqovl pos : %zu\n",seqovl_pos);
+			if (seqovl_pos)	DLOG("seqovl : %zu\n",seqovl_pos);
 		}
 		else if (dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_MULTIDISORDER)
 		{
 			seqovl_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &dp->seqovl);
 			seqovl_pos = pos_normalize(seqovl_pos,reasm_offset,dis->len_payload);
-			if (seqovl_pos)	DLOG("normalized seqovl pos : %zu\n",seqovl_pos);
+			if (seqovl_pos)	DLOG("normalized seqovl : %zu\n",seqovl_pos);
 		}
 		else
 			seqovl_pos = 0;
