@@ -5,7 +5,7 @@ CFLAGS_MAC = -mmacosx-version-min=10.8
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
-LIBS_CYGWIN = -lz -Lwindows/windivert -Iwindows -lwlanapi -lole32 -loleaut32 -luuid
+LIBS_CYGWIN = -lz -Lwindows/windivert -Iwindows -lwlanapi -lole32 -loleaut32
 LIBS_CYGWIN32 = -lwindivert32
 LIBS_CYGWIN64 = -lwindivert64
 RES_CYGWIN32 = windows/res/32/winmanifest.o windows/res/32/winicon.o

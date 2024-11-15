@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
 
-#include "helpers.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -10,6 +10,30 @@
 #include <ifaddrs.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <libgen.h>
+
+#include "helpers.h"
+
+int unique_size_t(size_t *pu, int ct)
+{
+	int i, j, u;
+	for (i = j = 0; j < ct; i++)
+	{
+		u = pu[j++];
+		for (; j < ct && pu[j] == u; j++);
+		pu[i] = u;
+	}
+	return i;
+}
+static int cmp_size_t(const void * a, const void * b)
+{
+	return *(size_t*)a < *(size_t*)b ? -1 : *(size_t*)a > *(size_t*)b;
+}
+void qsort_size_t(size_t *array,size_t ct)
+{
+	qsort(array,ct,sizeof(*array),cmp_size_t);
+}
+
 
 void rtrim(char *s)
 {
@@ -323,6 +347,20 @@ bool pf_parse(const char *s, port_filter *pf)
 bool pf_is_empty(const port_filter *pf)
 {
 	return !pf->neg && !pf->from && !pf->to;
+}
+
+
+bool set_env_exedir(const char *argv0)
+{
+	char *s,*d;
+	bool bOK=false;
+	if ((s = strdup(argv0)))
+	{
+		if ((d = dirname(s)))
+			setenv("EXEDIR",s,1);
+		free(s);
+	}
+	return bOK;
 }
 
 

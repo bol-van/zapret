@@ -511,8 +511,7 @@ size_t TLSPos(uint8_t posmarker, int16_t pos, const uint8_t *data, size_t sz)
 			{
 				if (posmarker==PM_SNI_EXT)
 				{
-					offset = ext-data+1+pos;
-					return (offset>=0 && offset<sz) ? offset : 0;
+					return CheckPos(sz,ext-data+pos);
 				}
 				else
 				{

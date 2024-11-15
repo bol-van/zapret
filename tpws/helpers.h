@@ -15,6 +15,9 @@ typedef union
 	struct sockaddr_in6 sa6;	// size 28
 } sockaddr_in46;
 
+int unique_size_t(size_t *pu, int ct);
+void qsort_size_t(size_t *array,size_t ct);
+
 void rtrim(char *s);
 void replace_char(char *s, char from, char to);
 char *strncasestr(const char *s,const char *find, size_t slen);
@@ -69,6 +72,8 @@ typedef struct
 bool pf_in_range(uint16_t port, const port_filter *pf);
 bool pf_parse(const char *s, port_filter *pf);
 bool pf_is_empty(const port_filter *pf);
+
+bool set_env_exedir(const char *argv0);
 
 #ifndef IN_LOOPBACK
 #define IN_LOOPBACK(a)          ((((uint32_t) (a)) & 0xff000000) == 0x7f000000)

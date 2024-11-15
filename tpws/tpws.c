@@ -182,9 +182,8 @@ static void exithelp(void)
 		" --hostlist-auto-fail-time=<int>\t; all failed attemps must be within these seconds (default : %d)\n"
 		" --hostlist-auto-debug=<logfile>\t; debug auto hostlist positives\n"
 		"\nTAMPER:\n"
-		" --split-http-req=method|host\t\t; split at specified logical part of plain http request\n"
-		" --split-tls=sni|sniext|snisld\t\t; split at specified logical part of TLS ClientHello\n"
-		" --split-pos=<numeric_offset>\t\t; split at specified pos. split-http-req or split-tls take precedence for http.\n"
+		" --split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
+		"\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
 		" --split-any-protocol\t\t\t; split not only http and https\n"
 #if defined(BSD) && !defined(__APPLE__)
 		" --disorder[=http|tls]\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
@@ -203,8 +202,7 @@ static void exithelp(void)
 		" --methodspace\t\t\t\t; add extra space after method\n"
 		" --methodeol\t\t\t\t; add end-of-line before method\n"
 		" --unixeol\t\t\t\t; replace 0D0A to 0A\n"
-		" --tlsrec=sni|sniext|snisld\t\t; make 2 TLS records. split at specified logical part. don't split if SNI is not present\n"
-		" --tlsrec-pos=<pos>\t\t\t; make 2 TLS records. split at specified pos\n"
+		" --tlsrec=N|-N|marker+N|marker-N\t; make 2 TLS records. split records at specified position.\n"
 #ifdef __linux__
 		" --mss=<int>\t\t\t\t; set client MSS. forces server to split messages but significantly decreases speed !\n"
 #endif
@@ -276,27 +274,129 @@ void save_default_ttl(void)
 	}
 }
 
-bool parse_httpreqpos(const char *s, enum httpreqpos *pos)
+static bool parse_httpreqpos(const char *s, struct proto_pos *sp)
 {
 	if (!strcmp(s, "method"))
-		*pos = httpreqpos_method;
+	{
+		sp->marker = PM_HTTP_METHOD;
+		sp->pos=2;
+	}
 	else if (!strcmp(s, "host"))
-		*pos = httpreqpos_host;
+	{
+		sp->marker = PM_HOST;
+		sp->pos=1;
+	}
 	else
 		return false;
 	return true;
 }
-bool parse_tlspos(const char *s, enum tlspos *pos)
+static bool parse_tlspos(const char *s, struct proto_pos *sp)
 {
 	if (!strcmp(s, "sni"))
-		*pos = tlspos_sni;
+	{
+		sp->marker = PM_HOST;
+		sp->pos=1;
+	}
 	else if (!strcmp(s, "sniext"))
-		*pos = tlspos_sniext;
+	{
+		sp->marker = PM_SNI_EXT;
+		sp->pos=1;
+	}
 	else if (!strcmp(s, "snisld"))
-		*pos = tlspos_snisld;
+	{
+		sp->marker = PM_HOST_MIDSLD;
+		sp->pos=0;
+	}
 	else
 		return false;
 	return true;
+}
+
+static bool parse_int16(const char *p, int16_t *v)
+{
+	if (*p=='+' || *p=='-' || *p>='0' && *p<='9')
+	{
+		int i = atoi(p);
+		*v = (int16_t)i;
+		return *v==i; // check overflow
+	}
+	return false;
+}
+static bool parse_posmarker(const char *opt, uint8_t *posmarker)
+{
+	if (!strcmp(opt,"host"))
+		*posmarker = PM_HOST;
+	else if (!strcmp(opt,"endhost"))
+		*posmarker = PM_HOST_END;
+	else if (!strcmp(opt,"sld"))
+		*posmarker = PM_HOST_SLD;
+	else if (!strcmp(opt,"midsld"))
+		*posmarker = PM_HOST_MIDSLD;
+	else if (!strcmp(opt,"endsld"))
+		*posmarker = PM_HOST_ENDSLD;
+	else if (!strcmp(opt,"method"))
+		*posmarker = PM_HTTP_METHOD;
+	else if (!strcmp(opt,"sniext"))
+		*posmarker = PM_SNI_EXT;
+	else
+		return false;
+	return true;
+}
+static bool parse_split_pos(char *opt, struct proto_pos *split)
+{
+	if (parse_int16(opt,&split->pos))
+	{
+		split->marker = PM_ABS;
+		return !!split->pos;
+	}
+	else
+	{
+		char c,*p=opt;
+		bool b;
+
+		for (; *opt && *opt!='+' && *opt!='-'; opt++);
+		c=*opt; *opt=0;
+		b=parse_posmarker(p,&split->marker);
+		*opt=c;
+		if (!b) return false;
+		if (*opt)
+			return parse_int16(opt,&split->pos);
+		else
+			split->pos = 0;
+	}
+	return true;
+}
+static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits_size, int *split_count)
+{
+	char c,*e,*p;
+
+	for (p=opt, *split_count=0 ; p && *split_count<splits_size ; (*split_count)++)
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+		if (!parse_split_pos(p,splits+*split_count)) return false;
+		if (e) *e++=c;
+		p = e;
+	}
+	if (p) return false; // too much splits
+	return true;
+}
+static void SplitDebug(void)
+{
+	struct desync_profile_list *dpl;
+	const struct desync_profile *dp;
+	int x;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+	{
+		dp = &dpl->dp;
+		for(x=0;x<dp->split_count;x++)
+			VPRINT("profile %d multisplit %s %d\n",dp->n,posmarker_name(dp->splits[x].marker),dp->splits[x].pos);
+		if (!PROTO_POS_EMPTY(&dp->tlsrec))
+			VPRINT("profile %d tlsrec %s %d\n",dp->n,posmarker_name(dp->tlsrec.marker),dp->tlsrec.pos);
+	}
 }
 
 static bool wf_make_l3(char *opt, bool *ipv4, bool *ipv6)
@@ -396,6 +496,16 @@ void config_from_file(const char *filename)
 		DLOG_ERR("failed to split command line options from file '%s'\n",filename);
 		exit_clean(1);
 	}
+}
+#endif
+
+#ifndef __linux__
+static bool check_oob_disorder(const struct desync_profile *dp)
+{
+	return !(
+		dp->oob && (dp->disorder || dp->disorder_http || dp->disorder_tls) ||
+		dp->oob_http && (dp->disorder || dp->disorder_http) ||
+		dp->oob_tls && (dp->disorder || dp->disorder_tls));
 }
 #endif
 
@@ -682,29 +792,45 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 23: /* split-http-req */
-			if (!parse_httpreqpos(optarg, &dp->split_http_req))
+			DLOG_CONDUP("WARNING ! --split-http-req is deprecated. use --split-pos with markers.\n",MAX_SPLITS);
+			if (dp->split_count>=MAX_SPLITS)
+			{
+				DLOG_ERR("Too much splits. max splits: %u\n",MAX_SPLITS);
+				exit_clean(1);
+			}
+			if (!parse_httpreqpos(optarg, dp->splits + dp->split_count))
 			{
 				DLOG_ERR("Invalid argument for split-http-req\n");
 				exit_clean(1);
 			}
+			dp->split_count++;
 			params.tamper = true;
 			break;
 		case 24: /* split-tls */
-			if (!parse_tlspos(optarg, &dp->split_tls))
+			// obsolete arg
+			DLOG_CONDUP("WARNING ! --split-tls is deprecated. use --split-pos with markers.\n",MAX_SPLITS);
+			if (dp->split_count>=MAX_SPLITS)
+			{
+				DLOG_ERR("Too much splits. max splits: %u\n",MAX_SPLITS);
+				exit_clean(1);
+			}
+			if (!parse_tlspos(optarg, dp->splits + dp->split_count))
 			{
 				DLOG_ERR("Invalid argument for split-tls\n");
 				exit_clean(1);
 			}
+			dp->split_count++;
 			params.tamper = true;
 			break;
 		case 25: /* split-pos */
-			i = atoi(optarg);
-			if (i>0)
-				dp->split_pos = i;
-			else
 			{
-				DLOG_ERR("Invalid argument for split-pos\n");
-				exit_clean(1);
+				int ct;
+				if (!parse_split_pos_list(optarg,dp->splits+dp->split_count,MAX_SPLITS-dp->split_count,&ct))
+				{
+					DLOG_ERR("could not parse split pos list or too much positions (before parsing - %u, max - %u) : %s\n",dp->split_count,MAX_SPLITS,optarg);
+					exit_clean(1);
+				}
+				dp->split_count += ct;
 			}
 			params.tamper = true;
 			break;
@@ -724,7 +850,13 @@ void parse_params(int argc, char *argv[])
 			}
 			else
 				dp->disorder = true;
-			save_default_ttl();
+#ifndef __linux__
+			if (!check_oob_disorder(dp))
+			{
+				DLOG_ERR("--oob and --disorder work simultaneously only in linux. in this system it's guaranteed to fail.\n");
+				exit_clean(1);
+			}
+#endif
 			break;
 		case 28: /* oob */
 			if (optarg)
@@ -739,6 +871,13 @@ void parse_params(int argc, char *argv[])
 			}
 			else
 				dp->oob = true;
+#ifndef __linux__
+			if (!check_oob_disorder(dp))
+			{
+				DLOG_ERR("--oob and --disorder work simultaneously only in linux. in this system it's guaranteed to fail.\n");
+				exit_clean(1);
+			}
+#endif
 			break;
 		case 29: /* oob-data */
 			{
@@ -770,7 +909,7 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 34: /* tlsrec */
-			if (!parse_tlspos(optarg, &dp->tlsrec))
+			if (!parse_split_pos(optarg, &dp->tlsrec) && !parse_tlspos(optarg, &dp->tlsrec))
 			{
 				DLOG_ERR("Invalid argument for tlsrec\n");
 				exit_clean(1);
@@ -778,9 +917,11 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 35: /* tlsrec-pos */
-			if ((dp->tlsrec_pos = atoi(optarg))>0)
-				dp->tlsrec = tlspos_pos;
-			else
+			// obsolete arg
+			i = atoi(optarg);
+			dp->tlsrec.marker = PM_ABS;
+			dp->tlsrec.pos = (int16_t)i;
+			if (!dp->tlsrec.pos || i!=dp->tlsrec.pos)
 			{
 				DLOG_ERR("Invalid argument for tlsrec-pos\n");
 				exit_clean(1);
@@ -823,8 +964,6 @@ void parse_params(int argc, char *argv[])
 					DLOG_ERR("gzipped auto hostlists are not supported\n");
 					exit_clean(1);
 				}
-				if (params.droproot && chown(optarg, params.uid, -1))
-					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
 			}
 			if (!(dp->hostlist_auto=RegisterHostlist(dp, false, optarg)))
 			{
@@ -858,8 +997,6 @@ void parse_params(int argc, char *argv[])
 					exit_clean(1);
 				}
 				fclose(F);
-				if (params.droproot && chown(optarg, params.uid, -1))
-					DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
 				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
@@ -881,8 +1018,6 @@ void parse_params(int argc, char *argv[])
 						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
 						exit_clean(1);
 					}
-					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
-						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
 					if (!params.debug) params.debug = 1;
 					params.debug_target = LOG_TARGET_FILE;
 				}
@@ -1054,7 +1189,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-			
+
 #if defined(__FreeBSD__)
 		case 62: /* enable-pf */
 			params.pf_enable = true;
@@ -1117,16 +1252,21 @@ void parse_params(int argc, char *argv[])
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
 
+	save_default_ttl();
+	if (params.debug_target == LOG_TARGET_FILE && params.droproot && chown(params.debug_logfile, params.uid, -1))
+		fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
+	if (params.droproot && *params.hostlist_auto_debuglog && chown(params.hostlist_auto_debuglog, params.uid, -1))
+		DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", params.hostlist_auto_debuglog);
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
-		if (dp->split_tls==tlspos_none && dp->split_pos) dp->split_tls=tlspos_pos;
-		if (dp->split_http_req==httpreqpos_none && dp->split_pos) dp->split_http_req=httpreqpos_pos;
-		if (params.skip_nodelay && (dp->split_tls || dp->split_http_req || dp->split_pos))
+		if (params.skip_nodelay && dp->split_count)
 		{
 			DLOG_ERR("Cannot split with --skip-nodelay\n");
 			exit_clean(1);
 		}
+		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
+			DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", dp->hostlist_auto->filename);
 	}
 
 	if (!LoadAllHostLists())
@@ -1143,6 +1283,9 @@ void parse_params(int argc, char *argv[])
 	VPRINT("\nlists summary:\n");
 	HostlistsDebug();
 	IpsetsDebug();
+
+	VPRINT("\nsplits summary:\n");
+	SplitDebug();
 	VPRINT("\n");
 
 #ifndef __OpenBSD__
@@ -1304,6 +1447,7 @@ int main(int argc, char *argv[])
 	struct salisten_s list[MAX_BINDS];
 	char ip_port[48];
 
+	set_env_exedir(argv[0]);
 	srand(time(NULL));
 	mask_from_preflen6_prepare();
 

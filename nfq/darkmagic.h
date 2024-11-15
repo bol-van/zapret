@@ -22,6 +22,7 @@
 #endif
 
 #ifdef __CYGWIN__
+#define INITGUID
 #include "windivert/windivert.h"
 #endif
 
@@ -247,3 +248,6 @@ void do_nat(bool bOutbound, struct ip *ip, struct ip6_hdr *ip6, struct tcphdr *t
 
 void verdict_tcp_csum_fix(uint8_t verdict, struct tcphdr *tcphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr);
 void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transport_len, struct ip *ip, struct ip6_hdr *ip6hdr);
+
+void dbgprint_socket_buffers(int fd);
+bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);

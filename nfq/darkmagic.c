@@ -1871,3 +1871,34 @@ void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transpo
 			udp_fix_checksum(udphdr,transport_len,ip,ip6hdr);
 	}
 }
+
+void dbgprint_socket_buffers(int fd)
+{
+	if (params.debug)
+	{
+		int v;
+		socklen_t sz;
+		sz = sizeof(int);
+		if (!getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &v, &sz))
+			DLOG("fd=%d SO_RCVBUF=%d\n", fd, v);
+			sz = sizeof(int);
+		if (!getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &v, &sz))
+			DLOG("fd=%d SO_SNDBUF=%d\n", fd, v);
+	}
+}
+bool set_socket_buffers(int fd, int rcvbuf, int sndbuf)
+{
+	DLOG("set_socket_buffers fd=%d rcvbuf=%d sndbuf=%d\n", fd, rcvbuf, sndbuf);
+	if (rcvbuf && setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(int)) < 0)
+	{
+		DLOG_PERROR("setsockopt (SO_RCVBUF)");
+		return false;
+	}
+	if (sndbuf && setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(int)) < 0)
+	{
+		DLOG_PERROR("setsockopt (SO_SNDBUF)");
+		return false;
+	}
+	dbgprint_socket_buffers(fd);
+	return true;
+}

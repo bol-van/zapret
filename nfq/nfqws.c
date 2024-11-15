@@ -752,12 +752,12 @@ static bool parse_tlspos(const char *s, struct proto_pos *sp)
 	else if (!strcmp(s, "sniext"))
 	{
 		sp->marker = PM_SNI_EXT;
-		sp->pos=0;
+		sp->pos=1;
 	}
 	else if (!strcmp(s, "snisld"))
 	{
 		sp->marker = PM_HOST_MIDSLD;
-		sp->pos=1;
+		sp->pos=0;
 	}
 	else
 		return false;
@@ -838,39 +838,14 @@ static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits
 }
 static void split_compat(struct desync_profile *dp)
 {
-	// make it mostly compatible with old versions
-	int i;
-	dp->split_unknown.marker=PM_ABS;
-	dp->split_unknown.pos=2;
-	for (i=0;i<dp->split_count;i++)
+	if (!dp->split_count)
 	{
-		if (dp->splits[i].marker==PM_ABS)
-		{
-			dp->split_unknown.pos=dp->splits[i].pos;
-			break;
-		}
-	}
-	if (PROTO_POS_EMPTY(&dp->split_http))
-	{
-		dp->split_http=dp->split_unknown;
-		for (i=0;i<dp->split_count;i++)
-			if (IsHostMarker(dp->splits[i].marker) || dp->splits[i].marker==PM_HTTP_METHOD)
-			{
-				dp->split_http = dp->splits[i];
-				break;
-			}
-	}
-	if (PROTO_POS_EMPTY(&dp->split_tls))
-	{
-		dp->split_tls=dp->split_unknown;
-		for (i=0;i<dp->split_count;i++)
-			if (IsHostMarker(dp->splits[i].marker) || dp->splits[i].marker==PM_SNI_EXT)
-			{
-				dp->split_tls = dp->splits[i];
-				break;
-			}
+		dp->splits[dp->split_count].marker = PM_ABS;
+		dp->splits[dp->split_count].pos = 2;
+		dp->split_count++;
 	}
 }
+
 static void SplitDebug(void)
 {
 	struct desync_profile_list *dpl;
@@ -878,11 +853,9 @@ static void SplitDebug(void)
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
-		DLOG("profile %d split_http %s %d\n",dp->n,posmarker_name(dp->split_http.marker),dp->split_http.pos);
-		DLOG("profile %d split_tls %s %d\n",dp->n,posmarker_name(dp->split_tls.marker),dp->split_tls.pos);
-		DLOG("profile %d split_unknown %s %d\n",dp->n,posmarker_name(dp->split_unknown.marker),dp->split_unknown.pos);
 		for(int x=0;x<dp->split_count;x++)
 			DLOG("profile %d multisplit %s %d\n",dp->n,posmarker_name(dp->splits[x].marker),dp->splits[x].pos);
+		if (!PROTO_POS_EMPTY(&dp->seqovl)) DLOG("profile %d seqovl %s %d\n",dp->n,posmarker_name(dp->seqovl.marker),dp->seqovl.pos);
 	}
 }
 
@@ -1066,7 +1039,7 @@ static void exithelp(void)
 		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
 		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes :\n"
 		"\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
-		"\t\t\t\t\t\t; disorder2 split2 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper\n"
+		"\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -1078,11 +1051,12 @@ static void exithelp(void)
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
-		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI (ESNI ?)\n"
-		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions. markers: method,host,endhost,sld,endsld,midsld,sniext\n"
+		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
+		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
+		"\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
 		"\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
-		"\t\t\t\t\t\t; single split takes first l7-protocol-compatible parameter if present, first abs value otherwise\n"
-		" --dpi-desync-split-seqovl=<int>\t\t; use sequence overlap before first sent original split segment\n"
+		"\t\t\t\t\t\t; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise\n"
+		" --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
@@ -1149,6 +1123,8 @@ void config_from_file(const char *filename)
 
 int main(int argc, char **argv)
 {
+	set_env_exedir(argv[0]);
+
 #ifdef __CYGWIN__
 	if (service_run(argc, argv))
 	{
@@ -1332,10 +1308,6 @@ int main(int argc, char **argv)
 						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
 						exit_clean(1);
 					}
-#ifndef __CYGWIN__
-					if (params.droproot && chown(params.debug_logfile, params.uid, -1))
-						fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
-#endif
 					params.debug = true;
 					params.debug_target = LOG_TARGET_FILE;
 				}
@@ -1589,24 +1561,38 @@ int main(int argc, char **argv)
 			break;
 		case 24: /* dpi-desync-split-http-req */
 			// obsolete arg
-			if (!parse_httpreqpos(optarg, &dp->split_http))
+			DLOG_CONDUP("WARNING ! --dpi-desync-split-http-req is deprecated. use --dpi-desync-split-pos with markers.\n",MAX_SPLITS);
+			if (dp->split_count>=MAX_SPLITS)
+			{
+				DLOG_ERR("Too much splits. max splits: %u\n",MAX_SPLITS);
+				exit_clean(1);
+			}
+			if (!parse_httpreqpos(optarg, dp->splits + dp->split_count))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-http-req\n");
 				exit_clean(1);
 			}
+			dp->split_count++;
 			break;
 		case 25: /* dpi-desync-split-tls */
 			// obsolete arg
-			if (!parse_tlspos(optarg, &dp->split_tls))
+			DLOG_CONDUP("WARNING ! --dpi-desync-split-tls is deprecated. use --dpi-desync-split-pos with markers.\n",MAX_SPLITS);
+			if (dp->split_count>=MAX_SPLITS)
+			{
+				DLOG_ERR("Too much splits. max splits: %u\n",MAX_SPLITS);
+				exit_clean(1);
+			}
+			if (!parse_tlspos(optarg, dp->splits + dp->split_count))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-tls\n");
 				exit_clean(1);
 			}
+			dp->split_count++;
 			break;
 		case 26: /* dpi-desync-split-seqovl */
-			if (sscanf(optarg,"%u",&dp->desync_seqovl)<1)
+			if (!parse_split_pos(optarg, &dp->seqovl))
 			{
-				DLOG_ERR("dpi-desync-split-seqovl is not valid\n");
+				DLOG_ERR("Invalid argument for dpi-desync-split-seqovl\n");
 				exit_clean(1);
 			}
 			break;
@@ -1754,10 +1740,6 @@ int main(int argc, char **argv)
 					DLOG_ERR("gzipped auto hostlists are not supported\n");
 					exit_clean(1);
 				}
-#ifndef __CYGWIN__
-				if (params.droproot && chown(optarg, params.uid, -1))
-					DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", optarg);
-#endif
 			}
 			if (!(dp->hostlist_auto=RegisterHostlist(dp, false, optarg)))
 			{
@@ -1798,10 +1780,6 @@ int main(int argc, char **argv)
 					exit_clean(1);
 				}
 				fclose(F);
-#ifndef __CYGWIN__
-				if (params.droproot && chown(optarg, params.uid, -1))
-					DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", optarg);
-#endif
 				strncpy(params.hostlist_auto_debuglog, optarg, sizeof(params.hostlist_auto_debuglog));
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
@@ -2045,16 +2023,15 @@ int main(int argc, char **argv)
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
 	
+#ifndef __CYGWIN__
+	if (params.debug_target == LOG_TARGET_FILE && params.droproot && chown(params.debug_logfile, params.uid, -1))
+		fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
+	if (params.droproot && *params.hostlist_auto_debuglog && chown(params.hostlist_auto_debuglog, params.uid, -1))
+		DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", params.hostlist_auto_debuglog);
+#endif
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
-
-		if (!dp->split_count && (dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_MULTIDISORDER))
-		{
-			DLOG_ERR("multisplit requires explicit split pos\n");
-			exit_clean(1);
-		}
-
 		// not specified - use desync_ttl value instead
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
@@ -2063,6 +2040,10 @@ int main(int argc, char **argv)
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
 			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		split_compat(dp);
+#ifndef __CYGWIN__
+		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
+			DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", dp->hostlist_auto->filename);
+#endif
 	}
 
 	if (!LoadAllHostLists())
