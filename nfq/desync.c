@@ -1212,7 +1212,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		if (dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_MULTISPLIT)
 		{
 			// split seqovl only uses absolute positive values
-			seqovl_pos = dp->seqovl.marker==PM_ABS ? dp->seqovl.pos : 0;
+			seqovl_pos = (dp->seqovl.marker==PM_ABS && dp->seqovl.pos>0) ? dp->seqovl.pos : 0;
 			if (seqovl_pos)	DLOG("seqovl pos : %zu\n",seqovl_pos);
 		}
 		else if (dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_MULTIDISORDER)
