@@ -1142,7 +1142,7 @@ pktws_check_domain_http_bypass_()
 	local ok ttls s f f2 e desync pos fooling frag sec="$2" delta splits
 	local need_split need_disorder need_fakedsplit need_fakeddisorder need_fake need_wssize
 	local splits_http='method+2 midsld method+2,midsld'
-	local splits_tls='2 1 sniext+1 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1'
+	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1'
 
 	[ "$sec" = 0 ] && {
 		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
@@ -1235,7 +1235,7 @@ pktws_check_domain_http_bypass_()
 			# make additional split pos "10" to guarantee enough space for seqovl and likely to be before midsld,sniext,...
 			# method is always expected in the beginning of the first packet
 			f="method+2 method+2,midsld"
-			[ "$sec" = 0 ] || f="10 10,sniext+1 10,midsld"
+			[ "$sec" = 0 ] || f="10 10,sniext+1 10,sniext+4 10,midsld"
 			for pos in $f; do
 				pktws_curl_test_update $1 $3 --dpi-desync=multisplit --dpi-desync-split-pos=$pos --dpi-desync-split-seqovl=1 $e && {
 					[ "$SCANLEVEL" = quick ] && return
@@ -1258,7 +1258,7 @@ pktws_check_domain_http_bypass_()
 					}
 				done
 			else
-				for pos in '1 2' 'sniext sniext+1' 'midsld-1 midsld' '1 2,midsld'; do
+				for pos in '1 2' 'sniext sniext+1' 'sniext+3 sniext+4' 'midsld-1 midsld' '1 2,midsld'; do
 					f=$(extract_arg 1 $pos)
 					f2=$(extract_arg 2 $pos)
 					pktws_curl_test_update $1 $3 --dpi-desync=multidisorder --dpi-desync-split-pos=$f2 --dpi-desync-split-seqovl=$f $e && {
@@ -1375,7 +1375,7 @@ tpws_check_domain_http_bypass_()
 	# $3 - domain
 
 	local s mss s2 s3 oobdis pos sec="$2"
-	local splits_tls='2 1 sniext+1 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld,endhost-1'
+	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld,endhost-1'
 	local splits_http='method+2 midsld method+2,midsld'
 
 	# simulteneous oob and disorder works properly only in linux. other systems retransmit oob byte without URG tcp flag and poison tcp stream.
@@ -1413,7 +1413,7 @@ tpws_check_domain_http_bypass_()
 				done
 			done
 			for s in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
-				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+1 --split-pos=1,midsld' ; do
+				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' '--tlsrec=sniext+1 --split-pos=1,midsld' '--tlsrec=sniext+4 --split-pos=1,midsld' ; do
 					tpws_curl_test_update $1 $3 $s2 $s $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						break
