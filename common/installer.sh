@@ -221,7 +221,7 @@ check_system()
 		else
 			echo system is not either systemd, openrc or openwrt based
 			echo easy installer can set up config settings but can\'t configure auto start
-			echo you have to do it manually. check readme.txt for manual setup info.
+			echo you have to do it manually. check readme.md for manual setup info.
 			if [ -n "$1" ] || ask_yes_no N "do you want to continue"; then
 			    SYSTEM=linux
 			else
@@ -232,7 +232,7 @@ check_system()
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
 	else
-		echo easy installer only supports Linux and MacOS. check readme.txt for supported systems and manual setup info.
+		echo easy installer only supports Linux and MacOS. check readme.md for supported systems and manual setup info.
 		exitp 5
 	fi
 	echo system is based on $SYSTEM
