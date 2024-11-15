@@ -1231,9 +1231,10 @@ pktws_check_domain_http_bypass_()
 		}
 
 		[ "$need_split" = 1 ] && {
-			f="method+2 midsld method+2,midsld"
 			# relative markers can be anywhere, even in subsequent packets. first packet can be MTU-full.
 			# make additional split pos "10" to guarantee enough space for seqovl and likely to be before midsld,sniext,...
+			# method is always expected in the beginning of the first packet
+			f="method+2 method+2,midsld"
 			[ "$sec" = 0 ] || f="10 10,sniext+1 10,midsld"
 			for pos in $f; do
 				pktws_curl_test_update $1 $3 --dpi-desync=multisplit --dpi-desync-split-pos=$pos --dpi-desync-split-seqovl=1 $e && {
