@@ -1182,7 +1182,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						DLOG("all multisplit pos are outside of this packet\n");
 				}
 			}
-			seqovl_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &dp->seqovl);
 		}
 		else if (dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER)
 		{
@@ -1204,15 +1203,26 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				DLOG("normalized regular split pos : %zu\n",split_pos);
 			else
 				DLOG("regular split pos is outside of this packet\n");
-			seqovl_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &dp->seqovl);
 		}
 		else
 		{
 			multisplit_count=0;
-			split_pos = seqovl_pos = 0;
+			split_pos = 0;
 		}
-		seqovl_pos = pos_normalize(seqovl_pos,reasm_offset,dis->len_payload);
-		if (seqovl_pos)	DLOG("normalized seqovl pos : %zu\n",seqovl_pos);
+		if (dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_MULTISPLIT)
+		{
+			// split seqovl only uses absolute positive values
+			seqovl_pos = dp->seqovl.marker==PM_ABS ? dp->seqovl.pos : 0;
+			if (seqovl_pos)	DLOG("seqovl pos : %zu\n",seqovl_pos);
+		}
+		else if (dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode==DESYNC_MULTIDISORDER || dp->desync_mode2==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_MULTIDISORDER)
+		{
+			seqovl_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, &dp->seqovl);
+			seqovl_pos = pos_normalize(seqovl_pos,reasm_offset,dis->len_payload);
+			if (seqovl_pos)	DLOG("normalized seqovl pos : %zu\n",seqovl_pos);
+		}
+		else
+			seqovl_pos = 0;
 
 		// we do not need reasm buffer anymore
 		reasm_orig_cancel(ctrack);

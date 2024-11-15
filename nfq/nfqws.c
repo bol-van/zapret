@@ -844,6 +844,11 @@ static void split_compat(struct desync_profile *dp)
 		dp->splits[dp->split_count].pos = 2;
 		dp->split_count++;
 	}
+	if ((dp->seqovl.marker!=PM_ABS || dp->seqovl.pos<0) && (dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_MULTISPLIT))
+	{
+		DLOG_ERR("split seqovl supports only absolute positive positions\n");
+		exit_clean(1);
+	}
 }
 
 static void SplitDebug(void)
