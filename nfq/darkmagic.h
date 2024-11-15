@@ -61,6 +61,7 @@ uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 #define VERDICT_NOCSUM	4
 
 #define IP4_TOS(ip_header) (ip_header ? ip_header->ip_tos : 0)
+#define IP4_IP_ID(ip_header) (ip_header ? ip_header->ip_id : 0)
 #define IP6_FLOW(ip6_header) (ip6_header ? ip6_header->ip6_ctlun.ip6_un1.ip6_un1_flow : 0)
 
 // seq and wsize have network byte order
@@ -73,6 +74,7 @@ bool prepare_tcp_segment4(
 	uint32_t *timestamps,
 	uint8_t ttl,
 	uint8_t tos,
+	uint16_t ip_id,
 	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
@@ -100,7 +102,9 @@ bool prepare_tcp_segment(
 	uint8_t scale_factor,
 	uint32_t *timestamps,
 	uint8_t ttl,
-	uint8_t tos, uint32_t flow_label,
+	uint8_t tos,
+	uint16_t ip_id,
+	uint32_t flow_label,
 	uint32_t fooling,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
@@ -112,6 +116,7 @@ bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t ttl,
 	uint8_t tos,
+	uint16_t ip_id,
 	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
@@ -129,7 +134,9 @@ bool prepare_udp_segment6(
 bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t ttl,
-	uint8_t tos, uint32_t flow_label,
+	uint8_t tos,
+	uint16_t ip_id,
+	uint32_t flow_label,
 	uint32_t fooling,
 	const uint8_t *padding, size_t padding_size,
 	int padlen,
