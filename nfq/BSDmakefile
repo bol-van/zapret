@@ -6,7 +6,7 @@ SRC_FILES = *.c crypto/*.c
 all: dvtws
 
 dvtws: $(SRC_FILES)
-	$(CC) $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -o dvtws $(SRC_FILES) $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f dvtws
