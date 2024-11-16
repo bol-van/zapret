@@ -844,6 +844,11 @@ static void split_compat(struct desync_profile *dp)
 		dp->splits[dp->split_count].pos = 2;
 		dp->split_count++;
 	}
+	if ((dp->seqovl.marker!=PM_ABS || dp->seqovl.pos<0) && (dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_MULTISPLIT))
+	{
+		DLOG_ERR("split seqovl supports only absolute positive positions\n");
+		exit_clean(1);
+	}
 }
 
 static void SplitDebug(void)
@@ -1590,7 +1595,13 @@ int main(int argc, char **argv)
 			dp->split_count++;
 			break;
 		case 26: /* dpi-desync-split-seqovl */
-			if (!parse_split_pos(optarg, &dp->seqovl))
+			if (!strcmp(optarg,"0"))
+			{
+				// allow zero = disable seqovl
+				dp->seqovl.marker=PM_ABS;
+				dp->seqovl.pos=0;
+			}
+			else if (!parse_split_pos(optarg, &dp->seqovl))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-split-seqovl\n");
 				exit_clean(1);

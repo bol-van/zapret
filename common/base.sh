@@ -60,11 +60,22 @@ starts_with()
 	esac
 	return 1
 }
+extract_arg()
+{
+	# $1 - arg number
+	# $2,$3,... - args
+        local n=$1
+        while [ -n "$1" ]; do
+                shift
+                [ $n -eq 1 ] && { echo "$1"; return 0; }
+                n=$(($n-1))
+        done
+        return 1
+}
 find_str_in_list()
 {
 	# $1 - string
 	# $2 - space separated values
-
 	local v
 	[ -n "$1" ] && {
 		for v in $2; do
