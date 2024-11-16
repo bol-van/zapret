@@ -3,19 +3,33 @@ How to compile native programs for use in openwrt
 
 1) Download latest SDK for your platform from https://downloads.openwrt.org
 
-   curl -o - https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz | tar -Jxvf -
-   cd openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
+examples :
 
-2) ./scripts/feeds update -a
-   ./scripts/feeds install -a
+curl -o - https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz | tar -Jxvf -
+cd openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
 
-3) cp -R /opt/zapret/docs/compile/openwrt/. .
-   cp -R /opt/zapret/tpws package/zapret/tpws
-   cp -R /opt/zapret/nfq package/zapret/nfqws
-   cp -R /opt/zapret/mdig package/zapret/mdig
-   cp -R /opt/zapret/ip2net package/zapret/ip2net
+curl -o - https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst | tar --zstd -xvf -
+cd openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64
 
-4) make package/{tpws,nfqws,mdig,ip2net}/compile
+2) Install required libs
 
-5) find bin -name tpws*.ipk
-   #take your tpws*.ipk , nfqws*.ipk , ip2net*.ipk, mdig*.ipk from there
+./scripts/feeds update base packages
+./scripts/feeds install libnetfilter-queue zlib libcap
+
+3) Prepare openwrt package definitions
+
+sudo make -C /opt/zapret clean
+cp -R /opt/zapret/docs/compile/openwrt/. .
+cp -R /opt/zapret/tpws package/zapret/tpws
+cp -R /opt/zapret/nfq package/zapret/nfqws
+cp -R /opt/zapret/mdig package/zapret/mdig
+cp -R /opt/zapret/ip2net package/zapret/ip2net
+
+4) Compile
+
+make package/{tpws,nfqws,mdig,ip2net}/compile
+
+5) Get result
+
+ls -l bin/packages/*/base
+# take your ipk or apk from there
