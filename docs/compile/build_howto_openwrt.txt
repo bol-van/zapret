@@ -18,12 +18,12 @@ cd openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64
 
 3) Prepare openwrt package definitions
 
-sudo make -C /opt/zapret clean
 cp -R /opt/zapret/docs/compile/openwrt/. .
 cp -R /opt/zapret/tpws package/zapret/tpws
 cp -R /opt/zapret/nfq package/zapret/nfqws
 cp -R /opt/zapret/mdig package/zapret/mdig
 cp -R /opt/zapret/ip2net package/zapret/ip2net
+rm -f package/zapret/tpws/tpws/tpws package/zapret/nfqws/nfq/nfqws package/zapret/mdig/mdig/mdig package/zapret/ip2net/ip2net/ip2net
 
 4) Compile
 
