@@ -9,7 +9,7 @@ SRC_FILES = *.c
 all: mdig
 
 mdig: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS)
+	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS)
 
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS)
