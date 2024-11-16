@@ -6,7 +6,7 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <time.h>
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 #include <wordexp.h>
 #endif
 
@@ -85,7 +85,7 @@ void dp_list_destroy(struct desync_profile_list_head *head);
 
 struct params_s
 {
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	wordexp_t wexp; // for file based config
 #endif
 

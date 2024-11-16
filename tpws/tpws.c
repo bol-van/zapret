@@ -122,7 +122,7 @@ static int get_default_ttl(void)
 static void exithelp(void)
 {
 	printf(
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 		" @<config_file>|$<config_file>\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 #endif
 		" --bind-addr=<v4_addr>|<v6_addr>\t; for v6 link locals append %%interface_name\n"
@@ -215,7 +215,7 @@ static void exithelp(void)
 	);
 	exit(1);
 }
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 static void cleanup_args()
 {
 	wordfree(&params.wexp);
@@ -223,7 +223,7 @@ static void cleanup_args()
 #endif
 static void cleanup_params(void)
 {
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	cleanup_args();
 #endif
 
@@ -472,7 +472,7 @@ static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
 	return true;
 }
 
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 // no static to not allow optimizer to inline this func (save stack)
 void config_from_file(const char *filename)
 {
@@ -547,7 +547,7 @@ void parse_params(int argc, char *argv[])
 	dp = &dpl->dp;
 	dp->n = ++desync_profile_count;
 
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	if (argc>=2 && (argv[1][0]=='@' || argv[1][0]=='$'))
 	{
 		config_from_file(argv[1]+1);
@@ -1288,7 +1288,7 @@ void parse_params(int argc, char *argv[])
 	SplitDebug();
 	VPRINT("\n");
 
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	// do not need args from file anymore
 	cleanup_args();
 #endif
