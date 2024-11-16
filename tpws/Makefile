@@ -2,12 +2,17 @@ CC ?= gcc
 CFLAGS += -std=gnu99 -Os
 CFLAGS_BSD = -Wno-address-of-packed-member
 LIBS = -lz -lpthread
+LIBS_ANDROID = -lz
 SRC_FILES = *.c
+SRC_FILES_ANDROID = $(SRC_FILES) andr/*.c
 
 all: tpws
 
 tpws: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS)
+	$(CC) -s $(CFLAGS) -o tpws $(SRC_FILES) $(LDFLAGS) $(LIBS)
+
+android: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) -o tpws $(SRC_FILES_ANDROID) $(LDFLAGS) $(LIBS_ANDROID)
 
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -o tpws $(SRC_FILES) epoll-shim/src/*.c $(LDFLAGS) $(LIBS)

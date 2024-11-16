@@ -7,7 +7,6 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <net/if.h>
-#include <ifaddrs.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -24,6 +23,12 @@
 #include <sys/resource.h>
 #include <time.h>
 #include <syslog.h>
+
+#ifdef __ANDROID__
+#include "andr/ifaddrs.h"
+#else
+#include <ifaddrs.h>
+#endif
 
 #include "tpws.h"
 
