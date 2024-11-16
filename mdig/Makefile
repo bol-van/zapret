@@ -3,6 +3,7 @@ CFLAGS += -std=gnu99 -Os
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_WIN = -static
 LIBS = -lpthread
+LIBS_ANDROID =
 LIBS_WIN = -lws2_32
 SRC_FILES = *.c
 
@@ -10,6 +11,9 @@ all: mdig
 
 mdig: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS)
+
+android: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS_ANDROID)
 
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o mdig $(SRC_FILES) $(LDFLAGS) $(LIBS)
