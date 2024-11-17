@@ -1,7 +1,9 @@
 /config
 ip2net/ip2net
 mdig/mdig
+nfq/dvtws
 nfq/nfqws
+nfq/winws.exe
 tpws/tpws
 binaries/my/
 init.d/**/custom
