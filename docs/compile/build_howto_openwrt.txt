@@ -33,3 +33,4 @@ make package/{tpws,nfqws,mdig,ip2net}/compile
 
 ls -l bin/packages/*/base
 # take your ipk or apk from there
+# zlib-dev is not required
