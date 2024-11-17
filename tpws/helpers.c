@@ -7,10 +7,15 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <ifaddrs.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <libgen.h>
+
+#ifdef __ANDROID__
+#include "andr/ifaddrs.h"
+#else
+#include <ifaddrs.h>
+#endif
 
 #include "helpers.h"
 

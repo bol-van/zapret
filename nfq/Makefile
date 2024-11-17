@@ -15,7 +15,9 @@ SRC_FILES = *.c crypto/*.c
 all: nfqws
 
 nfqws: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS_LINUX)
+	$(CC) -s $(CFLAGS) -o nfqws $(SRC_FILES) $(LDFLAGS) $(LIBS_LINUX)
+
+android: nfqws
 
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o dvtws $(SRC_FILES) $(LDFLAGS) $(LIBS_BSD)

@@ -87,15 +87,14 @@ jobs:
           export LDFLAGS="-Os"
 
           # netfilter libs
-          git clone --depth 1 -b libmnl-1.0.5 git://git.netfilter.org/libmnl
-          git clone --depth 1 -b libnfnetlink-1.0.2 git://git.netfilter.org/libnfnetlink
-          git clone --depth 1 -b libnetfilter_queue-1.0.5 git://git.netfilter.org/libnetfilter_queue
+          wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libnetfilter_queue/libnetfilter_queue-1.0.5.tar.bz2 | tar -xj
 
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
-              cd $i
-              ./autogen.sh && \
-              ./configure --prefix= --host=$TARGET --enable-static --disable-shared && \
+              cd $i-*
+              ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
             sed -i "s|^prefix=.*|prefix=$DEPS_DIR|g" $DEPS_DIR/lib/pkgconfig/$i.pc
@@ -106,7 +105,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            ./configure --prefix= --static && \
+            ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
 
@@ -282,9 +281,77 @@ jobs:
           path: zapret-*.zip
           if-no-files-found: error
 
+  build-android:
+    name: Android ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - abi: armeabi-v7a
+            target: armv7a-linux-androideabi
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: x86
+            target: i686-linux-android
+          - abi: x86_64
+            target: x86_64-linux-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zapret
+
+      - name: Build
+        env:
+          ABI: ${{ matrix.abi }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          DEPS_DIR=$GITHUB_WORKSPACE/deps
+          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          export API=21
+          export CC="$TOOLCHAIN/bin/clang --target=$TARGET$API"
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export AS=$CC
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
+
+          # optimize for size
+          export CFLAGS="-Os -flto=auto"
+          export LDFLAGS="-Os"
+
+          # netfilter libs
+          wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libnetfilter_queue/libnetfilter_queue-1.0.5.tar.bz2 | tar -xj
+          patch -p1 -d libnetfilter_queue-* -i ../zapret/.github/workflows/libnetfilter_queue-android.patch
+
+          for i in libmnl libnfnetlink libnetfilter_queue ; do
+            (
+              cd $i-*
+              CFLAGS="$CFLAGS -Wno-implicit-function-declaration" \
+              ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
+              make install -j$(nproc) DESTDIR=$DEPS_DIR
+            )
+            sed -i "s|^prefix=.*|prefix=$DEPS_DIR|g" $DEPS_DIR/lib/pkgconfig/$i.pc
+          done
+
+          # zapret
+          CFLAGS="$CFLAGS -I$DEPS_DIR/include" LDFLAGS="$LDFLAGS -L$DEPS_DIR/lib" \
+          make -C zapret android -j$(nproc)
+          zip zapret-android-$ABI.zip -j zapret/binaries/my/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-android-${{ matrix.abi }}
+          path: zapret-*.zip
+          if-no-files-found: error
+
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [ build-linux, build-windows, build-macos, build-freebsd ]
+    needs: [ build-linux, build-windows, build-macos, build-freebsd, build-android ]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -343,18 +410,22 @@ jobs:
             if [ -d $dir ]; then
               echo "Processing $dir"
               case $dir in
-                *-freebsd-x86_64 ) run_dir freebsd-x64 ;;
-                *-linux-arm )      run_dir arm ;;
-                *-linux-arm64 )    run_dir aarch64 ;;
-                *-linux-mips64 )   run_dir mips64r2-msb ;;
-                *-linux-mipselsf ) run_dir mips32r1-lsb ;;
-                *-linux-mipssf )   run_dir mips32r1-msb ;;
-                *-linux-ppc )      run_dir ppc ;;
-                *-linux-x86 )      run_dir x86 ;;
-                *-linux-x86_64 )   run_dir x86_64 ;;
-                *-mac-x64 )        run_dir mac64 ;;
-                *-win-x86 )        run_dir win32 ;;
-                *-win-x86_64 )     run_dir win64 ;;
+                *-android-arm64-v8a )   run_dir android-aarch64 ;;
+                *-android-armeabi-v7a ) run_dir android-arm ;;
+                *-android-x86 )         run_dir android-x86 ;;
+                *-android-x86_64 )      run_dir android-x86_64 ;;
+                *-freebsd-x86_64 )      run_dir freebsd-x64 ;;
+                *-linux-arm )           run_dir arm ;;
+                *-linux-arm64 )         run_dir aarch64 ;;
+                *-linux-mips64 )        run_dir mips64r2-msb ;;
+                *-linux-mipselsf )      run_dir mips32r1-lsb ;;
+                *-linux-mipssf )        run_dir mips32r1-msb ;;
+                *-linux-ppc )           run_dir ppc ;;
+                *-linux-x86 )           run_dir x86 ;;
+                *-linux-x86_64 )        run_dir x86_64 ;;
+                *-mac-x64 )             run_dir mac64 ;;
+                *-win-x86 )             run_dir win32 ;;
+                *-win-x86_64 )          run_dir win64 ;;
               esac
             fi
           done

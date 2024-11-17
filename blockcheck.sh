@@ -1011,6 +1011,15 @@ tpws_curl_test()
 	echo - checking tpws $3 $4 $5 $6 $7 $8 $9${TPWS_EXTRA:+ $TPWS_EXTRA}${TPWS_EXTRA_1:+ "$TPWS_EXTRA_1"}${TPWS_EXTRA_2:+ "$TPWS_EXTRA_2"}${TPWS_EXTRA_3:+ "$TPWS_EXTRA_3"}${TPWS_EXTRA_4:+ "$TPWS_EXTRA_4"}${TPWS_EXTRA_5:+ "$TPWS_EXTRA_5"}${TPWS_EXTRA_6:+ "$TPWS_EXTRA_6"}${TPWS_EXTRA_7:+ "$TPWS_EXTRA_7"}${TPWS_EXTRA_8:+ "$TPWS_EXTRA_8"}${TPWS_EXTRA_9:+ "$TPWS_EXTRA_9"}
 	local ALL_PROXY="socks5://127.0.0.1:$SOCKS_PORT"
 	ws_curl_test tpws_start "$@"${TPWS_EXTRA:+ $TPWS_EXTRA}${TPWS_EXTRA_1:+ "$TPWS_EXTRA_1"}${TPWS_EXTRA_2:+ "$TPWS_EXTRA_2"}${TPWS_EXTRA_3:+ "$TPWS_EXTRA_3"}${TPWS_EXTRA_4:+ "$TPWS_EXTRA_4"}${TPWS_EXTRA_5:+ "$TPWS_EXTRA_5"}${TPWS_EXTRA_6:+ "$TPWS_EXTRA_6"}${TPWS_EXTRA_7:+ "$TPWS_EXTRA_7"}${TPWS_EXTRA_8:+ "$TPWS_EXTRA_8"}${TPWS_EXTRA_9:+ "$TPWS_EXTRA_9"}
+	local code=$?
+	[ "$code" = 0 ] && {
+		local testf=$1 dom=$2
+		shift; shift;
+		local strategy="$@"
+		strategy_append_extra_tpws
+		report_append "ipv${IPV} $dom $testf : tpws ${WF:+$WF }$strategy"
+	}
+	return $code
 }
 pktws_curl_test()
 {
@@ -1019,7 +1028,26 @@ pktws_curl_test()
 	# $3,$4,$5, ... - nfqws/dvtws params
 	echo - checking $PKTWSD ${WF:+$WF }$3 $4 $5 $6 $7 $8 $9${PKTWS_EXTRA:+ $PKTWS_EXTRA}${PKTWS_EXTRA_1:+ "$PKTWS_EXTRA_1"}${PKTWS_EXTRA_2:+ "$PKTWS_EXTRA_2"}${PKTWS_EXTRA_3:+ "$PKTWS_EXTRA_3"}${PKTWS_EXTRA_4:+ "$PKTWS_EXTRA_4"}${PKTWS_EXTRA_5:+ "$PKTWS_EXTRA_5"}${PKTWS_EXTRA_6:+ "$PKTWS_EXTRA_6"}${PKTWS_EXTRA_7:+ "$PKTWS_EXTRA_7"}${PKTWS_EXTRA_8:+ "$PKTWS_EXTRA_8"}${PKTWS_EXTRA_9:+ "$PKTWS_EXTRA_9"}
 	ws_curl_test pktws_start "$@"${PKTWS_EXTRA:+ $PKTWS_EXTRA}${PKTWS_EXTRA_1:+ "$PKTWS_EXTRA_1"}${PKTWS_EXTRA_2:+ "$PKTWS_EXTRA_2"}${PKTWS_EXTRA_3:+ "$PKTWS_EXTRA_3"}${PKTWS_EXTRA_4:+ "$PKTWS_EXTRA_4"}${PKTWS_EXTRA_5:+ "$PKTWS_EXTRA_5"}${PKTWS_EXTRA_6:+ "$PKTWS_EXTRA_6"}${PKTWS_EXTRA_7:+ "$PKTWS_EXTRA_7"}${PKTWS_EXTRA_8:+ "$PKTWS_EXTRA_8"}${PKTWS_EXTRA_9:+ "$PKTWS_EXTRA_9"}
+	local code=$?
+	[ "$code" = 0 ] && {
+		local testf=$1 dom=$2
+		shift; shift;
+		local strategy="$@"
+		strategy_append_extra_pktws
+		report_append "ipv${IPV} $dom $testf : $PKTWSD ${WF:+$WF }$strategy"
+	}
+	return $code
 }
+
+strategy_append_extra_pktws()
+{
+	strategy="${strategy:+$strategy${PKTWS_EXTRA:+ $PKTWS_EXTRA}${PKTWS_EXTRA_1:+ "$PKTWS_EXTRA_1"}${PKTWS_EXTRA_2:+ "$PKTWS_EXTRA_2"}${PKTWS_EXTRA_3:+ "$PKTWS_EXTRA_3"}${PKTWS_EXTRA_4:+ "$PKTWS_EXTRA_4"}${PKTWS_EXTRA_5:+ "$PKTWS_EXTRA_5"}${PKTWS_EXTRA_6:+ "$PKTWS_EXTRA_6"}${PKTWS_EXTRA_7:+ "$PKTWS_EXTRA_7"}${PKTWS_EXTRA_8:+ "$PKTWS_EXTRA_8"}${PKTWS_EXTRA_9:+ "$PKTWS_EXTRA_9"}}"
+}
+strategy_append_extra_tpws()
+{
+	strategy="${strategy:+$strategy${TPWS_EXTRA:+ $TPWS_EXTRA}${TPWS_EXTRA_1:+ "$TPWS_EXTRA_1"}${TPWS_EXTRA_2:+ "$TPWS_EXTRA_2"}${TPWS_EXTRA_3:+ "$TPWS_EXTRA_3"}${TPWS_EXTRA_4:+ "$TPWS_EXTRA_4"}${TPWS_EXTRA_5:+ "$TPWS_EXTRA_5"}${TPWS_EXTRA_6:+ "$TPWS_EXTRA_6"}${TPWS_EXTRA_7:+ "$TPWS_EXTRA_7"}${TPWS_EXTRA_8:+ "$TPWS_EXTRA_8"}${TPWS_EXTRA_9:+ "$TPWS_EXTRA_9"}}"
+}
+
 xxxws_curl_test_update()
 {
 	# $1 - xxx_curl_test function
@@ -1071,7 +1099,7 @@ report_strategy()
 		strategy="$(echo "$strategy" | xargs)"
 		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
-		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
+#		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
 		return 0
 	else
 		echo "$1: $3 strategy for ipv${IPV} $2 not found"
@@ -1314,7 +1342,7 @@ pktws_check_domain_http_bypass()
 
 	local strategy
 	pktws_check_domain_http_bypass_ "$@"
-	strategy="${strategy:+$strategy${PKTWS_EXTRA:+ $PKTWS_EXTRA}${PKTWS_EXTRA_1:+ "$PKTWS_EXTRA_1"}${PKTWS_EXTRA_2:+ "$PKTWS_EXTRA_2"}${PKTWS_EXTRA_3:+ "$PKTWS_EXTRA_3"}${PKTWS_EXTRA_4:+ "$PKTWS_EXTRA_4"}${PKTWS_EXTRA_5:+ "$PKTWS_EXTRA_5"}${PKTWS_EXTRA_6:+ "$PKTWS_EXTRA_6"}${PKTWS_EXTRA_7:+ "$PKTWS_EXTRA_7"}${PKTWS_EXTRA_8:+ "$PKTWS_EXTRA_8"}${PKTWS_EXTRA_9:+ "$PKTWS_EXTRA_9"}}"
+	strategy_append_extra_pktws
 	report_strategy $1 $3 $PKTWSD
 }
 
@@ -1359,7 +1387,7 @@ pktws_check_domain_http3_bypass()
 
 	local strategy
 	pktws_check_domain_http3_bypass_ "$@"
-	strategy="${strategy:+$strategy $PKTWS_EXTRA $PKTWS_EXTRA_1 $PKTWS_EXTRA_2 $PKTWS_EXTRA_3 $PKTWS_EXTRA_4 $PKTWS_EXTRA_5 $PKTWS_EXTRA_6 $PKTWS_EXTRA_7 $PKTWS_EXTRA_8 $PKTWS_EXTRA_9}"
+	strategy_append_extra_pktws
 	report_strategy $1 $2 $PKTWSD
 }
 warn_mss()
@@ -1402,12 +1430,14 @@ tpws_check_domain_http_bypass_()
 			tpws_curl_test_update $1 $3 $s && [ "$SCANLEVEL" = quick ] && return
 		done
 	else
+		local need_mss=1
 		for mss in '' 88; do
 			s3=${mss:+--mss=$mss}
 			for s2 in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 				for pos in $splits_tls; do
 					tpws_curl_test_update $1 $3 --split-pos=$pos $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
+						need_mss=0
 						break
 					}
 				done
@@ -1416,12 +1446,14 @@ tpws_check_domain_http_bypass_()
 				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' '--tlsrec=sniext+1 --split-pos=1,midsld' '--tlsrec=sniext+4 --split-pos=1,midsld' ; do
 					tpws_curl_test_update $1 $3 $s2 $s $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
+						need_mss=0
 						break
 					}
 				done
 			done
 			# only linux supports mss
 			[ "$UNAME" = Linux -a "$sec" = 1 ] || break
+			[ "$SCANLEVEL" = force -o "$need_mss" = 1 ] || break
 		done
 	fi
 }
@@ -1433,7 +1465,7 @@ tpws_check_domain_http_bypass()
 
 	local strategy
 	tpws_check_domain_http_bypass_ "$@"
-	strategy="${strategy:+$strategy${TPWS_EXTRA:+ $TPWS_EXTRA}${TPWS_EXTRA_1:+ "$TPWS_EXTRA_1"}${TPWS_EXTRA_2:+ "$TPWS_EXTRA_2"}${TPWS_EXTRA_3:+ "$TPWS_EXTRA_3"}${TPWS_EXTRA_4:+ "$TPWS_EXTRA_4"}${TPWS_EXTRA_5:+ "$TPWS_EXTRA_5"}${TPWS_EXTRA_6:+ "$TPWS_EXTRA_6"}${TPWS_EXTRA_7:+ "$TPWS_EXTRA_7"}${TPWS_EXTRA_8:+ "$TPWS_EXTRA_8"}${TPWS_EXTRA_9:+ "$TPWS_EXTRA_9"}}"
+	strategy_append_extra_tpws
 	report_strategy $1 $3 tpws
 }
 

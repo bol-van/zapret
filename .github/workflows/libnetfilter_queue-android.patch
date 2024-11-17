@@ -1,0 +1,41 @@
+--- a/src/extra/pktbuff.c
++++ b/src/extra/pktbuff.c
+@@ -14,7 +14,7 @@
+ #include <string.h> /* for memcpy */
+ #include <stdbool.h>
+ 
+-#include <netinet/if_ether.h>
++#include <linux/if_ether.h>
+ #include <netinet/ip.h>
+ #include <netinet/tcp.h>
+ 
+--- a/src/nlmsg.c
++++ b/src/nlmsg.c
+@@ -21,7 +21,7 @@
+ 
+ #include <linux/netfilter/nfnetlink_queue.h>
+ 
+-#include <libnetfilter_queue/libnetfilter_queue.h>
++// #include <libnetfilter_queue/libnetfilter_queue.h>
+ 
+ #include "internal.h"
+ 
+--- a/src/extra/tcp.c
++++ b/src/extra/tcp.c
+@@ -139,12 +139,16 @@ void nfq_tcp_compute_checksum_ipv6(struc
+  *  (union is compatible to any of its members)
+  *  This means this part of the code is -fstrict-aliasing safe now.
+  */
++#ifndef __ANDROID__
+ union tcp_word_hdr {
+ 	struct tcphdr hdr;
+ 	uint32_t  words[5];
+ };
++#endif
+ 
++#ifndef tcp_flag_word
+ #define tcp_flag_word(tp) ( ((union tcp_word_hdr *)(tp))->words[3])
++#endif
+ 
+ /**
+  * nfq_pkt_snprintf_tcp_hdr - print tcp header into one buffer in a humnan

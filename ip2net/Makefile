@@ -9,7 +9,9 @@ SRC_FILES = ip2net.c qsort.c
 all: ip2net
 
 ip2net: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) -o $@ $(SRC_FILES) $(LDFLAGS) $(LIBS)
+	$(CC) -s $(CFLAGS) -o ip2net $(SRC_FILES) $(LDFLAGS) $(LIBS)
+
+android: ip2net
 
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o ip2net $(SRC_FILES) $(LDFLAGS) $(LIBS)

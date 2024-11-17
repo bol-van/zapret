@@ -552,7 +552,7 @@ static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
 
 
 
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 static void cleanup_args()
 {
 	wordfree(&params.wexp);
@@ -561,7 +561,7 @@ static void cleanup_args()
 
 static void cleanup_params(void)
 {
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	cleanup_args();
 #endif
 
@@ -985,7 +985,7 @@ static unsigned int hash_jen(const void *data,unsigned int len)
 static void exithelp(void)
 {
 	printf(
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 		" @<config_file>|$<config_file>\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 #endif
 		" --debug=0|1|syslog|@<filename>\n"
@@ -1099,7 +1099,7 @@ static void exithelp_clean(void)
 	exithelp();
 }
 
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 // no static to not allow optimizer to inline this func (save stack)
 void config_from_file(const char *filename)
 {
@@ -1192,7 +1192,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	if (argc>=2 && (argv[1][0]=='@' || argv[1][0]=='$'))
 	{
 		config_from_file(argv[1]+1);
@@ -1963,7 +1963,7 @@ int main(int argc, char **argv)
 	}
 
 	// do not need args from file anymore
-#ifndef __OpenBSD__
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	cleanup_args();
 #endif
 	argv=NULL; argc=0;
