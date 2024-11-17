@@ -87,15 +87,14 @@ jobs:
           export LDFLAGS="-Os"
 
           # netfilter libs
-          git clone --depth 1 -b libmnl-1.0.5 git://git.netfilter.org/libmnl
-          git clone --depth 1 -b libnfnetlink-1.0.2 git://git.netfilter.org/libnfnetlink
-          git clone --depth 1 -b libnetfilter_queue-1.0.5 git://git.netfilter.org/libnetfilter_queue
+          wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libnetfilter_queue/libnetfilter_queue-1.0.5.tar.bz2 | tar -xj
 
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
-              cd $i
-              ./autogen.sh && \
-              ./configure --prefix= --host=$TARGET --enable-static --disable-shared && \
+              cd $i-*
+              ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
             sed -i "s|^prefix=.*|prefix=$DEPS_DIR|g" $DEPS_DIR/lib/pkgconfig/$i.pc
@@ -106,7 +105,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            ./configure --prefix= --static && \
+            ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
 
