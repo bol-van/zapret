@@ -1,0 +1,29 @@
+Windows x64
+
+1) Download latest cygwin for windows 7
+
+curl -O https://www.cygwin.com/setup-x86_64.exe
+setup-x86_64.exe --allow-unsupported-windows --no-verify --site http://ctm.crouchingtigerhiddenfruitbat.org/pub/cygwin/circa/64bit/2024/01/30/231215
+
+2) During setup install packages : make gcc-core zlib-devel
+
+3) Run Cygwin.bat
+
+4) cd to %ZAPRET_BASE%/nfq
+
+cd C:/Users/user/Downloads/zapret/nfq
+
+5) Compile
+
+make cygwin64
+
+use winws.exe
+
+6) Take windivert.dll and windivert64.sys here : https://reqrypt.org/download
+Choose version 2.2.2 for Windows 10 and 2.2.0 for Windows 7.
+
+7) Copy cygwin1.dll, winws.exe, windivert.dll and windivert64.sys to one folder.
+
+8) Run winws.exe from cmd.exe running as administrator.
+winws will not run from cygwin shell with cygwin1.dll copy in it's folder.
+winws will not run without cygwin1.dll outside of cygwin shell.

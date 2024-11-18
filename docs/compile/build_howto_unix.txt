@@ -1,0 +1,16 @@
+debian,ubuntu :
+
+apt install make gcc zlib1g-dev libcap-dev libnetfilter-queue-dev
+make -C /opt/zapret
+
+FreeBSD :
+
+make -C /opt/zapret
+
+OpenBSD :
+
+make -C /opt/zapret bsd
+
+MacOS :
+
+make -C /opt/zapret mac
