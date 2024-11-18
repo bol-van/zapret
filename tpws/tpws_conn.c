@@ -1244,7 +1244,21 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 							if (wr>0) conn->partner->twr += wr;
 							break;
 						}
-
+#ifdef __linux__
+						if (params.fix_seg)
+						{
+							unsigned int wasted;
+							if (!socket_wait_notsent(conn->partner->fd, 20, &wasted))
+								DLOG_ERR("WARNING ! segmentation failed\n");
+							if (wasted)
+								VPRINT("WARNING ! wasted %u ms to fix segmenation\n", wasted);
+						}
+						else
+						{
+							if (socket_has_notsent(conn->partner->fd))
+								DLOG_ERR("WARNING ! segmentation failed\n");
+						}
+#endif
 						from = to;
 					}
 				}

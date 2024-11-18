@@ -170,6 +170,9 @@ static void exithelp(void)
 #if defined(__FreeBSD__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
+#if defined(__linux__)
+		" --fix-seg\t\t\t\t; fix segmentation failures at the cost of possible slowdown\n"
+#endif
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		"\nMULTI-STRATEGY:\n"
@@ -635,8 +638,9 @@ void parse_params(int argc, char *argv[])
 		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=62
 		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=63
 		{ "mss",required_argument,0,0 },			// optidx=64
+		{ "fix-seg",no_argument,0,0 },				// optidx=65
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },				// optidx=65
+		{ "nosplice",no_argument,0,0 },				// optidx=66
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -1228,8 +1232,11 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
+		case 65: /* fix-seg */
+			params.fix_seg = true;
+			break;
 #ifdef SPLICE_PRESENT
-		case 65: /* nosplice */
+		case 66: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
