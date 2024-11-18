@@ -380,6 +380,7 @@ nfqws,tpws: set EXEDIR env var to use in @config (won't work for stadalone winws
 dvtws: set random/increasing ip_id value in generated packets
 mdig: fixed parsing of DNS reply in windows (stdin is opened as text, not binary)
 tpws: support compile for android NDK api level >= 21 (Android 5.0)
+tpws: --fix-seg segmentation fixer
 repo: build for android NDK api level 21 (Android 5.0)
 install_easy: support for APK package manager in openwrt
 blockcheck: removed ignore CA question
