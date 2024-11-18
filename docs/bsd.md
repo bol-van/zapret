@@ -143,7 +143,7 @@ $ ipfw -q -f flush
 zapret, добавив в параметры `--daemon`. Например так:
 ```sh
 $ pkill ^dvtws$
-$ /opt/zapret/nfq/dvtws --port=989 --daemon --dpi-desync=split2
+$ /opt/zapret/nfq/dvtws --port=989 --daemon --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 Для перезапуска фаервола и демонов достаточно будет сделать:
@@ -209,7 +209,7 @@ $ ipfw delete 100
 $ ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted xmit em0
 # required for autottl mode only
 $ ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in not diverted recv em0
-$ /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
+$ /opt/zapret/nfq/dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 #### Трафик только на таблицу zapret, за исключением таблицы nozapret
@@ -220,7 +220,7 @@ $ ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
 $ ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted not sockarg xmit em0
 # required for autottl mode only
 $ ipfw add 100 divert 989 tcp from table\(zapret\) 80,443 to any tcpflags syn,ack in not diverted not sockarg recv em0
-$ /opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
+$ /opt/zapret/nfq/dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 
@@ -317,7 +317,7 @@ sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted xmit em0
 pkill ^dvtws$
-dvtws --daemon --port 989 --dpi-desync=split2
+dvtws --daemon --port 989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 
 # required for newer pfsense versions (2.6.0 tested) to return ipfw to functional state
 pfctl -d ; pfctl -e
@@ -357,7 +357,7 @@ rdr pass on em1 inet6 proto tcp to port {80,443} -> fe80::20c:29ff:5ae3:4821 por
 ```sh
 $ pfctl -a zapret -f /etc/zapret.anchor
 $ pkill ^tpws$
-$ tpws --daemon --port=988 --enable-pf --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force --split-http-req=method --split-pos=2
+$ tpws --daemon --port=988 --enable-pf --bind-addr=127.0.0.1 --bind-iface6=em1 --bind-linklocal=force --split-pos=2
 ```
 
 4. После перезагрузки проверьте, что правила создались:
@@ -424,7 +424,7 @@ pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989 no sta
 
 ```sh
 $ pfctl -f /etc/pf.conf
-$ ./dvtws --port=989 --dpi-desync=split2
+$ ./dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 #### Трафик только на таблицу zapret, за исключением таблицы nozapret
@@ -456,7 +456,7 @@ pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-p
 
 ```sh
 $ pfctl -f /etc/pf.conf
-$ ./dvtws --port=989 --dpi-desync=split2
+$ ./dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 
