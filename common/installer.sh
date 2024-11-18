@@ -190,6 +190,7 @@ check_system()
 
 	get_fwtype
 	OPENWRT_FW3=
+	OPENWRT_FW4=
 
 	local info
 	UNAME=$(uname)
@@ -201,21 +202,29 @@ check_system()
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd
-		elif [ -f "/etc/openwrt_release" ] && exists opkg && exists uci && [ "$INIT" = "procd" ] ; then
-		{
+		elif [ -f "/etc/openwrt_release" ] && exists opkg || exists apk && exists uci && [ "$INIT" = "procd" ] ; then
 			SYSTEM=openwrt
+			OPENWRT_PACKAGER=opkg
+			OPENWRT_PACKAGER_INSTALL="opkg install"
+			OPENWRT_PACKAGER_UPDATE="opkg update"
+			exists apk && {
+				OPENWRT_PACKAGER=apk
+				OPENWRT_PACKAGER_INSTALL="apk add"
+				OPENWRT_PACKAGER_UPDATE=
+			}
+			info="package manager $OPENWRT_PACKAGER\n"
 			if openwrt_fw3 ; then
 				OPENWRT_FW3=1
-				info="openwrt firewall uses fw3"
+				info="${info}firewall fw3"
 				if is_ipt_flow_offload_avail; then
 					info="$info. hardware flow offloading requires iptables."
 				else
 					info="$info. flow offloading unavailable."
 				fi
 			elif openwrt_fw4; then
-				info="openwrt firewall uses fw4. flow offloading requires nftables."
+				OPENWRT_FW4=1
+				info="${info}firewall fw4. flow offloading requires nftables."
 			fi
-		}
 		elif openrc_test; then
 			SYSTEM=openrc
 		else
@@ -236,7 +245,7 @@ check_system()
 		exitp 5
 	fi
 	echo system is based on $SYSTEM
-	[ -n "$info" ] && echo $info
+	[ -n "$info" ] && printf "${info}\n"
 }
 
 get_free_space_mb()
@@ -420,14 +429,21 @@ check_kmod()
 }
 check_package_exists_openwrt()
 {
-	[ -n "$(opkg list $1)" ]
+	[ -n "$($OPENWRT_PACKAGER list $1)" ]
 }
 check_package_openwrt()
 {
-	[ -n "$(opkg list-installed $1)" ] && return 0
-	local what="$(opkg whatprovides $1 | tail -n +2 | head -n 1)"
-	[ -n "$what" ] || return 1
-	[ -n "$(opkg list-installed $what)" ]
+	case $OPENWRT_PACKAGER in
+		opkg)
+			[ -n "$(opkg list-installed $1)" ] && return 0
+			local what="$(opkg whatprovides $1 | tail -n +2 | head -n 1)"
+			[ -n "$what" ] || return 1
+			[ -n "$(opkg list-installed $what)" ]
+			;;
+		apk)
+			apk info -e $1
+			;;
+	esac
 }
 check_packages_openwrt()
 {
@@ -516,9 +532,8 @@ restart_openwrt_firewall()
 
 	local FW=fw4
 	[ -n "$OPENWRT_FW3" ] && FW=fw3
-	$FW -q restart || {
+	exists $FW && $FW -q restart || {
 		echo could not restart firewall $FW
-		exitp 30
 	}
 }
 remove_openwrt_firewall()
@@ -684,7 +699,23 @@ check_prerequisites_linux()
 
 removable_pkgs_openwrt()
 {
-	PKGS="iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra ip6tables-mod-nat ip6tables-extra kmod-nft-queue gzip coreutils-sort coreutils-sleep curl"
+	local pkg PKGS2
+	[ -n "$OPENWRT_FW4" ] && PKGS2="$PKGS2 iptables-zz-legacy iptables ip6tables-zz-legacy ip6tables"
+	[ -n "$OPENWRT_FW3" ] && PKGS2="$PKGS2 nftables-json nftables-nojson nftables"
+	PKGS=
+	for pkg in $PKGS2; do
+		check_package_exists_openwrt $pkg && PKGS="${PKGS:+$PKGS }$pkg"
+	done
+	PKGS="ipset iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra ip6tables-mod-nat ip6tables-extra kmod-nft-queue gzip coreutils-sort coreutils-sleep curl $PKGS"
+}
+
+openwrt_fix_broken_apk_uninstall_scripts()
+{
+	# at least in early snapshots with apk removing gnu gzip, sort, ... does not restore links to busybox
+	# system may become unusable
+	exists sort || { echo fixing missing sort; ln -fs /bin/busybox /usr/bin/sort; }
+	exists gzip || { echo fixing missing gzip; ln -fs /bin/busybox /bin/gzip; }
+	exists sleep || { echo fixing missing sleep; ln -fs /bin/busybox /bin/sleep; }
 }
 
 remove_extra_pkgs_openwrt()
@@ -693,19 +724,32 @@ remove_extra_pkgs_openwrt()
 	echo \* remove dependencies
 	removable_pkgs_openwrt
 	echo these packages may have been installed by install_easy.sh : $PKGS
-	ask_yes_no N "do you want to remove them" && opkg remove --autoremove $PKGS
+	ask_yes_no N "do you want to remove them" && {
+		case $OPENWRT_PACKAGER in
+			opkg)
+				opkg remove --autoremove $PKGS
+				;;
+			apk)
+				apk del $PKGS
+				openwrt_fix_broken_apk_uninstall_scripts
+				;;
+		esac
+	}
 }
 
 check_prerequisites_openwrt()
 {
 	echo \* checking prerequisites
 
-	local PKGS="curl" UPD=0
+	local PKGS="curl" UPD=0 local pkg_iptables
 
 	case "$FWTYPE" in
 		iptables)
-			PKGS="$PKGS ipset iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
-			[ "$DISABLE_IPV6" != "1" ] && PKGS="$PKGS ip6tables ip6tables-mod-nat ip6tables-extra"
+			pkg_iptables=iptables
+			check_package_exists_openwrt iptables-zz-legacy && pkg_iptables=iptables-zz-legacy
+			PKGS="$PKGS ipset $pkg_iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
+			check_package_exists_openwrt ip6tables-zz-legacy && pkg_iptables=ip6tables-zz-legacy
+			[ "$DISABLE_IPV6" = 1 ] || PKGS="$PKGS $pkg_iptables ip6tables-mod-nat ip6tables-extra"
 			;;
 		nftables)
 			PKGS="$PKGS nftables kmod-nft-nat kmod-nft-offload kmod-nft-queue"
@@ -717,9 +761,9 @@ check_prerequisites_openwrt()
 	else
 		echo \* installing prerequisites
 
-		opkg update
+		$OPENWRT_PACKAGER_UPDATE
 		UPD=1
-		opkg install $PKGS || {
+		$OPENWRT_PACKAGER_INSTALL $PKGS || {
 			echo could not install prerequisites
 			exitp 6
 		}
@@ -732,10 +776,10 @@ check_prerequisites_openwrt()
 		echo installer can install GNU gzip but it requires about 100 Kb space
 		if ask_yes_no N "do you want to install GNU gzip"; then
 			[ "$UPD" = "0" ] && {
-				opkg update
+				$OPENWRT_PACKAGER_UPDATE
 				UPD=1
 			}
-			opkg install --force-overwrite gzip
+			$OPENWRT_PACKAGER_INSTALL --force-overwrite gzip
 		fi
 	}
 	is_linked_to_busybox sort && {
@@ -745,10 +789,10 @@ check_prerequisites_openwrt()
 		echo installer can install GNU sort but it requires about 100 Kb space
 		if ask_yes_no N "do you want to install GNU sort"; then
 			[ "$UPD" = "0" ] && {
-				opkg update
+				$OPENWRT_PACKAGER_UPDATE
 				UPD=1
 			}
-			opkg install --force-overwrite coreutils-sort
+			$OPENWRT_PACKAGER_INSTALL --force-overwrite coreutils-sort
 		fi
 	}
 	[ "$FSLEEP" = 0 ] && is_linked_to_busybox sleep && {
@@ -757,10 +801,10 @@ check_prerequisites_openwrt()
 		echo if you want to speed up blockcheck install coreutils-sleep. it requires about 40 Kb space
 		if ask_yes_no N "do you want to install COREUTILS sleep"; then
 			[ "$UPD" = "0" ] && {
-				opkg update
+				$OPENWRT_PACKAGER_UPDATE
 				UPD=1
 			}
-			opkg install --force-overwrite coreutils-sleep
+			$OPENWRT_PACKAGER_INSTALL --force-overwrite coreutils-sleep
 			fsleep_setup
 		fi
 	}
