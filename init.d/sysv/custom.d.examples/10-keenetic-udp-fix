@@ -2,19 +2,18 @@
 # Keenetic uses proprietary ndmmark and does not masquerade without this mark
 # If not masqueraded packets go to WAN with LAN IP and get dropped by ISP
 
-# !!! MUST set IFACE_WAN in config !!!
+# It's advised to set IFACE_WAN in config
 
 zapret_custom_firewall()
 {
-        # $1 - 1 - add, 0 - stop
+	# $1 - 1 - add, 0 - stop
 
-	local wan
+	local wan wanif
 
-        ipt_print_op $1 "-j MASQUERADE" "keenetic udp fix"
-
-        if [ -n "$IFACE_WAN" ] ; then
-                for wan in $IFACE_WAN; do
-                        ipt_add_del $1 POSTROUTING -t nat -o $wan -j MASQUERADE
-                done
-        fi
+	# use IFACE_WAN if defined. if not - search for interfaces with default route.
+	wanif=${IFACE_WAN:-$(sed -nre 's/^([^\t]+)\t00000000\t[0-9A-F]{8}\t[0-9A-F]{4}\t[0-9]+\t[0-9]+\t[0-9]+\t00000000.*$/\1/p' /proc/net/route | sort -u | xargs)}
+	for wan in $wanif; do
+		ipt_print_op $1 "-o $wan -j MASQUERADE" "keenetic udp fix"
+		ipt_add_del $1 POSTROUTING -t nat -o $wan -j MASQUERADE
+	done
 }
