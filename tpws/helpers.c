@@ -10,6 +10,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <unistd.h>
 
 #ifdef __linux__
 #include <linux/tcp.h>
@@ -477,6 +478,24 @@ void msleep(unsigned int ms)
 }
 
 #ifdef __linux__
+bool socket_supports_notsent()
+{
+	int sfd;
+	struct tcp_info tcpi;
+
+	sfd = socket(AF_INET,SOCK_STREAM,0);
+	if (sfd<0) return false;
+
+	socklen_t ts = sizeof(tcpi);
+	if (getsockopt(sfd, IPPROTO_TCP, TCP_INFO, (char *)&tcpi, &ts) < 0)
+	{
+		close(sfd);
+		return false;
+	}
+	close(sfd);
+
+	return ts>=((char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi.tcpi_state + sizeof(tcpi.tcpi_notsent_bytes));
+}
 bool socket_has_notsent(int sfd)
 {
 	struct tcp_info tcpi;
@@ -486,7 +505,7 @@ bool socket_has_notsent(int sfd)
 		return false;
 	if (tcpi.tcpi_state != 1) // TCP_ESTABLISHED
 		return false;
-	size_t s = (char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi.tcpi_state;
+	size_t s = (char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi + sizeof(tcpi.tcpi_notsent_bytes);
 	if (ts < s)
 		// old structure version
 		return false;

@@ -120,6 +120,7 @@ static inline const struct in6_addr *mask_from_preflen6(uint8_t preflen)
 
 void msleep(unsigned int ms);
 #ifdef __linux__
+bool socket_supports_notsent();
 bool socket_has_notsent(int sfd);
 bool socket_wait_notsent(int sfd, unsigned int delay_ms, unsigned int *wasted_ms);
 #endif

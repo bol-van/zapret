@@ -1236,6 +1236,11 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case 65: /* fix-seg */
+			if (!socket_supports_notsent())
+			{
+				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
+				exit_clean(1);
+			}
 			if (optarg)
 			{
 				i = atoi(optarg);
