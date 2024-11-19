@@ -105,6 +105,7 @@ struct params_s
 
 	uint8_t proxy_type;
 	unsigned int fix_seg;
+	bool fix_seg_avail;
 	bool no_resolve;
 	bool skip_nodelay;
 	bool droproot;

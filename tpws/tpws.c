@@ -538,6 +538,8 @@ void parse_params(int argc, char *argv[])
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
 #endif
 
+	params.fix_seg_avail = socket_supports_notsent();
+
 	LIST_INIT(&params.hostlists);
 	LIST_INIT(&params.ipsets);
 
@@ -1236,7 +1238,7 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case 65: /* fix-seg */
-			if (!socket_supports_notsent())
+			if (!params.fix_seg_avail)
 			{
 				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
 				exit_clean(1);

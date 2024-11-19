@@ -1248,19 +1248,22 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 						bApplyOOB = i==0 && (split_flags & SPLIT_FLAG_OOB);
 						len = to-from;
 #ifdef __linux__
-						if (params.fix_seg)
+						if (params.fix_seg_avail)
 						{
-							unsigned int wasted;
-							bool bWaitOK = socket_wait_notsent(conn->partner->fd, params.fix_seg, &wasted);
-							if (wasted)
-								VPRINT("WARNING ! wasted %u ms to fix segmenation\n", wasted);
-							if (!bWaitOK)
-								report_segfail();
-						}
-						else
-						{
-							if (socket_has_notsent(conn->partner->fd))
-								report_segfail();
+							if (params.fix_seg)
+							{
+								unsigned int wasted;
+								bool bWaitOK = socket_wait_notsent(conn->partner->fd, params.fix_seg, &wasted);
+								if (wasted)
+									VPRINT("WARNING ! wasted %u ms to fix segmenation\n", wasted);
+								if (!bWaitOK)
+									report_segfail();
+							}
+							else
+							{
+								if (socket_has_notsent(conn->partner->fd))
+									report_segfail();
+							}
 						}
 #endif
 						VPRINT("Sending multisplit part %d %zd-%zd (len %zd)%s%s : ", i+1, from, to, len, bApplyDisorder ? " with disorder" : "", bApplyOOB ? " with OOB" : "");
