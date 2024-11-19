@@ -538,7 +538,9 @@ void parse_params(int argc, char *argv[])
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
 #endif
 
+#ifdef __linux__
 	params.fix_seg_avail = socket_supports_notsent();
+#endif
 
 	LIST_INIT(&params.hostlists);
 	LIST_INIT(&params.ipsets);
