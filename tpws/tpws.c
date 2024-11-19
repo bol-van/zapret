@@ -192,7 +192,7 @@ static void exithelp(void)
 		"\nTAMPER:\n"
 		" --split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
 		"\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
-		" --split-any-protocol\t\t\t; split not only http and https\n"
+		" --split-any-protocol\t\t\t; split not only http and TLS\n"
 #if defined(BSD) && !defined(__APPLE__)
 		" --disorder[=http|tls]\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
 #else
