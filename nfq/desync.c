@@ -1440,7 +1440,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 					if (seqovl_pos>=split_pos)
 					{
-						DLOG("seqovl>=split_pos (%u>=%zu). cancelling seqovl.\n",seqovl_pos,split_pos);
+						DLOG("seqovl>=split_pos (%lu>=%zu). cancelling seqovl.\n",seqovl_pos,split_pos);
 						seqovl = 0;
 					}
 					else
