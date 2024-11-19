@@ -1118,8 +1118,24 @@ static ssize_t send_oob(int fd, uint8_t *buf, size_t len, int ttl, bool oob, uin
 }
 
 
+static unsigned int segfail_count=0;
+static time_t segfail_report_time=0;
+static void report_segfail(void)
+{
+	time_t now = time(NULL);
+	segfail_count++;
+	if (now==segfail_report_time)
+		VPRINT("WARNING ! segmentation failed. total fails : %u\n", segfail_count);
+	else
+	{
+		DLOG_ERR("WARNING ! segmentation failed. total fails : %u\n", segfail_count);
+		segfail_report_time = now;
+	}
+}
+
 #define RD_BLOCK_SIZE 65536
 #define MAX_WASTE (1024*1024)
+
 static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32_t evt)
 {
 	int numbytes;
@@ -1239,12 +1255,12 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 							if (wasted)
 								VPRINT("WARNING ! wasted %u ms to fix segmenation\n", wasted);
 							if (!bWaitOK)
-								DLOG_ERR("WARNING ! segmentation failed\n");
+								report_segfail();
 						}
 						else
 						{
 							if (socket_has_notsent(conn->partner->fd))
-								DLOG_ERR("WARNING ! segmentation failed\n");
+								report_segfail();
 						}
 #endif
 						VPRINT("Sending multisplit part %d %zd-%zd (len %zd)%s%s : ", i+1, from, to, len, bApplyDisorder ? " with disorder" : "", bApplyOOB ? " with OOB" : "");
