@@ -549,7 +549,7 @@ service_install_systemd()
 
 	if [ -w "$SYSTEMD_SYSTEM_DIR" ] ; then
 		rm -f "$INIT_SCRIPT"
-		ln -fs "$EXEDIR/init.d/systemd/zapret.service" "$SYSTEMD_SYSTEM_DIR"
+		cp -f "$EXEDIR/init.d/systemd/zapret.service" "$SYSTEMD_SYSTEM_DIR"
 		"$SYSTEMCTL" daemon-reload
 		"$SYSTEMCTL" enable zapret || {
 			echo could not enable systemd service
@@ -567,8 +567,8 @@ timer_install_systemd()
 	if [ -w "$SYSTEMD_SYSTEM_DIR" ] ; then
 		"$SYSTEMCTL" disable zapret-list-update.timer
 		"$SYSTEMCTL" stop zapret-list-update.timer
-		ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR"
-		ln -fs "$EXEDIR/init.d/systemd/zapret-list-update.timer" "$SYSTEMD_SYSTEM_DIR"
+		cp -f "$EXEDIR/init.d/systemd/zapret-list-update.service" "$SYSTEMD_SYSTEM_DIR"
+		cp -f "$EXEDIR/init.d/systemd/zapret-list-update.timer" "$SYSTEMD_SYSTEM_DIR"
 		"$SYSTEMCTL" daemon-reload
 		"$SYSTEMCTL" enable zapret-list-update.timer || {
 			echo could not enable zapret-list-update.timer

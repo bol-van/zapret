@@ -363,3 +363,29 @@ nfqws,tpws: use alternate $ sign for $<config_file>
 repo: binaries removed from repo. git actions binaries build in releases.
 uninstall_easy.sh: offer to remove dependencies in openwrt
 install_easy.sh: allow to download lists in autohostlist filter mode
+
+v69:
+
+nfqws, tpws: multisplit/multidisorder support.
+nfqws: name change split->fakedsplit, disorder->fakeddisorder. compat : old names are synonyms
+nfqws: --dpi-desync-split-http-req, --dpi-desync-split-tls deprecated. compat : these parameters add split point to multisplit.
+nfqws: --dpi-desync=split2|disorder2 deprecated. compat: they are now synonyms for multisplit/multidisorder
+nfqws: cancel seqovl if MTU is exceeded (linux only). cancel seqovl for disorder if seqovl>=first_part_size.
+nfqws: fixed splits in multiple TLS segments.
+tpws: --split-tls,--split-tls deprecated. compat : these parameters add split point to multisplit.
+tpws: --tlsrec now takes pos markers. compat : old names are converted to pos markers
+tpws: --tlsrec-pos deprecated. compat : sets absolute pos marker
+nfqws,tpws: chown autohostlist, autohostlist debug log and debug log files after options parse
+nfqws,tpws: set EXEDIR env var to use in @config (won't work for stadalone winws without /bin/sh)
+dvtws: set random/increasing ip_id value in generated packets
+mdig: fixed parsing of DNS reply in windows (stdin is opened as text, not binary)
+tpws: support compile for android NDK api level >= 21 (Android 5.0)
+tpws: --fix-seg segmentation fixer
+repo: build for android NDK api level 21 (Android 5.0)
+install_easy: support for APK package manager in openwrt
+blockcheck: removed ignore CA question
+blockcheck: removed IGNORE_CA, CURL_VERBOSE
+blockcheck: added CURL_OPT
+blockcheck: new strategies support
+blockcheck: test sequence rework
+blockcheck: view all working strategies in summary

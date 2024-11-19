@@ -70,7 +70,7 @@ pass in  quick on em0 proto tcp from port {80,443} flags SA/SA divert-packet por
 pass in  quick on em0 proto tcp from port {80,443} no state
 pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989 no state
 pfctl -f /etc/pf.conf
-./dvtws --port=989 --dpi-desync=split2
+./dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 
 ; dvtws with table limitations : to zapret,zapret6 but not to nozapret,nozapret6
 ; reload tables : pfctl -f /etc/pf.conf
