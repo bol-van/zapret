@@ -372,7 +372,7 @@ nfqws: --dpi-desync-split-http-req, --dpi-desync-split-tls deprecated. compat : 
 nfqws: --dpi-desync=split2|disorder2 deprecated. compat: they are now synonyms for multisplit/multidisorder
 nfqws: cancel seqovl if MTU is exceeded (linux only). cancel seqovl for disorder if seqovl>=first_part_size.
 nfqws: fixed splits in multiple TLS segments.
-tpws: --split-tls,--split-tls deprecated. compat : these parameters add split point to multisplit.
+tpws: --split-http-req,--split-tls deprecated. compat : these parameters add split point to multisplit.
 tpws: --tlsrec now takes pos markers. compat : old names are converted to pos markers
 tpws: --tlsrec-pos deprecated. compat : sets absolute pos marker
 nfqws,tpws: chown autohostlist, autohostlist debug log and debug log files after options parse

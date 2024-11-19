@@ -155,9 +155,10 @@ nfqws takes the following parameters:
  --dpi-desync-fooling=<mode>[,<mode>]           ; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2
  --dpi-desync-repeats=<N>                       ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1                    ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
- --dpi-desync-split-pos=<1..9216>               ; data payload split position
- --dpi-desync-split-http-req=method|host        ; split at specified logical part of plain http request
- --dpi-desync-split-tls=sni|sniext              ; split at specified logical part of TLS ClientHello
+ --dpi-desync-split-pos=N|-N|marker+N|marker-N  ; comma separated list of split positions
+                                                ; markers: method,host,endhost,sld,endsld,midsld,sniext
+                                                ; full list is only used by multisplit and multidisorder
+                                                ; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise
  --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment
  --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
