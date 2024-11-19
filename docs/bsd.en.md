@@ -100,7 +100,7 @@ Later you will add ipfw commands to `/etc/rc.firewall.my` to be reapplied after 
 You can also run zapret daemons from there. Start them with `--daemon` options, for example
 ```
 pkill ^dvtws$
-/opt/zapret/nfq/dvtws --port=989 --daemon --dpi-desync=split2
+/opt/zapret/nfq/dvtws --port=989 --daemon --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 To restart firewall and daemons run : `/etc/rc.d/ipfw restart`
@@ -157,7 +157,7 @@ ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 # required for autottl mode only
 ipfw add 100 divert 989 tcp from any 80,443 to any tcpflags syn,ack in not diverted not sockarg recv em0
-/opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
+/opt/zapret/nfq/dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 Process only table zapret with the exception of table nozapret:
@@ -167,7 +167,7 @@ ipfw add 100 allow tcp from me to table\(nozapret\) 80,443
 ipfw add 100 divert 989 tcp from any to table\(zapret\) 80,443 out not diverted not sockarg xmit em0
 # required for autottl mode only
 ipfw add 100 divert 989 tcp from table\(zapret\) 80,443 to any tcpflags syn,ack in not diverted not sockarg recv em0
-/opt/zapret/nfq/dvtws --port=989 --dpi-desync=split2
+/opt/zapret/nfq/dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 Reinjection loop avoidance. FreeBSD artificially ignores sockarg for ipv6 in
@@ -245,7 +245,7 @@ sysctl net.inet6.ip6.pfil.inbound=ipfw,pf
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg xmit em0
 pkill ^dvtws$
-dvtws --daemon --port 989 --dpi-desync=split2
+dvtws --daemon --port 989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 
 # required for newer pfsense versions (2.6.0 tested) to return ipfw to functional state
 pfctl -d ; pfctl -e
@@ -342,7 +342,7 @@ pass out quick on em0 proto tcp to   port {80,443} divert-packet port 989
 Then:
 ```
 pfctl -f /etc/pf.conf
-./dvtws --port=989 --dpi-desync=split2
+./dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 `dwtws` only for table zapret with the exception of table nozapret :
@@ -375,7 +375,7 @@ pass out quick on em0 inet6 proto tcp to   <zapret6-user> port {80,443} divert-p
 Then:
 ```
 pfctl -f /etc/pf.conf
-./dvtws --port=989 --dpi-desync=split2
+./dvtws --port=989 --dpi-desync=multisplit --dpi-desync-split-pos=2
 ```
 
 divert-packet automatically adds the reverse rule. By default also incoming

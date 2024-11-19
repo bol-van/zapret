@@ -15,22 +15,33 @@ ___
 - [What is it for](#what-is-it-for)
 - [How it works](#how-it-works)
 - [How to put this into practice in the linux system](#how-to-put-this-into-practice-in-the-linux-system)
-- [ip6tables](#ip6tables)
-- [nftables](#nftables)
 - [When it will not work](#when-it-will-not-work)
 - [nfqws](#nfqws)
   - [DPI desync attack](#dpi-desync-attack)
-  - [DPI desync combos](#dpi-desync-combos)
-  - [SYNACK mode](#synack-mode)
+  - [Fakes](#fakes)
+  - [TCP segmentation](#tcp-segmentation)
+  - [Sequence numbers overlap](#sequence-numbers-overlap)
+  - [ipv6 specific modes](#ipv6-specific-modes)
+  - [Server reply reaction](#server-reply-reaction)
   - [SYNDATA mode](#syndata-mode)
-  - [Virtual Machines](#virtual-machines)
+  - [DPI desync combos](#dpi-desync-combos)
   - [CONNTRACK](#conntrack)
   - [Reassemble](#reassemble)
   - [UDP support](#udp-support)
   - [IP fragmentation](#ip-fragmentation)
-  - [multiple strategies](#multiple-strategies)
+  - [Multiple strategies](#multiple-strategies)
+  - [Virtual machines](#virtual-machines)
+  - [IPTABLES for nfqws](#iptables-for-nfqws)
+  - [NFTABLES for nfqws](#nftables-for-nfqws)
 - [tpws](#tpws)
-  - [multiple strategies](#multiple-strategies-1)
+  - [TCP segmentation in tpws](#tcp-segmentation-in-tpws)
+  - [TLSREC](#tlsrec)
+  - [MSS](#mss)
+  - [Other tamper options](#other-tamper-options)
+  - [Supplementary options](#supplementary-options)
+  - [Multiple strategies](#multiple-strategies-1)
+  - [IPTABLES for tpws](#iptables-for-tpws)
+  - [NFTABLES for tpws](#nftables-for-tpws)
 - [Ways to get a list of blocked IP](#ways-to-get-a-list-of-blocked-ip)
 - [Domain name filtering](#domain-name-filtering)
 - [**autohostlist** mode](#autohostlist-mode)
@@ -99,93 +110,8 @@ deal with its consequences.
 2. Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
 3. Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
 
-For options 2 and 3, tpws and nfqws programs are implemented, respectively.
+For options 2 and 3, **tpws** and **nfqws** programs are implemented, respectively.
 You need to run them with the necessary parameters and redirect certain traffic with iptables or nftables.
-
-To redirect a TCP connection to a transparent proxy, the following commands are used:
-
-forwarded traffic :
-`iptables -t nat -I PREROUTING -i <internal_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988`
-
-outgoing traffic :
-`iptables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988`
-
-DNAT on localhost works in the OUTPUT chain, but does not work in the PREROUTING chain without enabling the route_localnet parameter:
-
-`sysctl -w net.ipv4.conf.<internal_interface>.route_localnet=1`
-
-You can use `-j REDIRECT --to-port 988` instead of DNAT, but in this case the transparent proxy process 
-should listen on the ip address of the incoming interface or on all addresses. Listen all - not good
-in terms of security. Listening one (local) is possible, but automated scripts will have to recognize it,
-then dynamically enter it into the command. In any case, additional efforts are required.
-Using route_localnet can also introduce some security risks. You make available from internal_interface everything
-bound to `127.0.0.0/8`. Services are usually bound to `127.0.0.1`. Its possible to deny input to `127.0.0.1` from all interfaces except lo
-or bind tpws to any other IP from `127.0.0.0/8` range, for example to `127.0.0.127`, and allow incomings only to that IP :
-
-```
-iptables -A INPUT ! -i lo -d 127.0.0.127 -j ACCEPT
-iptables -A INPUT ! -i lo -d 127.0.0.0/8 -j DROP
-```
-
-Owner filter is necessary to prevent recursive redirection of connections from tpws itself.
-tpws must be started under OS user `tpws`.
-
-NFQUEUE redirection of the outgoing traffic and forwarded traffic going towards the external interface,
-can be done with the following commands:
-
-`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -j NFQUEUE --queue-num 200 --queue-bypass`
-
-In order not to touch the traffic to unblocked addresses, you can take a list of blocked hosts, resolve it
-into IP addresses and put them to ipset 'zapret', then add a filter to the command:
-
-`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
-
-Some DPIs catch only the first http request, ignoring subsequent requests in a keep-alive session.
-Then we can reduce CPU load, refusing to process unnecessary packets.
-
-`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
-
-Mark filter does not allow nfqws-generated packets to enter the queue again.
-Its necessary to use this filter when also using `connbytes`. Without it packet ordering can be changed breaking the whole idea.
-Also if there's huge packet send from nfqws it may deadlock without mark filter.
-
-Some attacks require redirection of incoming packets :
-
-`iptables -t mangle -I PREROUTING -i <external_interface> -p tcp --sport 80 -m connbytes --connbytes-dir=reply --connbytes-mode=packets --connbytes 1:6 -m set --match-set zapret src -j NFQUEUE --queue-num 200 --queue-bypass`
-
-Incoming packets are filtered by incoming interface, source port and IP. This is opposite to the direct rule.
-
-Some techniques that break NAT are possible only with nftables.
-
-
-## ip6tables
-
-ip6tables work almost exactly the same way as ipv4, but there are a number of important nuances.
-In DNAT, you should take the address --to in square brackets. For example :
-
- `ip6tables -t nat -I OUTPUT -o <external_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to [::1]:988`
-
-The route_localnet parameter does not exist for ipv6.
-DNAT to localhost (:: 1) is possible only in the OUTPUT chain.
-In the PREROUTING DNAT chain, it is possible to any global address or to the link local address of the same interface
-the packet came from.
-NFQUEUE works without changes.
-
-
-## nftables
-
-nftables are fine except one very big problem.
-nft requires tons of RAM to load large nf sets (ip lists) with subnets/intervals. Most of the home routers can't afford that.
-For example, even a 256 Mb system can't load a 100K ip list. nft process will OOM.
-nf sets do not support overlapping intervals and that's why nft process applies very RAM consuming algorithm to merge intervals so they don't overlap.
-There're equivalents to iptables for all other functions. Interface and protocol anonymous sets allow not to write multiple similar rules.
-Flow offloading is built-in into new linux kernels and nft versions.
-
-nft version `1.0.2` or higher is recommended. But the higher is version the better.
-
-Some techniques can be fully used only with nftables. It's not possible to queue packets after NAT in iptables.
-This limits techniques that break NAT.
-
 
 ## When it will not work
 
@@ -220,7 +146,7 @@ nfqws takes the following parameters:
  --hostspell                                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostnospace                                  ; remove space after Host: and add it to User-Agent: to preserve packet size
  --domcase                                      ; mix domain case : Host: TeSt.cOm
- --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 disorder disorder2 split split2 ipfrag2 udplen tamper
+ --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                         ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                        ; set ipv6 hop limit for desync packet. by default ttl value is used.
@@ -232,7 +158,7 @@ nfqws takes the following parameters:
  --dpi-desync-split-pos=<1..9216>               ; data payload split position
  --dpi-desync-split-http-req=method|host        ; split at specified logical part of plain http request
  --dpi-desync-split-tls=sni|sniext              ; split at specified logical part of TLS ClientHello
- --dpi-desync-split-seqovl=<int>                ; use sequence overlap before first sent original split segment
+ --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment
  --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
@@ -267,24 +193,21 @@ nfqws takes the following parameters:
  --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
 ```
 
-The manipulation parameters can be combined in any way.
-
-WARNING. `--wsize` parameter is now not used anymore in scripts. TCP split can be achieved using DPI desync attack.
-
 ### DPI desync attack
 
-After completion of the tcp 3-way handshake, the first data packet from the client goes.
-It usually has `GET / ...` or TLS ClientHello. We drop this packet, replacing with something else.
-It can be a fake version with another harmless but valid http or https request (`fake`), tcp reset packet (`rst`,`rstack`),
-split into 2 segments original packet with fake segment in the middle (`split`).
-`fakeknown` sends fake only in response to known application protocol.
-In articles these attack have names **TCB desynchronization** and **TCB teardown**.
-Fake packet must reach DPI, but do not reach the destination server.
-The following means are available: set a low TTL, send a packet with bad checksum,
-add tcp option **MD5 signature**. All of them have their own disadvantages :
+The idea is to take original message, modify it, add additional fake information in such a way that the server OS accepts original data only
+but DPI cannot recostruct original message or sees what it cannot identify as a prohibited request.
 
-* md5sig does not work on all servers
-* badsum doesn't work if your device is behind NAT which does not pass invalid packets.
+There's a set of instruments to achieve that goal.
+It can be fake packets that reach DPI but do not reach server or get rejected by server, TCP segmentation or IP fragmentation.
+There're attacks based on TCP sequence numbers. Methods can be combined in many ways.
+
+### Fakes
+
+Fakes are separate generated by nfqws packets carrying false information for DPI. They must either not reach the server or be rejected by it. Otherwise TCP connection or data stream would be broken. There're multiple ways to solve this task.
+
+* **md5sig** does not work on all servers
+* **badsum** doesn't work if your device is behind NAT which does not pass invalid packets.
   The most common Linux NAT router configuration does not pass them. Most home routers are Linux based.
   The default sysctl configuration `net.netfilter.nf_conntrack_checksum=1` causes contrack to verify tcp and udp checksums
   and set INVALID state for packets with invalid checksum.
@@ -299,25 +222,25 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
   This behavior was observed on a Mediatek MT7621 based device.
   Tried to modify mediatek ethernet driver with no luck, likely hardware enforced limitation.
   However the device allowed to send badsum packets, problem only existed for passthrough traffic from clients.
-* badseq packets will be dropped by server, but DPI also can ignore them.
+* **badseq** packets will be dropped by server, but DPI also can ignore them.
   default badseq increment is set to -10000 because some DPIs drop packets outside of the small tcp window.
   But this also can cause troubles when `--dpi-desync-any-protocol` is enabled.
   To be 100% sure fake packet cannot fit to server tcp window consider setting badseq increment to 0x80000000
-* TTL looks like the best option, but it requires special tuning for each ISP. If DPI is further than local ISP websites
+* **TTL** looks like the best option, but it requires special tuning for each ISP. If DPI is further than local ISP websites
   you can cut access to them. Manual IP exclude list is required. Its possible to use md5sig with ttl.
   This way you cant hurt anything, but good chances it will help to open local ISP websites.
   If automatic solution cannot be found then use `zapret-hosts-user-exclude.txt`.
   Some router stock firmwares fix outgoing TTL. Without switching this option off TTL fooling will not work.
-* `hopbyhop` is ipv6 only. This fooling adds empty extension header `hop-by-hop options` or two headers in case of `hopbyhop2`.
+* **hopbyhop** is ipv6 only. This fooling adds empty extension header `hop-by-hop options` or two headers in case of `hopbyhop2`.
   Packets with two hop-by-hop headers violate RFC and discarded by all operating systems.
   All OS accept packets with one hop-by-hop header.
   Some ISPs/operators drop ipv6 packets with hop-by-hop options. Fakes will not be processed by the server either because
   ISP drops them or because there are two same headers.
   DPIs may still anaylize packets with one or two hop-by-hop headers.
-* `datanoack` sends tcp fakes without ACK flag. Servers do not accept this but DPI may accept.
+* **datanoack** sends tcp fakes without ACK flag. Servers do not accept this but DPI may accept.
   This mode may break NAT and may not work with iptables if masquerade is used, even from the router itself.
   Works with nftables properly. Likely requires external IP address (some ISPs pass these packets through their NAT).
-* `autottl` tries to automatically guess TTL value that allows DPI to receive fakes and does not allow them to reach the server.
+* **autottl** tries to automatically guess TTL value that allows DPI to receive fakes and does not allow them to reach the server.
   This tech relies on well known TTL values used by OS : 64,128,255. nfqws takes first incoming packet (YES, you need to redirect it too),
   guesses path length and decreases by `delta` value (default 1). If resulting value is outside the range (min,max - default 3,20)
   then its normalized to min or max. If the path shorter than the value then autottl fails and falls back to the fixed value.
@@ -327,41 +250,52 @@ add tcp option **MD5 signature**. All of them have their own disadvantages :
 
 `--dpi-desync-fooling` takes multiple comma separated values.
 
-For fake,rst,rstack modes original packet is sent after the fake.
 
-Disorder mode splits original packet and sends packets in the following order :
-1. 2nd segment
-2. fake 1st segment, data filled with zeroes
-3. 1st segment
-4. fake 1st segment, data filled with zeroes (2nd copy)
+### TCP segmentation
 
-Original packet is always dropped. `--dpi-desync-split-pos` sets split position (default 2).
-If position is higher than packet length, pos=1 is used.
-This sequence is designed to make reconstruction of critical message as difficult as possible.
-Fake segments may not be required to bypass some DPIs, but can potentially help if more sophisticated reconstruction
-algorithms are used.
-Mode `disorder2` disables sending of fake segments.
+ * `multisplit`. split request at specified in `--dpi-desync-split-pos` positions
+ * `multidisorder`. same as `multisplit` but send in reverse order
+ * `fakedsplit`. split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, 2nd segment
+ * `fakeddisorder`. same as `fakedsplit` but with another order : 2nd segment, fake 1st segment, 1st segment, fake 1st segment
 
-Split mode is very similar to disorder but without segment reordering :
+Positions are defined by markers.
 
-1. fake 1st segment, data filled with zeroes
-2. 1st segment
-3. fake 1st segment, data filled with zeroes (2nd copy)
-4. 2nd segment
+* **Absolute positive marker** - numeric offset inside one packet or group of packets starting from the start
+* **Absolute negative marker** - numeric offset inside one packet or group of packets starting from the next byte after the end
+* **Relative marker** - positive or negative offset relative to a logical position within a packet or group of packets
 
-Mode `split2` disables sending of fake segments. It can be used as a faster alternative to --wsize.
+Relative positions :
 
-In `disorder2` and `split2` modes no fake packets are sent, so ttl and fooling options are not required.
+* **method** - HTTP method start ('GET', 'POST', 'HEAD', ...). Method is usually always at position 0 but also supported `--methodeol` fooling by **tpws**. If fooled position can become 1 or 2.
+* **host** - hostname start in a known protocol (http, TLS)
+* **endhost** - the byte next to the last hostname's byte
+* **sld** - second level domain start in the hostname
+* **endsld** - the byte next to the last SLD byte
+* **midsld** - middle of SLD
+* **sniext** - start of the data field in the SNI TLS extension. Any extension has 2-byte type and length fields followed by data field.
 
-`seqovl` adds to the first sent original segment (1st for split, 2nd for disorder) seqovl bytes to the beginning and decreases
-sequence number.
-In `split2` mode this creates partially in-window packet. OS receives only in-window part.
-In `disorder2` mode OS receives fake and real part of the second segment but does not pass received data to the socket until first
-segment is received. First segment overwrites fake part of the second segment. Then OS passes original data to the socket.
+Marker list example : `100,midsld,sniext+1,endhost-2,-10`.
+
+When splitting all markers are resolved to absolute offsets. If a relative position is absent in the current protocol its dropped. Then all resolved offsets are normalized to the current packet offset in multi packet group (multi-packet TLS with kyber, for example). Positions outside of the current packet are dropped. Remaining positions are sorted and deduplicated.
+
+In `multisplit`or `multidisorder` case split is cancelled if no position remained.
+
+`fakedsplit` и `fakeddisorder` use only one split position. It's searched from the  `--dpi-desync-split-pos` list by a special alorightm.
+First relative markers are searched. If no suitable found absolute markers are searched. If nothing found position 1 is used.
+
+For example, `--dpi-desync-split-pos=method+2,midsld,5` means `method+2` for http, `midsld` for TLS and 5 for others.
+
+### Sequence numbers overlap
+
+`seqovl` adds to one of the original segment `seqovl` bytes to the beginning and decreases sequence number. For `split` - to the first segment, for `disorder` - to the beginning of the penultimate segment sent (second in the original sequence).
+
+In `split` mode this creates partially in-window packet. OS receives only in-window part.
+In `disorder` mode OS receives fake and real part of the second segment but does not pass received data to the socket until first segment is received. First segment overwrites fake part of the second segment. Then OS passes original data to the socket.
 All unix OS except Solaris preserve last received data. This is not the case for Windows servers and `disorder` with `seqovl` will not work.
-Disorder requires `seqovl` to be less than `split_pos`. Either statically defined or automatically calculated.
-Otherwise desync is not possible and will not happen.
+Disorder requires `seqovl` to be less than split position. Otherwise `seqovl` is not possible and will be cancelled.
 Method allows to avoid separate fakes. Fakes and real data are mixed.
+
+### ipv6 specific modes
 
 `hopbyhop`, `destopt` and `ipfrag1` desync modes (they're not the same as `hopbyhop` fooling !) are ipv6 only. One `hop-by-hop`,
 `destination options` or `fragment` header is added to all desynced packets.
@@ -370,79 +304,20 @@ If it's not possible to send modified packet original one will be sent.
 The idea here is that DPI sees 0 in the next header field of the main ipv6 header and does not
 walk through the extension header chain until transport header is found.
 `hopbyhop`, `destopt`, `ipfrag1` modes can be used with any second phase mode except `ipfrag1+ipfrag2`.
-For example, `hopbyhop,split2` means split original tcp packet into 2 pieces and add hop-by-hop header to both.
+For example, `hopbyhop,multisplit` means split original tcp packet into several pieces and add hop-by-hop header to each.
 With `hopbyhop,ipfrag2` header sequence will be : `ipv6,hop-by-hop,fragment,tcp/udp`.
 `ipfrag1` mode may not always work without special preparations. See "IP Fragmentation" notices.
 
-There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello
-that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server
-with ACK sequence number corresponding to the length of the ClientHello+1.
+### Server reply reaction
+
+There are DPIs that analyze responses from the server, particularly the certificate from the ServerHello that contain domain name(s). The ClientHello delivery confirmation is an ACK packet from the server with ACK sequence number corresponding to the length of the ClientHello+1.
 In the disorder variant, a selective acknowledgement (SACK) usually arrives first, then a full ACK.
 If, instead of ACK or SACK, there is an RST packet with minimal delay, DPI cuts you off at the request stage.
-If the RST is after a full ACK after a delay of about ping to the server, then probably DPI acts
-on the server response. The DPI may be satisfied with good ClientHello and stop monitoring the TCP session
-without checking ServerHello. Then you were lucky. 'fake' option could work.
-If it does not stop monitoring and persistently checks the ServerHello, --wssize parameter may help (see CONNTRACK).
+If the RST is after a full ACK after a delay of about ping to the server, then probably DPI acts on the server response. The DPI may be satisfied with good ClientHello and stop monitoring the TCP session without checking ServerHello. Then you were lucky. 'fake' option could work.
+If it does not stop monitoring and persistently checks the ServerHello, --wssize parameter may help (see [CONNTRACK](#conntrack)).
 Otherwise it is hardly possible to overcome this without the help of the server.
 The best solution is to enable TLS 1.3 support on the server. TLS 1.3 sends the server certificate in encrypted form.
 This is recommendation to all admins of blocked sites. Enable TLS 1.3. You will give more opportunities to overcome DPI.
-
-Hosts are extracted from plain http request Host: header and SNI of ClientHello TLS message.
-Subdomains are applied automatically. gzip lists are supported.
-
-iptables for performing the attack on the first packet :
-
-`iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass`
-
-This is good if DPI does not track all requests in http keep-alive session.
-If it does, then pass all outgoing packets for http and only first data packet for https :
-
-```
-iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
-iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
-```
-
-mark is needed to keep away generated packets from NFQUEUE. nfqws sets fwmark when it sends generated packets.
-nfqws can internally filter marked packets. but when connbytes filter is used without mark filter
-packet ordering can be changed breaking the whole idea of desync attack.
-
-### DPI desync combos
-
-dpi-desync parameter takes up to 3 comma separated arguments.
-zero phase means tcp connection establishement (before sending data payload). Mode can be `synack`.
-Hostlist filter is not applicable to the zero phase.
-Next phases work on packets with data payload.
-1st phase mode can be `fake`,`rst`,`rstack`, 2nd phase mode - `disorder`,`disorder2`,`split`,`split2`,`ipfrag2`.
-Can be useful for ISPs with more than one DPI.
-
-### SYNACK mode
-
-In geneva docs it's called **TCP turnaround**. Attempt to make the DPI believe the roles of client and server are reversed.
-
-!!! This mode breaks NAT operation and can be used only if there's no NAT between the attacker's device and the DPI !
-
-In linux it's required to remove standard firewall rule dropping INVALID packets in the OUTPUT chain,
-for example : `-A OUTPUT -m state --state INVALID -j DROP`
-
-In openwrt it's possible to disable the rule for both FORWARD and OUTPUT chains in /etc/config/firewall :
-```
-config zone
-	option name 'wan'
-	.........
-	option masq_allow_invalid '1'
-```
-Unfortunately there's no OUTPUT only switch. It's not desired to remove the rule from the FORWARD chain.
-Add the following lines to `/etc/firewall.user` :
-
-```
-iptables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
-ip6tables -D zone_wan_output -m comment --comment '!fw3' -j zone_wan_dest_ACCEPT
-```
-
-then `/etc/init.d/firewall restart`
-
-Otherwise raw sending SYN,ACK frame will cause error stopping the further processing.
-If you realize you don't need the synack mode it's highly suggested to restore drop INVALID rule.
 
 ### SYNDATA mode
 
@@ -450,11 +325,15 @@ Normally SYNs come without data payload. If it's present it's ignored by all maj
 Original connections with TFO are not touched because otherwise they would be definitely broken.
 Without extra parameter payload is 16 zero bytes.
 
-### Virtual Machines
+### DPI desync combos
 
-Most of nfqws packet magic does not work from VMs powered by virtualbox and vmware when network is NATed.
-Hypervisor forcibly changes ttl and does not forward fake packets.
-Set up bridge networking.
+`--dpi-desync` takes up to 3 comma separated modes.
+
+* 0 phase modes work during the connection establishement : `synack`, `syndata` `--wsize`, `--wssize`. [hostlist](((#multiple-strategies))) filters are not applicable.
+* In the 1st phase fakes are sent before original data  : `fake`, `rst`, `rstack`.
+* In the 2nd phase original data is sent in a modified way (for example `fakedsplit` or `ipfrag2`).
+
+Modes must be specified in phase ascending order.
 
 ### CONNTRACK
 
@@ -540,11 +419,7 @@ If nfqws receives a partial ClientHello it begins reassemble session. Packets ar
 Then they go through desync using fully reassembled message.
 On any error reassemble is cancelled and all delayed packets are sent immediately without desync.
 
-There is special support for all tcp split options for multi segment TLS. Split position is treated
-as message-oriented, not packet oriented. For example, if your client sends TLS ClientHello with size 2000
-and SNI is at 1700, desync mode is fake,split2, then fake is sent first, then original first segment
-and the last splitted segment. 3 segments total.
-
+There is special support for all tcp split options for multi segment TLS. Split position is treated as message-oriented, not packet oriented. For example, if your client sends TLS ClientHello with size 2000 and SNI is at 1700, desync mode is `fake,multisplit`, then fake is sent first, then original first segment and the last splitted segment. 3 segments total.
 
 ### UDP support
 
@@ -624,9 +499,9 @@ nfqws sees packets with internal network source address. If fragmented NAT does 
 This results in attempt to send packets to internet with internal IP address.
 You need to use nftables instead with hook priority 101 or higher.
 
-### multiple strategies
+### Multiple strategies
 
-`nfqws` can apply different strategies to different requests. It's done with multiple desync profiles.
+**nfqws** can apply different strategies to different requests. It's done with multiple desync profiles.
 Profiles are delimited by the `--new` parameter. First profile is created automatically and does not require `--new`.
 Each profile has a filter. By default it's empty and profile matches any packet.
 Filter can have hard parameters : ip version, ipset and tcp/udp port range.
@@ -642,7 +517,7 @@ Otherwise verification goes to the next profile.
 It's possible that before knowing L7 and hostname connection is served by one profile and after
 this information is revealed it's switched to another profile.
 If you use 0-phase desync methods think carefully what can happen during strategy switch.
-Use `--debug` logging to understand better what `nfqws` does.
+Use `--debug` logging to understand better what **nfqws** does.
 
 Profiles are numbered from 1 to N. There's last empty profile in the chain numbered 0.
 It's used when no filter matched.
@@ -654,95 +529,223 @@ This way you may never unblock all resources and only confuse yourself.
 IMPORTANT : user-mode ipset implementation was not designed as a kernel version replacement. Kernel version is much more effective.
 It's for the systems that lack ipset support : Windows and Linux without nftables and ipset kernel modules (Android, for example).
 
+### Virtual machines
+
+Most of nfqws packet magic does not work from VMs powered by virtualbox and vmware when network is NATed.
+Hypervisor forcibly changes TTL and does not forward fake packets.
+Set up bridge networking.
+
+### IPTABLES for nfqws
+
+This is the common way to redirect some traffic to nfqws :
+
+```
+iptables -t mangle -I POSTROUTING -o <wan_interface> -p tcp -m multiport --dports 80,443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+```
+
+This variant works if DPI is stateful and does not track all packets separately in search for "bad requests". If it's stateless you have to redirect all outgoing plain http packets.
+
+```
+iptables -t mangle -I POSTROUTING -o <wan_interface> -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+iptables -t mangle -I POSTROUTING -o <wan_interface> -p tcp --dport 80 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+```
+
+mark bit is used to prevent loops. **nfqws** sets this mark in each injected packet.
+It's also necessary for correct injected packet ordering and for deadlock prevention.
+
+`autottl` requires incoming `SYN,ACK` packet or first reply packet (it's usually the same). 
+
+`autohostlist` needs incoming `RST` and `http redirect`.
+
+It's possible to build tcp flags and u32 based filter but connbytes is easier.
+
+`
+iptables -t mangle -I PREROUTING -i <wan_interface> -p tcp -m multiport --sports 80,443 -m connbytes --connbytes-dir=reply --connbytes-mode=packets --connbytes 1:3 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+`
+
+For QUIC :
+
+```
+iptables -t mangle -I POSTROUTING -o <wan_interface> -p udp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -j NFQUEUE --queue-num 200 --queue-bypass
+```
+
+6 packets cover possible retransmissions of quic initials and feed `autohostlist` mode.
+
+### NFTABLES for nfqws
+
+This is the start configuration :
+
+```
+IFACE_WAN=wan
+
+nft create table inet ztest
+
+nft add chain inet ztest post "{type filter hook postrouting priority mangle;}"
+nft add rule inet ztest post oifname $IFACE_WAN meta mark and 0x40000000 == 0 tcp dport "{80,443}" ct original packets 1-6 queue num 200 bypass
+nft add rule inet ztest post oifname $IFACE_WAN meta mark and 0x40000000 == 0 udp dport 443 ct original packets 1-6 queue num 200 bypass
+
+# auto hostlist with avoiding wrong ACK numbers in RST,ACK packets sent by russian DPI
+sysctl net.netfilter.nf_conntrack_tcp_be_liberal=1 
+nft add chain inet ztest pre "{type filter hook prerouting priority filter;}"
+nft add rule inet ztest pre iifname $IFACE_WAN tcp sport "{80,443}" ct reply packets 1-3 queue num 200 bypass
+```
+
+To engage `datanoack` or `ipfrag` for passthrough traffic special POSTNAT configuration is required. Generated packets must be marked as **notrack** in the early stage to avoid being invalidated by linux conntrack.
+
+```
+IFACE_WAN=wan
+
+nft create table inet ztest
+
+nft add chain inet ztest postnat "{type filter hook postrouting priority srcnat+1;}"
+nft add rule inet ztest postnat oifname $IFACE_WAN meta mark and 0x40000000 == 0 tcp dport "{80,443}" ct original packets 1-6 queue num 200 bypass
+nft add rule inet ztest postnat oifname $IFACE_WAN meta mark and 0x40000000 == 0 udp dport 443 ct original packets 1-6 queue num 200 bypass
+
+nft add chain inet ztest predefrag "{type filter hook output priority -401;}"
+nft add rule inet ztest predefrag "mark & 0x40000000 != 0x00000000 notrack"
+```
+
+Delete nftable :
+
+```
+nft delete table inet ztest
+```
+
+### Flow offloading
+
+If your device supports flow offloading (hardware acceleration) iptables and nftables may not work. With offloading enabled packets bypass standard netfilter flow. It must be either disabled or selectively controlled.
+
+Newer linux kernels have software flow offloading (SFO). The story is the same with SFO.
+
+In `iptables` flow offloading is controlled by openwrt proprietary extension `FLOWOFFLOAD`. Newer `nftables` implement built-in offloading support.
+
+Flow offloading does not interfere with **tpws** and `OUTPUT` traffic. It only breaks nfqws that fools `FORWARD` traffic.
+
+
 ## tpws
 
 tpws is transparent proxy.
 
 ```
- @<config_file>			; read file for options. must be the only argument. other options are ignored.
+ @<config_file>                          ; read file for options. must be the only argument. other options are ignored.
 
- --debug=0|1|2|syslog|@<filename>  ; 1 and 2 means log to console and set debug level. for other targets use --debug-level.
- --debug-level=0|1|2               ; specify debug level for syslog and @<filename>
- --bind-addr=<v4_addr>|<v6_addr>; for v6 link locals append %interface_name : fe80::1%br-lan
- --bind-iface4=<interface_name> ; bind to the first ipv4 addr of interface
- --bind-iface6=<interface_name> ; bind to the first ipv6 addr of interface
+ --debug=0|1|2|syslog|@<filename>        ; 1 and 2 means log to console and set debug level. for other targets use --debug-level.
+ --debug-level=0|1|2                     ; specify debug level for syslog and @<filename>
+ --bind-addr=<v4_addr>|<v6_addr>         ; for v6 link locals append %interface_name : fe80::1%br-lan
+ --bind-iface4=<interface_name>          ; bind to the first ipv4 addr of interface
+ --bind-iface6=<interface_name>          ; bind to the first ipv6 addr of interface
  --bind-linklocal=no|unwanted|prefer|force
-				; no : bind only to global ipv6
- 				; unwanted (default) : prefer global address, then LL
-				; prefer : prefer LL, then global
-				; force : LL only
- --bind-wait-ifup=<sec>         ; wait for interface to appear and up
- --bind-wait-ip=<sec>           ; after ifup wait for ip address to appear up to N seconds
- --bind-wait-ip-linklocal=<sec> ; accept only link locals first N seconds then any
- --bind-wait-only		; wait for bind conditions satisfaction then exit. return code 0 if success.
+                                         ; no : bind only to global ipv6
+                                         ; unwanted (default) : prefer global address, then LL
+                                         ; prefer : prefer LL, then global
+                                         ; force : LL only
+ --bind-wait-ifup=<sec>                  ; wait for interface to appear and up
+ --bind-wait-ip=<sec>                    ; after ifup wait for ip address to appear up to N seconds
+ --bind-wait-ip-linklocal=<sec>          ; accept only link locals first N seconds then any
+ --bind-wait-only                        ; wait for bind conditions satisfaction then exit. return code 0 if success.
  --connect-bind-addr=<v4_addr>|<v6_addr> ; address for outbound connections. for v6 link locals append %%interface_name
- --port=<port>			; port number to listen on
- --socks			; implement socks4/5 proxy instead of transparent proxy
- --local-rcvbuf=<bytes>		; SO_RCVBUF for local legs
- --local-sndbuf=<bytes>		; SO_SNDBUF for local legs
- --remote-rcvbuf=<bytes>        ; SO_RCVBUF for remote legs
- --remote-sndbuf=<bytes>	; SO_SNDBUF for remote legs
- --nosplice                     ; do not use splice to transfer data between sockets
- --skip-nodelay			; do not set TCP_NODELAY for outgoing connections. incompatible with split.
- --local-tcp-user-timeout=<seconds>  ; set tcp user timeout for local leg (default : 10, 0 = system default)
- --remote-tcp-user-timeout=<seconds> ; set tcp user timeout for remote leg (default : 20, 0 = system default)
- --no-resolve			; disable socks5 remote dns
- --resolver-threads=<int>       ; number of resolver worker threads
- --maxconn=<max_connections>	; max number of local legs
- --maxfiles=<max_open_files>    ; max file descriptors (setrlimit). min requirement is (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode.
-				; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
- --max-orphan-time=<sec>	; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds
+ --port=<port>                           ; port number to listen on
+ --socks                                 ; implement socks4/5 proxy instead of transparent proxy
+ --local-rcvbuf=<bytes>                  ; SO_RCVBUF for local legs
+ --local-sndbuf=<bytes>                  ; SO_SNDBUF for local legs
+ --remote-rcvbuf=<bytes>                 ; SO_RCVBUF for remote legs
+ --remote-sndbuf=<bytes>                 ; SO_SNDBUF for remote legs
+ --nosplice                              ; do not use splice to transfer data between sockets
+ --skip-nodelay                          ; do not set TCP_NODELAY for outgoing connections. incompatible with split.
+ --local-tcp-user-timeout=<seconds>      ; set tcp user timeout for local leg (default : 10, 0 = system default)
+ --remote-tcp-user-timeout=<seconds>     ; set tcp user timeout for remote leg (default : 20, 0 = system default)
+ --fix-seg=<int>                         ; recover failed TCP segmentation at the cost of slowdown. wait up to N msec.
+ --no-resolve                            ; disable socks5 remote dns
+ --resolver-threads=<int>                ; number of resolver worker threads
+ --maxconn=<max_connections>             ; max number of local legs
+ --maxfiles=<max_open_files>             ; max file descriptors (setrlimit). min requirement is (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode.
+                                         ; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
+ --max-orphan-time=<sec>                 ; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds
 
- --new                          ; begin new strategy
- --filter-l3=ipv4|ipv6          ; L3 protocol filter. multiple comma separated values allowed.
- --filter-tcp=[~]port1[-port2]|* ; TCP port filter. ~ means negation. comma separated list supported.
- --filter-l7=[http|tls|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
- --ipset=<filename>             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
- --ipset-exclude=<filename>     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --new                                   ; begin new strategy
+ --filter-l3=ipv4|ipv6                   ; L3 protocol filter. multiple comma separated values allowed.
+ --filter-tcp=[~]port1[-port2]|*         ; TCP port filter. ~ means negation. comma separated list supported.
+ --filter-l7=[http|tls|unknown]          ; L6-L7 protocol filter. multiple comma separated values allowed.
+ --ipset=<filename>                      ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude=<filename>              ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
 
- --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
- --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
- --hostlist-auto=<filename>            ; detect DPI blocks and build hostlist automatically
- --hostlist-auto-fail-threshold=<int>  ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
- --hostlist-auto-fail-time=<int>       ; all failed attemps must be within these seconds (default : 60)
- --hostlist-auto-debug=<logfile>       	; debug auto hostlist positives
+ --hostlist=<filename>                   ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude=<filename>           ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-auto=<filename>              ; detect DPI blocks and build hostlist automatically
+ --hostlist-auto-fail-threshold=<int>    ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
+ --hostlist-auto-fail-time=<int>         ; all failed attemps must be within these seconds (default : 60)
+ --hostlist-auto-debug=<logfile>         ; debug auto hostlist positives
 
- --split-http-req=method|host	; split http request at specified logical position.
- --split-tls=sni|sniext         ; split at specified logical part of TLS ClientHello
- --split-pos=<numeric_offset>   ; split at specified pos. split-http-req takes precedence over split-pos for http reqs.
- --split-any-protocol		; split not only http and https
- --disorder[=http|tls]          ; when splitting simulate sending second fragment first
- --oob[=http|tls]               ; when splitting send out of band byte. default is HEX 0x00.
- --oob-data=<char>|0xHEX        ; override default 0x00 OOB byte.
- --hostcase                     ; change Host: => host:
- --hostspell                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
- --hostdot                      ; add "." after Host: name
- --hosttab                      ; add tab after Host: name
- --hostnospace                  ; remove space after Host:
- --hostpad=<bytes>		; add dummy padding headers before Host:
- --domcase			; mix domain case after Host: like this : TeSt.cOm
- --methodspace                  ; add extra space after method
- --methodeol                    ; add end-of-line before method
- --unixeol                      ; replace 0D0A to 0A
- --tlsrec=sni|sniext            ; make 2 TLS records. split at specified logical part. don't split if SNI is not present.
- --tlsrec-pos=<pos>             ; make 2 TLS records. split at specified pos
- --mss=<int>                    ; set client MSS. forces server to split messages but significantly decreases speed !
- --mss-pf=[~]port1[-port2]      ; MSS port filter. ~ means negation
- --tamper-start=[n]<pos>        ; start tampering only from specified outbound stream position. byte pos or block number ('n'). default is 0.
- --tamper-cutoff=[n]<pos>       ; do not tamper anymore after specified outbound stream position. byte pos or block number ('n'). default is unlimited.
- --daemon                       ; daemonize
- --pidfile=<filename>           ; write pid to file
- --user=<username>              ; drop root privs
- --uid=uid[:gid]		; drop root privs
+ --split-pos=N|-N|marker+N|marker-N      ; comma separated list of split positions
+                                         ; markers: method,host,endhost,sld,endsld,midsld,sniext  
+ --split-any-protocol                    ; split not only http and TLS
+ --disorder[=http|tls]                   ; when splitting simulate sending second fragment first
+ --oob[=http|tls]                        ; when splitting send out of band byte. default is HEX 0x00.
+ --oob-data=<char>|0xHEX                 ; override default 0x00 OOB byte.
+ --hostcase                              ; change Host: => host:
+ --hostspell                             ; exact spelling of "Host" header. must be 4 chars. default is "host"
+ --hostdot                               ; add "." after Host: name
+ --hosttab                               ; add tab after Host: name
+ --hostnospace                           ; remove space after Host:
+ --hostpad=<bytes>                       ; add dummy padding headers before Host:
+ --domcase                               ; mix domain case after Host: like this : TeSt.cOm
+ --methodspace                           ; add extra space after method
+ --methodeol                             ; add end-of-line before method
+ --unixeol                               ; replace 0D0A to 0A
+ --tlsrec=N|-N|marker+N|marker-N         ; make 2 TLS records. split at specified logical part. don't split if SNI is not present.
+ --tlsrec-pos=<pos>                      ; make 2 TLS records. split at specified pos
+ --mss=<int>                             ; set client MSS. forces server to split messages but significantly decreases speed !
+ --tamper-start=[n]<pos>                 ; start tampering only from specified outbound stream position. byte pos or block number ('n'). default is 0.
+ --tamper-cutoff=[n]<pos>                ; do not tamper anymore after specified outbound stream position. byte pos or block number ('n'). default is unlimited.
+ --daemon                                ; daemonize
+ --pidfile=<filename>                    ; write pid to file
+ --user=<username>                       ; drop root privs
+ --uid=uid[:gid]		                ; drop root privs
 ```
 
-The manipulation parameters can be combined in any way.
+### TCP segmentation in tpws
 
-`split-http-req` takes precedence over split-pos for http reqs.
+**tpws** like **nfqws** supports multiple splits. Split [markers](#tcp-segmentation) are specified in `--split-pos` parameter.
 
-split-pos works by default only on http and TLS ClientHello. use `--split-any-protocol` to act on any packet
+On the socket level there's no guaranteed way to force OS to send pieces of data in separate packets. OS has a send buffer for each socket. If `TCP_NODELAY` socket option is enabled and send buffer is empty OS will likely send data immediately. If send buffer is not empty OS will coalesce it with new data and send in one packet if possible.
 
-tpws can bind to multiple interfaces and IP addresses (up to 32).
+In practice outside of massive transmissions it's usually enough to enable `TCP_NODELAY` and use separate `send()` calls to force custom TCP segmentation. But if there're too many split segments Linux can combined some pieces and break desired behaviour. BSD and Windows are more predictable in this case. That's why it's not recommended to use too many splits. Tests revealed that 8+ can become problematic.
+
+Since linux kernel 4.6 **tpws** can recognize TCP segmentation failures and warn about them. `--fix-seg` can fix segmentation failures at the cost of some slowdown. It waits for several msec until all previous data is sent. This breaks async processing model and slows down every other connection going through **tpws**. Thus it's not recommended on highly loaded systems. But can be compromise for home systems.
+
+If you're attempting to split massive transmission with `--split-any-protocol` option it will definitely cause massive segmentation failures. Do not do that without `--tamper-start` and `--tamper-cutoff` limiters.
+
+**tpws** works on socket level and receives in one shot long requests (TLS with kyber) that should normally require several TCP packets. It tampers entire received block without knowing how much packets it will take. OS will do additional segmenation to meet MTU.
+
+`--disorder` sends every odd packet with TTL=1. Server receives even packets fastly. Then client OS retransmits odd packets with normal TTL and server receives them. In case of 6 segments server and DPI will see them in this order : `2 4 6 1 3 5`. This way of disorder causes some delays. Default retransmission timeout in Linux is 200 ms.
+
+`--oob` sends one out-of-band byte in the end of the first split segment.
+
+`--oob` and `--disorder` can be combined only in Linux. Others OS do not handle this correctly.
+
+### TLSREC
+
+`--tlsrec` allow to split TLS ClientHello into 2 TLS records in one TCP segment. It accepts single pos marker.
+
+`--tlsrec` breaks significant number of sites. Crypto libraries on servers usually accept fine modified ClientHello but middleboxes such as CDNs and ddos guards - not always. Use of `--tlsrec` without filters is discouraged.
+
+### MSS
+
+`--mss` sets TCP_MAXSEG socket option. Client sets this value in MSS TCP option in the SYN packet.
+Server replies with it's own MSS in SYN,ACK packet. Usually servers lower their packet sizes but they still don't fit to supplied MSS. The greater MSS client sets the bigger server's packets will be.
+If it's enough to split TLS 1.2 ServerHello, it may fool DPI that checks certificate domain name.
+This scheme may significantly lower speed. Hostlist filter is possible only in socks mode if client uses remote resolving (firefox `network.proxy.socks_remote_dns`).
+`--mss` is not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse. Use only if nothing better is available. Works only in Linux, not BSD or MacOS.
+
+### Other tamper options
+
+`--hostpad=<bytes>` adds padding headers before `Host:` with specified number of bytes. If `<bytes>` is too large headers are split by 2K. Padding more that 64K is not supported and not accepted by http servers.
+
+It's useful against stateful DPI's that reassemble only limited amount of data. Increase padding `<bytes>` until website works. If minimum working `<bytes>` is close to MTU then it's likely DPI is not reassembling packets. Then it's better to use regular split instead of `--hostpad`.
+
+### Supplementary options
+
+**tpws** can bind to multiple interfaces and IP addresses (up to 32).
 
 Port number is always the same.
 
@@ -778,43 +781,82 @@ To bind to a specific ip when its interface may not be configured yet do : `--bi
 
 It's possible to bind to any nonexistent address in transparent mode but in socks mode address must exist.
 
-In socks proxy mode no additional system privileges are required. Connections to local IPs of the system where tpws runs are prohibited.
+In socks proxy mode no additional system privileges are required. Connections to local IPs of the system where **tpws** runs are prohibited.
 tpws supports remote dns resolving (curl : `--socks5-hostname`  firefox : `socks_remote_dns=true`) , but does it in blocking mode.
 
-tpws uses async sockets for all activities. Domain names are resolved in multi threaded pool.
+**tpws** uses async sockets for all activities. Domain names are resolved in multi threaded pool.
 Resolving does not freeze other connections. But if there're too many requests resolving delays may increase.
 Number of resolver threads is choosen automatically proportinally to `--maxconn` and can be overriden using `--resolver-threads`.
 To disable hostname resolve use `--no-resolve` option.
 
-`--disorder` is an additional flag to any split option.
-It tries to simulate `--disorder2` option of `nfqws` using standard socket API without the need of additional privileges.
-This works fine in Linux and MacOS but unexpectedly in FreeBSD and OpenBSD
-(system sends second fragment then the whole packet instead of the first fragment).
+### Multiple strategies
 
-`--tlsrec` and `--tlsrec-pos` allow to split TLS ClientHello into 2 TLS records in one TCP segment.
-`--tlsrec=sni` splits between 1st and 2nd chars of the hostname. No split occurs if SNI is not present.
-`--tlsrec-pos` splits at specified position. If TLS data block size is too small pos=1 is applied.
-`--tlsrec` can be combined with `--split-pos` and `--disorder`.
-`--tlsrec` breaks significant number of sites. Crypto libraries on end servers usually accept fine modified ClientHello
-but middleboxes such as CDNs and ddos guards - not always.
-Use of `--tlsrec` without filters is discouraged.
-
-`--mss` sets TCP_MAXSEG socket option. Client sets this value in MSS TCP option in the SYN packet.
-Server replies with it's own MSS in SYN,ACK packet. Usually servers lower their packet sizes but they still don't
-fit to supplied MSS. The greater MSS client sets the bigger server's packets will be.
-If it's enough to split TLS 1.2 ServerHello, it may fool DPI that checks certificate domain name.
-This scheme may significantly lower speed. Hostlist filter is possible only in socks mode if client uses remote resolving (firefox `network.proxy.socks_remote_dns`).
-`--mss` is not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
-Use only if nothing better is available. Works only in Linux, not BSD or MacOS.
-
-### multiple strategies
-
-`tpws` supports multiple strategies as well. They work mostly like with `nfqws` with minimal differences.
-`filter-udp` is absent because `tpws` does not support udp. 0-phase desync methods (`--mss`) can work with hostlist in socks modes with remote hostname resolve.
+**tpws** like **nfqws** supports multiple strategies. They work mostly like with **nfqws** with minimal differences.
+`filter-udp` is absent because **tpws** does not support udp. 0-phase desync methods (`--mss`) can work with hostlist in socks modes with remote hostname resolve.
 This is the point where you have to plan profiles carefully. If you use `--mss` and hostlist filters, behaviour can be different depending on remote resolve feature enabled or not.
 Use `--mss` both in hostlist profile and profile without hostlist.
 Use `curl --socks5` and `curl --socks5-hostname` to issue two kinds of proxy queries.
 See `--debug` output to test your setup.
+
+### IPTABLES for tpws
+
+Use the following rules to redirect TCP connections to 'tpws' :
+```
+iptables -t nat -I OUTPUT -o <wan_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to 127.0.0.127:988
+iptables -t nat -I PREROUTING -i <lan_interface> -p tcp --dport 80 -j DNAT --to 127.0.0.127:988
+```
+
+First rule redirects outgoing from the same system traffic, second redirects passthrough traffic.
+
+DNAT to localhost works only in the **OUTPUT** chain and does not work in the **PREROUTING** chain without setting this sysctl :
+
+`sysctl -w net.ipv4.conf.<lan_interface>.route_localnet=1`
+
+It's also possible to use `-j REDIRECT --to-port 988` instead of DNAT but in the latter case transparent proxy must listen on all IP addresses or on a LAN interface address. It's not too good to listen on all IP and it's not trivial to get specific IP in a shell script. `route_localnet` has it's own security impact if not protected by additional rules. You open `127.0.0.0/8` subnet to the net.
+
+This is how to open only single `127.0.0.127` address :
+```
+iptables -A INPUT ! -i lo -d 127.0.0.127 -j ACCEPT
+iptables -A INPUT ! -i lo -d 127.0.0.0/8 -j DROP
+```
+
+Owner filter is required to avoid redirection loops. **tpws** must be run with `--user tpws` parameter.
+
+ip6tables work almost the same with minor differences. ipv6 addresses should be enclosed in square brackets :
+```
+ip6tables -t nat -I OUTPUT -o <wan_interface> -p tcp --dport 80 -m owner ! --uid-owner tpws -j DNAT --to [::1]:988
+```
+
+There's no `route_localnet` for ipv6. DNAT to localhost (`::1`) is possible only in **OUTPUT** chain. In **PREROUTING** chain DNAT is possible to any global address or link local address of the interface where packet came from.
+
+### NFTABLES for tpws
+
+Base nftables scheme :
+```
+IFACE_WAN=wan
+IFACE_LAN=br-lan
+
+sysctl -w net.ipv4.conf.$IFACE_LAN.route_localnet=1
+
+nft create table inet ztest
+
+nft create chain inet ztest localnet_protect
+nft add rule inet ztest localnet_protect ip daddr 127.0.0.127 return
+nft add rule inet ztest localnet_protect ip daddr 127.0.0.0/8 drop
+nft create chain inet ztest input "{type filter hook input priority filter - 1;}"
+nft add rule inet ztest input iif != "lo" jump localnet_protect
+
+nft create chain inet ztest dnat_output "{type nat hook output priority dstnat;}"
+nft add rule inet ztest dnat_output meta skuid != tpws oifname $IFACE_WAN tcp dport { 80, 443 } dnat ip to 127.0.0.127:988
+nft create chain inet ztest dnat_pre "{type nat hook prerouting priority dstnat;}"
+nft add rule inet ztest dnat_pre meta iifname $IFACE_LAN tcp dport { 80, 443 } dnat ip to 127.0.0.127:988
+```
+
+Delete nftable :
+```
+nft delete table inet ztest
+```
+
 
 ## Ways to get a list of blocked IP
 
@@ -883,8 +925,8 @@ LISTS_RELOAD=-  disables reloading ip list backend.
 
 ## Domain name filtering
 
-An alternative to ipset is to use tpws or nfqws with a list(s) of domains.
-Both `tpws` and `nfqws` take any number of include (`--hostlist`) and exclude (`--hostlist-exclude`) domain lists.
+An alternative to ipset is to use **tpws** or **nfqws** with a list(s) of domains.
+Both **tpws** and **nfqws** take any number of include (`--hostlist`) and exclude (`--hostlist-exclude`) domain lists.
 All lists of the same type are combined internally leaving only 2 lists : include and exclude.
 
 Exclude list is checked first. Fooling is cancelled if domain belongs to exclude list.
@@ -901,13 +943,13 @@ and 1 exclude list
 
 `ipset/zapret-hosts-users-exclude.txt.gz` or `ipset/zapret-hosts-users-exclude.txt`
 
-If `MODE_FILTER=hostlist` all present lists are passed to `nfqws` or `tpws`.
+If `MODE_FILTER=hostlist` all present lists are passed to **nfqws** or **tpws**.
 If all include lists are empty it works like no include lists exist at all.
 If you need "all except" mode you dont have to delete zapret-hosts-users.txt. Just make it empty.
 
 Subdomains auto apply. For example, "ru" in the list affects "*.ru" .
 
-tpws and nfqws automatically reload lists if their modification date is changed.
+**tpws** and **nfqws** automatically reload lists if their modification date is changed.
 
 When filtering by domain name, daemons should run without filtering by ipset.
 When using large regulator lists estimate the amount of RAM on the router !
@@ -923,7 +965,7 @@ In case of nfqws it's required to redirect both incoming and outgoing traffic to
 It's strongly recommended to use connbytes filter or nfqws will process gigabytes of incoming traffic.
 For the same reason it's not recommended to use autohostlist mode in BSDs. BSDs do not support connbytes or similar mechanism.
 
-nfqws и tpws detect the folowing situations :
+**nfqws** и **tpws** detect the folowing situations :
 1) [nfqws] Multiple retransmissions of the first request inside a TCP session having host.
 2) [nfqws,tpws] RST in response to the first request.
 3) [nfqws,tpws] HTTP redirect in response to the first http request with 2nd level domain diferent from the original.
@@ -969,11 +1011,11 @@ On openwrt by default `nftables` is selected on `firewall4` based systems.
 `FWTYPE=iptables`
 
 With `nftables` post-NAT scheme is used by default. It allows more DPI attacks on forwarded traffic.
-It's possible to use `iptables`-like pre-NAT scheme. `nfqws` will see client source IPs and display them in logs.
+It's possible to use `iptables`-like pre-NAT scheme. **nfqws** will see client source IPs and display them in logs.
 
 `#POSTNAT=0`
 
-There'are 3 standard options configured separately and independently : `tpws-socks`, `tpws`, `nfqws`.
+There'are 3 standard options configured separately and independently : `tpws-socks`, **tpws**, **nfqws**.
 They can be used alone or combined. Custom scripts in `init.d/{sysv,openwrt,macos}/custom.d` are always applied.
 
 `tpws-socks` requires daemon parameter configuration but does not require traffic interception.
@@ -992,45 +1034,45 @@ Don't use `<HOSTLIST>` in highly specialized profiles. Use your own filter or ho
 If any other profile adds something this profile accepts the change automatically.
 
 
-`tpws` socks proxy mode switch
+**tpws** socks proxy mode switch
 
 `TPWS_SOCKS_ENABLE=0`
 
-Listening tcp port for `tpws` proxy mode.
+Listening tcp port for **tpws** proxy mode.
 
 `TPPORT_SOCKS=987`
 
-`tpws` socks mode parameters
+**tpws** socks mode parameters
 
 ```
 TPWS_SOCKS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
---filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+--filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>"
 "
 ```
 
-`tpws` transparent mode switch
+**tpws** transparent mode switch
 
 `TPWS_ENABLE=0`
 
-`tpws` transparent mode target ports
+**tpws** transparent mode target ports
 
 `TPWS_PORTS=80,443`
 
-`tpws` transparent mode parameters
+**tpws** transparent mode parameters
 
 ```
 TPWS_OPT="
 --filter-tcp=80 --methodeol <HOSTLIST> --new
---filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+--filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>"
 "
 ```
 
-`nfqws` enable switch
+**nfqws** enable switch
 
 `NFQWS_ENABLE=0`
 
-`nfqws` port targets for `connbytes`-limited interception. `connbytes` allows to intercept only starting packets from connections.
+**nfqws** port targets for `connbytes`-limited interception. `connbytes` allows to intercept only starting packets from connections.
 This is more effective kernel-mode alternative to `nfqws --dpi-desync-cutoff=nX`.
 
 ```
@@ -1058,12 +1100,12 @@ It's advised also to remove these ports from `connbytes`-limited interception li
 #NFQWS_PORTS_UDP_KEEPALIVE=
 ```
 
-`nfqws` parameters
+**nfqws** parameters
 
 ```
 NFQWS_OPT="
---filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
---filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=80 --dpi-desync=fake,multisplit --dpi-desync-split-pos=method+2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=443 --dpi-desync=fake,multidisorder --dpi-desync-split-pos=1,midsld --dpi-desync-fooling=badseq,md5sig <HOSTLIST> --new
 --filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST_NOAUTO>
 "
 ```
@@ -1281,33 +1323,29 @@ For low storage openwrt see `init.d/openwrt-minimal`.
 
 ### Android
 
-Its not possible to use nfqws and tpws in transparent proxy mode without root privileges.
-Without root tpws can run in --socks mode.
+Its not possible to use **nfqws** and **tpws** in transparent proxy mode without root privileges. Without root **tpws** can run in `--socks` mode.
 
-Android has NFQUEUE and nfqws should work.
+Android has NFQUEUE and **nfqws** should work.
 
-There's no ipset support unless you run custom kernel. In common case task of bringing up ipset
-on android is ranging from "not easy" to "almost impossible", unless you find working kernel
-image for your device.
+There's no `ipset` support unless you run custom kernel. In common case task of bringing up `ipset` on android is ranging from "not easy" to "almost impossible", unless you find working kernel image for your device.
 
-Android does not use /etc/passwd, `tpws --user` won't work. There's replacement.
-Use numeric uids in `--uid` option.
-Its recommended to use gid 3003 (AID_INET), otherwise tpws will not have inet access.
+Although linux binaries work it's recommended to use Android specific ones. They have no problems with user names, local time, DNS, ...
+Its recommended to use gid 3003 (AID_INET), otherwise **tpws** will not have inet access.
 
 Example : `--uid 1:3003`
 
 In iptables use : `! --uid-owner 1` instead of `! --uid-owner tpws`.
 
-Nfqws should be executed with `--uid 1`. Otherwise on some devices or firmwares kernel may partially hang. Looks like processes with certain uids can be suspended. With buggy chineese cellular interface driver this can lead to device hang.
+**nfqws** should be executed with `--uid 1`. Otherwise on some devices or firmwares kernel may partially hang. Looks like processes with certain uids can be suspended. With buggy chineese cellular interface driver this can lead to device hang.
 
-Write your own shell script with iptables and tpws, run it using your root manager.
+Write your own shell script with iptables and **tpws**, run it using your root manager.
 Autorun scripts are here :
 
 magisk  : `/data/adb/service.d`
 
 supersu : `/system/su.d`
 
-How to run tpws on root-less android.
+How to run **tpws** on root-less android.
 You can't write to `/system`, `/data`, can't run from sd card.
 Selinux prevents running executables in `/data/local/tmp` from apps.
 Use adb and adb shell.
@@ -1341,7 +1379,7 @@ You will need :
  * root shell access. true sh shell, not microtik-like console
  * startup hook
  * r/w partition to store binaries and startup script with executable permission (+x)
- * tpws can be run almost anywhere but nfqws require kernel support for NFQUEUE. Its missing in most firmwares.
+ * **tpws** can be run almost anywhere but **nfqws** require kernel support for NFQUEUE. Its missing in most firmwares.
  * too old 2.6 kernels are unsupported and can cause errors. newer 2.6 kernels are OK.
 If binaries crash with segfault (rare but happens on some kernels) try to unpack upx like this : upx -d tpws.
 
