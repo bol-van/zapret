@@ -484,10 +484,11 @@ bool socket_has_notsent(int sfd)
 
 	if (getsockopt(sfd, IPPROTO_TCP, TCP_INFO, (char *)&tcpi, &ts) < 0)
 		return false;
-	if (tcpi.tcpi_state != 1)
+	if (tcpi.tcpi_state != 1) // TCP_ESTABLISHED
 		return false;
 	size_t s = (char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi.tcpi_state;
 	if (ts < s)
+		// old structure version
 		return false;
 	return !!tcpi.tcpi_notsent_bytes;
 }

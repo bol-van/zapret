@@ -1231,6 +1231,22 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 						bApplyDisorder = !(i & 1) && i<multisplit_count && (split_flags & SPLIT_FLAG_DISORDER);
 						bApplyOOB = i==0 && (split_flags & SPLIT_FLAG_OOB);
 						len = to-from;
+#ifdef __linux__
+						if (params.fix_seg)
+						{
+							unsigned int wasted;
+							bool bWaitOK = socket_wait_notsent(conn->partner->fd, params.fix_seg, &wasted);
+							if (wasted)
+								VPRINT("WARNING ! wasted %u ms to fix segmenation\n", wasted);
+							if (!bWaitOK)
+								DLOG_ERR("WARNING ! segmentation failed\n");
+						}
+						else
+						{
+							if (socket_has_notsent(conn->partner->fd))
+								DLOG_ERR("WARNING ! segmentation failed\n");
+						}
+#endif
 						VPRINT("Sending multisplit part %d %zd-%zd (len %zd)%s%s : ", i+1, from, to, len, bApplyDisorder ? " with disorder" : "", bApplyOOB ? " with OOB" : "");
 						packet_debug(buf+from,len);
 						wr = send_oob(conn->partner->fd, buf+from, len, bApplyDisorder, bApplyOOB, conn->track.dp ? conn->track.dp->oob_byte : 0);
@@ -1244,21 +1260,6 @@ static bool handle_epoll(tproxy_conn_t *conn, struct tailhead *conn_list, uint32
 							if (wr>0) conn->partner->twr += wr;
 							break;
 						}
-#ifdef __linux__
-						if (params.fix_seg)
-						{
-							unsigned int wasted;
-							if (!socket_wait_notsent(conn->partner->fd, 20, &wasted))
-								DLOG_ERR("WARNING ! segmentation failed\n");
-							if (wasted)
-								VPRINT("WARNING ! wasted %u ms to fix segmenation\n", wasted);
-						}
-						else
-						{
-							if (socket_has_notsent(conn->partner->fd))
-								DLOG_ERR("WARNING ! segmentation failed\n");
-						}
-#endif
 						from = to;
 					}
 				}

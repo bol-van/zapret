@@ -18,6 +18,8 @@
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
+#define FIX_SEG_DEFAULT_MAX_WAIT		30
+
 enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32
@@ -102,13 +104,13 @@ struct params_s
 	char connect_bind6_ifname[IF_NAMESIZE];
 
 	uint8_t proxy_type;
+	unsigned int fix_seg;
 	bool no_resolve;
 	bool skip_nodelay;
-	bool fix_seg;
 	bool droproot;
+	bool daemon;
 	uid_t uid;
 	gid_t gid;
-	bool daemon;
 	char pidfile[256];
 	int maxconn,resolver_threads,maxfiles,max_orphan_time;
 	int local_rcvbuf,local_sndbuf,remote_rcvbuf,remote_sndbuf;
