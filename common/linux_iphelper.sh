@@ -128,7 +128,7 @@ resolve_lower_devices()
 
 default_route_interfaces6()
 {
-	sed -nre 's/^00000000000000000000000000000000 00 [0-9a-f]{32} [0-9a-f]{2} [0-9a-f]{32} [0-9a-f]{8} [0-9a-f]{8} [0-9a-f]{8} [0-9a-f]{8} +(.*)$/\1/p' /proc/net/ipv6_route | grep -v lo | sort -u | xargs
+	sed -nre 's/^00000000000000000000000000000000 00 [0-9a-f]{32} [0-9a-f]{2} [0-9a-f]{32} [0-9a-f]{8} [0-9a-f]{8} [0-9a-f]{8} [0-9a-f]{8} +(.*)$/\1/p' /proc/net/ipv6_route | grep -v '^lo$' | sort -u | xargs
 }
 
 default_route_interfaces4()
