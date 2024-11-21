@@ -1,7 +1,6 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Os
-CFLAGS_BSD = -Wno-address-of-packed-member
-CFLAGS_MAC = -mmacosx-version-min=10.8
+CFLAGS_BSD = -Wno-address-of-packed-member -flto=auto
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_BSD = -lz
