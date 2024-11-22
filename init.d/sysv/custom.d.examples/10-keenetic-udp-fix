@@ -1,0 +1,22 @@
+# This script fixes keenetic issue with nfqws generated udp packets
+# Keenetic uses proprietary ndmmark and does not masquerade without this mark
+# If not masqueraded packets go to WAN with LAN IP and get dropped by ISP
+
+# It's advised to set IFACE_WAN in config
+
+zapret_custom_firewall()
+{
+	# $1 - 1 - add, 0 - stop
+
+	local wan wanif rule
+
+	[ "$DISABLE_IPV4" = "1" ] || {
+		# use IFACE_WAN if defined. if not - search for interfaces with default route.
+		wanif=${IFACE_WAN:-$(sed -nre 's/^([^\t]+)\t00000000\t[0-9A-F]{8}\t[0-9A-F]{4}\t[0-9]+\t[0-9]+\t[0-9]+\t00000000.*$/\1/p' /proc/net/route | sort -u | xargs)}
+		for wan in $wanif; do
+			rule="-o $wan -p udp -m mark --mark $DESYNC_MARK/$DESYNC_MARK"
+			ipt_print_op $1 "$rule" "keenetic udp fix"
+			ipt_add_del $1 POSTROUTING -t nat $rule -j MASQUERADE
+		done
+	}
+}

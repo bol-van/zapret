@@ -171,7 +171,7 @@ static void exithelp(void)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
 #if defined(__linux__)
-		" --fix-seg\t\t\t\t; fix segmentation failures at the cost of possible slowdown\n"
+		" --fix-seg=<int>\t\t\t; fix segmentation failures at the cost of possible slowdown. wait up to N msec (default %u)\n"
 #endif
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
@@ -192,7 +192,7 @@ static void exithelp(void)
 		"\nTAMPER:\n"
 		" --split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
 		"\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
-		" --split-any-protocol\t\t\t; split not only http and https\n"
+		" --split-any-protocol\t\t\t; split not only http and TLS\n"
 #if defined(BSD) && !defined(__APPLE__)
 		" --disorder[=http|tls]\t\t\t; when splitting simulate sending second fragment first (BSD sends entire message instead of first fragment, this is not good)\n"
 #else
@@ -218,6 +218,9 @@ static void exithelp(void)
 		" --tamper-cutoff=[n]<pos>\t\t; do not tamper anymore after specified outbound stream position. default is unlimited.\n",
 #if defined(__linux__) || defined(__APPLE__)
 		DEFAULT_TCP_USER_TIMEOUT_LOCAL,DEFAULT_TCP_USER_TIMEOUT_REMOTE,
+#endif
+#ifdef __linux__
+		FIX_SEG_DEFAULT_MAX_WAIT,
 #endif
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
 	);
@@ -535,6 +538,10 @@ void parse_params(int argc, char *argv[])
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
 #endif
 
+#ifdef __linux__
+	params.fix_seg_avail = socket_supports_notsent();
+#endif
+
 	LIST_INIT(&params.hostlists);
 	LIST_INIT(&params.ipsets);
 
@@ -638,7 +645,7 @@ void parse_params(int argc, char *argv[])
 		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=62
 		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=63
 		{ "mss",required_argument,0,0 },			// optidx=64
-		{ "fix-seg",no_argument,0,0 },				// optidx=65
+		{ "fix-seg",optional_argument,0,0 },			// optidx=65
 #ifdef SPLICE_PRESENT
 		{ "nosplice",no_argument,0,0 },				// optidx=66
 #endif
@@ -1233,7 +1240,23 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case 65: /* fix-seg */
-			params.fix_seg = true;
+			if (!params.fix_seg_avail)
+			{
+				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
+				exit_clean(1);
+			}
+			if (optarg)
+			{
+				i = atoi(optarg);
+				if (i < 0 || i > 1000)
+				{
+					DLOG_ERR("fix_seg value must be within 0..1000\n");
+					exit_clean(1);
+				}
+				params.fix_seg = i;
+			}
+			else
+				params.fix_seg = FIX_SEG_DEFAULT_MAX_WAIT;
 			break;
 #ifdef SPLICE_PRESENT
 		case 66: /* nosplice */
