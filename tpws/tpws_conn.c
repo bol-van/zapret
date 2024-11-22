@@ -495,8 +495,11 @@ static bool connect_remote_conn(tproxy_conn_t *conn)
 				bool bHostExcluded;
 				conn->track.b_host_matches = HostlistCheck(conn->track.dp, conn->track.hostname, &bHostExcluded, false);
 				conn->track.b_host_checked = true;
-				if (!conn->track.b_host_matches) conn->track.b_ah_check = !bHostExcluded;
-				if (!conn->track.b_host_matches) mss = 0;
+				if (!conn->track.b_host_matches)
+				{
+					conn->track.b_ah_check = !bHostExcluded;
+					mss = 0;
+				}
 			}
 		}
 	}
@@ -1676,7 +1679,6 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						}
 						else
 						{
-
 							DBGPRINT("conn fd=%d has no unsent\n", conn->fd);
 							conn->bFlowIn = false;
 							epoll_update_flow(conn);
