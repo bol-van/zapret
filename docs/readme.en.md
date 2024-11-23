@@ -146,6 +146,7 @@ nfqws takes the following parameters:
  --hostspell                                    ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostnospace                                  ; remove space after Host: and add it to User-Agent: to preserve packet size
  --domcase                                      ; mix domain case : Host: TeSt.cOm
+ --methodeol					; add '\n' before method and remove space after Host:
  --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                         ; set ttl for desync packet
@@ -185,7 +186,8 @@ nfqws takes the following parameters:
  --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
  --hostlist-auto-retrans-threshold=<int>        ; how many request retransmissions cause attempt to fail (default : 3)
  --hostlist-auto-debug=<logfile>        	; debug auto hostlist positives
- --new                                          ; begin new strategy
+ --new                                          ; begin new strategy (new profile)
+ --skip                                         ; do not use this profile
  --filter-l3=ipv4|ipv6                          ; L3 protocol filter. multiple comma separated values allowed.
  --filter-tcp=[~]port1[-port2]|*                ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list supported.
  --filter-udp=[~]port1[-port2]|*                ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list supported.
@@ -267,7 +269,7 @@ Positions are defined by markers.
 
 Relative positions :
 
-* **method** - HTTP method start ('GET', 'POST', 'HEAD', ...). Method is usually always at position 0 but also supported `--methodeol` fooling by **tpws**. If fooled position can become 1 or 2.
+* **method** - HTTP method start ('GET', 'POST', 'HEAD', ...). Method is usually always at position 0 but can shift because of `--methodeol` fooling. If fooled position can become 1 or 2.
 * **host** - hostname start in a known protocol (http, TLS)
 * **endhost** - the byte next to the last hostname's byte
 * **sld** - second level domain start in the hostname
@@ -663,7 +665,8 @@ tpws is transparent proxy.
                                          ; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
  --max-orphan-time=<sec>                 ; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds
 
- --new                                   ; begin new strategy
+ --new                                   ; begin new strategy (new profile)
+ --skip                                  ; do not use this profile
  --filter-l3=ipv4|ipv6                   ; L3 protocol filter. multiple comma separated values allowed.
  --filter-tcp=[~]port1[-port2]|*         ; TCP port filter. ~ means negation. comma separated list supported.
  --filter-l7=[http|tls|unknown]          ; L6-L7 protocol filter. multiple comma separated values allowed.

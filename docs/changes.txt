@@ -389,3 +389,14 @@ blockcheck: added CURL_OPT
 blockcheck: new strategies support
 blockcheck: test sequence rework
 blockcheck: view all working strategies in summary
+
+v69.1:
+
+init.d: keenetic udp fix custom
+tpws: fixed incorrect hostlist checks
+
+v69.2:
+
+nfqws,tpws: --skip
+nfqws: --methodeol
+init.d: do not use pgrep in sysv for busybox compat
