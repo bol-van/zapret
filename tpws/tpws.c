@@ -1284,8 +1284,8 @@ void parse_params(int argc, char *argv[])
 	}
 	if (bSkip)
 	{
-		dp_entry_destroy(dpl);
 		LIST_REMOVE(dpl,next);
+		dp_entry_destroy(dpl);
 		desync_profile_count--;
 	}
 
