@@ -434,12 +434,12 @@ jobs:
       - name: Create release bundles
         run: |
           rm -rf ${{ env.repo_dir }}/.git*
-          tar -czf ${{ env.repo_dir }}.tar.gz ${{ env.repo_dir }}
+          tar --owner=0 --group=0 -czf ${{ env.repo_dir }}.tar.gz ${{ env.repo_dir }}
           zip -qr ${{ env.repo_dir }}.zip ${{ env.repo_dir }}
           rm -rf ${{ env.repo_dir }}/tpws ${{ env.repo_dir }}/nfq ${{ env.repo_dir }}/ip2net ${{ env.repo_dir }}/mdig ${{ env.repo_dir }}/docs ${{ env.repo_dir }}/files/huawei
           rm -rf ${{ env.repo_dir }}/init.d/openrc ${{ env.repo_dir }}/init.d/macos ${{ env.repo_dir }}/init.d/pfsense ${{ env.repo_dir }}/init.d/runit ${{ env.repo_dir }}/init.d/s6 ${{ env.repo_dir }}/init.d/systemd
           rm -rf ${{ env.repo_dir }}/binaries/android* -rf ${{ env.repo_dir }}/binaries/win* ${{ env.repo_dir }}/binaries/mac* ${{ env.repo_dir }}/binaries/freebsd*
-          tar -czf ${{ env.repo_dir }}-openwrt-embedded.tar.gz ${{ env.repo_dir }}
+          tar --owner=0 --group=0 -czf ${{ env.repo_dir }}-openwrt-embedded.tar.gz ${{ env.repo_dir }}
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
