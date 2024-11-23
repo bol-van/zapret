@@ -167,9 +167,15 @@ run_daemon()
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 
 	local DAEMONBASE="$(basename "$2")"
-	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	local PID= PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Starting daemon $1: $2 $3"
-	if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" "$DAEMONBASE" >/dev/null; then
+
+	[ -f "$PIDFILE" ] && {
+		read PID <"$PIDFILE"
+		[ -d "/proc/$PID" ] || PID=
+	}
+
+	if [ -n "$PID" ]; then
 		echo already running
 	else
 		"$2" $3 >/dev/null &
@@ -188,18 +194,14 @@ stop_daemon()
 	# $2 - daemon
 	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
 	local DAEMONBASE="$(basename "$2")"
-	local PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
+	local PID PIDFILE=$PIDDIR/$DAEMONBASE$1.pid
 	echo "Stopping daemon $1: $2"
-	if exists start-stop-daemon ; then
-		start-stop-daemon -K -p "$PIDFILE" -x "$2"
+	if [ -f "$PIDFILE" ]; then
+		read PID <"$PIDFILE"
+		kill $PID
+		rm -f "$PIDFILE"
 	else
-		if [ -f "$PIDFILE" ]; then
-			read PID <"$PIDFILE"
-			kill $PID
-			rm -f "$PIDFILE"
-		else
-			echo no pidfile : $PIDFILE
-		fi
+		echo no pidfile : $PIDFILE
 	fi
 }
 do_daemon()
