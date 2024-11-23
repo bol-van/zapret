@@ -1116,6 +1116,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					verdict=VERDICT_MODIFY;
 				}
+				else
+					DLOG("cannot do hostnospace because valid User-Agent: not found\n");
 			}
 			else if (dp->methodeol)
 			{
