@@ -1020,6 +1020,7 @@ static void exithelp(void)
 #endif
 		"\nMULTI-STRATEGY:\n"
 		" --new\t\t\t\t\t\t; begin new strategy\n"
+		" --skip\t\t\t\t\t\t; do not use this strategy\n"
 		" --filter-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --filter-tcp=[~]port1[-port2]|*\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list allowed.\n"
 		" --filter-udp=[~]port1[-port2]|*\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
@@ -1139,7 +1140,7 @@ int main(int argc, char **argv)
 #endif
 	int result, v;
 	int option_index = 0;
-	bool daemon = false;
+	bool daemon = false, bSkip = false;
 	char pidfile[256];
 #ifdef __CYGWIN__
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
@@ -1272,25 +1273,26 @@ int main(int argc, char **argv)
 		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=50
 		{"hostlist-auto-debug",required_argument,0,0},	// optidx=51
 		{"new",no_argument,0,0},	// optidx=52
-		{"filter-l3",required_argument,0,0},	// optidx=53
-		{"filter-tcp",required_argument,0,0},	// optidx=54
-		{"filter-udp",required_argument,0,0},	// optidx=55
-		{"filter-l7",required_argument,0,0},	// optidx=56
-		{"ipset",required_argument,0,0},	// optidx=57
-		{"ipset-exclude",required_argument,0,0},// optidx=58
+		{"skip",no_argument,0,0},	// optidx=53
+		{"filter-l3",required_argument,0,0},	// optidx=54
+		{"filter-tcp",required_argument,0,0},	// optidx=55
+		{"filter-udp",required_argument,0,0},	// optidx=56
+		{"filter-l7",required_argument,0,0},	// optidx=57
+		{"ipset",required_argument,0,0},	// optidx=58
+		{"ipset-exclude",required_argument,0,0},// optidx=59
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=59
-		{"bind-fix6",no_argument,0,0},		// optidx=60
+		{"bind-fix4",no_argument,0,0},		// optidx=60
+		{"bind-fix6",no_argument,0,0},		// optidx=61
 #elif defined(__CYGWIN__)
-		{"wf-iface",required_argument,0,0},	// optidx=59
-		{"wf-l3",required_argument,0,0},	// optidx=60
-		{"wf-tcp",required_argument,0,0},	// optidx=61
-		{"wf-udp",required_argument,0,0},	// optidx=62
-		{"wf-raw",required_argument,0,0},	// optidx=63
-		{"wf-save",required_argument,0,0},	// optidx=64
-		{"ssid-filter",required_argument,0,0},	// optidx=65
-		{"nlm-filter",required_argument,0,0},	// optidx=66
-		{"nlm-list",optional_argument,0,0},	// optidx=67
+		{"wf-iface",required_argument,0,0},	// optidx=60
+		{"wf-l3",required_argument,0,0},	// optidx=61
+		{"wf-tcp",required_argument,0,0},	// optidx=62
+		{"wf-udp",required_argument,0,0},	// optidx=63
+		{"wf-raw",required_argument,0,0},	// optidx=64
+		{"wf-save",required_argument,0,0},	// optidx=65
+		{"ssid-filter",required_argument,0,0},	// optidx=66
+		{"nlm-filter",required_argument,0,0},	// optidx=67
+		{"nlm-list",optional_argument,0,0},	// optidx=68
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1797,22 +1799,36 @@ int main(int argc, char **argv)
 			break;
 
 		case 52: /* new */
-			if (!(dpl = dp_list_add(&params.desync_profiles)))
+			if (bSkip)
 			{
-				DLOG_ERR("desync_profile_add: out of memory\n");
-				exit_clean(1);
+				dp_clear(dp);
+				dp_init(dp);
+				dp->n = desync_profile_count;
+				bSkip = false;
 			}
-			dp = &dpl->dp;
-			dp->n = ++desync_profile_count;
+			else
+			{
+				if (!(dpl = dp_list_add(&params.desync_profiles)))
+				{
+					DLOG_ERR("desync_profile_add: out of memory\n");
+					exit_clean(1);
+				}
+				dp = &dpl->dp;
+				dp->n = ++desync_profile_count;
+			}
 			break;
-		case 53: /* filter-l3 */
+		case 53: /* skip */
+			bSkip = true;
+			break;
+
+		case 54: /* filter-l3 */
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 54: /* filter-tcp */
+		case 55: /* filter-tcp */
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
@@ -1822,7 +1838,7 @@ int main(int argc, char **argv)
 			if (!port_filters_deny_if_empty(&dp->pf_udp))
 				exit_clean(1);
 			break;
-		case 55: /* filter-udp */
+		case 56: /* filter-udp */
 			if (!parse_pf_list(optarg,&dp->pf_udp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
@@ -1832,21 +1848,21 @@ int main(int argc, char **argv)
 			if (!port_filters_deny_if_empty(&dp->pf_tcp))
 				exit_clean(1);
 			break;
-		case 56: /* filter-l7 */
+		case 57: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 57: /* ipset */
+		case 58: /* ipset */
 			if (!RegisterIpset(dp, false, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
-		case 58: /* ipset-exclude */
+		case 59: /* ipset-exclude */
 			if (!RegisterIpset(dp, true, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
@@ -1857,28 +1873,28 @@ int main(int argc, char **argv)
 
 
 #ifdef __linux__
-		case 59: /* bind-fix4 */
+		case 60: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 60: /* bind-fix6 */
+		case 61: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #elif defined(__CYGWIN__)
-		case 59: /* wf-iface */
+		case 60: /* wf-iface */
 			if (!sscanf(optarg,"%u.%u",&IfIdx,&SubIfIdx))
 			{
 				DLOG_ERR("bad value for --wf-iface\n");
 				exit_clean(1);
 			}
 			break;
-		case 60: /* wf-l3 */
+		case 61: /* wf-l3 */
 			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
 			{
 				DLOG_ERR("bad value for --wf-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 61: /* wf-tcp */
+		case 62: /* wf-tcp */
 			hash_wf_tcp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
@@ -1887,7 +1903,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 62: /* wf-udp */
+		case 63: /* wf-udp */
 			hash_wf_udp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
@@ -1896,7 +1912,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 63: /* wf-raw */
+		case 64: /* wf-raw */
 			hash_wf_raw=hash_jen(optarg,strlen(optarg));
 			if (optarg[0]=='@')
 			{
@@ -1910,11 +1926,11 @@ int main(int argc, char **argv)
 				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
 			}
 			break;
-		case 64: /* wf-save */
+		case 65: /* wf-save */
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
-		case 65: /* ssid-filter */
+		case 66: /* ssid-filter */
 			hash_ssid_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -1932,7 +1948,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 66: /* nlm-filter */
+		case 67: /* nlm-filter */
 			hash_nlm_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -1950,7 +1966,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 67: /* nlm-list */
+		case 68: /* nlm-list */
 			if (!nlm_list(optarg && !strcmp(optarg,"all")))
 			{
 				DLOG_ERR("could not get list of NLM networks\n");
@@ -1960,6 +1976,12 @@ int main(int argc, char **argv)
 
 #endif
 		}
+	}
+	if (bSkip)
+	{
+		dp_entry_destroy(dpl);
+		LIST_REMOVE(dpl,next);
+		desync_profile_count--;
 	}
 
 	// do not need args from file anymore
