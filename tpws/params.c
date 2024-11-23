@@ -155,22 +155,26 @@ void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
 	if (bcut) VPRINT(" ...");
 }
 
+void dp_init(struct desync_profile *dp)
+{
+	LIST_INIT(&dp->hl_collection);
+	LIST_INIT(&dp->hl_collection_exclude);
+	LIST_INIT(&dp->ips_collection);
+	LIST_INIT(&dp->ips_collection_exclude);
+	LIST_INIT(&dp->pf_tcp);
+
+	dp->filter_ipv4 = dp->filter_ipv6 = true;
+	memcpy(dp->hostspell, "host", 4); // default hostspell
+	dp->hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
+	dp->hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+}
 
 struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 {
 	struct desync_profile_list *entry = calloc(1,sizeof(struct desync_profile_list));
 	if (!entry) return NULL;
 
-	LIST_INIT(&entry->dp.hl_collection);
-	LIST_INIT(&entry->dp.hl_collection_exclude);
-	LIST_INIT(&entry->dp.ips_collection);
-	LIST_INIT(&entry->dp.ips_collection_exclude);
-	LIST_INIT(&entry->dp.pf_tcp);
-
-	entry->dp.filter_ipv4 = entry->dp.filter_ipv6 = true;
-	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
-	entry->dp.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
-	entry->dp.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+	dp_init(&entry->dp);
 
 	// add to the tail
 	struct desync_profile_list *dpn,*dpl=LIST_FIRST(&params.desync_profiles);
@@ -184,14 +188,23 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 
 	return entry;
 }
-static void dp_entry_destroy(struct desync_profile_list *entry)
+static void dp_clear_dynamic(struct desync_profile *dp)
 {
-	hostlist_collection_destroy(&entry->dp.hl_collection);
-	hostlist_collection_destroy(&entry->dp.hl_collection_exclude);
-	ipset_collection_destroy(&entry->dp.ips_collection);
-	ipset_collection_destroy(&entry->dp.ips_collection_exclude);
-	port_filters_destroy(&entry->dp.pf_tcp);
-	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
+	hostlist_collection_destroy(&dp->hl_collection);
+	hostlist_collection_destroy(&dp->hl_collection_exclude);
+	ipset_collection_destroy(&dp->ips_collection);
+	ipset_collection_destroy(&dp->ips_collection_exclude);
+	port_filters_destroy(&dp->pf_tcp);
+	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
+}
+void dp_clear(struct desync_profile *dp)
+{
+	dp_clear_dynamic(dp);
+	memset(dp,0,sizeof(*dp));
+}
+void dp_entry_destroy(struct desync_profile_list *entry)
+{
+	dp_clear_dynamic(&entry->dp);
 	free(entry);
 }
 void dp_list_destroy(struct desync_profile_list_head *head)
