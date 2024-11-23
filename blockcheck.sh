@@ -1173,7 +1173,7 @@ pktws_check_domain_http_bypass_()
 	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1'
 
 	[ "$sec" = 0 ] && {
-		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase'; do
+		for s in '--hostcase' '--hostspell=hoSt' '--hostnospace' '--domcase' '--methodeol'; do
 			pktws_curl_test_update $1 $3 $s
 		done
 	}
