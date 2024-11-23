@@ -479,6 +479,33 @@ static int connect_remote(const struct sockaddr *remote_addr, int mss)
 	return remote_fd;
 }
 
+static bool connect_remote_conn(tproxy_conn_t *conn)
+{
+	int mss=0;
+
+	apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
+
+	if (conn->track.dp)
+	{
+		mss = conn->track.dp->mss;
+		if (conn->track.dp->hostlist_auto)
+		{
+			if (conn->track.hostname)
+			{
+				bool bHostExcluded;
+				conn->track.b_host_matches = HostlistCheck(conn->track.dp, conn->track.hostname, &bHostExcluded, false);
+				conn->track.b_host_checked = true;
+				if (!conn->track.b_host_matches)
+				{
+					conn->track.b_ah_check = !bHostExcluded;
+					mss = 0;
+				}
+			}
+		}
+	}
+
+	return (conn->partner->fd = connect_remote((struct sockaddr *)&conn->dest, mss))>=0;
+}
 
 //Free resources occupied by this connection
 static void free_conn(tproxy_conn_t *conn)
@@ -636,9 +663,7 @@ static tproxy_conn_t* add_tcp_connection(int efd, struct tailhead *conn_list,int
 		conn->partner->client = conn->client;
 		conn->partner->dest = conn->dest;
 
-		apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
-
-		if ((conn->partner->fd = connect_remote((struct sockaddr *)&orig_dst, conn->track.dp ? conn->track.dp->mss : 0)) < 0)
+		if (!connect_remote_conn(conn))
 		{
 			DLOG_ERR("Failed to connect\n");
 			free_conn(conn->partner);
@@ -811,14 +836,7 @@ static bool proxy_mode_connect_remote(tproxy_conn_t *conn, struct tailhead *conn
 		return false;
 	}
 
-	apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
-	if ((remote_fd = connect_remote((struct sockaddr *)&conn->dest, conn->track.dp ? conn->track.dp->mss : 0)) < 0)
-	{
-		DLOG_ERR("socks failed to connect (1) errno=%d\n", errno);
-		socks_send_rep_errno(conn->socks_ver, conn->fd, errno);
-		return false;
-	}
 	if (!(conn->partner = new_conn(remote_fd, true)))
 	{
 		close(remote_fd);
@@ -830,6 +848,15 @@ static bool proxy_mode_connect_remote(tproxy_conn_t *conn, struct tailhead *conn
 	conn->partner->efd = conn->efd;
 	conn->partner->client = conn->client;
 	conn->partner->dest = conn->dest;
+
+	if (!connect_remote_conn(conn))
+	{
+		free_conn(conn->partner); conn->partner = NULL;
+		DLOG_ERR("socks failed to connect (1) errno=%d\n", errno);
+		socks_send_rep_errno(conn->socks_ver, conn->fd, errno);
+		return false;
+	}
+
 	if (!epoll_set(conn->partner, EPOLLOUT))
 	{
 		DLOG_ERR("socks epoll_set error %d\n", errno);
@@ -1652,7 +1679,6 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 						}
 						else
 						{
-
 							DBGPRINT("conn fd=%d has no unsent\n", conn->fd);
 							conn->bFlowIn = false;
 							epoll_update_flow(conn);

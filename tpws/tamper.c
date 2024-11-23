@@ -140,11 +140,6 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 
 	if (bHaveHost)
 		VPRINT("request hostname: %s\n", Host);
-	if (ctrack->b_not_act)
-	{
-		VPRINT("Not acting on this request\n");
-		return;
-	}
 
 	bool bDiscoveredL7 = ctrack->l7proto==UNKNOWN && l7proto!=UNKNOWN;
 	if (bDiscoveredL7)
@@ -169,17 +164,25 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 		struct desync_profile *dp_prev = ctrack->dp;
 		apply_desync_profile(ctrack, dest);
 		if (ctrack->dp!=dp_prev)
+		{
 			VPRINT("desync profile changed by revealed l7 protocol or hostname !\n");
+			ctrack->b_host_checked = ctrack->b_ah_check = false;
+		}
 	}
 
-	if (bDiscoveredHostname && ctrack->dp->hostlist_auto)
+	if (l7proto!=UNKNOWN && ctrack->dp->hostlist_auto)
 	{
-		bool bHostExcluded;
-		if (!HostlistCheck(ctrack->dp, Host, &bHostExcluded, false))
+		if (bHaveHost && !ctrack->b_host_checked)
 		{
-			ctrack->b_ah_check = !bHostExcluded;
+			bool bHostExcluded;
+			ctrack->b_host_matches = HostlistCheck(ctrack->dp, Host, &bHostExcluded, false);
+			ctrack->b_host_checked = true;
+			if (!ctrack->b_host_matches)
+				ctrack->b_ah_check = !bHostExcluded;
+		}
+		if (!ctrack->b_host_matches)
+		{
 			VPRINT("Not acting on this request\n");
-			ctrack->b_not_act = true;
 			return;
 		}
 	}

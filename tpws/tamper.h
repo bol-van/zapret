@@ -14,8 +14,7 @@ typedef struct
 	// common state
 	t_l7proto l7proto;
 	bool bTamperInCutoff;
-	bool b_ah_check;
-	bool b_not_act;
+	bool b_host_checked,b_host_matches,b_ah_check;
 	char *hostname;
 	struct desync_profile *dp;		// desync profile cache
 } t_ctrack;
