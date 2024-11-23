@@ -1082,7 +1082,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		}
 
 		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
-		if ((l7proto == HTTP) && (dp->hostcase || dp->hostnospace || dp->domcase) && HttpFindHost(&phost,dis->data_payload,dis->len_payload))
+		if ((l7proto == HTTP) && (dp->hostcase || dp->hostnospace || dp->domcase || dp->methodeol) && HttpFindHost(&phost,dis->data_payload,dis->len_payload))
 		{
 			if (dp->hostcase)
 			{
@@ -1098,23 +1098,38 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				verdict=VERDICT_MODIFY;
 			}
 			uint8_t *pua;
-			if (dp->hostnospace &&
-				(pua = (uint8_t*)memmem(dis->data_payload, dis->len_payload, "\r\nUser-Agent: ", 14)) &&
-				(pua = (uint8_t*)memmem(pua + 1, dis->len_payload - (pua - dis->data_payload) - 1, "\r\n", 2)))
+			if (dp->hostnospace)
 			{
-				DLOG("removing space after Host: and adding it to User-Agent:\n");
-				if (pua > phost)
+				if ((pua = (uint8_t*)memmem(dis->data_payload, dis->len_payload, "\r\nUser-Agent: ", 14)) &&
+					(pua = (uint8_t*)memmem(pua + 1, dis->len_payload - (pua - dis->data_payload) - 1, "\r\n", 2)))
 				{
-					memmove(phost + 5, phost + 6, pua - phost - 6);
-					pua[-1]=' ';
+					DLOG("removing space after Host: and adding it to User-Agent:\n");
+					if (pua > phost)
+					{
+						memmove(phost + 5, phost + 6, pua - phost - 6);
+						pua[-1]=' ';
+					}
+					else
+					{
+						memmove(pua + 1, pua, phost - pua + 5);
+						*pua = ' ';
+					}
+					verdict=VERDICT_MODIFY;
+				}
+			}
+			else if (dp->methodeol)
+			{
+				if (phost[5]==' ' || phost[5]=='\t')
+				{
+					DLOG("removing space after Host: and adding '\\n' before method\n");
+					memmove(dis->data_payload+1,dis->data_payload,phost-dis->data_payload+5);
+					dis->data_payload[0]='\n';
+					verdict=VERDICT_MODIFY;
 				}
 				else
-				{
-					memmove(pua + 1, pua, phost - pua + 5);
-					*pua = ' ';
-				}
-				verdict=VERDICT_MODIFY;
+					DLOG("cannot do methodeol because there's no space or tab after Host:\n");
 			}
+			
 		}
 
 		if (dp->desync_mode==DESYNC_NONE)
