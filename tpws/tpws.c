@@ -1499,6 +1499,15 @@ struct salisten_s
 	int bind_wait_ip_left; // how much seconds left from bind_wait_ip
 };
 static const char *bindll_s[] = { "unwanted","no","prefer","force" };
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
+#define PRINT_VER printf("github version %s (%s)\n\n", TOSTRING(ZAPRET_GH_VER), TOSTRING(ZAPRET_GH_HASH))
+#else
+#define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
+#endif
+
 int main(int argc, char *argv[])
 {
 	int i, listen_fd[MAX_BINDS], yes = 1, retval = 0, if_index, exit_v=EXIT_FAILURE;
@@ -1508,6 +1517,8 @@ int main(int argc, char *argv[])
 	set_env_exedir(argv[0]);
 	srand(time(NULL));
 	mask_from_preflen6_prepare();
+
+	PRINT_VER;
 
 	parse_params(argc, argv);
 	argv=NULL; argc=0;

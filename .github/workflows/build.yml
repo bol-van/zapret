@@ -82,9 +82,7 @@ jobs:
           export STRIP=$TARGET-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
 
-          # optimize for size
-          export CFLAGS="-Os -flto=auto"
-          export LDFLAGS="-Os"
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
 
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
@@ -136,6 +134,7 @@ jobs:
 
       - name: Build zapret
         run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
           make mac -j$(sysctl -n hw.logicalcpu)
           tar -C binaries/my -cJf zapret-mac-x64.tar.xz .
 
@@ -170,6 +169,7 @@ jobs:
           TARGET: ${{ matrix.target }}
           ARCH: ${{ matrix.arch }}
         run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
           settarget $TARGET-freebsd11 make bsd -j$(nproc) || exit 1
           tar -C binaries/my -cJf zapret-freebsd-$ARCH.tar.xz .
 
@@ -205,6 +205,7 @@ jobs:
         run: |
           mkdir -p output
           cd zapret
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
           mingw32-make -C ip2net win
           mingw32-make -C mdig win
           cp -a {ip2net/ip2net,mdig/mdig}.exe ../output
@@ -259,6 +260,7 @@ jobs:
         shell: C:\cygwin\bin\bash.exe -eo pipefail '{0}'
         run: >-
           export MAKEFLAGS=-j$(nproc) &&
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}" &&
           cd zapret &&
           make -C nfq ${TARGET} &&
           cp -a nfq/winws.exe ../output
@@ -317,9 +319,7 @@ jobs:
           export STRIP=$TOOLCHAIN/bin/llvm-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
 
-          # optimize for size
-          export CFLAGS="-Os -flto=auto"
-          export LDFLAGS="-Os"
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
 
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj

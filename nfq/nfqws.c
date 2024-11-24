@@ -1128,6 +1128,14 @@ void config_from_file(const char *filename)
 }
 #endif
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
+#define PRINT_VER printf("github version %s (%s)\n\n", TOSTRING(ZAPRET_GH_VER), TOSTRING(ZAPRET_GH_HASH))
+#else
+#define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
+#endif
+
 int main(int argc, char **argv)
 {
 	set_env_exedir(argv[0]);
@@ -1153,6 +1161,8 @@ int main(int argc, char **argv)
 
 	srandom(time(NULL));
 	mask_from_preflen6_prepare();
+
+	PRINT_VER;
 
 	memset(&params, 0, sizeof(params));
 	*pidfile = 0;
