@@ -31,7 +31,7 @@ static bool addpool(ipset *ips, char **s, const char *end, int *ct)
 				ipsetDestroy(ips);
 				return false;
 			}
-			(*ct)++;
+			if (ct) (*ct)++;
 		}
 		else if (parse_cidr6(cidr,&c6))
 		{
@@ -40,7 +40,7 @@ static bool addpool(ipset *ips, char **s, const char *end, int *ct)
 				ipsetDestroy(ips);
 				return false;
 			}
-			(*ct)++;
+			if (ct) (*ct)++;
 		}
 		else
 			DLOG_ERR("bad ip or subnet : %s\n",cidr);
@@ -51,6 +51,11 @@ static bool addpool(ipset *ips, char **s, const char *end, int *ct)
 	*s = p;
 	return true;
 
+}
+
+bool AppendIpsetItem(ipset *ips, char *ip)
+{
+	return addpool(ips,&ip,ip+strlen(ip),NULL);
 }
 
 static bool AppendIpset(ipset *ips, const char *filename)
@@ -119,21 +124,24 @@ static bool AppendIpset(ipset *ips, const char *filename)
 
 static bool LoadIpset(struct ipset_file *hfile)
 {
-	time_t t = file_mod_time(hfile->filename);
-	if (!t)
+	if (hfile->filename)
 	{
-		// stat() error
-		DLOG_ERR("cannot access ipset file '%s'. in-memory content remains unchanged.\n",hfile->filename);
-		return true;
-	}
-	if (t==hfile->mod_time) return true; // up to date
-	ipsetDestroy(&hfile->ipset);
-	if (!AppendIpset(&hfile->ipset, hfile->filename))
-	{
+		time_t t = file_mod_time(hfile->filename);
+		if (!t)
+		{
+			// stat() error
+			DLOG_ERR("cannot access ipset file '%s'. in-memory content remains unchanged.\n",hfile->filename);
+			return true;
+		}
+			if (t==hfile->mod_time) return true; // up to date
 		ipsetDestroy(&hfile->ipset);
-		return false;
+		if (!AppendIpset(&hfile->ipset, hfile->filename))
+		{
+			ipsetDestroy(&hfile->ipset);
+			return false;
+		}
+		hfile->mod_time=t;
 	}
-	hfile->mod_time=t;
 	return true;
 }
 static bool LoadIpsets(struct ipset_files_head *list)
@@ -205,7 +213,7 @@ static bool IpsetCheck_(const struct ipset_collection_head *ips, const struct ip
 
 	LIST_FOREACH(item, ips_exclude, next)
 	{
-		VPRINT("[%s] exclude ",item->hfile->filename);
+		VPRINT("[%s] exclude ",item->hfile->filename ? item->hfile->filename : "fixed");
 		if (SearchIpset(&item->hfile->ipset, ipv4, ipv6))
 			return false;
 	}
@@ -214,7 +222,7 @@ static bool IpsetCheck_(const struct ipset_collection_head *ips, const struct ip
 	{
 		LIST_FOREACH(item, ips, next)
 		{
-			VPRINT("[%s] include ",item->hfile->filename);
+			VPRINT("[%s] include ",item->hfile->filename ? item->hfile->filename : "fixed");
 			if (SearchIpset(&item->hfile->ipset, ipv4, ipv6))
 				return true;
 		}
@@ -244,7 +252,7 @@ static struct ipset_file *RegisterIpset_(struct ipset_files_head *ipsets, struct
 }
 struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename)
 {
-	if (!file_mod_time(filename))
+	if (filename && !file_mod_time(filename))
 	{
 		DLOG_ERR("cannot access ipset file '%s'\n",filename);
 		return NULL;
@@ -277,13 +285,24 @@ void IpsetsDebug()
 	struct ipset_item *ips_item;
 
 	LIST_FOREACH(hfile, &params.ipsets, next)
-		VPRINT("ipset file %s (%s)\n",hfile->filename,dbg_ipset_fill(&hfile->ipset));
+	{
+		if (hfile->filename)
+			VPRINT("ipset file %s (%s)\n",hfile->filename,dbg_ipset_fill(&hfile->ipset));
+		else
+			VPRINT("ipset fixed (%s)\n",dbg_ipset_fill(&hfile->ipset));
+	}
 
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		LIST_FOREACH(ips_item, &dpl->dp.ips_collection, next)
-			VPRINT("profile %d include ipset %s (%s)\n",dpl->dp.n,ips_item->hfile->filename,dbg_ipset_fill(&ips_item->hfile->ipset));
+			if (ips_item->hfile->filename)
+				VPRINT("profile %d include ipset %s (%s)\n",dpl->dp.n,ips_item->hfile->filename,dbg_ipset_fill(&ips_item->hfile->ipset));
+			else
+				VPRINT("profile %d include fixed ipset (%s)\n",dpl->dp.n,dbg_ipset_fill(&ips_item->hfile->ipset));
 		LIST_FOREACH(ips_item, &dpl->dp.ips_collection_exclude, next)
-			VPRINT("profile %d exclude ipset %s (%s)\n",dpl->dp.n,ips_item->hfile->filename,dbg_ipset_fill(&ips_item->hfile->ipset));
+			if (ips_item->hfile->filename)
+				VPRINT("profile %d exclude ipset %s (%s)\n",dpl->dp.n,ips_item->hfile->filename,dbg_ipset_fill(&ips_item->hfile->ipset));
+			else
+				VPRINT("profile %d exclude fixed ipset (%s)\n",dpl->dp.n,dbg_ipset_fill(&ips_item->hfile->ipset));
 	}
 }

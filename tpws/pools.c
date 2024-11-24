@@ -160,7 +160,7 @@ struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const
 	struct hostlist_file *entry = malloc(sizeof(struct hostlist_file));
 	if (entry)
 	{
-		if (!(entry->filename = strdup(filename)))
+		if (filename && !(entry->filename = strdup(filename)))
 		{
 			free(entry);
 			return false;
@@ -192,7 +192,7 @@ struct hostlist_file *hostlist_files_search(struct hostlist_files_head *head, co
 
 	LIST_FOREACH(hfile, head, next)
 	{
-		if (!strcmp(hfile->filename,filename))
+		if (hfile->filename && !strcmp(hfile->filename,filename))
 			return hfile;
 	}
 	return NULL;
@@ -223,7 +223,7 @@ struct hostlist_item *hostlist_collection_search(struct hostlist_collection_head
 
 	LIST_FOREACH(item, head, next)
 	{
-		if (!strcmp(item->hfile->filename,filename))
+		if (item->hfile->filename && !strcmp(item->hfile->filename,filename))
 			return item;
 	}
 	return NULL;
@@ -369,7 +369,7 @@ struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *fi
 	struct ipset_file *entry = malloc(sizeof(struct ipset_file));
 	if (entry)
 	{
-		if (!(entry->filename = strdup(filename)))
+		if (filename && !(entry->filename = strdup(filename)))
 		{
 			free(entry);
 			return false;
@@ -401,7 +401,7 @@ struct ipset_file *ipset_files_search(struct ipset_files_head *head, const char 
 
 	LIST_FOREACH(hfile, head, next)
 	{
-		if (!strcmp(hfile->filename,filename))
+		if (hfile->filename && !strcmp(hfile->filename,filename))
 			return hfile;
 	}
 	return NULL;
@@ -432,7 +432,7 @@ struct ipset_item *ipset_collection_search(struct ipset_collection_head *head, c
 
 	LIST_FOREACH(item, head, next)
 	{
-		if (!strcmp(item->hfile->filename,filename))
+		if (item->hfile->filename && !strcmp(item->hfile->filename,filename))
 			return item;
 	}
 	return NULL;
