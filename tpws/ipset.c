@@ -242,12 +242,22 @@ bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, con
 static struct ipset_file *RegisterIpset_(struct ipset_files_head *ipsets, struct ipset_collection_head *ips_collection, const char *filename)
 {
 	struct ipset_file *hfile;
-	if (!(hfile=ipset_files_search(ipsets, filename)))
-		if (!(hfile=ipset_files_add(ipsets, filename)))
+	if (filename)
+	{
+		if (!(hfile=ipset_files_search(ipsets, filename)))
+			if (!(hfile=ipset_files_add(ipsets, filename)))
+				return NULL;
+		if (!ipset_collection_search(ips_collection, filename))
+			if (!ipset_collection_add(ips_collection, hfile))
+				return NULL;
+	}
+	else
+	{
+		if (!(hfile=ipset_files_add(ipsets, NULL)))
 			return NULL;
-	if (!ipset_collection_search(ips_collection, filename))
 		if (!ipset_collection_add(ips_collection, hfile))
 			return NULL;
+	}
 	return hfile;
 }
 struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename)

@@ -154,18 +154,22 @@ void strlist_destroy(struct str_list_head *head)
 
 
 
-
 struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const char *filename)
 {
 	struct hostlist_file *entry = malloc(sizeof(struct hostlist_file));
 	if (entry)
 	{
-		if (filename && !(entry->filename = strdup(filename)))
+		if (filename)
 		{
-			free(entry);
-			return false;
+			if (!(entry->filename = strdup(filename)))
+			{
+				free(entry);
+				return false;
+			}
 		}
-		entry->mod_time=0;
+		else
+			entry->filename = NULL;
+		entry->mod_time = 0;
 		entry->hostlist = NULL;
 		LIST_INSERT_HEAD(head, entry, next);
 	}
@@ -369,12 +373,17 @@ struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *fi
 	struct ipset_file *entry = malloc(sizeof(struct ipset_file));
 	if (entry)
 	{
-		if (filename && !(entry->filename = strdup(filename)))
+		if (filename)
 		{
-			free(entry);
-			return false;
+			if (!(entry->filename = strdup(filename)))
+			{
+				free(entry);
+				return false;
+			}
 		}
-		entry->mod_time=0;
+		else
+			entry->filename = NULL;
+		entry->mod_time = 0;
 		memset(&entry->ipset,0,sizeof(entry->ipset));
 		LIST_INSERT_HEAD(head, entry, next);
 	}
