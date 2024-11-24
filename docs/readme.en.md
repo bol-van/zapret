@@ -712,7 +712,7 @@ tpws is transparent proxy.
  --daemon                                ; daemonize
  --pidfile=<filename>                    ; write pid to file
  --user=<username>                       ; drop root privs
- --uid=uid[:gid]		                ; drop root privs
+ --uid=uid[:gid]                         ; drop root privs
 ```
 
 ### TCP segmentation in tpws
