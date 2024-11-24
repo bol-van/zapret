@@ -485,7 +485,7 @@ static bool connect_remote_conn(tproxy_conn_t *conn)
 
 	apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
-	if (conn->track.dp)
+	if (conn->track.dp && conn->track.dp->mss)
 	{
 		mss = conn->track.dp->mss;
 		if (conn->track.dp->hostlist_auto)
@@ -835,7 +835,6 @@ static bool proxy_mode_connect_remote(tproxy_conn_t *conn, struct tailhead *conn
 		socks_send_rep(conn->socks_ver, conn->fd, S5_REP_NOT_ALLOWED_BY_RULESET);
 		return false;
 	}
-
 
 	if (!(conn->partner = new_conn(remote_fd, true)))
 	{

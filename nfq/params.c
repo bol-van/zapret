@@ -170,45 +170,49 @@ void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
 	if (bcut) DLOG(" ...");
 }
 
+void dp_init(struct desync_profile *dp)
+{
+	LIST_INIT(&dp->hl_collection);
+	LIST_INIT(&dp->hl_collection_exclude);
+	LIST_INIT(&dp->ips_collection);
+	LIST_INIT(&dp->ips_collection_exclude);
+	LIST_INIT(&dp->pf_tcp);
+	LIST_INIT(&dp->pf_udp);
+
+	memcpy(dp->hostspell, "host", 4); // default hostspell
+	dp->desync_skip_nosni = true;
+	dp->desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
+	dp->desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
+	dp->desync_repeats = 1;
+	dp->fake_tls_size = sizeof(fake_tls_clienthello_default);
+	memcpy(dp->fake_tls,fake_tls_clienthello_default,dp->fake_tls_size);
+	randomize_default_tls_payload(dp->fake_tls);
+	dp->fake_http_size = strlen(fake_http_request_default);
+	memcpy(dp->fake_http,fake_http_request_default,dp->fake_http_size);
+	dp->fake_quic_size = 620; // must be 601+ for TSPU hack
+	dp->fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
+	dp->fake_wg_size = 64;
+	dp->fake_dht_size = 64;
+	dp->fake_unknown_size = 256;
+	dp->fake_syndata_size = 16;
+	dp->fake_unknown_udp_size = 64;
+	dp->wscale=-1; // default - dont change scale factor (client)
+	dp->desync_ttl6 = 0xFF; // unused
+	dp->desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
+	dp->desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
+	dp->wssize_cutoff_mode = dp->desync_start_mode = dp->desync_cutoff_mode = 'n'; // packet number by default
+	dp->udplen_increment = UDPLEN_INCREMENT_DEFAULT;
+	dp->hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
+	dp->hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
+	dp->hostlist_auto_retrans_threshold = HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT;
+	dp->filter_ipv4 = dp->filter_ipv6 = true;
+}
 struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 {
 	struct desync_profile_list *entry = calloc(1,sizeof(struct desync_profile_list));
 	if (!entry) return NULL;
 	
-	LIST_INIT(&entry->dp.hl_collection);
-	LIST_INIT(&entry->dp.hl_collection_exclude);
-	LIST_INIT(&entry->dp.ips_collection);
-	LIST_INIT(&entry->dp.ips_collection_exclude);
-	LIST_INIT(&entry->dp.pf_tcp);
-	LIST_INIT(&entry->dp.pf_udp);
-
-	memcpy(entry->dp.hostspell, "host", 4); // default hostspell
-	entry->dp.desync_skip_nosni = true;
-	entry->dp.desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
-	entry->dp.desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
-	entry->dp.desync_repeats = 1;
-	entry->dp.fake_tls_size = sizeof(fake_tls_clienthello_default);
-	memcpy(entry->dp.fake_tls,fake_tls_clienthello_default,entry->dp.fake_tls_size);
-	randomize_default_tls_payload(entry->dp.fake_tls);
-	entry->dp.fake_http_size = strlen(fake_http_request_default);
-	memcpy(entry->dp.fake_http,fake_http_request_default,entry->dp.fake_http_size);
-	entry->dp.fake_quic_size = 620; // must be 601+ for TSPU hack
-	entry->dp.fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
-	entry->dp.fake_wg_size = 64;
-	entry->dp.fake_dht_size = 64;
-	entry->dp.fake_unknown_size = 256;
-	entry->dp.fake_syndata_size = 16;
-	entry->dp.fake_unknown_udp_size = 64;
-	entry->dp.wscale=-1; // default - dont change scale factor (client)
-	entry->dp.desync_ttl6 = 0xFF; // unused
-	entry->dp.desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
-	entry->dp.desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
-	entry->dp.wssize_cutoff_mode = entry->dp.desync_start_mode = entry->dp.desync_cutoff_mode = 'n'; // packet number by default
-	entry->dp.udplen_increment = UDPLEN_INCREMENT_DEFAULT;
-	entry->dp.hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
-	entry->dp.hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
-	entry->dp.hostlist_auto_retrans_threshold = HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT;
-	entry->dp.filter_ipv4 = entry->dp.filter_ipv6 = true;
+	dp_init(&entry->dp);
 
 	// add to the tail
 	struct desync_profile_list *dpn,*dpl=LIST_FIRST(&params.desync_profiles);
@@ -222,15 +226,24 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 
 	return entry;
 }
-static void dp_entry_destroy(struct desync_profile_list *entry)
+static void dp_clear_dynamic(struct desync_profile *dp)
 {
-	hostlist_collection_destroy(&entry->dp.hl_collection);
-	hostlist_collection_destroy(&entry->dp.hl_collection_exclude);
-	ipset_collection_destroy(&entry->dp.ips_collection);
-	ipset_collection_destroy(&entry->dp.ips_collection_exclude);
-	port_filters_destroy(&entry->dp.pf_tcp);
-	port_filters_destroy(&entry->dp.pf_udp);
-	HostFailPoolDestroy(&entry->dp.hostlist_auto_fail_counters);
+	hostlist_collection_destroy(&dp->hl_collection);
+	hostlist_collection_destroy(&dp->hl_collection_exclude);
+	ipset_collection_destroy(&dp->ips_collection);
+	ipset_collection_destroy(&dp->ips_collection_exclude);
+	port_filters_destroy(&dp->pf_tcp);
+	port_filters_destroy(&dp->pf_udp);
+	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
+}
+void dp_clear(struct desync_profile *dp)
+{
+	dp_clear_dynamic(dp);
+	memset(dp,0,sizeof(*dp));
+}
+void dp_entry_destroy(struct desync_profile_list *entry)
+{
+	dp_clear_dynamic(&entry->dp);
 	free(entry);
 }
 void dp_list_destroy(struct desync_profile_list_head *head)

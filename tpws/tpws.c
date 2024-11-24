@@ -177,6 +177,7 @@ static void exithelp(void)
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		"\nMULTI-STRATEGY:\n"
 		" --new\t\t\t\t\t; begin new strategy\n"
+		" --skip\t\t\t\t\t; do not use this strategy\n"
 		" --filter-l3=ipv4|ipv6\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --filter-tcp=[~]port1[-port2]|*\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
 		" --filter-l7=[http|tls|unknown]\t\t; L6-L7 protocol filter. multiple comma separated values allowed.\n"
@@ -524,6 +525,7 @@ void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
 	int v, i;
+	bool bSkip=false;
 
 	memset(&params, 0, sizeof(params));
 	params.maxconn = DEFAULT_MAX_CONN;
@@ -630,24 +632,25 @@ void parse_params(int argc, char *argv[])
 		{ "connect-bind-addr",required_argument,0,0 },// optidx=55
 
 		{ "new",no_argument,0,0 },				// optidx=56
-		{ "filter-l3",required_argument,0,0 },			// optidx=57
-		{ "filter-tcp",required_argument,0,0 },			// optidx=58
-		{ "filter-l7",required_argument,0,0 },			// optidx=59
-		{ "ipset",required_argument,0,0 },			// optidx=60
-		{ "ipset-exclude",required_argument,0,0 },		// optidx=61
+		{ "skip",no_argument,0,0 },				// optidx=57
+		{ "filter-l3",required_argument,0,0 },			// optidx=58
+		{ "filter-tcp",required_argument,0,0 },			// optidx=59
+		{ "filter-l7",required_argument,0,0 },			// optidx=60
+		{ "ipset",required_argument,0,0 },			// optidx=61
+		{ "ipset-exclude",required_argument,0,0 },		// optidx=62
 
 #if defined(__FreeBSD__)
 		{ "enable-pf",no_argument,0,0 },// optidx=62
 #elif defined(__APPLE__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=62
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=63
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=63
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=64
 #elif defined(__linux__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=62
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=63
-		{ "mss",required_argument,0,0 },			// optidx=64
-		{ "fix-seg",optional_argument,0,0 },			// optidx=65
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=63
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=64
+		{ "mss",required_argument,0,0 },			// optidx=65
+		{ "fix-seg",optional_argument,0,0 },			// optidx=66
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },				// optidx=66
+		{ "nosplice",no_argument,0,0 },				// optidx=67
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -1160,36 +1163,49 @@ void parse_params(int argc, char *argv[])
 
 
 		case 56: /* new */
-			if (!(dpl = dp_list_add(&params.desync_profiles)))
+			if (bSkip)
 			{
-				DLOG_ERR("desync_profile_add: out of memory\n");
-				exit_clean(1);
+				dp_clear(dp);
+				dp_init(dp);
+				dp->n = desync_profile_count;
+				bSkip = false;
 			}
-			dp = &dpl->dp;
-			dp->n = ++desync_profile_count;
+			else
+			{
+				if (!(dpl = dp_list_add(&params.desync_profiles)))
+				{
+					DLOG_ERR("desync_profile_add: out of memory\n");
+					exit_clean(1);
+				}
+				dp = &dpl->dp;
+				dp->n = ++desync_profile_count;
+			}
 			break;
-		case 57: /* filter-l3 */
+		case 57: /* skip */
+			bSkip = true;
+			break;
+		case 58: /* filter-l3 */
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 58: /* filter-tcp */
+		case 59: /* filter-tcp */
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 59: /* filter-l7 */
+		case 60: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 60: /* ipset */
+		case 61: /* ipset */
 			if (!RegisterIpset(dp, false, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
@@ -1197,7 +1213,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 61: /* ipset-exclude */
+		case 62: /* ipset-exclude */
 			if (!RegisterIpset(dp, true, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
@@ -1207,11 +1223,11 @@ void parse_params(int argc, char *argv[])
 			break;
 
 #if defined(__FreeBSD__)
-		case 62: /* enable-pf */
+		case 63: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__) || defined(__APPLE__)
-		case 62: /* local-tcp-user-timeout */
+		case 63: /* local-tcp-user-timeout */
 			params.tcp_user_timeout_local = atoi(optarg);
 			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
 			{
@@ -1219,7 +1235,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 63: /* remote-tcp-user-timeout */
+		case 64: /* remote-tcp-user-timeout */
 			params.tcp_user_timeout_remote = atoi(optarg);
 			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
 			{
@@ -1230,7 +1246,7 @@ void parse_params(int argc, char *argv[])
 #endif
 
 #if defined(__linux__)
-		case 64: /* mss */
+		case 65: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			dp->mss = atoi(optarg);
 			if (dp->mss<88 || dp->mss>32767)
@@ -1239,7 +1255,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 65: /* fix-seg */
+		case 66: /* fix-seg */
 			if (!params.fix_seg_avail)
 			{
 				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
@@ -1259,13 +1275,20 @@ void parse_params(int argc, char *argv[])
 				params.fix_seg = FIX_SEG_DEFAULT_MAX_WAIT;
 			break;
 #ifdef SPLICE_PRESENT
-		case 66: /* nosplice */
+		case 67: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
 #endif
 		}
 	}
+	if (bSkip)
+	{
+		LIST_REMOVE(dpl,next);
+		dp_entry_destroy(dpl);
+		desync_profile_count--;
+	}
+
 	if (!params.bind_wait_only && !params.port)
 	{
 		DLOG_ERR("Need port number\n");

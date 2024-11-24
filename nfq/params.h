@@ -51,7 +51,7 @@ struct desync_profile
 	char wssize_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int wssize_cutoff;
 
-	bool hostcase, hostnospace, domcase;
+	bool hostcase, hostnospace, domcase, methodeol;
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;
 	bool desync_retrans,desync_skip_nosni,desync_any_proto;
@@ -99,8 +99,11 @@ struct desync_profile_list {
 };
 LIST_HEAD(desync_profile_list_head, desync_profile_list);
 struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head);
+void dp_entry_destroy(struct desync_profile_list *entry);
 void dp_list_destroy(struct desync_profile_list_head *head);
 bool dp_list_have_autohostlist(struct desync_profile_list_head *head);
+void dp_init(struct desync_profile *dp);
+void dp_clear(struct desync_profile *dp);
 
 struct params_s
 {
