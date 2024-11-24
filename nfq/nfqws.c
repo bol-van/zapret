@@ -836,6 +836,47 @@ static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits
 	if (p) return false; // too much splits
 	return true;
 }
+
+static bool parse_domain_list(char *opt, strpool **pp)
+{
+	char *e,*p,c;
+
+	for (p=opt ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (*p && !AppendHostlistItem(pp,p)) return false;
+
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
+static bool parse_ip_list(char *opt, ipset *pp)
+{
+	char *e,*p,c;
+
+	for (p=opt ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (*p && !AppendIpsetItem(pp,p)) return false;
+
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
 static void split_compat(struct desync_profile *dp)
 {
 	if (!dp->split_count)
@@ -1026,10 +1067,14 @@ static void exithelp(void)
 		" --filter-udp=[~]port1[-port2]|*\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
 		" --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
 		" --ipset=<filename>\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-ip=<ip_list>\t\t\t\t; comma separated fixed ip list\n"
 		" --ipset-exclude=<filename>\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-exclude-ip=<ip_list>\t\t\t; comma separated fixed ip list\n"
 		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-domains=<domain_list>\t\t; comma separated fixed domain list\n"
 		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude-domains=<domain_list>\t; comma separated fixed domain list\n"
 		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
 		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
 		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
@@ -1151,6 +1196,8 @@ int main(int argc, char **argv)
 	int option_index = 0;
 	bool daemon = false, bSkip = false;
 	char pidfile[256];
+	struct hostlist_file *anon_hl = NULL, *anon_hl_exclude = NULL;
+	struct ipset_file *anon_ips = NULL, *anon_ips_exclude = NULL;
 #ifdef __CYGWIN__
 	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
 	bool wf_ipv4=true, wf_ipv6=true;
@@ -1278,33 +1325,37 @@ int main(int argc, char **argv)
 		{"dpi-desync-cutoff",required_argument,0,0},// optidx=44
 		{"dpi-desync-start",required_argument,0,0},// optidx=45
 		{"hostlist",required_argument,0,0},		// optidx=46
-		{"hostlist-exclude",required_argument,0,0},	// optidx=47
-		{"hostlist-auto",required_argument,0,0},	// optidx=48
-		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=49
-		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=50
-		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=51
-		{"hostlist-auto-debug",required_argument,0,0},	// optidx=52
-		{"new",no_argument,0,0},	// optidx=53
-		{"skip",no_argument,0,0},	// optidx=54
-		{"filter-l3",required_argument,0,0},	// optidx=55
-		{"filter-tcp",required_argument,0,0},	// optidx=56
-		{"filter-udp",required_argument,0,0},	// optidx=57
-		{"filter-l7",required_argument,0,0},	// optidx=58
-		{"ipset",required_argument,0,0},	// optidx=59
-		{"ipset-exclude",required_argument,0,0},// optidx=60
+		{"hostlist-domains",required_argument,0,0},// optidx=47
+		{"hostlist-exclude",required_argument,0,0},	// optidx=48
+		{"hostlist-exclude-domains",required_argument,0,0},// optidx=49
+		{"hostlist-auto",required_argument,0,0},	// optidx=50
+		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=51
+		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=52
+		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=53
+		{"hostlist-auto-debug",required_argument,0,0},	// optidx=54
+		{"new",no_argument,0,0},	// optidx=55
+		{"skip",no_argument,0,0},	// optidx=56
+		{"filter-l3",required_argument,0,0},	// optidx=57
+		{"filter-tcp",required_argument,0,0},	// optidx=58
+		{"filter-udp",required_argument,0,0},	// optidx=59
+		{"filter-l7",required_argument,0,0},	// optidx=60
+		{"ipset",required_argument,0,0},	// optidx=61
+		{"ipset-ip",required_argument,0,0},	// optidx=62
+		{"ipset-exclude",required_argument,0,0},// optidx=63
+		{"ipset-exclude-ip",required_argument,0,0},	// optidx=64
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=61
-		{"bind-fix6",no_argument,0,0},		// optidx=62
+		{"bind-fix4",no_argument,0,0},		// optidx=65
+		{"bind-fix6",no_argument,0,0},		// optidx=66
 #elif defined(__CYGWIN__)
-		{"wf-iface",required_argument,0,0},	// optidx=61
-		{"wf-l3",required_argument,0,0},	// optidx=62
-		{"wf-tcp",required_argument,0,0},	// optidx=63
-		{"wf-udp",required_argument,0,0},	// optidx=64
-		{"wf-raw",required_argument,0,0},	// optidx=65
-		{"wf-save",required_argument,0,0},	// optidx=66
-		{"ssid-filter",required_argument,0,0},	// optidx=67
-		{"nlm-filter",required_argument,0,0},	// optidx=68
-		{"nlm-list",optional_argument,0,0},	// optidx=69
+		{"wf-iface",required_argument,0,0},	// optidx=65
+		{"wf-l3",required_argument,0,0},	// optidx=66
+		{"wf-tcp",required_argument,0,0},	// optidx=67
+		{"wf-udp",required_argument,0,0},	// optidx=68
+		{"wf-raw",required_argument,0,0},	// optidx=69
+		{"wf-save",required_argument,0,0},	// optidx=70
+		{"ssid-filter",required_argument,0,0},	// optidx=71
+		{"nlm-filter",required_argument,0,0},	// optidx=72
+		{"nlm-list",optional_argument,0,0},	// optidx=73
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1745,20 +1796,49 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 46: /* hostlist */
+			if (bSkip) break;
 			if (!RegisterHostlist(dp, false, optarg))
 			{
 				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
-		case 47: /* hostlist-exclude */
+		case 47: /* hostlist-domains */
+			if (bSkip) break;
+			if (!anon_hl && !(anon_hl=RegisterHostlist(dp, false, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous hostlist\n");
+				exit_clean(1);
+			}
+			if (!parse_domain_list(optarg, &anon_hl->hostlist))
+			{
+				DLOG_ERR("failed to add domains to anonymous hostlist\n");
+				exit_clean(1);
+			}
+			break;
+		case 48: /* hostlist-exclude */
+			if (bSkip) break;
 			if (!RegisterHostlist(dp, true, optarg))
 			{
 				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
-		case 48: /* hostlist-auto */
+		case 49: /* hostlist-exclude-domains */
+			if (bSkip) break;
+			if (!anon_hl_exclude && !(anon_hl_exclude=RegisterHostlist(dp, true, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous hostlist\n");
+				exit_clean(1);
+			}
+			if (!parse_domain_list(optarg, &anon_hl_exclude->hostlist))
+			{
+				DLOG_ERR("failed to add domains to anonymous hostlist\n");
+				exit_clean(1);
+			}
+			break;
+		case 50: /* hostlist-auto */
+			if (bSkip) break;
 			if (dp->hostlist_auto)
 			{
 				DLOG_ERR("only one auto hostlist per profile is supported\n");
@@ -1785,7 +1865,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 49: /* hostlist-auto-fail-threshold */
+		case 51: /* hostlist-auto-fail-threshold */
 			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_threshold<1 || dp->hostlist_auto_fail_threshold>20)
 			{
@@ -1793,7 +1873,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 50: /* hostlist-auto-fail-time */
+		case 52: /* hostlist-auto-fail-time */
 			dp->hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_time<1)
 			{
@@ -1801,7 +1881,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 51: /* hostlist-auto-retrans-threshold */
+		case 53: /* hostlist-auto-retrans-threshold */
 			dp->hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_retrans_threshold<2 || dp->hostlist_auto_retrans_threshold>10)
 			{
@@ -1809,7 +1889,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 52: /* hostlist-auto-debug */
+		case 54: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1823,7 +1903,7 @@ int main(int argc, char **argv)
 			}
 			break;
 
-		case 53: /* new */
+		case 55: /* new */
 			if (bSkip)
 			{
 				dp_clear(dp);
@@ -1841,19 +1921,21 @@ int main(int argc, char **argv)
 				dp = &dpl->dp;
 				dp->n = ++desync_profile_count;
 			}
+			anon_hl = anon_hl_exclude = NULL;
+			anon_ips = anon_ips_exclude = NULL;
 			break;
-		case 54: /* skip */
+		case 56: /* skip */
 			bSkip = true;
 			break;
 
-		case 55: /* filter-l3 */
+		case 57: /* filter-l3 */
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 56: /* filter-tcp */
+		case 58: /* filter-tcp */
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
@@ -1863,7 +1945,7 @@ int main(int argc, char **argv)
 			if (!port_filters_deny_if_empty(&dp->pf_udp))
 				exit_clean(1);
 			break;
-		case 57: /* filter-udp */
+		case 59: /* filter-udp */
 			if (!parse_pf_list(optarg,&dp->pf_udp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
@@ -1873,53 +1955,80 @@ int main(int argc, char **argv)
 			if (!port_filters_deny_if_empty(&dp->pf_tcp))
 				exit_clean(1);
 			break;
-		case 58: /* filter-l7 */
+		case 60: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 59: /* ipset */
+		case 61: /* ipset */
+			if (bSkip) break;
 			if (!RegisterIpset(dp, false, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
-		case 60: /* ipset-exclude */
+		case 62: /* ipset-ip */
+			if (bSkip) break;
+			if (!anon_ips && !(anon_ips=RegisterIpset(dp, false, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous ipset\n");
+				exit_clean(1);
+			}
+			if (!parse_ip_list(optarg, &anon_ips->ipset))
+			{
+				DLOG_ERR("failed to add subnets to anonymous ipset\n");
+				exit_clean(1);
+			}
+			break;
+		case 63: /* ipset-exclude */
+			if (bSkip) break;
 			if (!RegisterIpset(dp, true, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
 				exit_clean(1);
 			}
 			break;
-
+		case 64: /* ipset-exclude-ip */
+			if (bSkip) break;
+			if (!anon_ips_exclude && !(anon_ips_exclude=RegisterIpset(dp, true, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous ipset\n");
+				exit_clean(1);
+			}
+			if (!parse_ip_list(optarg, &anon_ips_exclude->ipset))
+			{
+				DLOG_ERR("failed to add subnets to anonymous ipset\n");
+				exit_clean(1);
+			}
+			break;
 
 
 #ifdef __linux__
-		case 61: /* bind-fix4 */
+		case 65: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 62: /* bind-fix6 */
+		case 66: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #elif defined(__CYGWIN__)
-		case 61: /* wf-iface */
+		case 65: /* wf-iface */
 			if (!sscanf(optarg,"%u.%u",&IfIdx,&SubIfIdx))
 			{
 				DLOG_ERR("bad value for --wf-iface\n");
 				exit_clean(1);
 			}
 			break;
-		case 62: /* wf-l3 */
+		case 66: /* wf-l3 */
 			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
 			{
 				DLOG_ERR("bad value for --wf-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 63: /* wf-tcp */
+		case 67: /* wf-tcp */
 			hash_wf_tcp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
@@ -1928,7 +2037,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 64: /* wf-udp */
+		case 68: /* wf-udp */
 			hash_wf_udp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
@@ -1937,7 +2046,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 65: /* wf-raw */
+		case 69: /* wf-raw */
 			hash_wf_raw=hash_jen(optarg,strlen(optarg));
 			if (optarg[0]=='@')
 			{
@@ -1951,11 +2060,11 @@ int main(int argc, char **argv)
 				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
 			}
 			break;
-		case 66: /* wf-save */
+		case 70: /* wf-save */
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
-		case 67: /* ssid-filter */
+		case 71: /* ssid-filter */
 			hash_ssid_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -1973,7 +2082,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 68: /* nlm-filter */
+		case 72: /* nlm-filter */
 			hash_nlm_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -1991,7 +2100,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 69: /* nlm-list */
+		case 73: /* nlm-list */
 			if (!nlm_list(optarg && !strcmp(optarg,"all")))
 			{
 				DLOG_ERR("could not get list of NLM networks\n");

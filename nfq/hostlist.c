@@ -24,12 +24,17 @@ static bool addpool(strpool **hostlist, char **s, const char *end, int *ct)
 			*hostlist = NULL;
 			return false;
 		}
-		(*ct)++;
+		if (ct) (*ct)++;
 	}
 	// advance to the next line
 	for (; p<end && (!*p || *p=='\r' || *p=='\n') ; p++);
 	*s = p;
 	return true;
+}
+
+bool AppendHostlistItem(strpool **hostlist, char *s)
+{
+	return addpool(hostlist,&s,s+strlen(s),NULL);
 }
 
 bool AppendHostList(strpool **hostlist, const char *filename)
@@ -98,21 +103,24 @@ bool AppendHostList(strpool **hostlist, const char *filename)
 
 static bool LoadHostList(struct hostlist_file *hfile)
 {
-	time_t t = file_mod_time(hfile->filename);
-	if (!t)
+	if (hfile->filename)
 	{
-		// stat() error
-		DLOG_ERR("cannot access hostlist file '%s'. in-memory content remains unchanged.\n",hfile->filename);
-		return true;
-	}
-	if (t==hfile->mod_time) return true; // up to date
-	StrPoolDestroy(&hfile->hostlist);
-	if (!AppendHostList(&hfile->hostlist, hfile->filename))
-	{
+		time_t t = file_mod_time(hfile->filename);
+		if (!t)
+		{
+			// stat() error
+			DLOG_ERR("cannot access hostlist file '%s'. in-memory content remains unchanged.\n",hfile->filename);
+			return true;
+		}
+		if (t==hfile->mod_time) return true; // up to date
 		StrPoolDestroy(&hfile->hostlist);
-		return false;
+		if (!AppendHostList(&hfile->hostlist, hfile->filename))
+		{
+			StrPoolDestroy(&hfile->hostlist);
+			return false;
+		}
+		hfile->mod_time=t;
 	}
-	hfile->mod_time=t;
 	return true;
 }
 static bool LoadHostLists(struct hostlist_files_head *list)
@@ -202,7 +210,7 @@ static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, con
 
 	LIST_FOREACH(item, hostlists_exclude, next)
 	{
-		DLOG("[%s] exclude ", item->hfile->filename);
+		DLOG("[%s] exclude ", item->hfile->filename ? item->hfile->filename : "fixed");
 		if (SearchHostList(item->hfile->hostlist, host))
 		{
 			if (excluded) *excluded = true;
@@ -214,7 +222,7 @@ static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, con
 	{
 		LIST_FOREACH(item, hostlists, next)
 		{
-			DLOG("[%s] include ", item->hfile->filename);
+			DLOG("[%s] include ", item->hfile->filename ? item->hfile->filename : "fixed");
 			if (SearchHostList(item->hfile->hostlist, host))
 				return true;
 		}
@@ -235,17 +243,29 @@ bool HostlistCheck(const struct desync_profile *dp, const char *host, bool *excl
 static struct hostlist_file *RegisterHostlist_(struct hostlist_files_head *hostlists, struct hostlist_collection_head *hl_collection, const char *filename)
 {
 	struct hostlist_file *hfile;
-	if (!(hfile=hostlist_files_search(hostlists, filename)))
-		if (!(hfile=hostlist_files_add(hostlists, filename)))
+
+	if (filename)
+	{
+		if (!(hfile=hostlist_files_search(hostlists, filename)))
+			if (!(hfile=hostlist_files_add(hostlists, filename)))
+				return NULL;
+		if (!hostlist_collection_search(hl_collection, filename))
+			if (!hostlist_collection_add(hl_collection, hfile))
+				return NULL;
+	}
+	else
+	{
+		if (!(hfile=hostlist_files_add(hostlists, NULL)))
 			return NULL;
-	if (!hostlist_collection_search(hl_collection, filename))
 		if (!hostlist_collection_add(hl_collection, hfile))
 			return NULL;
+	}
+
 	return hfile;
 }
 struct hostlist_file *RegisterHostlist(struct desync_profile *dp, bool bExclude, const char *filename)
 {
-	if (!file_mod_time(filename))
+	if (filename && !file_mod_time(filename))
 	{
 		DLOG_ERR("cannot access hostlist file '%s'\n",filename);
 		return NULL;
@@ -265,15 +285,30 @@ void HostlistsDebug()
 	struct hostlist_item *hl_item;
 
 	LIST_FOREACH(hfile, &params.hostlists, next)
-		DLOG("hostlist file %s%s\n",hfile->filename,hfile->hostlist ? "" : " (empty)");
+	{
+		if (hfile->filename)
+			DLOG("hostlist file %s%s\n",hfile->filename,hfile->hostlist ? "" : " (empty)");
+		else
+			DLOG("hostlist fixed%s\n",hfile->hostlist ? "" : " (empty)");
+	}
 
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		LIST_FOREACH(hl_item, &dpl->dp.hl_collection, next)
 			if (hl_item->hfile!=dpl->dp.hostlist_auto)
-				DLOG("profile %d include hostlist %s%s\n",dpl->dp.n, hl_item->hfile->filename,hl_item->hfile->hostlist ? "" : " (empty)");
+			{
+				if (hl_item->hfile->filename)
+					DLOG("profile %d include hostlist %s%s\n",dpl->dp.n, hl_item->hfile->filename,hl_item->hfile->hostlist ? "" : " (empty)");
+				else
+					DLOG("profile %d include fixed hostlist%s\n",dpl->dp.n, hl_item->hfile->hostlist ? "" : " (empty)");
+			}
 		LIST_FOREACH(hl_item, &dpl->dp.hl_collection_exclude, next)
-			DLOG("profile %d exclude hostlist %s%s\n",dpl->dp.n,hl_item->hfile->filename,hl_item->hfile->hostlist ? "" : " (empty)");
+		{
+			if (hl_item->hfile->filename)
+				DLOG("profile %d exclude hostlist %s%s\n",dpl->dp.n,hl_item->hfile->filename,hl_item->hfile->hostlist ? "" : " (empty)");
+			else
+				DLOG("profile %d exclude fixed hostlist%s\n",dpl->dp.n,hl_item->hfile->hostlist ? "" : " (empty)");
+		}
 		if (dpl->dp.hostlist_auto)
 			DLOG("profile %d auto hostlist %s%s\n",dpl->dp.n,dpl->dp.hostlist_auto->filename,dpl->dp.hostlist_auto->hostlist ? "" : " (empty)");
 	}
