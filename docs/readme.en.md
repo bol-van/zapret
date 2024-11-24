@@ -1,4 +1,4 @@
-# zapret v.69
+# zapret v69.3
 
 # SCAMMER WARNING
 
@@ -180,7 +180,9 @@ nfqws takes the following parameters:
  --dpi-desync-start=[n|d|s]N                    ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N
  --dpi-desync-cutoff=[n|d|s]N                   ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --hostlist=<filename>                          ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-domains=<domain_list>               ; comma separated fixed domain list
  --hostlist-exclude=<filename>                  ; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude-domains=<domain_list>       ; comma separated fixed domain list
  --hostlist-auto=<filename>                     ; detect DPI blocks and build hostlist automatically
  --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
  --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
@@ -193,7 +195,9 @@ nfqws takes the following parameters:
  --filter-udp=[~]port1[-port2]|*                ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list supported.
  --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
  --ipset=<filename>                             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-ip=<ip_list>                           ; comma separated fixed subnet list
  --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude-ip=<ip_list>                   ; comma separated fixed subnet list
 ```
 
 ### DPI desync attack
@@ -671,10 +675,14 @@ tpws is transparent proxy.
  --filter-tcp=[~]port1[-port2]|*         ; TCP port filter. ~ means negation. comma separated list supported.
  --filter-l7=[http|tls|unknown]          ; L6-L7 protocol filter. multiple comma separated values allowed.
  --ipset=<filename>                      ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-ip=<ip_list>                    ; comma separated fixed subnet list
  --ipset-exclude=<filename>              ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude-ip=<ip_list>            ; comma separated fixed subnet list
 
  --hostlist=<filename>                   ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-domains=<domain_list>        ; comma separated fixed domain list
  --hostlist-exclude=<filename>           ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude-domains=<domain_list> ; comma separated fixed domain list
  --hostlist-auto=<filename>              ; detect DPI blocks and build hostlist automatically
  --hostlist-auto-fail-threshold=<int>    ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
  --hostlist-auto-fail-time=<int>         ; all failed attemps must be within these seconds (default : 60)
