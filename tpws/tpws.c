@@ -182,10 +182,14 @@ static void exithelp(void)
 		" --filter-tcp=[~]port1[-port2]|*\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
 		" --filter-l7=[http|tls|unknown]\t\t; L6-L7 protocol filter. multiple comma separated values allowed.\n"
 		" --ipset=<filename>\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-ip=<ip_list>\t\t\t; comma separated fixed ip list\n"
 		" --ipset-exclude=<filename>\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-exclude-ip=<ip_list>\t\t; comma separated fixed ip list\n"
 		"\nHOSTLIST FILTER:\n"
 		" --hostlist=<filename>\t\t\t; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-domains=<domain_list>\t; comma separated fixed domain list\n"
 		" --hostlist-exclude=<filename>\t\t; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude-domains=<domain_list> ; comma separated fixed domain list\n"
 		" --hostlist-auto=<filename>\t\t; detect DPI blocks and build hostlist automatically\n"
 		" --hostlist-auto-fail-threshold=<int>\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
 		" --hostlist-auto-fail-time=<int>\t; all failed attemps must be within these seconds (default : %d)\n"
@@ -484,6 +488,46 @@ static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
 	return true;
 }
 
+static bool parse_domain_list(char *opt, strpool **pp)
+{
+	char *e,*p,c;
+
+	for (p=opt ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (*p && !AppendHostlistItem(pp,p)) return false;
+
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
+static bool parse_ip_list(char *opt, ipset *pp)
+{
+	char *e,*p,c;
+
+	for (p=opt ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (*p && !AppendIpsetItem(pp,p)) return false;
+
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
 // no static to not allow optimizer to inline this func (save stack)
 void config_from_file(const char *filename)
@@ -526,6 +570,8 @@ void parse_params(int argc, char *argv[])
 	int option_index = 0;
 	int v, i;
 	bool bSkip=false;
+	struct hostlist_file *anon_hl = NULL, *anon_hl_exclude = NULL;
+	struct ipset_file *anon_ips = NULL, *anon_ips_exclude = NULL;
 
 	memset(&params, 0, sizeof(params));
 	params.maxconn = DEFAULT_MAX_CONN;
@@ -611,46 +657,50 @@ void parse_params(int argc, char *argv[])
 		{ "tlsrec",required_argument,0,0 },// optidx=34
 		{ "tlsrec-pos",required_argument,0,0 },// optidx=35
 		{ "hostlist",required_argument,0,0 },// optidx=36
-		{ "hostlist-exclude",required_argument,0,0 },// optidx=37
-		{ "hostlist-auto",required_argument,0,0}, // optidx=38
-		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=39
-		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=40
-		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=41
-		{ "pidfile",required_argument,0,0 },// optidx=42
-		{ "debug",optional_argument,0,0 },// optidx=43
-		{ "debug-level",required_argument,0,0 },// optidx=44
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=45
-		{ "local-sndbuf",required_argument,0,0 },// optidx=46
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=47
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=48
-		{ "socks",no_argument,0,0 },// optidx=40
-		{ "no-resolve",no_argument,0,0 },// optidx=50
-		{ "resolver-threads",required_argument,0,0 },// optidx=51
-		{ "skip-nodelay",no_argument,0,0 },// optidx=52
-		{ "tamper-start",required_argument,0,0 },// optidx=53
-		{ "tamper-cutoff",required_argument,0,0 },// optidx=54
-		{ "connect-bind-addr",required_argument,0,0 },// optidx=55
+		{ "hostlist-domains",required_argument,0,0 },// optidx=37
+		{ "hostlist-exclude",required_argument,0,0 },// optidx=38
+		{ "hostlist-exclude-domains",required_argument,0,0 },// optidx=39
+		{ "hostlist-auto",required_argument,0,0}, // optidx=40
+		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=41
+		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=42
+		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=43
+		{ "pidfile",required_argument,0,0 },// optidx=44
+		{ "debug",optional_argument,0,0 },// optidx=45
+		{ "debug-level",required_argument,0,0 },// optidx=46
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=47
+		{ "local-sndbuf",required_argument,0,0 },// optidx=48
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=49
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=50
+		{ "socks",no_argument,0,0 },// optidx=51
+		{ "no-resolve",no_argument,0,0 },// optidx=52
+		{ "resolver-threads",required_argument,0,0 },// optidx=53
+		{ "skip-nodelay",no_argument,0,0 },// optidx=54
+		{ "tamper-start",required_argument,0,0 },// optidx=55
+		{ "tamper-cutoff",required_argument,0,0 },// optidx=56
+		{ "connect-bind-addr",required_argument,0,0 },// optidx=57
 
-		{ "new",no_argument,0,0 },				// optidx=56
-		{ "skip",no_argument,0,0 },				// optidx=57
-		{ "filter-l3",required_argument,0,0 },			// optidx=58
-		{ "filter-tcp",required_argument,0,0 },			// optidx=59
-		{ "filter-l7",required_argument,0,0 },			// optidx=60
-		{ "ipset",required_argument,0,0 },			// optidx=61
-		{ "ipset-exclude",required_argument,0,0 },		// optidx=62
+		{ "new",no_argument,0,0 },				// optidx=58
+		{ "skip",no_argument,0,0 },				// optidx=59
+		{ "filter-l3",required_argument,0,0 },			// optidx=60
+		{ "filter-tcp",required_argument,0,0 },			// optidx=61
+		{ "filter-l7",required_argument,0,0 },			// optidx=62
+		{ "ipset",required_argument,0,0 },			// optidx=63
+		{ "ipset-ip",required_argument,0,0 },			// optidx=64
+		{ "ipset-exclude",required_argument,0,0 },		// optidx=65
+		{ "ipset-exclude-ip",required_argument,0,0 },		// optidx=66
 
 #if defined(__FreeBSD__)
-		{ "enable-pf",no_argument,0,0 },// optidx=62
+		{ "enable-pf",no_argument,0,0 },// optidx=67
 #elif defined(__APPLE__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=63
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=64
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=67
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=68
 #elif defined(__linux__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=63
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=64
-		{ "mss",required_argument,0,0 },			// optidx=65
-		{ "fix-seg",optional_argument,0,0 },			// optidx=66
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=67
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=68
+		{ "mss",required_argument,0,0 },			// optidx=69
+		{ "fix-seg",optional_argument,0,0 },			// optidx=70
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },				// optidx=67
+		{ "nosplice",no_argument,0,0 },				// optidx=71
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -948,6 +998,7 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 		case 36: /* hostlist */
+			if (bSkip) break;
 			if (!RegisterHostlist(dp, false, optarg))
 			{
 				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
@@ -955,7 +1006,22 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 37: /* hostlist-exclude */
+		case 37: /* hostlist-domains */
+			if (bSkip) break;
+			if (!anon_hl && !(anon_hl=RegisterHostlist(dp, false, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous hostlist\n");
+				exit_clean(1);
+			}
+			if (!parse_domain_list(optarg, &anon_hl->hostlist))
+			{
+				DLOG_ERR("failed to add domains to anonymous hostlist\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 38: /* hostlist-exclude */
+			if (bSkip) break;
 			if (!RegisterHostlist(dp, true, optarg))
 			{
 				DLOG_ERR("failed to register hostlist '%s'\n", optarg);
@@ -963,7 +1029,22 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 38: /* hostlist-auto */
+		case 39: /* hostlist-exclude-domains */
+			if (bSkip) break;
+			if (!anon_hl_exclude && !(anon_hl_exclude=RegisterHostlist(dp, true, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous hostlist\n");
+				exit_clean(1);
+			}
+			if (!parse_domain_list(optarg, &anon_hl_exclude->hostlist))
+			{
+				DLOG_ERR("failed to add domains to anonymous hostlist\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 40: /* hostlist-auto */
+			if (bSkip) break;
 			if (dp->hostlist_auto)
 			{
 				DLOG_ERR("only one auto hostlist per profile is supported\n");
@@ -991,7 +1072,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true; // need to detect blocks and update autohostlist. cannot just slice.
 			break;
-		case 39: /* hostlist-auto-fail-threshold */
+		case 41: /* hostlist-auto-fail-threshold */
 			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_threshold<1 || dp->hostlist_auto_fail_threshold>20)
 			{
@@ -999,7 +1080,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 40: /* hostlist-auto-fail-time */
+		case 42: /* hostlist-auto-fail-time */
 			dp->hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_time<1)
 			{
@@ -1007,7 +1088,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 41: /* hostlist-auto-debug */
+		case 43: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1020,11 +1101,11 @@ void parse_params(int argc, char *argv[])
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
 			break;
-		case 42: /* pidfile */
+		case 44: /* pidfile */
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 43: /* debug */
+		case 45: /* debug */
 			if (optarg)
 			{
 				if (*optarg=='@')
@@ -1058,44 +1139,44 @@ void parse_params(int argc, char *argv[])
 				params.debug_target = LOG_TARGET_CONSOLE;
 			}
 			break;
-		case 44: /* debug-level */
+		case 46: /* debug-level */
 			params.debug = atoi(optarg);
 			break;
-		case 45: /* local-rcvbuf */
+		case 47: /* local-rcvbuf */
 #ifdef __linux__
 			params.local_rcvbuf = atoi(optarg)/2;
 #else
 			params.local_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 46: /* local-sndbuf */
+		case 48: /* local-sndbuf */
 #ifdef __linux__
 			params.local_sndbuf = atoi(optarg)/2;
 #else
 			params.local_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 47: /* remote-rcvbuf */
+		case 49: /* remote-rcvbuf */
 #ifdef __linux__
 			params.remote_rcvbuf = atoi(optarg)/2;
 #else
 			params.remote_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 48: /* remote-sndbuf */
+		case 50: /* remote-sndbuf */
 #ifdef __linux__
 			params.remote_sndbuf = atoi(optarg)/2;
 #else
 			params.remote_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 49: /* socks */
+		case 51: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 50: /* no-resolve */
+		case 52: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 51: /* resolver-threads */
+		case 53: /* resolver-threads */
 			params.resolver_threads = atoi(optarg);
 			if (params.resolver_threads<1 || params.resolver_threads>300)
 			{
@@ -1103,10 +1184,10 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 52: /* skip-nodelay */
+		case 54: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
-		case 53: /* tamper-start */
+		case 55: /* tamper-start */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -1120,7 +1201,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper_lim = true;
 			break;
-		case 54: /* tamper-cutoff */
+		case 56: /* tamper-cutoff */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -1134,7 +1215,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper_lim = true;
 			break;
-		case 55: /* connect-bind-addr */
+		case 57: /* connect-bind-addr */
 			{
 				char *p = strchr(optarg,'%');
 				if (p) *p++=0;
@@ -1162,7 +1243,7 @@ void parse_params(int argc, char *argv[])
 			break;
 
 
-		case 56: /* new */
+		case 58: /* new */
 			if (bSkip)
 			{
 				dp_clear(dp);
@@ -1180,32 +1261,35 @@ void parse_params(int argc, char *argv[])
 				dp = &dpl->dp;
 				dp->n = ++desync_profile_count;
 			}
+			anon_hl = anon_hl_exclude = NULL;
+			anon_ips = anon_ips_exclude = NULL;
 			break;
-		case 57: /* skip */
+		case 59: /* skip */
 			bSkip = true;
 			break;
-		case 58: /* filter-l3 */
+		case 60: /* filter-l3 */
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 59: /* filter-tcp */
+		case 61: /* filter-tcp */
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 60: /* filter-l7 */
+		case 62: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 61: /* ipset */
+		case 63: /* ipset */
+			if (bSkip) break;
 			if (!RegisterIpset(dp, false, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
@@ -1213,7 +1297,22 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 62: /* ipset-exclude */
+		case 64: /* ipset-ip */
+			if (bSkip) break;
+			if (!anon_ips && !(anon_ips=RegisterIpset(dp, false, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous ipset\n");
+				exit_clean(1);
+			}
+			if (!parse_ip_list(optarg, &anon_ips->ipset))
+			{
+				DLOG_ERR("failed to add subnets to anonymous ipset\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
+		case 65: /* ipset-exclude */
+			if (bSkip) break;
 			if (!RegisterIpset(dp, true, optarg))
 			{
 				DLOG_ERR("failed to register ipset '%s'\n", optarg);
@@ -1221,13 +1320,27 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
+		case 66: /* ipset-exclude-ip */
+			if (bSkip) break;
+			if (!anon_ips_exclude && !(anon_ips_exclude=RegisterIpset(dp, true, NULL)))
+			{
+				DLOG_ERR("failed to register anonymous ipset\n");
+				exit_clean(1);
+			}
+			if (!parse_ip_list(optarg, &anon_ips_exclude->ipset))
+			{
+				DLOG_ERR("failed to add subnets to anonymous ipset\n");
+				exit_clean(1);
+			}
+			params.tamper = true;
+			break;
 
 #if defined(__FreeBSD__)
-		case 63: /* enable-pf */
+		case 67: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__) || defined(__APPLE__)
-		case 63: /* local-tcp-user-timeout */
+		case 67: /* local-tcp-user-timeout */
 			params.tcp_user_timeout_local = atoi(optarg);
 			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
 			{
@@ -1235,7 +1348,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 64: /* remote-tcp-user-timeout */
+		case 68: /* remote-tcp-user-timeout */
 			params.tcp_user_timeout_remote = atoi(optarg);
 			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
 			{
@@ -1246,7 +1359,7 @@ void parse_params(int argc, char *argv[])
 #endif
 
 #if defined(__linux__)
-		case 65: /* mss */
+		case 69: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			dp->mss = atoi(optarg);
 			if (dp->mss<88 || dp->mss>32767)
@@ -1255,7 +1368,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 66: /* fix-seg */
+		case 70: /* fix-seg */
 			if (!params.fix_seg_avail)
 			{
 				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
@@ -1275,7 +1388,7 @@ void parse_params(int argc, char *argv[])
 				params.fix_seg = FIX_SEG_DEFAULT_MAX_WAIT;
 			break;
 #ifdef SPLICE_PRESENT
-		case 67: /* nosplice */
+		case 71: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
@@ -1499,6 +1612,15 @@ struct salisten_s
 	int bind_wait_ip_left; // how much seconds left from bind_wait_ip
 };
 static const char *bindll_s[] = { "unwanted","no","prefer","force" };
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
+#define PRINT_VER printf("github version %s (%s)\n\n", TOSTRING(ZAPRET_GH_VER), TOSTRING(ZAPRET_GH_HASH))
+#else
+#define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
+#endif
+
 int main(int argc, char *argv[])
 {
 	int i, listen_fd[MAX_BINDS], yes = 1, retval = 0, if_index, exit_v=EXIT_FAILURE;
@@ -1508,6 +1630,8 @@ int main(int argc, char *argv[])
 	set_env_exedir(argv[0]);
 	srand(time(NULL));
 	mask_from_preflen6_prepare();
+
+	PRINT_VER;
 
 	parse_params(argc, argv);
 	argv=NULL; argc=0;

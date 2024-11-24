@@ -192,7 +192,7 @@ static void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * 
 static void rtrim(char *s)
 {
 	if (s)
-		for (char *p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--) *p = '\0';
+		for (char *p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r' || *p == ' ' || *p == '\t'); p--) *p = '\0';
 }
 
 
@@ -216,6 +216,14 @@ static void exithelp(void)
 	);
 	exit(1);
 }
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
+#define PRINT_VER printf("github version %s (%s)\n\n", TOSTRING(ZAPRET_GH_VER), TOSTRING(ZAPRET_GH_HASH))
+#else
+#define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
+#endif
 
 static void parse_params(int argc, char *argv[])
 {
@@ -245,6 +253,7 @@ static void parse_params(int argc, char *argv[])
 		{
 		case 0:
 		case 1:
+			PRINT_VER;
 			exithelp();
 			break;
 		case 2:

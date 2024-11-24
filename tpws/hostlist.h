@@ -4,6 +4,7 @@
 #include "pools.h"
 #include "params.h"
 
+bool AppendHostlistItem(strpool **hostlist, char *s);
 bool AppendHostList(strpool **hostlist, const char *filename);
 bool LoadAllHostLists();
 bool NonEmptyHostlist(strpool **hostlist);

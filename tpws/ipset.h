@@ -9,3 +9,4 @@ bool LoadAllIpsets();
 bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, const struct in6_addr *ipv6);
 struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename);
 void IpsetsDebug();
+bool AppendIpsetItem(ipset *ips, char *ip);
