@@ -1110,6 +1110,10 @@ test_has_split()
 {
 	contains "$1" split || contains "$1" disorder
 }
+test_has_fakedsplit()
+{
+	contains "$1" fakedsplit || contains "$1" fakeddisorder
+}
 test_has_fake()
 {
 	[ "$1" = fake ] || starts_with "$1" fake,
@@ -1136,10 +1140,13 @@ pktws_curl_test_update_vary()
 	proto=http
 	[ "$sec" = 0 ] || proto=tls
 	test_has_fake $desync && zerofake="--dpi-desync-fake-$proto=0x00000000"
-	test_has_split $desync && {
+	if test_has_fakedsplit $desync ; then
+		splits="method+2 midsld"
+		[ "$sec" = 0 ] || splits="1 midsld"
+	elif test_has_split $desync ; then
 		splits="method+2 midsld"
 		[ "$sec" = 0 ] || splits="1 midsld 1,midsld"
-	}
+	fi
 	for fake in '' $zerofake ; do
 		if [ -n "$splits" ]; then
 			for pos in $splits ; do
