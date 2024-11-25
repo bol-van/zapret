@@ -400,3 +400,10 @@ v69.2:
 nfqws,tpws: --skip
 nfqws: --methodeol
 init.d: do not use pgrep in sysv for busybox compat
+
+v69.3
+
+nfqws,tpws: fixed ipsets and hostlists
+all progs: version numbers for github, build date/time for self built
+repo: light release for openwrt and embedded systems
+repo: sha256sum
