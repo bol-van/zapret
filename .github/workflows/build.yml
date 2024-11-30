@@ -82,8 +82,6 @@ jobs:
           export STRIP=$TARGET-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
 
-          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
-
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
           wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
@@ -92,6 +90,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
+              CFLAGS="-Os -flto=auto" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -103,6 +102,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
+            CFLAGS="-Os -flto=auto" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -113,8 +113,8 @@ jobs:
           install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
 
           # zapret
-          CFLAGS="$CFLAGS -static-libgcc -static -I$DEPS_DIR/include" \
-          LDFLAGS="$LDFLAGS -L$DEPS_DIR/lib" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include" \
+          LDFLAGS="-L$DEPS_DIR/lib" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
 
@@ -170,7 +170,7 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
-          settarget $TARGET-freebsd11 make bsd -j$(nproc) || exit 1
+          settarget $TARGET-freebsd11 make bsd -j$(nproc)
           tar -C binaries/my -cJf zapret-freebsd-$ARCH.tar.xz .
 
       - name: Upload artifacts
@@ -203,9 +203,9 @@ jobs:
       - name: Build ip2net, mdig
         shell: msys2 {0}
         run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
           mkdir -p output
           cd zapret
-          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
           mingw32-make -C ip2net win
           mingw32-make -C mdig win
           cp -a {ip2net/ip2net,mdig/mdig}.exe ../output
@@ -319,8 +319,6 @@ jobs:
           export STRIP=$TOOLCHAIN/bin/llvm-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
 
-          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
-
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
           wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
@@ -330,7 +328,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="$CFLAGS -Wno-implicit-function-declaration" \
+              CFLAGS="-Os -flto=auto -Wno-implicit-function-declaration" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -338,7 +336,8 @@ jobs:
           done
 
           # zapret
-          CFLAGS="$CFLAGS -I$DEPS_DIR/include" LDFLAGS="$LDFLAGS -L$DEPS_DIR/lib" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -I$DEPS_DIR/include" \
+          LDFLAGS="-L$DEPS_DIR/lib" \
           make -C zapret android -j$(nproc)
           zip zapret-android-$ABI.zip -j zapret/binaries/my/*
 
@@ -437,10 +436,12 @@ jobs:
           find ${{ env.repo_dir }}/binaries -type f -exec sha256sum {} \; >sha256sum.txt
           tar --owner=0 --group=0 -czf ${{ env.repo_dir }}.tar.gz ${{ env.repo_dir }}
           zip -qr ${{ env.repo_dir }}.zip ${{ env.repo_dir }}
-          rm -rf ${{ env.repo_dir }}/tpws ${{ env.repo_dir }}/nfq ${{ env.repo_dir }}/ip2net ${{ env.repo_dir }}/mdig ${{ env.repo_dir }}/docs ${{ env.repo_dir }}/files/huawei
-          rm -rf ${{ env.repo_dir }}/init.d/openrc ${{ env.repo_dir }}/init.d/macos ${{ env.repo_dir }}/init.d/pfsense ${{ env.repo_dir }}/init.d/runit ${{ env.repo_dir }}/init.d/s6 ${{ env.repo_dir }}/init.d/systemd
-          rm -rf ${{ env.repo_dir }}/binaries/android* -rf ${{ env.repo_dir }}/binaries/win* ${{ env.repo_dir }}/binaries/mac* ${{ env.repo_dir }}/binaries/freebsd*
-          rm -f ${{ env.repo_dir }}/Makefile ${{ env.repo_dir }}/binaries/x86_64/tpws_wsl.tgz
+          (
+            cd ${{ env.repo_dir }}
+            rm -rf binaries/{android*,freebsd*,mac*,win*,x86_64/tpws_wsl.tgz} \
+                   init.d/{openrc,macos,pfsense,runit,s6,systemd} \
+                   tpws nfq ip2net mdig docs files/huawei Makefile
+          )
           tar --owner=0 --group=0 -czf ${{ env.repo_dir }}-openwrt-embedded.tar.gz ${{ env.repo_dir }}
 
       - name: Upload release assets
