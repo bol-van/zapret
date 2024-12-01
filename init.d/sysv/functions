@@ -102,7 +102,7 @@ dnat6_target()
 }
 set_route_localnet()
 {
-	_set_route_localnet $1 "$IFACE_LAN"
+	_set_route_localnet $1 $IFACE_LAN
 }
 
 fw_nfqws_post4()
