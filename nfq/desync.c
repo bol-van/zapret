@@ -1453,7 +1453,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					size_t seg_len,fakeseg2_len;
 					unsigned int seqovl;
 
-					if (dis->len_payload>sizeof(pat))
+					if (dis->len_payload > sizeof(pat))
 					{
 						DLOG("packet is too large\n");
 						return verdict;
@@ -1559,7 +1559,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100],ovlseg[DPI_DESYNC_MAX_FAKE_LEN+100],pat[DPI_DESYNC_MAX_FAKE_LEN], *seg;
 					size_t fakeseg_len,seg_len;
 
-					if (dis->len_payload>sizeof(pat))
+					if (dis->len_payload > sizeof(pat))
 					{
 						DLOG("packet is too large\n");
 						return verdict;
