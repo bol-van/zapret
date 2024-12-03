@@ -68,7 +68,7 @@ struct desync_profile
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
-	uint8_t fake_http[1460],fake_tls[1460],fake_unknown[1460],fake_syndata[1460],seqovl_pattern[1460];
+	uint8_t fake_http[1460],fake_tls[1460],fake_unknown[1460],fake_syndata[1460],seqovl_pattern[1460],fsplit_pattern[1460];
 	uint8_t fake_unknown_udp[1472],udplen_pattern[1472],fake_quic[1472],fake_wg[1472],fake_dht[1472];
 	size_t fake_http_size,fake_tls_size,fake_quic_size,fake_wg_size,fake_dht_size,fake_unknown_size,fake_syndata_size,fake_unknown_udp_size;
 	int udplen_increment;

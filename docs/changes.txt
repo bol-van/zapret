@@ -407,3 +407,8 @@ nfqws,tpws: fixed ipsets and hostlists
 all progs: version numbers for github, build date/time for self built
 repo: light release for openwrt and embedded systems
 repo: sha256sum
+
+v69.4
+
+nfqws : fakedsplit/fakeddisorder fakes for both split segments
+nfqws : --dpi-desync-fakedsplit-pattern
