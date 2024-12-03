@@ -140,7 +140,7 @@ echo_var()
 	eval v="\$$1"
 	if find_str_in_list $1 "$EDITVAR_NEWLINE_VARS"; then
 		echo "$1=\""
-		echo "$v\"" | tr '\n' ' ' | tr -d '\r' | sed -e 's/ *//' -e "s/$EDITVAR_NEWLINE_DELIMETER /$EDITVAR_NEWLINE_DELIMETER\n/g"
+		echo "$v\"" | tr '\n' ' ' | tr -d '\r' | sed -e 's/^ *//' -e 's/ *$//' -e "s/$EDITVAR_NEWLINE_DELIMETER /$EDITVAR_NEWLINE_DELIMETER\n/g"
 	else
 		if contains "$v" " "; then
 			echo $1=\"$v\"
