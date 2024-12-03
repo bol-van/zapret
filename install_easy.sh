@@ -26,6 +26,7 @@ IPSET_DIR="$ZAPRET_BASE/ipset"
 . "$ZAPRET_BASE/common/ipt.sh"
 . "$ZAPRET_BASE/common/installer.sh"
 . "$ZAPRET_BASE/common/virt.sh"
+. "$ZAPRET_BASE/common/list.sh"
 
 GET_LIST="$IPSET_DIR/get_config.sh"
 
@@ -115,6 +116,30 @@ ws_opt_validate()
 	}
 	return 0
 }
+tpws_opt_validate()
+{
+	ws_opt_validate "$1" || return 1
+	dry_run_tpws || {
+		echo invalid tpws options
+		return 1
+	}
+}
+tpws_socks_opt_validate()
+{
+	# --ipset allowed here
+	dry_run_tpws_socks || {
+		echo invalid tpws options
+		return 1
+	}
+}
+nfqws_opt_validate()
+{
+	ws_opt_validate "$1" || return 1
+	dry_run_nfqws || {
+		echo invalid nfqws options
+		return 1
+	}
+}
 
 select_mode_group()
 {
@@ -162,18 +187,17 @@ select_mode_group()
 select_mode_tpws_socks()
 {
 	local EDITVAR_NEWLINE_DELIMETER="--new" EDITVAR_NEWLINE_VARS="TPWS_SOCKS_OPT"
-	# --ipset allowed here
-	select_mode_group TPWS_SOCKS_ENABLE "enable tpws socks mode on port $TPPORT_SOCKS ?" "TPPORT_SOCKS TPWS_SOCKS_OPT"
+	select_mode_group TPWS_SOCKS_ENABLE "enable tpws socks mode on port $TPPORT_SOCKS ?" "TPPORT_SOCKS TPWS_SOCKS_OPT" tpws_socks_opt_validate TPWS_SOCKS_OPT
 }
 select_mode_tpws()
 {
 	local EDITVAR_NEWLINE_DELIMETER="--new" EDITVAR_NEWLINE_VARS="TPWS_OPT"
-	select_mode_group TPWS_ENABLE "enable tpws transparent mode ?" "TPWS_PORTS TPWS_OPT" ws_opt_validate TPWS_OPT
+	select_mode_group TPWS_ENABLE "enable tpws transparent mode ?" "TPWS_PORTS TPWS_OPT" tpws_opt_validate TPWS_OPT
 }
 select_mode_nfqws()
 {
 	local EDITVAR_NEWLINE_DELIMETER="--new" EDITVAR_NEWLINE_VARS="NFQWS_OPT"
-	select_mode_group NFQWS_ENABLE "enable nfqws ?" "NFQWS_PORTS_TCP NFQWS_PORTS_UDP NFQWS_TCP_PKT_OUT NFQWS_TCP_PKT_IN NFQWS_UDP_PKT_OUT NFQWS_UDP_PKT_IN NFQWS_PORTS_TCP_KEEPALIVE NFQWS_PORTS_UDP_KEEPALIVE NFQWS_OPT" ws_opt_validate NFQWS_OPT
+	select_mode_group NFQWS_ENABLE "enable nfqws ?" "NFQWS_PORTS_TCP NFQWS_PORTS_UDP NFQWS_TCP_PKT_OUT NFQWS_TCP_PKT_IN NFQWS_UDP_PKT_OUT NFQWS_UDP_PKT_IN NFQWS_PORTS_TCP_KEEPALIVE NFQWS_PORTS_UDP_KEEPALIVE NFQWS_OPT" nfqws_opt_validate NFQWS_OPT
 }
 
 select_mode_mode()
