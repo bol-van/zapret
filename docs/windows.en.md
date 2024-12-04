@@ -101,10 +101,11 @@ There are several options :
 Replace these 2 files in every location they are present.
 In `zapret-win-bundle` they are in `zapret-winws` и `blockcheck/zapret/nfq` folders.
 However this option still requires 10+ year old patch that enables SHA256 signatures.
+If you're using win bundle you can simply run `win7\install_win7.cmd`
 
-2. [Hack ESU](https://hackandpwn.com/windows-7-esu-patching)
+3. [Hack ESU](https://hackandpwn.com/windows-7-esu-patching)
 
-3. Use `UpdatePack7R2` from simplix : https://blog.simplix.info
+4. Use `UpdatePack7R2` from simplix : https://blog.simplix.info
 If you are in Russia or Belarus temporary change region in Control Panel.
 
 ### blockcheck

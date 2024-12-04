@@ -140,7 +140,7 @@ echo_var()
 	eval v="\$$1"
 	if find_str_in_list $1 "$EDITVAR_NEWLINE_VARS"; then
 		echo "$1=\""
-		echo "$v\"" | sed "s/$EDITVAR_NEWLINE_DELIMETER /$EDITVAR_NEWLINE_DELIMETER\n/g"
+		echo "$v\"" | tr '\n' ' ' | tr -d '\r' | sed -e 's/^ *//' -e 's/ *$//' -e "s/$EDITVAR_NEWLINE_DELIMETER /$EDITVAR_NEWLINE_DELIMETER\n/g"
 	else
 		if contains "$v" " "; then
 			echo $1=\"$v\"
@@ -170,6 +170,7 @@ list_vars()
 		echo_var $1
 		shift
 	done
+	echo
 }
 
 openrc_test()
@@ -836,4 +837,38 @@ select_fwtype()
 	}
 	echo select firewall type :
 	ask_list FWTYPE "iptables nftables" "$FWTYPE" && write_config_var FWTYPE
+}
+
+dry_run_tpws_()
+{
+	local TPWS="$ZAPRET_BASE/tpws/tpws"
+	echo verifying tpws options
+	"$TPWS" --dry-run "$@"
+}
+dry_run_nfqws_()
+{
+	local NFQWS="$ZAPRET_BASE/nfq/nfqws"
+	echo verifying nfqws options
+	"$NFQWS" --dry-run "$@"
+}
+dry_run_tpws()
+{
+	[ "$TPWS_ENABLE" = 1 ] || return 0
+	local opt="$TPWS_OPT" port=${TPPORT_SOCKS:-988}
+	filter_apply_hostlist_target opt
+	dry_run_tpws_ --port=$port $opt
+}
+dry_run_tpws_socks()
+{
+	[ "$TPWS_SOCKS_ENABLE" = 1 ] || return 0
+	local opt="$TPWS_SOCKS_OPT" port=${TPPORT:-987}
+	filter_apply_hostlist_target opt
+	dry_run_tpws_ --port=$port --socks $opt
+}
+dry_run_nfqws()
+{
+	[ "$NFQWS_ENABLE" = 1 ] || return 0
+	local opt="$NFQWS_OPT" qn=${QNUM:-200}
+	filter_apply_hostlist_target opt
+	dry_run_nfqws_ --qnum=$qn $opt
 }

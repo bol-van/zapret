@@ -410,5 +410,10 @@ repo: sha256sum
 
 v69.4
 
-nfqws : fakedsplit/fakeddisorder fakes for both split segments
-nfqws : --dpi-desync-fakedsplit-pattern
+nfqws: fakedsplit/fakeddisorder fakes for both split segments
+nfqws: --dpi-desync-fakedsplit-pattern
+
+v69.5
+
+nfqws,tpws: --dry-run
+install_easy: check tpws and nfqws options validity
