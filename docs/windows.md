@@ -159,7 +159,6 @@ _windivert 2.2.2-A_, который идет в поставке zapret.
 и заменить эти 2 файла.
 В [zapret-win-bundle](https://github.com/bol-van/zapret-win-bundle) есть отдельных 2 места, где находится **winws** : [_zapret-winws_](https://github.com/bol-van/zapret-win-bundle/tree/master/zapret-winws) и [_blockcheck/zapret/nfq_](https://github.com/bol-van/zapret-win-bundle/tree/master/blockcheck).
 Надо менять в обоих местах.
-
 Альтернативный вариант при использовании win bundle - запустить `win7\install_win7.cmd`
 
 > [!NOTE]
