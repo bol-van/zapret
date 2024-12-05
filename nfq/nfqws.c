@@ -1407,7 +1407,6 @@ int main(int argc, char **argv)
 				params.debug_target = LOG_TARGET_CONSOLE;
 			}
 			break;
-#ifndef __CYGWIN__
 		case 1: /* dry-run */
 			bDry=true;
 			break;
@@ -1431,7 +1430,6 @@ int main(int argc, char **argv)
 			}
 #endif
 			break;
-#endif
 		case 3: /* daemon */
 			daemon = true;
 			break;
