@@ -152,7 +152,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	DLOG("packet: id=%d pass unmodified\n", id);
 	return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, 0, NULL);
 }
-bool nfq_deinit(struct nfq_handle **h,struct nfq_q_handle **qh)
+static bool nfq_deinit(struct nfq_handle **h,struct nfq_q_handle **qh)
 {
 	if (*qh)
 	{
@@ -167,7 +167,7 @@ bool nfq_deinit(struct nfq_handle **h,struct nfq_q_handle **qh)
 		*h = NULL;
 	}
 }
-bool nfq_init(struct nfq_handle **h,struct nfq_q_handle **qh)
+static bool nfq_init(struct nfq_handle **h,struct nfq_q_handle **qh)
 {
 	nfq_deinit(h,qh);
 
