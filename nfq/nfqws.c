@@ -152,50 +152,62 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	DLOG("packet: id=%d pass unmodified\n", id);
 	return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, 0, NULL);
 }
-static int nfq_main(void)
+bool nfq_deinit(struct nfq_handle **h,struct nfq_q_handle **qh)
 {
-	struct nfq_handle *h = NULL;
-	struct nfq_q_handle *qh = NULL;
-	int fd,rv;
-	uint8_t buf[16384] __attribute__((aligned));
+	if (*qh)
+	{
+		DLOG_CONDUP("unbinding from queue %u\n", params.qnum);
+		nfq_destroy_queue(*qh);
+		*qh = NULL;
+	}
+	if (*h)
+	{
+		DLOG_CONDUP("closing library handle\n");
+		nfq_close(*h);
+		*h = NULL;
+	}
+}
+bool nfq_init(struct nfq_handle **h,struct nfq_q_handle **qh)
+{
+	nfq_deinit(h,qh);
 
 	DLOG_CONDUP("opening library handle\n");
-	h = nfq_open();
-	if (!h) {
+	*h = nfq_open();
+	if (!*h) {
 		DLOG_PERROR("nfq_open()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("unbinding existing nf_queue handler for AF_INET (if any)\n");
-	if (nfq_unbind_pf(h, AF_INET) < 0) {
+	if (nfq_unbind_pf(*h, AF_INET) < 0) {
 		DLOG_PERROR("nfq_unbind_pf()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
-	if (nfq_bind_pf(h, AF_INET) < 0) {
+	if (nfq_bind_pf(*h, AF_INET) < 0) {
 		DLOG_PERROR("nfq_bind_pf()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("binding this socket to queue '%u'\n", params.qnum);
-	qh = nfq_create_queue(h, params.qnum, &nfq_cb, &params);
+	*qh = nfq_create_queue(*h, params.qnum, &nfq_cb, &params);
 	if (!qh) {
 		DLOG_PERROR("nfq_create_queue()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("setting copy_packet mode\n");
-	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
+	if (nfq_set_mode(*qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		DLOG_PERROR("can't set packet_copy mode");
 		goto exiterr;
 	}
-	if (nfq_set_queue_maxlen(qh, Q_MAXLEN) < 0) {
+	if (nfq_set_queue_maxlen(*qh, Q_MAXLEN) < 0) {
 		DLOG_PERROR("can't set queue maxlen");
 		goto exiterr;
 	}
 	// accept packets if they cant be handled
-	if (nfq_set_queue_flags(qh, NFQA_CFG_F_FAIL_OPEN , NFQA_CFG_F_FAIL_OPEN))
+	if (nfq_set_queue_flags(*qh, NFQA_CFG_F_FAIL_OPEN , NFQA_CFG_F_FAIL_OPEN))
 	{
 		DLOG_ERR("can't set queue flags. its OK on linux <3.6\n");
 		// dot not fail. not supported on old linuxes <3.6 
@@ -204,6 +216,25 @@ static int nfq_main(void)
 	DLOG_CONDUP("initializing raw sockets bind-fix4=%u bind-fix6=%u\n",params.bind_fix4,params.bind_fix6);
 	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
 		goto exiterr;
+
+	// increase socket buffer size. on slow systems reloading hostlist can take a while.
+	// if too many unhandled packets are received its possible to get "no buffer space available" error
+	if (!set_socket_buffers(nfq_fd(*h),Q_RCVBUF/2,Q_SNDBUF/2))
+		goto exiterr;
+
+	return true;
+exiterr:
+	nfq_deinit(h,qh);
+	return false;
+}
+
+static int nfq_main(void)
+{
+	uint8_t buf[16384] __attribute__((aligned));
+	struct nfq_handle *h = NULL;
+	struct nfq_q_handle *qh = NULL;
+	int fd,e;
+	ssize_t rd;
 
 #ifndef __CYGWIN__
 	sec_harden();
@@ -216,36 +247,30 @@ static int nfq_main(void)
 
 	pre_desync();
 
-	fd = nfq_fd(h);
+	nfq_init(&h,&qh);
 
-	// increase socket buffer size. on slow systems reloading hostlist can take a while.
-	// if too many unhandled packets are received its possible to get "no buffer space available" error
-	if (!set_socket_buffers(fd,Q_RCVBUF/2,Q_SNDBUF/2))
-		goto exiterr;
+	fd = nfq_fd(h);
 	do
 	{
-		while ((rv = recv(fd, buf, sizeof(buf), 0)) > 0)
+		while ((rd = recv(fd, buf, sizeof(buf), 0)) >= 0)
 		{
-			int r = nfq_handle_packet(h, (char *)buf, rv);
-			if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
+			if (rd)
+			{
+				int r = nfq_handle_packet(h, (char *)buf, (int)rd);
+				if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
+			}
+			else
+				DLOG("recv from nfq returned 0 !\n");
 		}
-		DLOG_ERR("recv: errno %d\n",errno);
+		e=errno;
+		DLOG_ERR("recv: recv=%zd errno %d\n",rd,e);
+		errno=e;
 		DLOG_PERROR("recv");
 		// do not fail on ENOBUFS
 	} while(errno==ENOBUFS);
 
-	DLOG_CONDUP("unbinding from queue %u\n", params.qnum);
-	nfq_destroy_queue(qh);
+	nfq_deinit(&h,&qh);
 
-#ifdef INSANE
-	/* normally, applications SHOULD NOT issue this command, since
-	 * it detaches other programs/sockets from AF_INET, too ! */
-	DLOG_CONDUP("unbinding from AF_INET\n");
-	nfq_unbind_pf(h, AF_INET);
-#endif
-
-	DLOG_CONDUP("closing library handle\n");
-	nfq_close(h);
 	return 0;
 
 exiterr:
