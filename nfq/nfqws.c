@@ -1392,10 +1392,12 @@ int main(int argc, char **argv)
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
 		if (v)
+		{
 			if (bDry)
 				exit_clean(1);
 			else
 				exithelp_clean();
+		}
 		switch (option_index)
 		{
 		case 0: /* debug */
