@@ -267,7 +267,7 @@ static int nfq_main(void)
 		errno=e;
 		DLOG_PERROR("recv");
 		// do not fail on ENOBUFS
-	} while(errno==ENOBUFS);
+	} while(e==ENOBUFS);
 
 	nfq_deinit(&h,&qh);
 
