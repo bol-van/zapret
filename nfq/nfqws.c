@@ -217,10 +217,12 @@ static bool nfq_init(struct nfq_handle **h,struct nfq_q_handle **qh)
 	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
 		goto exiterr;
 
-	// increase socket buffer size. on slow systems reloading hostlist can take a while.
-	// if too many unhandled packets are received its possible to get "no buffer space available" error
-	if (!set_socket_buffers(nfq_fd(*h),Q_RCVBUF/2,Q_SNDBUF/2))
-		goto exiterr;
+	int yes=1, fd = nfq_fd(*h);
+
+#if defined SOL_NETLINK && defined NETLINK_NO_ENOBUFS
+	if (setsockopt(fd, SOL_NETLINK, NETLINK_NO_ENOBUFS, &yes, sizeof(yes)) == -1)
+		DLOG_PERROR("setsockopt(NETLINK_NO_ENOBUFS)");
+#endif
 
 	return true;
 exiterr:
