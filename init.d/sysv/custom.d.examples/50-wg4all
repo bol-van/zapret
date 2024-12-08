@@ -10,7 +10,7 @@ zapret_custom_daemons()
 {
         # stop logic is managed by procd
 
-        local opt="--qnum=$QNUM_WG4ALL $NFQWS_OPT_BASE $NFQWS_OPT_DESYNC_WG"
+        local opt="--qnum=$QNUM_WG4ALL $NFQWS_OPT_DESYNC_WG"
 	do_nfqws $1 $DNUM_WG4ALL "$opt"
 }
 # size = 156 (8 udp header + 148 payload) && payload starts with 0x01000000
