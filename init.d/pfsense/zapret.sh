@@ -21,4 +21,4 @@ pfctl -d ; pfctl -e
 ipfw delete 100
 ipfw add 100 divert 989 tcp from any to any 80,443 out not diverted not sockarg
 pkill ^dvtws$
-dvtws --daemon --port 989 --dpi-desync=split2
+dvtws --daemon --port 989 --dpi-desync=multisplit
