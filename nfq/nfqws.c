@@ -192,7 +192,7 @@ static bool nfq_init(struct nfq_handle **h,struct nfq_q_handle **qh)
 
 	DLOG_CONDUP("binding this socket to queue '%u'\n", params.qnum);
 	*qh = nfq_create_queue(*h, params.qnum, &nfq_cb, &params);
-	if (!qh) {
+	if (!*qh) {
 		DLOG_PERROR("nfq_create_queue()");
 		goto exiterr;
 	}
@@ -249,7 +249,8 @@ static int nfq_main(void)
 
 	pre_desync();
 
-	nfq_init(&h,&qh);
+	if (!nfq_init(&h,&qh))
+		goto exiterr;
 
 	fd = nfq_fd(h);
 	do
