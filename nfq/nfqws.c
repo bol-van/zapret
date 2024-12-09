@@ -242,7 +242,7 @@ static int nfq_main(void)
 	sec_harden();
 
 	if (params.droproot && !droproot(params.uid, params.gid))
-		goto exiterr;
+		return 1;
 
 	print_id();
 #endif
@@ -250,7 +250,7 @@ static int nfq_main(void)
 	pre_desync();
 
 	if (!nfq_init(&h,&qh))
-		goto exiterr;
+		return 1;
 
 	fd = nfq_fd(h);
 	do
@@ -273,13 +273,7 @@ static int nfq_main(void)
 	} while(e==ENOBUFS);
 
 	nfq_deinit(&h,&qh);
-
 	return 0;
-
-exiterr:
-	if (qh) nfq_destroy_queue(qh);
-	if (h) nfq_close(h);
-	return 1;
 }
 
 #elif defined(BSD)
