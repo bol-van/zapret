@@ -238,14 +238,10 @@ static int nfq_main(void)
 	int fd,e;
 	ssize_t rd;
 
-#ifndef __CYGWIN__
 	sec_harden();
-
 	if (params.droproot && !droproot(params.uid, params.gid))
 		return 1;
-
 	print_id();
-#endif
 
 	pre_desync();
 
