@@ -349,26 +349,36 @@ ipt_do_nfqws_in_out()
 	}
 }
 
-zapret_do_firewall_standard_rules_ipt()
+zapret_do_firewall_standard_tpws_rules_ipt()
 {
 	# $1 - 1 - add, 0 - del
 
 	local f4 f6
 
-	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] &&
-	{
+	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] && {
 		f4="-p tcp -m multiport --dports $TPWS_PORTS_IPT"
 		f6=$f4
 		filter_apply_ipset_target f4 f6
 		fw_tpws $1 "$f4" "$f6" $TPPORT
 	}
-	[ "$NFQWS_ENABLE" = 1 ] &&
-	{
+}
+zapret_do_firewall_standard_nfqws_rules_ipt()
+{
+	# $1 - 1 - add, 0 - del
+
+	[ "$NFQWS_ENABLE" = 1 ] && {
 		ipt_do_nfqws_in_out $1 tcp "$NFQWS_PORTS_TCP_IPT" "$NFQWS_TCP_PKT_OUT" "$NFQWS_TCP_PKT_IN"
 		ipt_do_nfqws_in_out $1 tcp "$NFQWS_PORTS_TCP_KEEPALIVE_IPT" keepalive "$NFQWS_TCP_PKT_IN"
 		ipt_do_nfqws_in_out $1 udp "$NFQWS_PORTS_UDP_IPT" "$NFQWS_UDP_PKT_OUT" "$NFQWS_UDP_PKT_IN"
 		ipt_do_nfqws_in_out $1 udp "$NFQWS_PORTS_UDP_KEEPALIVE_IPT" keepalive "$NFQWS_UDP_PKT_IN"
 	}
+}
+zapret_do_firewall_standard_rules_ipt()
+{
+	# $1 - 1 - add, 0 - del
+
+	zapret_do_firewall_standard_tpws_rules_ipt $1
+	zapret_do_firewall_standard_nfqws_rules_ipt $1
 }
 
 zapret_do_firewall_rules_ipt()

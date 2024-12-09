@@ -123,34 +123,6 @@ do_nfqws()
 	[ "$1" = 0 ] || { shift; run_nfqws "$@"; }
 }
 
-
-
-
-standard_mode_daemons()
-{
-	# $1 - 1 - run, 0 - stop
-
-	# stop logic is managed by procd
-	[ "$1" = 0 ] && return 0
-
-	local opt
-	[ "$TPWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$TPWS_OPT" && {
-		opt="--port=$TPPORT $TPWS_OPT"
-		filter_apply_hostlist_target opt
-		run_tpws 1 "$opt"
-	}
-	[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
-		opt="--port=$TPPORT_SOCKS $TPWS_SOCKS_OPT"
-		filter_apply_hostlist_target opt
-		run_tpws_socks 2 "$opt"
-	}
-	[ "$NFQWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$NFQWS_OPT" && {
-		opt="--qnum=$QNUM $NFQWS_OPT_BASE $NFQWS_OPT"
-		filter_apply_hostlist_target opt
-		run_daemon 3 "$NFQWS" "$opt"
-	}
-}
-
 start_daemons_procd()
 {
 	standard_mode_daemons 1

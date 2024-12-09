@@ -640,24 +640,30 @@ nft_apply_nfqws_in_out()
 	}
 }
 
-zapret_apply_firewall_standard_rules_nft()
+zapret_apply_firewall_standard_tpws_rules_nft()
 {
 	local f4 f6
 
-	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] &&
-	{
+	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] && {
 		f4="tcp dport {$TPWS_PORTS}"
 		f6=$f4
 		nft_filter_apply_ipset_target f4 f6
 		nft_fw_tpws "$f4" "$f6" $TPPORT
 	}
-	[ "$NFQWS_ENABLE" = 1 ] &&
-	{
+}
+zapret_apply_firewall_standard_nfqws_rules_nft()
+{
+	[ "$NFQWS_ENABLE" = 1 ] && {
 		nft_apply_nfqws_in_out tcp "$NFQWS_PORTS_TCP" "$NFQWS_TCP_PKT_OUT" "$NFQWS_TCP_PKT_IN"
 		nft_apply_nfqws_in_out tcp "$NFQWS_PORTS_TCP_KEEPALIVE" keepalive "$NFQWS_TCP_PKT_IN"
 		nft_apply_nfqws_in_out udp "$NFQWS_PORTS_UDP" "$NFQWS_UDP_PKT_OUT" "$NFQWS_UDP_PKT_IN"
 		nft_apply_nfqws_in_out udp "$NFQWS_PORTS_UDP_KEEPALIVE" keepalive "$NFQWS_UDP_PKT_IN"
 	}
+}
+zapret_apply_firewall_standard_rules_nft()
+{
+	zapret_apply_firewall_standard_tpws_rules_nft
+	zapret_apply_firewall_standard_nfqws_rules_nft
 }
 
 zapret_apply_firewall_rules_nft()
