@@ -417,3 +417,9 @@ v69.5
 
 nfqws,tpws: --dry-run
 install_easy: check tpws and nfqws options validity
+
+v69.6
+
+nfqws: set NETLINK_NO_ENOBUFS to fix possible nfq recv errors
+init.d: unify custom scripts for linux
+init.d: new custom scripts : 20-fw-extra, 50-wg4all
