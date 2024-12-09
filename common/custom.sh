@@ -3,6 +3,8 @@ custom_runner()
 	# $1 - function name
 	# $2+ - params
 
+	[ "$DISABLE_CUSTOM" = 1 ] && return 0
+
 	local n script FUNC=$1
 
 	shift
