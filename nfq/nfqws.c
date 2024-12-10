@@ -303,8 +303,6 @@ static int dvt_main(void)
 			DLOG_PERROR("bind (DIVERT4)");
 			goto exiterr;
 		}
-		if (!set_socket_buffers(fd[0],Q_RCVBUF,Q_SNDBUF))
-			goto exiterr;
 	}
 
 
