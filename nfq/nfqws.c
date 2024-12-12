@@ -84,8 +84,6 @@ static void pre_desync(void)
 	signal(SIGHUP, onhup);
 	signal(SIGUSR1, onusr1);
 	signal(SIGUSR2, onusr2);
-
-	desync_init();
 }
 
 

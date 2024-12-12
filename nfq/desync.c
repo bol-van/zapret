@@ -76,13 +76,6 @@ void randomize_default_tls_payload(uint8_t *p)
 #define PKTDATA_MAXDUMP 32
 #define IP_MAXDUMP 80
 
-static uint8_t zeropkt[DPI_DESYNC_MAX_FAKE_LEN];
-
-void desync_init(void)
-{
-	memset(zeropkt, 0, sizeof(zeropkt));
-}
-
 bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 {
 	return mode==DESYNC_SYNACK || mode==DESYNC_SYNDATA;
