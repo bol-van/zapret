@@ -212,7 +212,7 @@ doh_resolve()
 	# $1 - ip version 4/6
 	# $2 - hostname
 	# $3 - doh server URL. use $DOH_SERVER if empty
-	$MDIG --family=$1 --dns-make-query=$2 | curl -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | $MDIG --dns-parse-query
+	$MDIG --family=$1 --dns-make-query=$2 | $CURL -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | $MDIG --dns-parse-query
 }
 doh_find_working()
 {
