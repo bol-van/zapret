@@ -1,4 +1,4 @@
-# zapret v69.6
+# zapret v69.7
 
 # SCAMMER WARNING
 
@@ -132,6 +132,7 @@ nfqws takes the following parameters:
 
  --debug=0|1
  --dry-run                                      ; verify parameters and exit with code 0 if successful
+ --comment                                      ; any text (ignored)
  --qnum=<nfqueue_number>
  --daemon                                       ; daemonize
  --pidfile=<filename>                           ; write pid to file

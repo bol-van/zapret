@@ -423,3 +423,9 @@ v69.6
 nfqws: set NETLINK_NO_ENOBUFS to fix possible nfq recv errors
 init.d: unify custom scripts for linux
 init.d: new custom scripts : 20-fw-extra, 50-wg4all
+
+v69.7
+
+nfqws,tpws: --comment
+nfqws: trash flood warning
+winws: exclude empty outgoing ack packets in windivert filter
