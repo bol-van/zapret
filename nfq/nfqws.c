@@ -1190,6 +1190,27 @@ void config_from_file(const char *filename)
 }
 #endif
 
+void check_dp(const struct desync_profile *dp)
+{
+	// only linux has connbytes limiter
+	if (dp->desync_any_proto && !dp->desync_cutoff &&
+		(dp->desync_mode==DESYNC_FAKE || dp->desync_mode==DESYNC_RST || dp->desync_mode==DESYNC_RSTACK ||
+		 dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER))
+	{
+#ifdef __linux__
+		DLOG_CONDUP("WARNING !!! in profile %d you are using --dpi-desync-any-protocol without --dpi-desync-cutoff\n", dp->n);
+		DLOG_CONDUP("WARNING !!! it's completely ok if connbytes or payload based ip/nf tables limiter is applied. Make sure it exists.\n");
+#else
+		DLOG_CONDUP("WARNING !!! possible TRASH FLOOD configuration detected in profile %d\n", dp->n);
+		DLOG_CONDUP("WARNING !!! it's highly recommended to use --dpi-desync-cutoff limiter or fakes will be sent on every processed packet\n");
+		DLOG_CONDUP("WARNING !!! make sure it's really what you want\n");
+#ifdef __CYGWIN__
+		DLOG_CONDUP("WARNING !!! in most cases this is acceptable only with custom payload based windivert filter (--wf-raw)\n");
+#endif
+#endif
+	}
+}
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
@@ -1950,6 +1971,7 @@ int main(int argc, char **argv)
 			}
 			else
 			{
+				check_dp(dp);
 				if (!(dpl = dp_list_add(&params.desync_profiles)))
 				{
 					DLOG_ERR("desync_profile_add: out of memory\n");
@@ -2154,6 +2176,8 @@ int main(int argc, char **argv)
 		dp_entry_destroy(dpl);
 		desync_profile_count--;
 	}
+	else
+		check_dp(dp);
 
 	// do not need args from file anymore
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
