@@ -981,6 +981,7 @@ static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *bu
 #define DIVERT_NO_LOCALNETS_SRC "(" DIVERT_NO_LOCALNETSv4_SRC " or " DIVERT_NO_LOCALNETSv6_SRC ")"
 #define DIVERT_NO_LOCALNETS_DST "(" DIVERT_NO_LOCALNETSv4_DST " or " DIVERT_NO_LOCALNETSv6_DST ")"
 
+#define DIVERT_TCP_NOT_EMPTY "(!tcp or tcp.Syn or tcp.PayloadLength>0)"
 #define DIVERT_TCP_INBOUNDS "(tcp.Ack and tcp.Syn or tcp.Rst or tcp.Fin)"
 
 // HTTP/1.? 30(2|7)
@@ -998,6 +999,7 @@ static bool wf_make_filter(
 	char pf_dst_buf[512],iface[64];
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? dp_list_have_autohostlist(&params.desync_profiles) ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
+	const char *f_tcp_not_empty = *pf_tcp_src ? DIVERT_TCP_NOT_EMPTY " and " : "";
 
 	snprintf(iface,sizeof(iface)," ifIdx=%u and subIfIdx=%u and",IfIdx,SubIfIdx);
 
@@ -1010,9 +1012,10 @@ static bool wf_make_filter(
 	else
 		pf_dst = *pf_tcp_dst ? pf_tcp_dst : pf_udp_dst;
 	snprintf(wf,len,
- 	       DIVERT_PROLOG " and%s%s\n ((outbound and %s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
+	       DIVERT_PROLOG " and%s%s\n ((outbound and %s%s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
 		IfIdx ? iface : "",
 		ipv4 ? ipv6 ? "" : " ip and" : " ipv6 and",
+		f_tcp_not_empty,
 		pf_dst,
 		ipv4 ? ipv6 ? " and " DIVERT_NO_LOCALNETS_DST : " and " DIVERT_NO_LOCALNETSv4_DST : " and " DIVERT_NO_LOCALNETSv6_DST,
 		*pf_tcp_src ? "" : " and false",
