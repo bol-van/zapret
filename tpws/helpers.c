@@ -12,10 +12,6 @@
 #include <libgen.h>
 #include <unistd.h>
 
-#ifdef __linux__
-#include <linux/tcp.h>
-#endif
-
 #ifdef __ANDROID__
 #include "andr/ifaddrs.h"
 #else
@@ -23,6 +19,7 @@
 #endif
 
 #include "helpers.h"
+#include "linux_compat.h"
 
 int unique_size_t(size_t *pu, int ct)
 {
@@ -481,7 +478,7 @@ void msleep(unsigned int ms)
 bool socket_supports_notsent()
 {
 	int sfd;
-	struct tcp_info tcpi;
+	union my_tcp_info tcpi;
 
 	sfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sfd<0) return false;
@@ -494,22 +491,22 @@ bool socket_supports_notsent()
 	}
 	close(sfd);
 
-	return ts>=((char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi.tcpi_state + sizeof(tcpi.tcpi_notsent_bytes));
+	return ts>=((char *)&tcpi.ti.tcpi_notsent_bytes - (char *)&tcpi.ti + sizeof(tcpi.ti.tcpi_notsent_bytes));
 }
 bool socket_has_notsent(int sfd)
 {
-	struct tcp_info tcpi;
+	union my_tcp_info tcpi;
 	socklen_t ts = sizeof(tcpi);
 
 	if (getsockopt(sfd, IPPROTO_TCP, TCP_INFO, (char *)&tcpi, &ts) < 0)
 		return false;
-	if (tcpi.tcpi_state != 1) // TCP_ESTABLISHED
+	if (tcpi.ti.tcpi_state != 1) // TCP_ESTABLISHED
 		return false;
-	size_t s = (char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi + sizeof(tcpi.tcpi_notsent_bytes);
+	size_t s = (char *)&tcpi.ti.tcpi_notsent_bytes - (char *)&tcpi.ti + sizeof(tcpi.ti.tcpi_notsent_bytes);
 	if (ts < s)
 		// old structure version
 		return false;
-	return !!tcpi.tcpi_notsent_bytes;
+	return !!tcpi.ti.tcpi_notsent_bytes;
 }
 bool socket_wait_notsent(int sfd, unsigned int delay_ms, unsigned int *wasted_ms)
 {
