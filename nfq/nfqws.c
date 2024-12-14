@@ -2267,9 +2267,9 @@ int main(int argc, char **argv)
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
 		if (AUTOTTL_ENABLED(dp->desync_autottl))
-			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
+			DLOG("profile %d autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
-			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+			DLOG("profile %d autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		split_compat(dp);
 #ifndef __CYGWIN__
 		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
