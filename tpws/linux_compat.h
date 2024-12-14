@@ -96,10 +96,4 @@ struct tcp_info_new {
 									 */
 };
 
-union my_tcp_info
-{
-	struct tcp_info ti_native;
-	struct tcp_info_new ti;
-};
-
 #endif

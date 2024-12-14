@@ -478,7 +478,7 @@ void msleep(unsigned int ms)
 bool socket_supports_notsent()
 {
 	int sfd;
-	union my_tcp_info tcpi;
+	struct tcp_info_new tcpi;
 
 	sfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sfd<0) return false;
@@ -491,22 +491,22 @@ bool socket_supports_notsent()
 	}
 	close(sfd);
 
-	return ts>=((char *)&tcpi.ti.tcpi_notsent_bytes - (char *)&tcpi.ti + sizeof(tcpi.ti.tcpi_notsent_bytes));
+	return ts>=((char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi + sizeof(tcpi.tcpi_notsent_bytes));
 }
 bool socket_has_notsent(int sfd)
 {
-	union my_tcp_info tcpi;
+	struct tcp_info_new tcpi;
 	socklen_t ts = sizeof(tcpi);
 
 	if (getsockopt(sfd, IPPROTO_TCP, TCP_INFO, (char *)&tcpi, &ts) < 0)
 		return false;
-	if (tcpi.ti.tcpi_state != 1) // TCP_ESTABLISHED
+	if (tcpi.tcpi_state != 1) // TCP_ESTABLISHED
 		return false;
-	size_t s = (char *)&tcpi.ti.tcpi_notsent_bytes - (char *)&tcpi.ti + sizeof(tcpi.ti.tcpi_notsent_bytes);
+	size_t s = (char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi + sizeof(tcpi.tcpi_notsent_bytes);
 	if (ts < s)
 		// old structure version
 		return false;
-	return !!tcpi.ti.tcpi_notsent_bytes;
+	return !!tcpi.tcpi_notsent_bytes;
 }
 bool socket_wait_notsent(int sfd, unsigned int delay_ms, unsigned int *wasted_ms)
 {
