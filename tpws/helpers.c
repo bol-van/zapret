@@ -19,6 +19,9 @@
 #endif
 
 #include "helpers.h"
+#ifdef __linux__
+#include <linux/tcp.h>
+#endif
 #include "linux_compat.h"
 
 int unique_size_t(size_t *pu, int ct)

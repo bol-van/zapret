@@ -1,6 +1,14 @@
 #ifdef __linux__
 
-#include <linux/tcp.h>
+#include <linux/types.h>
+
+#ifndef TCP_USER_TIMEOUT
+#define TCP_USER_TIMEOUT 18
+#endif
+
+#ifndef IP6T_SO_ORIGINAL_DST
+ #define IP6T_SO_ORIGINAL_DST 80
+#endif
 
 // workaround for old headers
 
