@@ -981,7 +981,7 @@ static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *bu
 #define DIVERT_NO_LOCALNETS_SRC "(" DIVERT_NO_LOCALNETSv4_SRC " or " DIVERT_NO_LOCALNETSv6_SRC ")"
 #define DIVERT_NO_LOCALNETS_DST "(" DIVERT_NO_LOCALNETSv4_DST " or " DIVERT_NO_LOCALNETSv6_DST ")"
 
-#define DIVERT_TCP_NOT_EMPTY "(!tcp or tcp.Syn or tcp.PayloadLength>0)"
+#define DIVERT_TCP_NOT_EMPTY "(!tcp or tcp.Syn or tcp.Rst or tcp.Fin or tcp.PayloadLength>0)"
 #define DIVERT_TCP_INBOUNDS "(tcp.Ack and tcp.Syn or tcp.Rst or tcp.Fin)"
 
 // HTTP/1.? 30(2|7)
