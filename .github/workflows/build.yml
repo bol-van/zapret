@@ -22,6 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - arch: lexra
+            tool: mips-linux
+            dir: rsdk-4.6.4-5281-EB-3.10-0.9.33-m32ub-20141001
           - arch: arm64
             tool: aarch64-unknown-linux-musl
           - arch: arm
@@ -61,12 +64,21 @@ jobs:
       - name: Set up build tools
         env:
           REPO: 'spvkgn/musl-cross'
+          REPO_LEXRA: 'bol-van/build'
+          ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
+          DIR: ${{ matrix.dir }}
         run: |
-          sudo apt update -qq && sudo apt install -y libcap-dev
+          DIR=${DIR:-$TOOL}
+          [ "$ARCH" = lexra ] && sudo dpkg --add-architecture i386
+          sudo apt update -qq
+          sudo apt install -y libcap-dev
+          [ "$ARCH" = lexra ] && sudo apt install -y libc6:i386 zlib1g:i386
           mkdir -p $HOME/tools
-          wget -qO- https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz | tar -C $HOME/tools -xJ || exit 1
-          [ -d "$HOME/tools/$TOOL/bin" ] && echo "$HOME/tools/$TOOL/bin" >> $GITHUB_PATH
+          URL=https://github.com/$REPO/releases/download/latest/$DIR.tar.xz
+          [ "$ARCH" = lexra ] && URL=https://github.com/$REPO_LEXRA/raw/refs/heads/master/$DIR.txz
+          wget -qO- $URL | tar -C $HOME/tools -xJ || exit 1
+          [ -d "$HOME/tools/$DIR/bin" ] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
 
       - name: Build
         env:
@@ -81,6 +93,10 @@ jobs:
           export NM=$TARGET-nm
           export STRIP=$TARGET-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
+          export STAGING_DIR=/tmp
+          LDFLAGS=
+          [ "$ARCH" = lexra ] && LDFLAGS=-lgcc_eh
+          export LDFLAGS
 
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
@@ -114,7 +130,7 @@ jobs:
 
           # zapret
           CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include" \
-          LDFLAGS="-L$DEPS_DIR/lib" \
+          LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
 
@@ -390,7 +406,7 @@ jobs:
                   if [[ $dir == *-linux-x86_64 ]]; then
                     tar -C $dir -czvf $dir/tpws_wsl.tgz tpws
                     run_upx $dir/*
-                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]]; then
+                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]] && [[ $dir != *-linux-lexra ]]; then
                     run_upx $dir/*
                   fi
                   ;;
@@ -422,6 +438,7 @@ jobs:
                 *-linux-ppc )           run_dir ppc ;;
                 *-linux-x86 )           run_dir x86 ;;
                 *-linux-x86_64 )        run_dir x86_64 ;;
+                *-linux-lexra )         run_dir lexra ;;
                 *-mac-x64 )             run_dir mac64 ;;
                 *-win-x86 )             run_dir win32 ;;
                 *-win-x86_64 )          run_dir win64 ;;
