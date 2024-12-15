@@ -429,3 +429,8 @@ v69.7
 nfqws,tpws: --comment
 nfqws: trash flood warning
 winws: exclude empty outgoing ack packets in windivert filter
+
+v69.8
+
+winws: accept empty outgoing RST and FIN packets for conntrack needs
+repo: lexra build
