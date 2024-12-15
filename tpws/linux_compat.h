@@ -10,6 +10,10 @@
  #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
+#ifndef PR_SET_NO_NEW_PRIVS
+ #define PR_SET_NO_NEW_PRIVS	38
+#endif
+
 // workaround for old headers
 
 struct tcp_info_new {
