@@ -325,8 +325,6 @@ static int dvt_main(void)
 			goto exiterr;
 		}
 		fdct++;
-		if (!set_socket_buffers(fd[1],Q_RCVBUF,Q_SNDBUF))
-			goto exiterr;
 	}
 #endif
 	fdmax = (fd[0]>fd[1] ? fd[0] : fd[1]) + 1;
