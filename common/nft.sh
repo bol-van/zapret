@@ -263,28 +263,6 @@ nft_add_flow_offload_exemption()
 	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || nft_add_rule flow_offload oifname @wanif6 $2 ip6 daddr != @nozapret6 return comment \"$3\"
 }
 
-nft_hw_offload_supported()
-{
-	# $1,$2,... - interface names
-	local devices res=1
-	make_quoted_comma_list devices "$@"
-	[ -n "$devices" ] && devices="devices={$devices};"
-	nft add table ${ZAPRET_NFT_TABLE}_test && nft add flowtable ${ZAPRET_NFT_TABLE}_test ft "{ flags offload; $devices }" 2>/dev/null && res=0
-	nft delete table ${ZAPRET_NFT_TABLE}_test 2>/dev/null
-	return $res
-}
-
-nft_hw_offload_find_supported()
-{
-	# $1,$2,... - interface names
-	local supported_list
-	while [ -n "$1" ]; do
-		nft_hw_offload_supported "$1" && append_separator_list supported_list ' ' '' "$1"
-		shift
-	done
-	echo $supported_list
-}
-
 nft_apply_flow_offloading()
 {
 	# ft can be absent
@@ -370,17 +348,15 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 			nft_create_or_update_flowtable 'offload' 2>/dev/null
 			# then add elements. some of them can cause error because unsupported
 			for i in $ALLDEVS; do
-				if nft_hw_offload_supported $i; then
-					nft_create_or_update_flowtable 'offload' $i
-				else
-					# bridge members must be added instead of the bridge itself
-					# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
-					devs=$(resolve_lower_devices $i)
-					for j in $devs; do
-						# do not display error if addition failed
-						nft_create_or_update_flowtable 'offload' $j 2>/dev/null
-					done
-				fi
+				# first try to add interface itself
+				nft_create_or_update_flowtable 'offload' $i 2>/dev/null
+				# bridge members must be added instead of the bridge itself
+				# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
+				devs=$(resolve_lower_devices $i)
+				for j in $devs; do
+					# do not display error if addition failed
+					nft_create_or_update_flowtable 'offload' $j 2>/dev/null
+				done
 			done
 			;;
 	esac
