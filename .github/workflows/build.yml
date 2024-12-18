@@ -22,9 +22,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: lexra
-            tool: mips-linux
-            dir: rsdk-4.6.4-5281-EB-3.10-0.9.33-m32ub-20141001
           - arch: arm64
             tool: aarch64-unknown-linux-musl
           - arch: arm
@@ -55,6 +52,13 @@ jobs:
             tool: i586-unknown-linux-musl
           - arch: x86_64
             tool: x86_64-unknown-linux-musl
+          - arch: lexra
+            tool: mips-linux
+            dir: rsdk-4.6.4-5281-EB-3.10-0.9.33-m32ub-20141001
+            env:
+              CFLAGS: '-march=5281'
+              LDFLAGS: '-lgcc_eh'
+            repo: 'bol-van/build'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,27 +67,31 @@ jobs:
 
       - name: Set up build tools
         env:
-          REPO: 'spvkgn/musl-cross'
-          REPO_LEXRA: 'bol-van/build'
           ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
-          DIR: ${{ matrix.dir }}
+          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
+          DIR: ${{ matrix.arch == 'lexra' && matrix.dir || matrix.tool }}
         run: |
-          DIR=${DIR:-$TOOL}
-          [ "$ARCH" = lexra ] && sudo dpkg --add-architecture i386
-          sudo apt update -qq
-          sudo apt install -y libcap-dev
-          [ "$ARCH" = lexra ] && sudo apt install -y libc6:i386 zlib1g:i386
+          if [[ "$ARCH" == lexra ]]; then
+            sudo dpkg --add-architecture i386
+            sudo apt update -qq
+            sudo apt install -y libcap-dev libc6:i386 zlib1g:i386
+            URL=https://github.com/$REPO/raw/refs/heads/master/$DIR.txz
+          else
+            sudo apt update -qq
+            sudo apt install -y libcap-dev
+            URL=https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz
+          fi
           mkdir -p $HOME/tools
-          URL=https://github.com/$REPO/releases/download/latest/$DIR.tar.xz
-          [ "$ARCH" = lexra ] && URL=https://github.com/$REPO_LEXRA/raw/refs/heads/master/$DIR.txz
           wget -qO- $URL | tar -C $HOME/tools -xJ || exit 1
-          [ -d "$HOME/tools/$DIR/bin" ] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
+          [[ -d "$HOME/tools/$DIR/bin" ]] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
 
       - name: Build
         env:
           ARCH: ${{ matrix.arch }}
           TARGET: ${{ matrix.tool }}
+          CFLAGS: ${{ matrix.env.CFLAGS != '' && matrix.env.CFLAGS || null }}
+          LDFLAGS: ${{ matrix.env.LDFLAGS != '' && matrix.env.LDFLAGS || null }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           DEPS_DIR=$GITHUB_WORKSPACE/deps
@@ -93,10 +101,7 @@ jobs:
           export NM=$TARGET-nm
           export STRIP=$TARGET-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
-          export STAGING_DIR=/tmp
-          LDFLAGS=
-          [ "$ARCH" = lexra ] && LDFLAGS=-lgcc_eh
-          export LDFLAGS
+          export STAGING_DIR=$RUNNER_TEMP
 
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
@@ -106,7 +111,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="-Os -flto=auto" \
+              CFLAGS="-Os -flto=auto $CFLAGS" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -118,7 +123,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            CFLAGS="-Os -flto=auto" \
+            CFLAGS="-Os -flto=auto $CFLAGS" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -129,7 +134,7 @@ jobs:
           install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
 
           # zapret
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $CFLAGS" \
           LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
