@@ -56,6 +56,7 @@ jobs:
             tool: mips-linux
             dir: rsdk-4.6.4-5281-EB-3.10-0.9.33-m32ub-20141001
             env:
+              CFLAGS: '-march=5281'
               LDFLAGS: '-lgcc_eh'
             repo: 'bol-van/build'
     steps:
@@ -66,9 +67,9 @@ jobs:
 
       - name: Set up build tools
         env:
-          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
           ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
+          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
           DIR: ${{ matrix.arch == 'lexra' && matrix.dir || matrix.tool }}
         run: |
           if [[ "$ARCH" == lexra ]]; then
@@ -89,6 +90,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           TARGET: ${{ matrix.tool }}
+          CFLAGS: ${{ matrix.env.CFLAGS != '' && matrix.env.CFLAGS || null }}
           LDFLAGS: ${{ matrix.env.LDFLAGS != '' && matrix.env.LDFLAGS || null }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -109,7 +111,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="-Os -flto=auto" \
+              CFLAGS="-Os -flto=auto $CFLAGS" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -121,7 +123,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            CFLAGS="-Os -flto=auto" \
+            CFLAGS="-Os -flto=auto $CFLAGS" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -132,7 +134,7 @@ jobs:
           install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
 
           # zapret
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $CFLAGS" \
           LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
