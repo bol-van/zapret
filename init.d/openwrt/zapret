@@ -81,6 +81,10 @@ run_tpws()
 	}
 	run_daemon $1 "$TPWS" "$OPT $2"
 }
+do_tpws()
+{
+	[ "$1" = 0 ] || { shift; run_tpws "$@"; }
+}
 run_tpws_socks()
 {
 	[ "$DISABLE_IPV4" = "1" ] && [ "$DISABLE_IPV6" = "1" ] && return 0
@@ -90,13 +94,10 @@ run_tpws_socks()
 	tpws_apply_socks_binds opt
 	run_daemon $1 "$TPWS" "$opt $2"
 }
-
-stop_tpws()
+do_tpws_socks()
 {
-	stop_daemon $1 "$TPWS"
+	[ "$1" = 0 ] || { shift; run_tpws_socks "$@"; }
 }
-
-
 tpws_apply_socks_binds()
 {
 	local o
@@ -105,39 +106,27 @@ tpws_apply_socks_binds()
 	[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-addr=::1"
 	
 	for lan in $OPENWRT_LAN; do
-	    network_get_device DEVICE $lan
-	    [ -n "$DEVICE" ] || continue
-	    [ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$DEVICE $TPWS_WAIT"
-	    [ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$DEVICE --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
+		network_get_device DEVICE $lan
+		[ -n "$DEVICE" ] || continue
+		[ "$DISABLE_IPV4" = "1" ] || o="$o --bind-iface4=$DEVICE $TPWS_WAIT"
+		[ "$DISABLE_IPV6" = "1" ] || o="$o --bind-iface6=$DEVICE --bind-linklocal=unwanted $TPWS_WAIT_SOCKS6"
 	done
 	eval $1="\"\$$1 $o\""
 }
 
-
-standard_mode_daemons()
+run_nfqws()
 {
-	local opt
-	[ "$TPWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$TPWS_OPT" && {
-		opt="--port=$TPPORT $TPWS_OPT"
-		filter_apply_hostlist_target opt
-		run_tpws 1 "$opt"
-	}
-	[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
-		opt="--port=$TPPORT_SOCKS $TPWS_SOCKS_OPT"
-		filter_apply_hostlist_target opt
-		run_tpws_socks 2 "$opt"
-	}
-	[ "$NFQWS_ENABLE" = 1 ] && check_bad_ws_options 1 "$NFQWS_OPT" && {
-		opt="--qnum=$QNUM $NFQWS_OPT_BASE $NFQWS_OPT"
-		filter_apply_hostlist_target opt
-		run_daemon 3 "$NFQWS" "$opt"
-	}
+	run_daemon $1 "$NFQWS" "$NFQWS_OPT_BASE $2"
+}
+do_nfqws()
+{
+	[ "$1" = 0 ] || { shift; run_nfqws "$@"; }
 }
 
 start_daemons_procd()
 {
-	standard_mode_daemons
-	custom_runner zapret_custom_daemons
+	standard_mode_daemons 1
+	custom_runner zapret_custom_daemons 1
 
 	return 0
 }

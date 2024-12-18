@@ -84,8 +84,6 @@ static void pre_desync(void)
 	signal(SIGHUP, onhup);
 	signal(SIGUSR1, onusr1);
 	signal(SIGUSR2, onusr2);
-
-	desync_init();
 }
 
 
@@ -152,50 +150,62 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	DLOG("packet: id=%d pass unmodified\n", id);
 	return nfq_set_verdict2(qh, id, NF_ACCEPT, mark, 0, NULL);
 }
-static int nfq_main(void)
+static void nfq_deinit(struct nfq_handle **h,struct nfq_q_handle **qh)
 {
-	struct nfq_handle *h = NULL;
-	struct nfq_q_handle *qh = NULL;
-	int fd,rv;
-	uint8_t buf[16384] __attribute__((aligned));
+	if (*qh)
+	{
+		DLOG_CONDUP("unbinding from queue %u\n", params.qnum);
+		nfq_destroy_queue(*qh);
+		*qh = NULL;
+	}
+	if (*h)
+	{
+		DLOG_CONDUP("closing library handle\n");
+		nfq_close(*h);
+		*h = NULL;
+	}
+}
+static bool nfq_init(struct nfq_handle **h,struct nfq_q_handle **qh)
+{
+	nfq_deinit(h,qh);
 
 	DLOG_CONDUP("opening library handle\n");
-	h = nfq_open();
-	if (!h) {
+	*h = nfq_open();
+	if (!*h) {
 		DLOG_PERROR("nfq_open()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("unbinding existing nf_queue handler for AF_INET (if any)\n");
-	if (nfq_unbind_pf(h, AF_INET) < 0) {
+	if (nfq_unbind_pf(*h, AF_INET) < 0) {
 		DLOG_PERROR("nfq_unbind_pf()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
-	if (nfq_bind_pf(h, AF_INET) < 0) {
+	if (nfq_bind_pf(*h, AF_INET) < 0) {
 		DLOG_PERROR("nfq_bind_pf()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("binding this socket to queue '%u'\n", params.qnum);
-	qh = nfq_create_queue(h, params.qnum, &nfq_cb, &params);
-	if (!qh) {
+	*qh = nfq_create_queue(*h, params.qnum, &nfq_cb, &params);
+	if (!*qh) {
 		DLOG_PERROR("nfq_create_queue()");
 		goto exiterr;
 	}
 
 	DLOG_CONDUP("setting copy_packet mode\n");
-	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
+	if (nfq_set_mode(*qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		DLOG_PERROR("can't set packet_copy mode");
 		goto exiterr;
 	}
-	if (nfq_set_queue_maxlen(qh, Q_MAXLEN) < 0) {
+	if (nfq_set_queue_maxlen(*qh, Q_MAXLEN) < 0) {
 		DLOG_PERROR("can't set queue maxlen");
 		goto exiterr;
 	}
 	// accept packets if they cant be handled
-	if (nfq_set_queue_flags(qh, NFQA_CFG_F_FAIL_OPEN , NFQA_CFG_F_FAIL_OPEN))
+	if (nfq_set_queue_flags(*qh, NFQA_CFG_F_FAIL_OPEN , NFQA_CFG_F_FAIL_OPEN))
 	{
 		DLOG_ERR("can't set queue flags. its OK on linux <3.6\n");
 		// dot not fail. not supported on old linuxes <3.6 
@@ -205,53 +215,59 @@ static int nfq_main(void)
 	if (!rawsend_preinit(params.bind_fix4,params.bind_fix6))
 		goto exiterr;
 
-#ifndef __CYGWIN__
-	sec_harden();
+	int yes=1, fd = nfq_fd(*h);
 
-	if (params.droproot && !droproot(params.uid, params.gid))
-		goto exiterr;
-
-	print_id();
+#if defined SOL_NETLINK && defined NETLINK_NO_ENOBUFS
+	if (setsockopt(fd, SOL_NETLINK, NETLINK_NO_ENOBUFS, &yes, sizeof(yes)) == -1)
+		DLOG_PERROR("setsockopt(NETLINK_NO_ENOBUFS)");
 #endif
+
+	return true;
+exiterr:
+	nfq_deinit(h,qh);
+	return false;
+}
+
+static int nfq_main(void)
+{
+	uint8_t buf[16384] __attribute__((aligned));
+	struct nfq_handle *h = NULL;
+	struct nfq_q_handle *qh = NULL;
+	int fd,e;
+	ssize_t rd;
+
+	sec_harden();
+	if (params.droproot && !droproot(params.uid, params.gid))
+		return 1;
+	print_id();
 
 	pre_desync();
 
-	fd = nfq_fd(h);
+	if (!nfq_init(&h,&qh))
+		return 1;
 
-	// increase socket buffer size. on slow systems reloading hostlist can take a while.
-	// if too many unhandled packets are received its possible to get "no buffer space available" error
-	if (!set_socket_buffers(fd,Q_RCVBUF/2,Q_SNDBUF/2))
-		goto exiterr;
+	fd = nfq_fd(h);
 	do
 	{
-		while ((rv = recv(fd, buf, sizeof(buf), 0)) > 0)
+		while ((rd = recv(fd, buf, sizeof(buf), 0)) >= 0)
 		{
-			int r = nfq_handle_packet(h, (char *)buf, rv);
-			if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
+			if (rd)
+			{
+				int r = nfq_handle_packet(h, (char *)buf, (int)rd);
+				if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
+			}
+			else
+				DLOG("recv from nfq returned 0 !\n");
 		}
-		DLOG_ERR("recv: errno %d\n",errno);
+		e=errno;
+		DLOG_ERR("recv: recv=%zd errno %d\n",rd,e);
+		errno=e;
 		DLOG_PERROR("recv");
 		// do not fail on ENOBUFS
-	} while(errno==ENOBUFS);
+	} while(e==ENOBUFS);
 
-	DLOG_CONDUP("unbinding from queue %u\n", params.qnum);
-	nfq_destroy_queue(qh);
-
-#ifdef INSANE
-	/* normally, applications SHOULD NOT issue this command, since
-	 * it detaches other programs/sockets from AF_INET, too ! */
-	DLOG_CONDUP("unbinding from AF_INET\n");
-	nfq_unbind_pf(h, AF_INET);
-#endif
-
-	DLOG_CONDUP("closing library handle\n");
-	nfq_close(h);
+	nfq_deinit(&h,&qh);
 	return 0;
-
-exiterr:
-	if (qh) nfq_destroy_queue(qh);
-	if (h) nfq_close(h);
-	return 1;
 }
 
 #elif defined(BSD)
@@ -285,8 +301,6 @@ static int dvt_main(void)
 			DLOG_PERROR("bind (DIVERT4)");
 			goto exiterr;
 		}
-		if (!set_socket_buffers(fd[0],Q_RCVBUF,Q_SNDBUF))
-			goto exiterr;
 	}
 
 
@@ -311,8 +325,6 @@ static int dvt_main(void)
 			goto exiterr;
 		}
 		fdct++;
-		if (!set_socket_buffers(fd[1],Q_RCVBUF,Q_SNDBUF))
-			goto exiterr;
 	}
 #endif
 	fdmax = (fd[0]>fd[1] ? fd[0] : fd[1]) + 1;
@@ -967,6 +979,7 @@ static bool wf_make_pf(char *opt, const char *l4, const char *portname, char *bu
 #define DIVERT_NO_LOCALNETS_SRC "(" DIVERT_NO_LOCALNETSv4_SRC " or " DIVERT_NO_LOCALNETSv6_SRC ")"
 #define DIVERT_NO_LOCALNETS_DST "(" DIVERT_NO_LOCALNETSv4_DST " or " DIVERT_NO_LOCALNETSv6_DST ")"
 
+#define DIVERT_TCP_NOT_EMPTY "(!tcp or tcp.Syn or tcp.Rst or tcp.Fin or tcp.PayloadLength>0)"
 #define DIVERT_TCP_INBOUNDS "(tcp.Ack and tcp.Syn or tcp.Rst or tcp.Fin)"
 
 // HTTP/1.? 30(2|7)
@@ -984,6 +997,7 @@ static bool wf_make_filter(
 	char pf_dst_buf[512],iface[64];
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? dp_list_have_autohostlist(&params.desync_profiles) ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
+	const char *f_tcp_not_empty = *pf_tcp_src ? DIVERT_TCP_NOT_EMPTY " and " : "";
 
 	snprintf(iface,sizeof(iface)," ifIdx=%u and subIfIdx=%u and",IfIdx,SubIfIdx);
 
@@ -996,9 +1010,10 @@ static bool wf_make_filter(
 	else
 		pf_dst = *pf_tcp_dst ? pf_tcp_dst : pf_udp_dst;
 	snprintf(wf,len,
- 	       DIVERT_PROLOG " and%s%s\n ((outbound and %s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
+	       DIVERT_PROLOG " and%s%s\n ((outbound and %s%s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
 		IfIdx ? iface : "",
 		ipv4 ? ipv6 ? "" : " ip and" : " ipv6 and",
+		f_tcp_not_empty,
 		pf_dst,
 		ipv4 ? ipv6 ? " and " DIVERT_NO_LOCALNETS_DST : " and " DIVERT_NO_LOCALNETSv4_DST : " and " DIVERT_NO_LOCALNETSv6_DST,
 		*pf_tcp_src ? "" : " and false",
@@ -1031,6 +1046,7 @@ static void exithelp(void)
 #endif
 		" --debug=0|1|syslog|@<filename>\n"
 		" --dry-run\t\t\t\t\t; verify parameters and exit with code 0 if successful\n"
+		" --comment=any_text\n"
 #ifdef __linux__
 		" --qnum=<nfqueue_number>\n"
 #elif defined(BSD)
@@ -1175,6 +1191,27 @@ void config_from_file(const char *filename)
 }
 #endif
 
+void check_dp(const struct desync_profile *dp)
+{
+	// only linux has connbytes limiter
+	if (dp->desync_any_proto && !dp->desync_cutoff &&
+		(dp->desync_mode==DESYNC_FAKE || dp->desync_mode==DESYNC_RST || dp->desync_mode==DESYNC_RSTACK ||
+		 dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER))
+	{
+#ifdef __linux__
+		DLOG_CONDUP("WARNING !!! in profile %d you are using --dpi-desync-any-protocol without --dpi-desync-cutoff\n", dp->n);
+		DLOG_CONDUP("WARNING !!! it's completely ok if connbytes or payload based ip/nf tables limiter is applied. Make sure it exists.\n");
+#else
+		DLOG_CONDUP("WARNING !!! possible TRASH FLOOD configuration detected in profile %d\n", dp->n);
+		DLOG_CONDUP("WARNING !!! it's highly recommended to use --dpi-desync-cutoff limiter or fakes will be sent on every processed packet\n");
+		DLOG_CONDUP("WARNING !!! make sure it's really what you want\n");
+#ifdef __CYGWIN__
+		DLOG_CONDUP("WARNING !!! in most cases this is acceptable only with custom payload based windivert filter (--wf-raw)\n");
+#endif
+#endif
+	}
+}
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
@@ -1265,101 +1302,102 @@ int main(int argc, char **argv)
 	const struct option long_options[] = {
 		{"debug",optional_argument,0,0},	// optidx=0
 		{"dry-run",no_argument,0,0},		// optidx=1
+		{"comment",optional_argument,0,0},	// optidx=2
 #ifdef __linux__
-		{"qnum",required_argument,0,0},		// optidx=2
+		{"qnum",required_argument,0,0},		// optidx=3
 #elif defined(BSD)
-		{"port",required_argument,0,0},		// optidx=2
+		{"port",required_argument,0,0},		// optidx=3
 #else
-		{"disabled_argument_1",no_argument,0,0},// optidx=2
+		{"disabled_argument_1",no_argument,0,0},// optidx=3
 #endif
-		{"daemon",no_argument,0,0},		// optidx=3
-		{"pidfile",required_argument,0,0},	// optidx=4
+		{"daemon",no_argument,0,0},		// optidx=4
+		{"pidfile",required_argument,0,0},	// optidx=5
 #ifndef __CYGWIN__
-		{"user",required_argument,0,0 },	// optidx=5
-		{"uid",required_argument,0,0 },		// optidx=6
+		{"user",required_argument,0,0 },	// optidx=6
+		{"uid",required_argument,0,0 },		// optidx=7
 #else
-		{"disabled_argument_2",no_argument,0,0},	// optidx=5
-		{"disabled_argument_3",no_argument,0,0},	// optidx=6
+		{"disabled_argument_2",no_argument,0,0},	// optidx=6
+		{"disabled_argument_3",no_argument,0,0},	// optidx=7
 #endif
-		{"wsize",required_argument,0,0},	// optidx=7
-		{"wssize",required_argument,0,0},	// optidx=8
-		{"wssize-cutoff",required_argument,0,0},// optidx=9
-		{"ctrack-timeouts",required_argument,0,0},// optidx=10
-		{"hostcase",no_argument,0,0},		// optidx=11
-		{"hostspell",required_argument,0,0},	// optidx=12
-		{"hostnospace",no_argument,0,0},	// optidx=13
-		{"domcase",no_argument,0,0 },		// optidx=14
-		{"methodeol",no_argument,0,0 },		// optidx=15
+		{"wsize",required_argument,0,0},	// optidx=8
+		{"wssize",required_argument,0,0},	// optidx=9
+		{"wssize-cutoff",required_argument,0,0},// optidx=10
+		{"ctrack-timeouts",required_argument,0,0},// optidx=11
+		{"hostcase",no_argument,0,0},		// optidx=12
+		{"hostspell",required_argument,0,0},	// optidx=13
+		{"hostnospace",no_argument,0,0},	// optidx=14
+		{"domcase",no_argument,0,0 },		// optidx=15
+		{"methodeol",no_argument,0,0 },		// optidx=16
 		{"dpi-desync",required_argument,0,0},		// optidx=17
 #ifdef __linux__
-		{"dpi-desync-fwmark",required_argument,0,0},	// optidx=17
+		{"dpi-desync-fwmark",required_argument,0,0},	// optidx=18
 #elif defined(SO_USER_COOKIE)
-		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=17
+		{"dpi-desync-sockarg",required_argument,0,0},	// optidx=18
 #else
-		{"disabled_argument_4",no_argument,0,0},	// optidx=17
+		{"disabled_argument_4",no_argument,0,0},	// optidx=18
 #endif
-		{"dpi-desync-ttl",required_argument,0,0},	// optidx=18
-		{"dpi-desync-ttl6",required_argument,0,0},	// optidx=19
-		{"dpi-desync-autottl",optional_argument,0,0},	// optidx=20
-		{"dpi-desync-autottl6",optional_argument,0,0},	// optidx=21
-		{"dpi-desync-fooling",required_argument,0,0},	// optidx=22
-		{"dpi-desync-repeats",required_argument,0,0},	// optidx=23
-		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=24
-		{"dpi-desync-split-pos",required_argument,0,0},// optidx=25
-		{"dpi-desync-split-http-req",required_argument,0,0 },// optidx=26
-		{"dpi-desync-split-tls",required_argument,0,0 },// optidx=27
-		{"dpi-desync-split-seqovl",required_argument,0,0 },// optidx=28
-		{"dpi-desync-split-seqovl-pattern",required_argument,0,0 },// optidx=29
-		{"dpi-desync-fakedsplit-pattern",required_argument,0,0 },// optidx=30
-		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=31
-		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=32
-		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=33
-		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=34
-		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=35
-		{"dpi-desync-fake-http",required_argument,0,0},// optidx=36
-		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=37
-		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=38
-		{"dpi-desync-fake-syndata",required_argument,0,0},// optidx=39
-		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=40
-		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=41
-		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=42
-		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=43
-		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=44
-		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=45
-		{"dpi-desync-cutoff",required_argument,0,0},// optidx=46
-		{"dpi-desync-start",required_argument,0,0},// optidx=47
-		{"hostlist",required_argument,0,0},		// optidx=48
-		{"hostlist-domains",required_argument,0,0},// optidx=49
-		{"hostlist-exclude",required_argument,0,0},	// optidx=50
-		{"hostlist-exclude-domains",required_argument,0,0},// optidx=51
-		{"hostlist-auto",required_argument,0,0},	// optidx=52
-		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=53
-		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=54
-		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=55
-		{"hostlist-auto-debug",required_argument,0,0},	// optidx=56
-		{"new",no_argument,0,0},	// optidx=57
-		{"skip",no_argument,0,0},	// optidx=58
-		{"filter-l3",required_argument,0,0},	// optidx=59
-		{"filter-tcp",required_argument,0,0},	// optidx=60
-		{"filter-udp",required_argument,0,0},	// optidx=61
-		{"filter-l7",required_argument,0,0},	// optidx=62
-		{"ipset",required_argument,0,0},	// optidx=63
-		{"ipset-ip",required_argument,0,0},	// optidx=64
-		{"ipset-exclude",required_argument,0,0},// optidx=65
-		{"ipset-exclude-ip",required_argument,0,0},	// optidx=66
+		{"dpi-desync-ttl",required_argument,0,0},	// optidx=19
+		{"dpi-desync-ttl6",required_argument,0,0},	// optidx=20
+		{"dpi-desync-autottl",optional_argument,0,0},	// optidx=21
+		{"dpi-desync-autottl6",optional_argument,0,0},	// optidx=22
+		{"dpi-desync-fooling",required_argument,0,0},	// optidx=23
+		{"dpi-desync-repeats",required_argument,0,0},	// optidx=24
+		{"dpi-desync-skip-nosni",optional_argument,0,0},// optidx=25
+		{"dpi-desync-split-pos",required_argument,0,0},// optidx=26
+		{"dpi-desync-split-http-req",required_argument,0,0 },// optidx=27
+		{"dpi-desync-split-tls",required_argument,0,0 },// optidx=28
+		{"dpi-desync-split-seqovl",required_argument,0,0 },// optidx=29
+		{"dpi-desync-split-seqovl-pattern",required_argument,0,0 },// optidx=30
+		{"dpi-desync-fakedsplit-pattern",required_argument,0,0 },// optidx=31
+		{"dpi-desync-ipfrag-pos-tcp",required_argument,0,0},// optidx=32
+		{"dpi-desync-ipfrag-pos-udp",required_argument,0,0},// optidx=33
+		{"dpi-desync-badseq-increment",required_argument,0,0},// optidx=34
+		{"dpi-desync-badack-increment",required_argument,0,0},// optidx=35
+		{"dpi-desync-any-protocol",optional_argument,0,0},// optidx=36
+		{"dpi-desync-fake-http",required_argument,0,0},// optidx=37
+		{"dpi-desync-fake-tls",required_argument,0,0},// optidx=38
+		{"dpi-desync-fake-unknown",required_argument,0,0},// optidx=39
+		{"dpi-desync-fake-syndata",required_argument,0,0},// optidx=40
+		{"dpi-desync-fake-quic",required_argument,0,0},// optidx=41
+		{"dpi-desync-fake-wireguard",required_argument,0,0},// optidx=42
+		{"dpi-desync-fake-dht",required_argument,0,0},// optidx=43
+		{"dpi-desync-fake-unknown-udp",required_argument,0,0},// optidx=44
+		{"dpi-desync-udplen-increment",required_argument,0,0},// optidx=45
+		{"dpi-desync-udplen-pattern",required_argument,0,0},// optidx=46
+		{"dpi-desync-cutoff",required_argument,0,0},// optidx=47
+		{"dpi-desync-start",required_argument,0,0},// optidx=48
+		{"hostlist",required_argument,0,0},		// optidx=49
+		{"hostlist-domains",required_argument,0,0},// optidx=50
+		{"hostlist-exclude",required_argument,0,0},	// optidx=51
+		{"hostlist-exclude-domains",required_argument,0,0},// optidx=52
+		{"hostlist-auto",required_argument,0,0},	// optidx=53
+		{"hostlist-auto-fail-threshold",required_argument,0,0},	// optidx=54
+		{"hostlist-auto-fail-time",required_argument,0,0},	// optidx=55
+		{"hostlist-auto-retrans-threshold",required_argument,0,0},	// optidx=56
+		{"hostlist-auto-debug",required_argument,0,0},	// optidx=57
+		{"new",no_argument,0,0},	// optidx=58
+		{"skip",no_argument,0,0},	// optidx=59
+		{"filter-l3",required_argument,0,0},	// optidx=60
+		{"filter-tcp",required_argument,0,0},	// optidx=61
+		{"filter-udp",required_argument,0,0},	// optidx=62
+		{"filter-l7",required_argument,0,0},	// optidx=63
+		{"ipset",required_argument,0,0},	// optidx=64
+		{"ipset-ip",required_argument,0,0},	// optidx=65
+		{"ipset-exclude",required_argument,0,0},// optidx=66
+		{"ipset-exclude-ip",required_argument,0,0},	// optidx=67
 #ifdef __linux__
-		{"bind-fix4",no_argument,0,0},		// optidx=67
-		{"bind-fix6",no_argument,0,0},		// optidx=68
+		{"bind-fix4",no_argument,0,0},		// optidx=68
+		{"bind-fix6",no_argument,0,0},		// optidx=69
 #elif defined(__CYGWIN__)
-		{"wf-iface",required_argument,0,0},	// optidx=67
-		{"wf-l3",required_argument,0,0},	// optidx=68
-		{"wf-tcp",required_argument,0,0},	// optidx=69
-		{"wf-udp",required_argument,0,0},	// optidx=70
-		{"wf-raw",required_argument,0,0},	// optidx=71
-		{"wf-save",required_argument,0,0},	// optidx=72
-		{"ssid-filter",required_argument,0,0},	// optidx=73
-		{"nlm-filter",required_argument,0,0},	// optidx=74
-		{"nlm-list",optional_argument,0,0},	// optidx=75
+		{"wf-iface",required_argument,0,0},	// optidx=68
+		{"wf-l3",required_argument,0,0},	// optidx=69
+		{"wf-tcp",required_argument,0,0},	// optidx=70
+		{"wf-udp",required_argument,0,0},	// optidx=71
+		{"wf-raw",required_argument,0,0},	// optidx=72
+		{"wf-save",required_argument,0,0},	// optidx=73
+		{"ssid-filter",required_argument,0,0},	// optidx=74
+		{"nlm-filter",required_argument,0,0},	// optidx=75
+		{"nlm-list",optional_argument,0,0},	// optidx=76
 #endif
 		{NULL,0,NULL,0}
 	};
@@ -1367,10 +1405,12 @@ int main(int argc, char **argv)
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
 		if (v)
+		{
 			if (bDry)
 				exit_clean(1);
 			else
 				exithelp_clean();
+		}
 		switch (option_index)
 		{
 		case 0: /* debug */
@@ -1407,11 +1447,12 @@ int main(int argc, char **argv)
 				params.debug_target = LOG_TARGET_CONSOLE;
 			}
 			break;
-#ifndef __CYGWIN__
 		case 1: /* dry-run */
 			bDry=true;
 			break;
-		case 2: /* qnum or port */
+		case 2: /* comment */
+			break;
+		case 3: /* qnum or port */
 #ifdef __linux__
 			params.qnum = atoi(optarg);
 			if (params.qnum < 0 || params.qnum>65535)
@@ -1431,16 +1472,15 @@ int main(int argc, char **argv)
 			}
 #endif
 			break;
-#endif
-		case 3: /* daemon */
+		case 4: /* daemon */
 			daemon = true;
 			break;
-		case 4: /* pidfile */
+		case 5: /* pidfile */
 			strncpy(pidfile, optarg, sizeof(pidfile));
 			pidfile[sizeof(pidfile) - 1] = '\0';
 			break;
 #ifndef __CYGWIN__
-		case 5: /* user */
+		case 6: /* user */
 		{
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
@@ -1453,7 +1493,7 @@ int main(int argc, char **argv)
 			params.droproot = true;
 			break;
 		}
-		case 6: /* uid */
+		case 7: /* uid */
 			params.gid = 0x7FFFFFFF; // default gid. drop gid=0
 			params.droproot = true;
 			if (sscanf(optarg, "%u:%u", &params.uid, &params.gid)<1)
@@ -1463,32 +1503,32 @@ int main(int argc, char **argv)
 			}
 			break;
 #endif
-		case 7: /* wsize */
+		case 8: /* wsize */
 			if (!parse_ws_scale_factor(optarg,&dp->wsize,&dp->wscale))
 				exit_clean(1);
 			break;
-		case 8: /* wssize */
+		case 9: /* wssize */
 			if (!parse_ws_scale_factor(optarg,&dp->wssize,&dp->wsscale))
 				exit_clean(1);
 			break;
-		case 9: /* wssize-cutoff */
+		case 10: /* wssize-cutoff */
 			if (!parse_cutoff(optarg, &dp->wssize_cutoff, &dp->wssize_cutoff_mode))
 			{
 				DLOG_ERR("invalid wssize-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 10: /* ctrack-timeouts */
+		case 11: /* ctrack-timeouts */
 			if (sscanf(optarg, "%u:%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin, &params.ctrack_t_udp)<3)
 			{
 				DLOG_ERR("invalid ctrack-timeouts value\n");
 				exit_clean(1);
 			}
 			break;
-		case 11: /* hostcase */
+		case 12: /* hostcase */
 			dp->hostcase = true;
 			break;
-		case 12: /* hostspell */
+		case 13: /* hostspell */
 			if (strlen(optarg) != 4)
 			{
 				DLOG_ERR("hostspell must be exactly 4 chars long\n");
@@ -1497,7 +1537,7 @@ int main(int argc, char **argv)
 			dp->hostcase = true;
 			memcpy(dp->hostspell, optarg, 4);
 			break;
-		case 13: /* hostnospace */
+		case 14: /* hostnospace */
 			if (dp->methodeol)
 			{
 				DLOG_ERR("--hostnospace and --methodeol are incompatible\n");
@@ -1505,10 +1545,10 @@ int main(int argc, char **argv)
 			}
 			dp->hostnospace = true;
 			break;
-		case 14: /* domcase */
+		case 15: /* domcase */
 			dp->domcase = true;
 			break;
-		case 15: /* methodeol */
+		case 16: /* methodeol */
 			if (dp->hostnospace)
 			{
 				DLOG_ERR("--hostnospace and --methodeol are incompatible\n");
@@ -1516,7 +1556,7 @@ int main(int argc, char **argv)
 			}
 			dp->methodeol = true;
 			break;
-		case 16: /* dpi-desync */
+		case 17: /* dpi-desync */
 			{
 				char *mode=optarg,*mode2,*mode3;
 				mode2 = mode ? strchr(mode,',') : NULL;
@@ -1562,7 +1602,7 @@ int main(int argc, char **argv)
 			}
 			break;
 #ifndef __CYGWIN__
-		case 17: /* dpi-desync-fwmark/dpi-desync-sockarg */
+		case 18: /* dpi-desync-fwmark/dpi-desync-sockarg */
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 			params.desync_fwmark = 0;
 			if (sscanf(optarg, "0x%X", &params.desync_fwmark)<=0) sscanf(optarg, "%u", &params.desync_fwmark);
@@ -1577,27 +1617,27 @@ int main(int argc, char **argv)
 #endif
 			break;
 #endif
-		case 18: /* dpi-desync-ttl */
+		case 19: /* dpi-desync-ttl */
 			dp->desync_ttl = (uint8_t)atoi(optarg);
 			break;
-		case 19: /* dpi-desync-ttl6 */
+		case 20: /* dpi-desync-ttl6 */
 			dp->desync_ttl6 = (uint8_t)atoi(optarg);
 			break;
-		case 20: /* dpi-desync-autottl */
+		case 21: /* dpi-desync-autottl */
 			if (!parse_autottl(optarg, &dp->desync_autottl))
 			{
 				DLOG_ERR("dpi-desync-autottl value error\n");
 				exit_clean(1);
 			}
 			break;
-		case 21: /* dpi-desync-autottl6 */
+		case 22: /* dpi-desync-autottl6 */
 			if (!parse_autottl(optarg, &dp->desync_autottl6))
 			{
 				DLOG_ERR("dpi-desync-autottl6 value error\n");
 				exit_clean(1);
 			}
 			break;
-		case 22: /* dpi-desync-fooling */
+		case 23: /* dpi-desync-fooling */
 			{
 				char *e,*p = optarg;
 				while (p)
@@ -1632,17 +1672,17 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 23: /* dpi-desync-repeats */
+		case 24: /* dpi-desync-repeats */
 			if (sscanf(optarg,"%u",&dp->desync_repeats)<1 || !dp->desync_repeats || dp->desync_repeats>20)
 			{
 				DLOG_ERR("dpi-desync-repeats must be within 1..20\n");
 				exit_clean(1);
 			}
 			break;
-		case 24: /* dpi-desync-skip-nosni */
+		case 25: /* dpi-desync-skip-nosni */
 			dp->desync_skip_nosni = !optarg || atoi(optarg);
 			break;
-		case 25: /* dpi-desync-split-pos */
+		case 26: /* dpi-desync-split-pos */
 			{
 				int ct;
 				if (!parse_split_pos_list(optarg,dp->splits+dp->split_count,MAX_SPLITS-dp->split_count,&ct))
@@ -1653,7 +1693,7 @@ int main(int argc, char **argv)
 				dp->split_count += ct;
 			}
 			break;
-		case 26: /* dpi-desync-split-http-req */
+		case 27: /* dpi-desync-split-http-req */
 			// obsolete arg
 			DLOG_CONDUP("WARNING ! --dpi-desync-split-http-req is deprecated. use --dpi-desync-split-pos with markers.\n",MAX_SPLITS);
 			if (dp->split_count>=MAX_SPLITS)
@@ -1668,7 +1708,7 @@ int main(int argc, char **argv)
 			}
 			dp->split_count++;
 			break;
-		case 27: /* dpi-desync-split-tls */
+		case 28: /* dpi-desync-split-tls */
 			// obsolete arg
 			DLOG_CONDUP("WARNING ! --dpi-desync-split-tls is deprecated. use --dpi-desync-split-pos with markers.\n",MAX_SPLITS);
 			if (dp->split_count>=MAX_SPLITS)
@@ -1683,7 +1723,7 @@ int main(int argc, char **argv)
 			}
 			dp->split_count++;
 			break;
-		case 28: /* dpi-desync-split-seqovl */
+		case 29: /* dpi-desync-split-seqovl */
 			if (!strcmp(optarg,"0"))
 			{
 				// allow zero = disable seqovl
@@ -1696,7 +1736,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 29: /* dpi-desync-split-seqovl-pattern */
+		case 30: /* dpi-desync-split-seqovl-pattern */
 			{
 				char buf[sizeof(dp->seqovl_pattern)];
 				size_t sz=sizeof(buf);
@@ -1704,7 +1744,7 @@ int main(int argc, char **argv)
 				fill_pattern(dp->seqovl_pattern,sizeof(dp->seqovl_pattern),buf,sz);
 			}
 			break;
-		case 30: /* dpi-desync-fakedsplit-pattern */
+		case 31: /* dpi-desync-fakedsplit-pattern */
 			{
 				char buf[sizeof(dp->fsplit_pattern)];
 				size_t sz=sizeof(buf);
@@ -1712,7 +1752,7 @@ int main(int argc, char **argv)
 				fill_pattern(dp->fsplit_pattern,sizeof(dp->fsplit_pattern),buf,sz);
 			}
 			break;
-		case 31: /* dpi-desync-ipfrag-pos-tcp */
+		case 32: /* dpi-desync-ipfrag-pos-tcp */
 			if (sscanf(optarg,"%u",&dp->desync_ipfrag_pos_tcp)<1 || dp->desync_ipfrag_pos_tcp<1 || dp->desync_ipfrag_pos_tcp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				DLOG_ERR("dpi-desync-ipfrag-pos-tcp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
@@ -1724,7 +1764,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 32: /* dpi-desync-ipfrag-pos-udp */
+		case 33: /* dpi-desync-ipfrag-pos-udp */
 			if (sscanf(optarg,"%u",&dp->desync_ipfrag_pos_udp)<1 || dp->desync_ipfrag_pos_udp<1 || dp->desync_ipfrag_pos_udp>DPI_DESYNC_MAX_FAKE_LEN)
 			{
 				DLOG_ERR("dpi-desync-ipfrag-pos-udp must be within 1..%u range\n",DPI_DESYNC_MAX_FAKE_LEN);
@@ -1736,63 +1776,63 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 33: /* dpi-desync-badseq-increments */
+		case 34: /* dpi-desync-badseq-increments */
 			if (!parse_badseq_increment(optarg,&dp->desync_badseq_increment))
 			{
 				DLOG_ERR("dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 34: /* dpi-desync-badack-increment */
+		case 35: /* dpi-desync-badack-increment */
 			if (!parse_badseq_increment(optarg,&dp->desync_badseq_ack_increment))
 			{
 				DLOG_ERR("dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
-		case 35: /* dpi-desync-any-protocol */
+		case 36: /* dpi-desync-any-protocol */
 			dp->desync_any_proto = !optarg || atoi(optarg);
 			break;
-		case 36: /* dpi-desync-fake-http */
+		case 37: /* dpi-desync-fake-http */
 			dp->fake_http_size = sizeof(dp->fake_http);
 			load_file_or_exit(optarg,dp->fake_http,&dp->fake_http_size);
 			break;
-		case 37: /* dpi-desync-fake-tls */
+		case 38: /* dpi-desync-fake-tls */
 			dp->fake_tls_size = sizeof(dp->fake_tls);
 			load_file_or_exit(optarg,dp->fake_tls,&dp->fake_tls_size);
 			break;
-		case 38: /* dpi-desync-fake-unknown */
+		case 39: /* dpi-desync-fake-unknown */
 			dp->fake_unknown_size = sizeof(dp->fake_unknown);
 			load_file_or_exit(optarg,dp->fake_unknown,&dp->fake_unknown_size);
 			break;
-		case 39: /* dpi-desync-fake-syndata */
+		case 40: /* dpi-desync-fake-syndata */
 			dp->fake_syndata_size = sizeof(dp->fake_syndata);
 			load_file_or_exit(optarg,dp->fake_syndata,&dp->fake_syndata_size);
 			break;
-		case 40: /* dpi-desync-fake-quic */
+		case 41: /* dpi-desync-fake-quic */
 			dp->fake_quic_size = sizeof(dp->fake_quic);
 			load_file_or_exit(optarg,dp->fake_quic,&dp->fake_quic_size);
 			break;
-		case 41: /* dpi-desync-fake-wireguard */
+		case 42: /* dpi-desync-fake-wireguard */
 			dp->fake_wg_size = sizeof(dp->fake_wg);
 			load_file_or_exit(optarg,dp->fake_wg,&dp->fake_wg_size);
 			break;
-		case 42: /* dpi-desync-fake-dht */
+		case 43: /* dpi-desync-fake-dht */
 			dp->fake_dht_size = sizeof(dp->fake_dht);
 			load_file_or_exit(optarg,dp->fake_dht,&dp->fake_dht_size);
 			break;
-		case 43: /* dpi-desync-fake-unknown-udp */
+		case 44: /* dpi-desync-fake-unknown-udp */
 			dp->fake_unknown_udp_size = sizeof(dp->fake_unknown_udp);
 			load_file_or_exit(optarg,dp->fake_unknown_udp,&dp->fake_unknown_udp_size);
 			break;
-		case 44: /* dpi-desync-udplen-increment */
+		case 45: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&dp->udplen_increment)<1 || dp->udplen_increment>0x7FFF || dp->udplen_increment<-0x8000)
 			{
 				DLOG_ERR("dpi-desync-udplen-increment must be integer within -32768..32767 range\n");
 				exit_clean(1);
 			}
 			break;
-		case 45: /* dpi-desync-udplen-pattern */
+		case 46: /* dpi-desync-udplen-pattern */
 			{
 				char buf[sizeof(dp->udplen_pattern)];
 				size_t sz=sizeof(buf);
@@ -1800,21 +1840,21 @@ int main(int argc, char **argv)
 				fill_pattern(dp->udplen_pattern,sizeof(dp->udplen_pattern),buf,sz);
 			}
 			break;
-		case 46: /* desync-cutoff */
+		case 47: /* desync-cutoff */
 			if (!parse_cutoff(optarg, &dp->desync_cutoff, &dp->desync_cutoff_mode))
 			{
 				DLOG_ERR("invalid desync-cutoff value\n");
 				exit_clean(1);
 			}
 			break;
-		case 47: /* desync-start */
+		case 48: /* desync-start */
 			if (!parse_cutoff(optarg, &dp->desync_start, &dp->desync_start_mode))
 			{
 				DLOG_ERR("invalid desync-start value\n");
 				exit_clean(1);
 			}
 			break;
-		case 48: /* hostlist */
+		case 49: /* hostlist */
 			if (bSkip) break;
 			if (!RegisterHostlist(dp, false, optarg))
 			{
@@ -1822,7 +1862,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 49: /* hostlist-domains */
+		case 50: /* hostlist-domains */
 			if (bSkip) break;
 			if (!anon_hl && !(anon_hl=RegisterHostlist(dp, false, NULL)))
 			{
@@ -1835,7 +1875,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 50: /* hostlist-exclude */
+		case 51: /* hostlist-exclude */
 			if (bSkip) break;
 			if (!RegisterHostlist(dp, true, optarg))
 			{
@@ -1843,7 +1883,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 51: /* hostlist-exclude-domains */
+		case 52: /* hostlist-exclude-domains */
 			if (bSkip) break;
 			if (!anon_hl_exclude && !(anon_hl_exclude=RegisterHostlist(dp, true, NULL)))
 			{
@@ -1856,7 +1896,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 52: /* hostlist-auto */
+		case 53: /* hostlist-auto */
 			if (bSkip) break;
 			if (dp->hostlist_auto)
 			{
@@ -1884,7 +1924,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 53: /* hostlist-auto-fail-threshold */
+		case 54: /* hostlist-auto-fail-threshold */
 			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_threshold<1 || dp->hostlist_auto_fail_threshold>20)
 			{
@@ -1892,7 +1932,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 54: /* hostlist-auto-fail-time */
+		case 55: /* hostlist-auto-fail-time */
 			dp->hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_time<1)
 			{
@@ -1900,7 +1940,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 55: /* hostlist-auto-retrans-threshold */
+		case 56: /* hostlist-auto-retrans-threshold */
 			dp->hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_retrans_threshold<2 || dp->hostlist_auto_retrans_threshold>10)
 			{
@@ -1908,7 +1948,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 56: /* hostlist-auto-debug */
+		case 57: /* hostlist-auto-debug */
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1922,7 +1962,7 @@ int main(int argc, char **argv)
 			}
 			break;
 
-		case 57: /* new */
+		case 58: /* new */
 			if (bSkip)
 			{
 				dp_clear(dp);
@@ -1932,6 +1972,7 @@ int main(int argc, char **argv)
 			}
 			else
 			{
+				check_dp(dp);
 				if (!(dpl = dp_list_add(&params.desync_profiles)))
 				{
 					DLOG_ERR("desync_profile_add: out of memory\n");
@@ -1943,18 +1984,18 @@ int main(int argc, char **argv)
 			anon_hl = anon_hl_exclude = NULL;
 			anon_ips = anon_ips_exclude = NULL;
 			break;
-		case 58: /* skip */
+		case 59: /* skip */
 			bSkip = true;
 			break;
 
-		case 59: /* filter-l3 */
+		case 60: /* filter-l3 */
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 60: /* filter-tcp */
+		case 61: /* filter-tcp */
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
@@ -1964,7 +2005,7 @@ int main(int argc, char **argv)
 			if (!port_filters_deny_if_empty(&dp->pf_udp))
 				exit_clean(1);
 			break;
-		case 61: /* filter-udp */
+		case 62: /* filter-udp */
 			if (!parse_pf_list(optarg,&dp->pf_udp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
@@ -1974,14 +2015,14 @@ int main(int argc, char **argv)
 			if (!port_filters_deny_if_empty(&dp->pf_tcp))
 				exit_clean(1);
 			break;
-		case 62: /* filter-l7 */
+		case 63: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 63: /* ipset */
+		case 64: /* ipset */
 			if (bSkip) break;
 			if (!RegisterIpset(dp, false, optarg))
 			{
@@ -1989,7 +2030,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 64: /* ipset-ip */
+		case 65: /* ipset-ip */
 			if (bSkip) break;
 			if (!anon_ips && !(anon_ips=RegisterIpset(dp, false, NULL)))
 			{
@@ -2002,7 +2043,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 65: /* ipset-exclude */
+		case 66: /* ipset-exclude */
 			if (bSkip) break;
 			if (!RegisterIpset(dp, true, optarg))
 			{
@@ -2010,7 +2051,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 66: /* ipset-exclude-ip */
+		case 67: /* ipset-exclude-ip */
 			if (bSkip) break;
 			if (!anon_ips_exclude && !(anon_ips_exclude=RegisterIpset(dp, true, NULL)))
 			{
@@ -2026,28 +2067,28 @@ int main(int argc, char **argv)
 
 
 #ifdef __linux__
-		case 67: /* bind-fix4 */
+		case 68: /* bind-fix4 */
 			params.bind_fix4 = true;
 			break;
-		case 68: /* bind-fix6 */
+		case 69: /* bind-fix6 */
 			params.bind_fix6 = true;
 			break;
 #elif defined(__CYGWIN__)
-		case 67: /* wf-iface */
+		case 68: /* wf-iface */
 			if (!sscanf(optarg,"%u.%u",&IfIdx,&SubIfIdx))
 			{
 				DLOG_ERR("bad value for --wf-iface\n");
 				exit_clean(1);
 			}
 			break;
-		case 68: /* wf-l3 */
+		case 69: /* wf-l3 */
 			if (!wf_make_l3(optarg,&wf_ipv4,&wf_ipv6))
 			{
 				DLOG_ERR("bad value for --wf-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 69: /* wf-tcp */
+		case 70: /* wf-tcp */
 			hash_wf_tcp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"tcp","SrcPort",wf_pf_tcp_src,sizeof(wf_pf_tcp_src)) ||
 				!wf_make_pf(optarg,"tcp","DstPort",wf_pf_tcp_dst,sizeof(wf_pf_tcp_dst)))
@@ -2056,7 +2097,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 70: /* wf-udp */
+		case 71: /* wf-udp */
 			hash_wf_udp=hash_jen(optarg,strlen(optarg));
 			if (!wf_make_pf(optarg,"udp","SrcPort",wf_pf_udp_src,sizeof(wf_pf_udp_src)) ||
 				!wf_make_pf(optarg,"udp","DstPort",wf_pf_udp_dst,sizeof(wf_pf_udp_dst)))
@@ -2065,7 +2106,7 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case 71: /* wf-raw */
+		case 72: /* wf-raw */
 			hash_wf_raw=hash_jen(optarg,strlen(optarg));
 			if (optarg[0]=='@')
 			{
@@ -2079,11 +2120,11 @@ int main(int argc, char **argv)
 				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
 			}
 			break;
-		case 72: /* wf-save */
+		case 73: /* wf-save */
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
 			break;
-		case 73: /* ssid-filter */
+		case 74: /* ssid-filter */
 			hash_ssid_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -2101,7 +2142,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 74: /* nlm-filter */
+		case 75: /* nlm-filter */
 			hash_nlm_filter=hash_jen(optarg,strlen(optarg));
 			{
 				char *e,*p = optarg;
@@ -2119,7 +2160,7 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 75: /* nlm-list */
+		case 76: /* nlm-list */
 			if (!nlm_list(optarg && !strcmp(optarg,"all")))
 			{
 				DLOG_ERR("could not get list of NLM networks\n");
@@ -2136,6 +2177,8 @@ int main(int argc, char **argv)
 		dp_entry_destroy(dpl);
 		desync_profile_count--;
 	}
+	else
+		check_dp(dp);
 
 	// do not need args from file anymore
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
@@ -2222,9 +2265,9 @@ int main(int argc, char **argv)
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
 		if (AUTOTTL_ENABLED(dp->desync_autottl))
-			DLOG("[profile %d] autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
+			DLOG("profile %d autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
-			DLOG("[profile %d] autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+			DLOG("profile %d autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		split_compat(dp);
 #ifndef __CYGWIN__
 		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))

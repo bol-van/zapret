@@ -23,6 +23,7 @@
 #include "socks.h"
 #include "helpers.h"
 #include "hostlist.h"
+#include "linux_compat.h"
 
 // keep separate legs counter. counting every time thousands of legs can consume cpu
 static int legs_local, legs_remote;

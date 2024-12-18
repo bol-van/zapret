@@ -263,28 +263,6 @@ nft_add_flow_offload_exemption()
 	[ "$DISABLE_IPV6" = "1" -o -z "$2" ] || nft_add_rule flow_offload oifname @wanif6 $2 ip6 daddr != @nozapret6 return comment \"$3\"
 }
 
-nft_hw_offload_supported()
-{
-	# $1,$2,... - interface names
-	local devices res=1
-	make_quoted_comma_list devices "$@"
-	[ -n "$devices" ] && devices="devices={$devices};"
-	nft add table ${ZAPRET_NFT_TABLE}_test && nft add flowtable ${ZAPRET_NFT_TABLE}_test ft "{ flags offload; $devices }" 2>/dev/null && res=0
-	nft delete table ${ZAPRET_NFT_TABLE}_test 2>/dev/null
-	return $res
-}
-
-nft_hw_offload_find_supported()
-{
-	# $1,$2,... - interface names
-	local supported_list
-	while [ -n "$1" ]; do
-		nft_hw_offload_supported "$1" && append_separator_list supported_list ' ' '' "$1"
-		shift
-	done
-	echo $supported_list
-}
-
 nft_apply_flow_offloading()
 {
 	# ft can be absent
@@ -370,17 +348,15 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 			nft_create_or_update_flowtable 'offload' 2>/dev/null
 			# then add elements. some of them can cause error because unsupported
 			for i in $ALLDEVS; do
-				if nft_hw_offload_supported $i; then
-					nft_create_or_update_flowtable 'offload' $i
-				else
-					# bridge members must be added instead of the bridge itself
-					# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
-					devs=$(resolve_lower_devices $i)
-					for j in $devs; do
-						# do not display error if addition failed
-						nft_create_or_update_flowtable 'offload' $j 2>/dev/null
-					done
-				fi
+				# first try to add interface itself
+				nft_create_or_update_flowtable 'offload' $i 2>/dev/null
+				# bridge members must be added instead of the bridge itself
+				# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
+				devs=$(resolve_lower_devices $i)
+				for j in $devs; do
+					# do not display error if addition failed
+					nft_create_or_update_flowtable 'offload' $j 2>/dev/null
+				done
 			done
 			;;
 	esac
@@ -640,24 +616,30 @@ nft_apply_nfqws_in_out()
 	}
 }
 
-zapret_apply_firewall_standard_rules_nft()
+zapret_apply_firewall_standard_tpws_rules_nft()
 {
 	local f4 f6
 
-	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] &&
-	{
+	[ "$TPWS_ENABLE" = 1 -a -n "$TPWS_PORTS" ] && {
 		f4="tcp dport {$TPWS_PORTS}"
 		f6=$f4
 		nft_filter_apply_ipset_target f4 f6
 		nft_fw_tpws "$f4" "$f6" $TPPORT
 	}
-	[ "$NFQWS_ENABLE" = 1 ] &&
-	{
+}
+zapret_apply_firewall_standard_nfqws_rules_nft()
+{
+	[ "$NFQWS_ENABLE" = 1 ] && {
 		nft_apply_nfqws_in_out tcp "$NFQWS_PORTS_TCP" "$NFQWS_TCP_PKT_OUT" "$NFQWS_TCP_PKT_IN"
 		nft_apply_nfqws_in_out tcp "$NFQWS_PORTS_TCP_KEEPALIVE" keepalive "$NFQWS_TCP_PKT_IN"
 		nft_apply_nfqws_in_out udp "$NFQWS_PORTS_UDP" "$NFQWS_UDP_PKT_OUT" "$NFQWS_UDP_PKT_IN"
 		nft_apply_nfqws_in_out udp "$NFQWS_PORTS_UDP_KEEPALIVE" keepalive "$NFQWS_UDP_PKT_IN"
 	}
+}
+zapret_apply_firewall_standard_rules_nft()
+{
+	zapret_apply_firewall_standard_tpws_rules_nft
+	zapret_apply_firewall_standard_nfqws_rules_nft
 }
 
 zapret_apply_firewall_rules_nft()

@@ -20,8 +20,6 @@
 
 #define TLS_PARTIALS_ENABLE	true
 
-#define Q_RCVBUF	(128*1024)	// in bytes
-#define Q_SNDBUF	(64*1024)	// in bytes
 #define RAW_SNDBUF	(64*1024)	// in bytes
 
 #define Q_MAXLEN	1024		// in packets

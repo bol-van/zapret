@@ -18,7 +18,7 @@
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
-#define FIX_SEG_DEFAULT_MAX_WAIT		30
+#define FIX_SEG_DEFAULT_MAX_WAIT		50
 
 enum bindll { unwanted=0, no, prefer, force };
 

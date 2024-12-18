@@ -1,0 +1,89 @@
+# this custom script demonstrates how to launch extra tpws instance limited by ipset
+
+# can override in config :
+TPWS_MY1_OPT="${TPWS_MY1_OPT:---oob --split-pos=midsld}"
+TPWS_MY1_PORTS=${TPWS_MY1_PORTS:-$TPWS_PORTS}
+TPWS_MY1_SUBNETS4="${TPWS_MY1_SUBNETS4:-142.250.0.0/15 64.233.160.0/19 172.217.0.0/16 173.194.0.0/16 108.177.0.0/17 74.125.0.0/16 209.85.128.0/17 216.58.192.0/19}"
+TPWS_MY1_SUBNETS6="${TPWS_MY1_SUBNETS6:-2607:F8B0::/32 2a00:1450:4000::/37}"
+
+TPWS_MY1_IPSET_SIZE=${TPWS_MY1_IPSET_SIZE:-4096}
+TPWS_MY1_IPSET_OPT="${TPWS_MY1_IPSET_OPT:-hash:net hashsize 8192 maxelem $TPWS_MY1_IPSET_SIZE}"
+
+alloc_dnum DNUM_TPWS_MY1
+alloc_tpws_port PORT_TPWS_MY1
+TPWS_MY1_NAME4=my1tpws4
+TPWS_MY1_NAME6=my1tpws6
+
+zapret_custom_daemons()
+{
+	# $1 - 1 - run, 0 - stop
+
+	local opt="--port=$PORT_TPWS_MY1 $TPWS_MY1_OPT"
+	do_tpws $1 $DNUM_TPWS_MY1 "$opt"
+}
+
+zapret_custom_firewall()
+{
+	# $1 - 1 - run, 0 - stop
+
+	local f4 f6 subnet
+	local PORTS_IPT=$(replace_char - : $TPWS_MY1_PORTS)
+	local dest_set="-m set --match-set $TPWS_MY1_NAME4 dst"
+
+	[ "$1" = 1 -a "$DISABLE_IPV4" != 1 ] && {
+		ipset create $TPWS_MY1_NAME4 $TPWS_MY1_IPSET_OPT family inet 2>/dev/null
+		ipset flush $TPWS_MY1_NAME4
+		for subnet in $TPWS_MY1_SUBNETS4; do
+			echo add $TPWS_MY1_NAME4 $subnet
+		done | ipset -! restore
+	}
+	[ "$1" = 1 -a "$DISABLE_IPV6" != 1 ] && {
+		ipset create $TPWS_MY1_NAME6 $TPWS_MY1_IPSET_OPT family inet6 2>/dev/null
+		ipset flush $TPWS_MY1_NAME6
+		for subnet in $TPWS_MY1_SUBNETS6; do
+			echo add $TPWS_MY1_NAME6 $subnet
+		done | ipset -! restore
+	}
+
+	f4="-p tcp -m multiport --dports $PORTS_IPT -m set --match-set"
+	f6="$f4 $TPWS_MY1_NAME6 dst"
+	f4="$f4 $TPWS_MY1_NAME4 dst"
+	fw_tpws $1 "$f4" "$f6" $PORT_TPWS_MY1
+
+	[ "$1" = 1 ] || {
+		ipset destroy $TPWS_MY1_NAME4 2>/dev/null
+		ipset destroy $TPWS_MY1_NAME6 2>/dev/null
+	}
+}
+
+zapret_custom_firewall_nft()
+{
+	local f4 f6 subnet
+
+	[ "$DISABLE_IPV4" != 1 ] && {
+	        make_comma_list subnets $TPWS_MY1_SUBNETS4
+		nft_create_set $TPWS_MY1_NAME4 "type ipv4_addr; size $TPWS_MY1_IPSET_SIZE; auto-merge; flags interval;"
+		nft_flush_set $TPWS_MY1_NAME4
+		nft_add_set_element $TPWS_MY1_NAME4 "$subnets"
+	}
+	[ "$DISABLE_IPV6" != 1 ] && {
+	        make_comma_list subnets $TPWS_MY1_SUBNETS6
+		nft_create_set $TPWS_MY1_NAME6 "type ipv6_addr; size $TPWS_MY1_IPSET_SIZE; auto-merge; flags interval;"
+		nft_flush_set $TPWS_MY1_NAME6
+		nft_add_set_element $TPWS_MY1_NAME6 "$subnets"
+	}
+
+	f4="tcp dport {$TPWS_MY1_PORTS}"
+	f6="$f4 ip6 daddr @$TPWS_MY1_NAME6"
+	f4="$f4 ip daddr @$TPWS_MY1_NAME4"
+	nft_fw_tpws "$f4" "$f6" $PORT_TPWS_MY1
+}
+
+zapret_custom_firewall_nft_flush()
+{
+	# this function is called after all nft fw rules are deleted
+	# however sets are not deleted. it's desired to clear sets here.
+
+	nft_del_set $TPWS_MY1_NAME4 2>/dev/null
+	nft_del_set $TPWS_MY1_NAME6 2>/dev/null
+}

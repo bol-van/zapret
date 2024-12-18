@@ -9,12 +9,10 @@
 
 #include "params.h"
 #include "helpers.h"
+#include "linux_compat.h"
 
 #ifdef __linux__
  #include <linux/netfilter_ipv4.h>
- #ifndef IP6T_SO_ORIGINAL_DST
-  #define IP6T_SO_ORIGINAL_DST 80
- #endif
 #endif
 
 

@@ -12,10 +12,6 @@
 #include <libgen.h>
 #include <unistd.h>
 
-#ifdef __linux__
-#include <linux/tcp.h>
-#endif
-
 #ifdef __ANDROID__
 #include "andr/ifaddrs.h"
 #else
@@ -23,6 +19,10 @@
 #endif
 
 #include "helpers.h"
+#ifdef __linux__
+#include <linux/tcp.h>
+#endif
+#include "linux_compat.h"
 
 int unique_size_t(size_t *pu, int ct)
 {
@@ -481,7 +481,7 @@ void msleep(unsigned int ms)
 bool socket_supports_notsent()
 {
 	int sfd;
-	struct tcp_info tcpi;
+	struct tcp_info_new tcpi;
 
 	sfd = socket(AF_INET,SOCK_STREAM,0);
 	if (sfd<0) return false;
@@ -494,11 +494,11 @@ bool socket_supports_notsent()
 	}
 	close(sfd);
 
-	return ts>=((char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi.tcpi_state + sizeof(tcpi.tcpi_notsent_bytes));
+	return ts>=((char *)&tcpi.tcpi_notsent_bytes - (char *)&tcpi + sizeof(tcpi.tcpi_notsent_bytes));
 }
 bool socket_has_notsent(int sfd)
 {
-	struct tcp_info tcpi;
+	struct tcp_info_new tcpi;
 	socklen_t ts = sizeof(tcpi);
 
 	if (getsockopt(sfd, IPPROTO_TCP, TCP_INFO, (char *)&tcpi, &ts) < 0)

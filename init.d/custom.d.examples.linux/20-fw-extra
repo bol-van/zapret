@@ -1,0 +1,66 @@
+# this custom script runs standard mode with extra firewall rules
+
+# config: use TPWS_ENABLE_OVERRIDE, NFQWS_ENABLE_OVERRIDE to enable standard mode daemons
+# standard and override switches cannot be enabled simultaneously !
+
+TPWS_ENABLE_OVERRIDE=${TPWS_ENABLE_OVERRIDE:-0}
+NFQWS_ENABLE_OVERRIDE=${NFQWS_ENABLE_OVERRIDE:-0}
+
+# config: some if these values must be set in config. not setting any of these makes this script meaningless.
+# pre vars put ipt/nft code to the rule beginning
+#FW_EXTRA_PRE_TPWS_IPT=
+#FW_EXTRA_PRE_TPWS_NFT=
+#FW_EXTRA_PRE_NFQWS_IPT="-m mark --mark 0x10000000/0x10000000"
+#FW_EXTRA_PRE_NFQWS_NFT="mark and 0x10000000 != 0"
+# post vars put ipt/nft code to the rule end
+#FW_EXTRA_POST_TPWS_IPT=
+#FW_EXTRA_POST_TPWS_NFT=
+#FW_EXTRA_POST_NFQWS_IPT=
+#FW_EXTRA_POST_NFQWS_NFT=
+
+check_std_intersect()
+{
+	[ "$TPWS_ENABLE_OVERRIDE" = 1 -a "$TPWS_ENABLE" = 1 ] && {
+		echo "ERROR ! both TPWS_ENABLE_OVERRIDE and TPWS_ENABLE are enabled"
+		return 1
+	}
+	[ "$NFQWS_ENABLE_OVERRIDE" = 1 -a "$NFQWS_ENABLE" = 1 ] && {
+		echo "ERROR ! both NFQWS_ENABLE_OVERRIDE and NFQWS_ENABLE are enabled"
+		return 1
+	}
+	return 0
+}
+
+zapret_custom_daemons()
+{
+	# $1 - 1 - add, 0 - stop
+
+	check_std_intersect || return
+
+	local TPWS_SOCKS_ENABLE=0 TPWS_ENABLE=$TPWS_ENABLE_OVERRIDE NFQWS_ENABLE=$NFQWS_ENABLE_OVERRIDE
+	standard_mode_daemons "$1"
+}
+zapret_custom_firewall()
+{
+        # $1 - 1 - run, 0 - stop
+
+	check_std_intersect || return
+
+	local FW_EXTRA_PRE FW_EXTRA_POST TPWS_ENABLE=$TPWS_ENABLE_OVERRIDE NFQWS_ENABLE=$NFQWS_ENABLE_OVERRIDE
+	FW_EXTRA_PRE="$FW_EXTRA_PRE_TPWS_IPT" FW_EXTRA_POST="$FW_EXTRA_POST_TPWS_IPT"
+	zapret_do_firewall_standard_tpws_rules_ipt $1
+	FW_EXTRA_PRE="$FW_EXTRA_PRE_NFQWS_IPT" FW_EXTRA_POST="$FW_EXTRA_POST_NFQWS_IPT"
+	zapret_do_firewall_standard_nfqws_rules_ipt $1
+}
+zapret_custom_firewall_nft()
+{
+        # stop logic is not required
+
+	check_std_intersect || return
+
+	local FW_EXTRA_PRE FW_EXTRA_POST TPWS_ENABLE=$TPWS_ENABLE_OVERRIDE NFQWS_ENABLE=$NFQWS_ENABLE_OVERRIDE
+	FW_EXTRA_PRE="$FW_EXTRA_PRE_TPWS_NFT" FW_EXTRA_POST="$FW_EXTRA_POST_TPWS_NFT"
+	zapret_apply_firewall_standard_tpws_rules_nft
+	FW_EXTRA_PRE="$FW_EXTRA_PRE_NFQWS_NFT" FW_EXTRA_POST="$FW_EXTRA_POST_NFQWS_NFT"
+	zapret_apply_firewall_standard_nfqws_rules_nft
+}

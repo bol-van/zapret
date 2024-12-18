@@ -52,6 +52,13 @@ jobs:
           #   tool: i586-unknown-linux-musl
           - arch: x86_64
             tool: x86_64-unknown-linux-musl
+          - arch: lexra
+            tool: mips-linux
+            dir: rsdk-4.6.4-5281-EB-3.10-0.9.33-m32ub-20141001
+            env:
+              CFLAGS: '-march=5281'
+              LDFLAGS: '-lgcc_eh'
+            repo: 'bol-van/build'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,18 +67,31 @@ jobs:
 
       - name: Set up build tools
         env:
-          REPO: 'spvkgn/musl-cross'
+          ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
+          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
+          DIR: ${{ matrix.arch == 'lexra' && matrix.dir || matrix.tool }}
         run: |
-          sudo apt update -qq && sudo apt install -y libcap-dev
+          if [[ "$ARCH" == lexra ]]; then
+            sudo dpkg --add-architecture i386
+            sudo apt update -qq
+            sudo apt install -y libcap-dev libc6:i386 zlib1g:i386
+            URL=https://github.com/$REPO/raw/refs/heads/master/$DIR.txz
+          else
+            sudo apt update -qq
+            sudo apt install -y libcap-dev
+            URL=https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz
+          fi
           mkdir -p $HOME/tools
-          wget -qO- https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz | tar -C $HOME/tools -xJ || exit 1
-          [ -d "$HOME/tools/$TOOL/bin" ] && echo "$HOME/tools/$TOOL/bin" >> $GITHUB_PATH
+          wget -qO- $URL | tar -C $HOME/tools -xJ || exit 1
+          [[ -d "$HOME/tools/$DIR/bin" ]] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
 
       - name: Build
         env:
           ARCH: ${{ matrix.arch }}
           TARGET: ${{ matrix.tool }}
+          CFLAGS: ${{ matrix.env.CFLAGS != '' && matrix.env.CFLAGS || null }}
+          LDFLAGS: ${{ matrix.env.LDFLAGS != '' && matrix.env.LDFLAGS || null }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           DEPS_DIR=$GITHUB_WORKSPACE/deps
@@ -81,6 +101,7 @@ jobs:
           export NM=$TARGET-nm
           export STRIP=$TARGET-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
+          export STAGING_DIR=$RUNNER_TEMP
 
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
@@ -90,7 +111,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="-Os -flto=auto" \
+              CFLAGS="-Os -flto=auto $CFLAGS" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -102,7 +123,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            CFLAGS="-Os -flto=auto" \
+            CFLAGS="-Os -flto=auto $CFLAGS" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -113,8 +134,8 @@ jobs:
           install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
 
           # zapret
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include" \
-          LDFLAGS="-L$DEPS_DIR/lib" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $CFLAGS" \
+          LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
 
@@ -390,7 +411,7 @@ jobs:
                   if [[ $dir == *-linux-x86_64 ]]; then
                     tar -C $dir -czvf $dir/tpws_wsl.tgz tpws
                     run_upx $dir/*
-                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]]; then
+                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]] && [[ $dir != *-linux-lexra ]]; then
                     run_upx $dir/*
                   fi
                   ;;
@@ -422,6 +443,7 @@ jobs:
                 *-linux-ppc )           run_dir ppc ;;
                 *-linux-x86 )           run_dir x86 ;;
                 *-linux-x86_64 )        run_dir x86_64 ;;
+                *-linux-lexra )         run_dir lexra ;;
                 *-mac-x64 )             run_dir mac64 ;;
                 *-win-x86 )             run_dir win32 ;;
                 *-win-x86_64 )          run_dir win64 ;;

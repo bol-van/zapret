@@ -10,6 +10,7 @@ ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 . "$ZAPRET_BASE/common/ipt.sh"
 . "$ZAPRET_BASE/common/nft.sh"
 . "$ZAPRET_BASE/common/linux_fw.sh"
+. "$ZAPRET_BASE/common/linux_daemons.sh"
 . "$ZAPRET_BASE/common/list.sh"
 . "$ZAPRET_BASE/common/custom.sh"
 CUSTOM_DIR="$ZAPRET_RW/init.d/sysv"
@@ -274,46 +275,4 @@ create_ipset()
 {
 	echo "Creating ip list table (firewall type $FWTYPE)"
 	"$IPSET_CR" "$@"
-}
-
-
-standard_mode_daemons()
-{
-	# $1 - 1 - run, 0 - stop
-
-	local opt
-
-	[ "$TPWS_ENABLE" = 1 ] && check_bad_ws_options $1 "$TPWS_OPT" && {
-		opt="--port=$TPPORT $TPWS_OPT"
-		filter_apply_hostlist_target opt
-		do_tpws $1 1 "$opt"
-	}
-	[ "$TPWS_SOCKS_ENABLE" = 1 ] && {
-		opt="--port=$TPPORT_SOCKS $TPWS_SOCKS_OPT"
-		filter_apply_hostlist_target opt
-		do_tpws_socks $1 2 "$opt"
-	}
-	[ "$NFQWS_ENABLE" = 1 ] && check_bad_ws_options $1 "$NFQWS_OPT" && {
-		opt="--qnum=$QNUM $NFQWS_OPT"
-		filter_apply_hostlist_target opt
-		do_nfqws $1 3 "$opt"
-	}
-}
-
-zapret_do_daemons()
-{
-	# $1 - 1 - run, 0 - stop
-
-	standard_mode_daemons $1
-	custom_runner zapret_custom_daemons $1
-
-	return 0
-}
-zapret_run_daemons()
-{
-	zapret_do_daemons 1 "$@"
-}
-zapret_stop_daemons()
-{
-	zapret_do_daemons 0 "$@"
 }

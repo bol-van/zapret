@@ -14,24 +14,24 @@ SRC_FILES = *.c crypto/*.c
 all: nfqws
 
 nfqws: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) -o nfqws $(SRC_FILES) $(LDFLAGS) $(LIBS_LINUX)
+	$(CC) -s $(CFLAGS) -o nfqws $(SRC_FILES) $(LIBS_LINUX) $(LDFLAGS)
 
 android: nfqws
 
 bsd: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o dvtws $(SRC_FILES) $(LDFLAGS) $(LIBS_BSD)
+	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o dvtws $(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)
 
 mac: $(SRC_FILES)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o dvtwsa $(SRC_FILES) $(LDFLAGS) -target arm64-apple-macos10.8 $(LIBS_BSD)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o dvtwsx $(SRC_FILES) $(LDFLAGS) -target x86_64-apple-macos10.8 $(LIBS_BSD)
+	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o dvtwsa $(SRC_FILES) -target arm64-apple-macos10.8 $(LIBS_BSD) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o dvtwsx $(SRC_FILES) -target x86_64-apple-macos10.8 $(LIBS_BSD) $(LDFLAGS)
 	strip dvtwsa dvtwsx
 	lipo -create -output dvtws dvtwsx dvtwsa
 	rm -f dvtwsx dvtwsa
 
 cygwin64:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) $(LIBS_CYGWIN64) $(RES_CYGWIN64)
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LIBS_CYGWIN) $(LIBS_CYGWIN64) $(RES_CYGWIN64) $(LDFLAGS)
 cygwin32:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LDFLAGS) $(LIBS_CYGWIN) $(LIBS_CYGWIN32) $(RES_CYGWIN32)
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LIBS_CYGWIN) $(LIBS_CYGWIN32) $(RES_CYGWIN32) $(LDFLAGS)
 cygwin: cygwin64
 
 clean:
