@@ -74,8 +74,7 @@ case "$1" in
 		;;
 		
   *)
-	N=/etc/init.d/$NAME
-	echo "Usage: $N {start|stop|restart|start-fw|stop-fw|restart-fw|start-daemons|stop-daemons|restart-daemons|reload-ifsets|list-ifsets|list-table}" >&2
+	echo "Usage: $SCRIPT {start|stop|restart|start-fw|stop-fw|restart-fw|start-daemons|stop-daemons|restart-daemons|reload-ifsets|list-ifsets|list-table}" >&2
 	exit 1
 	;;
 esac
