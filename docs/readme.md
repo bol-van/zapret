@@ -2078,6 +2078,7 @@ chcon u:object_r:system_file:s0 /data/local/tmp/zapret/tpws
 Подойдет что-то легковесное, например, alpine или даже openwrt.
 Если это не эмулятор android, то универсальная архитектура - arm (любой вариант).
 Если вы точно знаете, что ОС у вас 64-разрядная, то лучше вместо arm - aarch64.
+Выяснить архитектуру можно командой `uname -a`.
 
 ```
 mount --bind /dev /data/linux/dev
