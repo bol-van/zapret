@@ -1,5 +1,5 @@
 [ -n "$ZAPRET_NFT_TABLE" ] || ZAPRET_NFT_TABLE=zapret
-readonly nft_connbytes="ct original packets"
+nft_connbytes="ct original packets"
 
 # required for : nft -f -
 create_dev_stdin

@@ -1,5 +1,5 @@
 std_ports
-readonly ipt_connbytes="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes"
+ipt_connbytes="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes"
 
 ipt()
 {

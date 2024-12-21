@@ -1,4 +1,4 @@
-readonly GET_LIST_PREFIX=/ipset/get_
+GET_LIST_PREFIX=/ipset/get_
 
 SYSTEMD_DIR=/lib/systemd
 [ -d "$SYSTEMD_DIR" ] || SYSTEMD_DIR=/usr/lib/systemd
