@@ -5,7 +5,7 @@ ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
 ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 IPSET_RW_DIR="$ZAPRET_RW/ipset"
 
-. "$ZAPRET_CONFIG"
+[ -f "$ZAPRET_CONFIG" ] && . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 
 [ -z "$TMPDIR" ] && TMPDIR=/tmp
