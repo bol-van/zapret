@@ -26,7 +26,7 @@ dl()
    exit 2
   fi
   # remove DOS EOL \r
-  zzcat "$TMPLIST" | tr -d '\015' | zz "$2"
+  zzcat "$TMPLIST" | zz "$2"
   rm -f "$TMPLIST"
 }
 
