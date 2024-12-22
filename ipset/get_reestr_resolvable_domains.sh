@@ -28,7 +28,7 @@ dl()
    echo list is too small : $dlsize bytes. can be bad.
    exit 2
   fi
-  zzcat "$TMPLIST" | zz "$2"
+  zzcopy "$TMPLIST" "$2"
   rm -f "$TMPLIST"
 }
 
