@@ -1,5 +1,9 @@
 std_ports
 ipt_connbytes="-m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes"
+IPSET_EXCLUDE="-m set ! --match-set nozapret"
+IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
+IPBAN_EXCLUDE="-m set ! --match-set ipban"
+IPBAN_EXCLUDE6="-m set ! --match-set ipban6"
 
 ipt()
 {
@@ -132,7 +136,7 @@ _fw_tpws4()
 
 		ipt_print_op $1 "$2" "tpws (port $3)"
 
-		rule="$2 $IPSET_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
+		rule="$2 $IPSET_EXCLUDE dst $IPBAN_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
 		for i in $4 ; do
 			ipt_add_del $1 PREROUTING -t nat -i $i $rule
 	 	done
@@ -160,7 +164,7 @@ _fw_tpws6()
 
 		ipt_print_op $1 "$2" "tpws (port $3)" 6
 
-		rule="$2 $IPSET_EXCLUDE6 dst"
+		rule="$2 $IPSET_EXCLUDE6 dst $IPBAN_EXCLUDE6 dst"
 		for i in $4 ; do
 			_dnat6_target $i DNAT6
 			[ -n "$DNAT6" -a "$DNAT6" != "-" ] && ipt6_add_del $1 PREROUTING -t nat -i $i $rule -j DNAT --to [$DNAT6]:$3

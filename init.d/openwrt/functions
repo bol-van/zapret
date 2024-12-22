@@ -30,10 +30,6 @@ LINKLOCAL_WAIT_SEC=5
 
 IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
-IPSET_EXCLUDE="-m set ! --match-set nozapret"
-IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
-
-
 # can be multiple ipv6 outgoing interfaces
 # uplink from isp, tunnelbroker, vpn, ...
 # want them all. who knows what's the real one that blocks sites
