@@ -241,7 +241,7 @@ fix_sbin_path()
 # it can calculate floating point expr
 calc()
 {
-	awk "BEGIN { print $*}";
+	LC_ALL=C awk "BEGIN { print $*}";
 }
 
 fsleep_setup()
