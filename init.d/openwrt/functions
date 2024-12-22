@@ -25,9 +25,6 @@ CUSTOM_DIR="$ZAPRET_RW/init.d/openwrt"
 
 TPWS_LOCALHOST4=127.0.0.127
 
-# max wait time for the link local ipv6 on the LAN interface
-LINKLOCAL_WAIT_SEC=5
-
 IPSET_CR="$ZAPRET_BASE/ipset/create_ipset.sh"
 
 # can be multiple ipv6 outgoing interfaces
