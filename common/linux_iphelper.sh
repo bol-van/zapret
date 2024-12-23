@@ -4,6 +4,8 @@
 # PREROUTING - can't DNAT to ::1. can DNAT to link local of -i interface or to any global addr
 # not a good idea to expose tpws to the world (bind to ::)
 
+# max wait time for the link local ipv6 on the LAN interface
+LINKLOCAL_WAIT_SEC=${LINKLOCAL_WAIT_SEC:-5}
 
 get_ipv6_linklocal()
 {

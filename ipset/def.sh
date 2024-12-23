@@ -5,7 +5,7 @@ ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
 ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
 IPSET_RW_DIR="$ZAPRET_RW/ipset"
 
-. "$ZAPRET_CONFIG"
+[ -f "$ZAPRET_CONFIG" ] && . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
 
 [ -z "$TMPDIR" ] && TMPDIR=/tmp
@@ -139,6 +139,18 @@ zzsize()
   wc -c <"$f" | xargs
  else
   printf 0
+ fi
+}
+zzcopy()
+{
+ local is_gz=0
+ zztest "$1" && is_gz=1
+ if [ "$GZIP_LISTS" = 1 -a $is_gz = 1 ]; then
+  cp "$1" "${2}.gz"
+ elif [ "$GZIP_LISTS" != 1 -a $is_gz != 1 ]; then
+  cp "$1" "$2"
+ else
+  zzcat "$1" | zz "$2"
  fi
 }
 

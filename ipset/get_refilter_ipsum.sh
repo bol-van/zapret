@@ -20,13 +20,12 @@ dl()
    echo list download failed : $1
    exit 2
   }
-  dlsize=$(LANG=C wc -c "$TMPLIST" | xargs | cut -f 1 -d ' ')
+  dlsize=$(LC_ALL=C LANG=C wc -c "$TMPLIST" | xargs | cut -f 1 -d ' ')
   if test $dlsize -lt $3; then
    echo list is too small : $dlsize bytes. can be bad.
    exit 2
   fi
-  # remove DOS EOL \r
-  zzcat "$TMPLIST" | tr -d '\015' | zz "$2"
+  zzcopy "$TMPLIST" "$2"
   rm -f "$TMPLIST"
 }
 

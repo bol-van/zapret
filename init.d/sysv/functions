@@ -90,13 +90,6 @@ TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 # first wait for lan to ifup, then wait for bind-wait-ip-linklocal seconds for link local address and bind-wait-ip for any ipv6 as the worst case
 TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
 
-# max wait time for the link local ipv6 on the LAN interface
-LINKLOCAL_WAIT_SEC=5
-
-IPSET_EXCLUDE="-m set ! --match-set nozapret"
-IPSET_EXCLUDE6="-m set ! --match-set nozapret6"
-
-
 dnat6_target()
 {
 	_dnat6_target "$@"

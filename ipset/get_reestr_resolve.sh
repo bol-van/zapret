@@ -5,12 +5,12 @@ IPSET_DIR="$(cd "$IPSET_DIR"; pwd)"
 
 . "$IPSET_DIR/def.sh"
 
-ZREESTR="$TMPDIR/zapret.txt"
+ZREESTR="$TMPDIR/zapret.txt.gz"
 ZDIG="$TMPDIR/zapret-dig.txt"
 IPB="$TMPDIR/ipb.txt"
 ZIPLISTTMP="$TMPDIR/zapret-ip.txt"
 #ZURL=https://reestr.rublacklist.net/api/current
-ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv
+ZURL_REESTR=https://raw.githubusercontent.com/zapret-info/z-i/master/dump.csv.gz
 
 dl_checked()
 {
@@ -24,7 +24,7 @@ dl_checked()
    echo list download failed : $1
    return 2
   }
-  dlsize=$(LANG=C wc -c "$2" | xargs | cut -f 1 -d ' ')
+  dlsize=$(LC_ALL=C LANG=C wc -c "$2" | xargs | cut -f 1 -d ' ')
   if test $dlsize -lt $3; then
    echo list is too small : $dlsize bytes. can be bad.
    return 2
@@ -34,11 +34,11 @@ dl_checked()
 
 reestr_list()
 {
- LANG=C cut -s -f2 -d';' "$ZREESTR" | LANG=C nice -n 5 sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p'
+ LC_ALL=C LANG=C gunzip -c "$ZREESTR" | cut -s -f2 -d';' | LC_ALL=C LANG=C nice -n 5 sed -Ee 's/^\*\.(.+)$/\1/' -ne 's/^[a-z0-9A-Z._-]+$/&/p' | $AWK '{ print tolower($0) }'
 }
 reestr_extract_ip()
 {
- LANG=C nice -n 5 $AWK -F ';' '($1 ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}/) && (($2 == "" && $3 == "") || ($1 == $2)) {gsub(/ \| /, RS); print $1}' "$ZREESTR" | LANG=C $AWK '{split($1, a, /\|/); for (i in a) {print a[i]}}'
+ LC_ALL=C LANG=C gunzip -c | nice -n 5 $AWK -F ';' '($1 ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}/) && (($2 == "" && $3 == "") || ($1 == $2)) {gsub(/ \| /, RS); print $1}' | LC_ALL=C LANG=C $AWK '{split($1, a, /\|/); for (i in a) {print a[i]}}'
 }
 
 getuser && {

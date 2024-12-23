@@ -21,7 +21,7 @@ curl -H "Accept-Encoding: gzip" -k --fail --max-time 600 --connect-timeout 5 --r
  exit 2
 }
 
-dlsize=$(LANG=C wc -c "$ZDOM" | xargs | cut -f 1 -d ' ')
+dlsize=$(LC_ALL=C LANG=C wc -c "$ZDOM" | xargs | cut -f 1 -d ' ')
 if test $dlsize -lt 102400; then
  echo list file is too small. can be bad.
  exit 2
