@@ -70,7 +70,7 @@ check_bins()
 	elif [ -f "$EXEDIR/Makefile" ] && exists make; then
 		echo trying to compile
 		[ "$SYSTEM" = "macos" ] && make_target=mac
-		make -C "$EXEDIR" $make_target || {
+		CFLAGS="-march=native ${CFLAGS}" make -C "$EXEDIR" $make_target || {
 			echo could not compile
 			make -C "$EXEDIR" clean
 			exitp 8
