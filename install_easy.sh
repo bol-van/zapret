@@ -70,7 +70,7 @@ check_bins()
 	elif [ -f "$EXEDIR/Makefile" ] && exists make; then
 		echo trying to compile
 		[ "$SYSTEM" = "macos" ] && make_target=mac
-		make -C "$EXEDIR" $make_target || {
+		CFLAGS="-march=native ${CFLAGS}" make -C "$EXEDIR" $make_target || {
 			echo could not compile
 			make -C "$EXEDIR" clean
 			exitp 8
@@ -292,7 +292,7 @@ ask_config_tmpdir()
 		echo default tmpfs has size of 50% RAM
 		echo "RAM  : $(get_ram_mb) Mb"
 		echo "DISK : $(get_free_space_mb) Mb"
-		echo select temp file location 
+		echo select temp file location
 		[ -z "$TMPDIR" ] && TMPDIR=/tmp
 		ask_list TMPDIR "/tmp $EXEDIR/tmp" && {
 		    [ "$TMPDIR" = "/tmp" ] && TMPDIR=
@@ -388,7 +388,7 @@ copy_openwrt()
 	local ARCH="$(get_bin_arch)"
 	local BINDIR="$1/binaries/$ARCH"
 	local file
-	
+
 	[ -d "$2" ] || mkdir -p "$2"
 
 	mkdir "$2/tpws" "$2/nfq" "$2/ip2net" "$2/mdig" "$2/binaries" "$2/binaries/$ARCH" "$2/init.d" "$2/tmp" "$2/files"
@@ -482,7 +482,7 @@ _restore_settings()
 		[ -z "$f" -o "$f" = "/" ] && continue
 
 		[ -f "/tmp/zapret-bkp-$i" ] && {
-			mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -f "/tmp/zapret-bkp-$i" 
+			mv -f "/tmp/zapret-bkp-$i" "$ZAPRET_TARGET/$f" || rm -f "/tmp/zapret-bkp-$i"
 		}
 		[ -d "/tmp/zapret-bkp-$i" ] && {
 			[ -d "$ZAPRET_TARGET/$f" ] && rm -r "$ZAPRET_TARGET/$f"
@@ -724,7 +724,7 @@ install_linux()
 	crontab_del_quiet
 	# desktop system. more likely up at daytime
 	crontab_add 10 22
-	
+
 	echo
 	echo '!!! WARNING. YOUR SETUP IS INCOMPLETE !!!'
 	echo you must manually add to auto start : $INIT_SCRIPT_SRC start
@@ -772,7 +772,6 @@ deoffload_openwrt_firewall()
 	else
 		echo system wide software flow offloading disabled. ok
 	fi
-			
 }
 
 
