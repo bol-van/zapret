@@ -2,6 +2,8 @@
 
 #include "protocol.h"
 #include "helpers.h"
+#include "params.h"
+
 #include <string.h>
 #include <ctype.h>
 #include <arpa/inet.h>
@@ -507,7 +509,7 @@ size_t TLSPos(uint8_t posmarker, int16_t pos, const uint8_t *data, size_t sz)
 		case PM_HOST_MIDSLD:
 		case PM_HOST_ENDSLD:
 		case PM_SNI_EXT:
-			if (TLSFindExt(data,sz,0,&ext,&elen,false))
+			if (TLSFindExt(data,sz,0,&ext,&elen,TLS_PARTIALS_ENABLE))
 			{
 				if (posmarker==PM_SNI_EXT)
 				{
