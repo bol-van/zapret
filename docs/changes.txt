@@ -434,3 +434,10 @@ v69.8
 
 winws: accept empty outgoing RST and FIN packets for conntrack needs
 repo: lexra build
+
+v69.9
+
+init.d: exclude ipban from tpws redirection
+macos: fix install_easy
+macos: fix national decimal separator in sleep
+nfqws: apply relative markers to partial TLS ClientHello
