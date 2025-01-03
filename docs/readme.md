@@ -1437,7 +1437,7 @@ ENABLE_HTTPS_TLS13=0|1 - включить тест https TLS 1.3
 ENABLE_HTTP3=0|1 - включить тест QUIC
 REPEATS - количество попыток тестирования
 PARALLEL=0|1 - включить параллельные попытки. может обидеть сайт из-за долбежки и привести к неверному результату
-SCANLEVEL=quick|standard|force - глубина сканирования. quick - до первого результата, standard - исследование DPI, force - тестировать все
+SCANLEVEL=quick|standard|force - уровень сканирования
 HTTP_PORT, HTTPS_PORT, QUIC_PORT - номера портов для соответствующих протоколов
 SKIP_DNSCHECK=1 - отказ от проверки DNS
 SKIP_TPWS=1 - отказ от тестов tpws
