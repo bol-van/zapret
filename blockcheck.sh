@@ -38,6 +38,7 @@ IPFW_RULE_NUM=${IPFW_RULE_NUM:-1}
 IPFW_DIVERT_PORT=${IPFW_DIVERT_PORT:-59780}
 CURL_MAX_TIME=${CURL_MAX_TIME:-2}
 CURL_MAX_TIME_QUIC=${CURL_MAX_TIME_QUIC:-$CURL_MAX_TIME}
+CURL_MAX_TIME_DOH=${CURL_MAX_TIME_DOH:-2}
 MIN_TTL=${MIN_TTL:-1}
 MAX_TTL=${MAX_TTL:-12}
 USER_AGENT=${USER_AGENT:-Mozilla}
@@ -215,7 +216,7 @@ doh_resolve()
 	# $1 - ip version 4/6
 	# $2 - hostname
 	# $3 - doh server URL. use $DOH_SERVER if empty
-	$MDIG --family=$1 --dns-make-query=$2 | $CURL -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | $MDIG --dns-parse-query
+	$MDIG --family=$1 --dns-make-query=$2 | $CURL --max-time $CURL_MAX_TIME_DOH -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | $MDIG --dns-parse-query
 }
 doh_find_working()
 {
