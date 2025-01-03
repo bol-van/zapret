@@ -78,9 +78,11 @@ exitp()
 {
 	local A
 
-	echo
-	echo press enter to continue
-	read A
+	[ "$BATCH" = 1 ] || {
+		echo
+		echo press enter to continue
+		read A
+	}
 	exit $1
 }
 
