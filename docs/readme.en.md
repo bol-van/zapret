@@ -1,4 +1,4 @@
-# zapret v69.9
+# zapret v70
 
 # SCAMMER WARNING
 

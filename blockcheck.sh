@@ -23,6 +23,7 @@ CURL=${CURL:-curl}
 . "$ZAPRET_BASE/common/fwtype.sh"
 . "$ZAPRET_BASE/common/virt.sh"
 
+DOMAINS_DEFAULT="rutracker.org"
 QNUM=${QNUM:-59780}
 SOCKS_PORT=${SOCKS_PORT:-1993}
 TPWS_UID=${TPWS_UID:-1}
@@ -35,7 +36,6 @@ MDIG=${MDIG:-${ZAPRET_BASE}/mdig/mdig}
 DESYNC_MARK=0x10000000
 IPFW_RULE_NUM=${IPFW_RULE_NUM:-1}
 IPFW_DIVERT_PORT=${IPFW_DIVERT_PORT:-59780}
-DOMAINS=${DOMAINS:-rutracker.org}
 CURL_MAX_TIME=${CURL_MAX_TIME:-2}
 CURL_MAX_TIME_QUIC=${CURL_MAX_TIME_QUIC:-$CURL_MAX_TIME}
 MIN_TTL=${MIN_TTL:-1}
@@ -45,8 +45,9 @@ HTTP_PORT=${HTTP_PORT:-80}
 HTTPS_PORT=${HTTPS_PORT:-443}
 QUIC_PORT=${QUIC_PORT:-443}
 UNBLOCKED_DOM=${UNBLOCKED_DOM:-iana.org}
+PARALLEL_OUT=/tmp/zapret_parallel
 
-HDRTEMP=/tmp/zapret-hdr.txt
+HDRTEMP=/tmp/zapret-hdr
 
 NFT_TABLE=blockcheck
 
@@ -560,7 +561,7 @@ curl_supports_tls13()
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
 	# this is online test because there's no other way to trigger library incompatibility case
-	$CURL --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://iana.org 2>/dev/null
+	$CURL --tlsv1.3 --max-time 1 -Is -o /dev/null https://iana.org 2>/dev/null
 	r=$?
 	[ $r != 4 -a $r != 35 ]
 }
@@ -651,28 +652,28 @@ curl_test_http()
 	# $3 - subst ip
 	# $4 - "detail" - detail info
 
-	local code loc
-	curl_probe $1 $2 $HTTP_PORT "$3" -SsD "$HDRTEMP" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
+	local code loc hdrt="${HDRTEMP}_${!:-$$}.txt"
+	curl_probe $1 $2 $HTTP_PORT "$3" -SsD "$hdrt" -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT "http://$2" -o /dev/null 2>&1 || {
 		code=$?
-		rm -f "$HDRTEMP"
+		rm -f "$hdrt"
 		return $code
 	}
 	if [ "$4" = "detail" ] ; then
-		head -n 1 "$HDRTEMP"
-		grep "^[lL]ocation:" "$HDRTEMP"
+		head -n 1 "$hdrt"
+		grep "^[lL]ocation:" "$hdrt"
 	else
-		code=$(hdrfile_http_code "$HDRTEMP")
+		code=$(hdrfile_http_code "$hdrt")
 		[ "$code" = 301 -o "$code" = 302 -o "$code" = 307 -o "$code" = 308 ] && {
-			loc=$(hdrfile_location "$HDRTEMP")
+			loc=$(hdrfile_location "$hdrt")
 			echo "$loc" | grep -qE "^https?://.*$2(/|$)" ||
 			echo "$loc" | grep -vqE '^https?://' || {
 				echo suspicious redirection $code to : $loc
-				rm -f "$HDRTEMP"
+				rm -f "$hdrt"
 				return 254
 			}
 		}
 	fi
-	rm -f "$HDRTEMP"
+	rm -f "$hdrt"
 	[ "$code" = 400 ] && {
 		# this can often happen if the server receives fake packets it should not receive
 		echo http code $code. likely the server receives fakes.
@@ -964,18 +965,38 @@ curl_test()
 	# $2 - domain
 	# $3 - subst ip
 	# $4 - param of test function
-	local code=0 n=0
+	local code=0 n=0 p pids
 
-	while [ $n -lt $REPEATS ]; do
-		n=$(($n+1))
-		[ $REPEATS -gt 1 ] && printf "[attempt $n] "
-		if $1 "$IPV" $2 $3 "$4" ; then
-			[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
-		else
-			code=$?
-			[ "$SCANLEVEL" = quick ] && break
-		fi
-	done
+	if [ "$PARALLEL" = 1 ]; then
+		rm -f "${PARALLEL_OUT}"*
+		for n in $(seq -s ' ' 1 $REPEATS); do
+			$1 "$IPV" $2 $3 "$4" >"${PARALLEL_OUT}_$n" &
+			pids=${pids:+$pids }$!
+		done
+		n=1
+		for p in $pids; do
+			[ $REPEATS -gt 1 ] && printf "[attempt $n] "
+			if wait $p; then
+				[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
+			else
+				code=$?
+				cat "${PARALLEL_OUT}_$n"
+			fi
+			n=$(($n+1))
+		done
+		rm -f "${PARALLEL_OUT}"*
+	else
+		while [ $n -lt $REPEATS ]; do
+			n=$(($n+1))
+			[ $REPEATS -gt 1 ] && printf "[attempt $n] "
+			if $1 "$IPV" $2 $3 "$4" ; then
+				[ $REPEATS -gt 1 ] && echo 'AVAILABLE'
+			else
+				code=$?
+				[ "$SCANLEVEL" = quick ] && break
+			fi
+		done
+	fi
 	[ "$4" = detail ] || {
 		if [ $code = 254 ]; then
 			echo "UNAVAILABLE"
@@ -1707,76 +1728,99 @@ ask_params()
 		exitp 1
 	}
 
-
-	echo "specify domain(s) to test. multiple domains are space separated."
-	printf "domain(s) (default: $DOMAINS) : "
 	local dom
-	read dom
-	[ -n "$dom" ] && DOMAINS="$dom"
+	[ -n "$DOMAINS" ] || {
+		DOMAINS="$DOMAINS_DEFAULT"
+		echo "specify domain(s) to test. multiple domains are space separated."
+		printf "domain(s) (default: $DOMAINS) : "
+		read dom
+		[ -n "$dom" ] && DOMAINS="$dom"
+	}
 
 	local IPVS_def=4
-	# yandex public dns
-	pingtest 6 2a02:6b8::feed:0ff && IPVS_def=46
-	printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
-	read IPVS
-	[ -n "$IPVS" ] || IPVS=$IPVS_def
-	[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
-		echo 'invalid ip version(s). should be 4, 6 or 46.'
-		exitp 1
+	[ -n "$IPVS" ] || {
+		# yandex public dns
+		pingtest 6 2a02:6b8::feed:0ff && IPVS_def=46
+		printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
+		read IPVS
+		[ -n "$IPVS" ] || IPVS=$IPVS_def
+		[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
+			echo 'invalid ip version(s). should be 4, 6 or 46.'
+			exitp 1
+		}
 	}
 	[ "$IPVS" = 46 ] && IPVS="4 6"
 
 	configure_curl_opt
 
-	ENABLE_HTTP=1
-	echo
-	ask_yes_no_var ENABLE_HTTP "check http"
-
-	ENABLE_HTTPS_TLS12=1
-	echo
-	ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
-
-	ENABLE_HTTPS_TLS13=0
-	echo
-	if [ -n "$TLS13" ]; then
-		echo "TLS 1.3 uses encrypted ServerHello. DPI cannot check domain name in server response."
-		echo "This can allow more bypass strategies to work."
-		echo "What works for TLS 1.2 will also work for TLS 1.3 but not vice versa."
-		echo "Most sites nowadays support TLS 1.3 but not all. If you can't find a strategy for TLS 1.2 use this test."
-		echo "TLS 1.3 only strategy is better than nothing."
-		ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
-	else
-		echo "installed curl version does not support TLS 1.3 . tests disabled."
-	fi
-
-	ENABLE_HTTP3=0
-	echo
-	if [ -n "$HTTP3" ]; then
-		echo "make sure target domain(s) support QUIC or result will be negative in any case"
-		ENABLE_HTTP3=1
-		ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
-	else
-		echo "installed curl version does not support http3 QUIC. tests disabled."
-	fi
-
-	echo
-	echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
-	printf "how many times to repeat each test (default: 1) : "
-	read REPEATS
-	REPEATS=$((0+${REPEATS:-1}))
-	[ "$REPEATS" = 0 ] && {
-		echo invalid repeat count
-		exitp 1
+	[ -n "$ENABLE_HTTP" ] || {
+		ENABLE_HTTP=1
+		echo
+		ask_yes_no_var ENABLE_HTTP "check http"
 	}
 
-	echo
-	echo quick    - scan as fast as possible to reveal any working strategy
-	echo standard - do investigation what works on your DPI
-	echo force    - scan maximum despite of result
-	SCANLEVEL=${SCANLEVEL:-standard}
-	ask_list SCANLEVEL "quick standard force" "$SCANLEVEL"
-	# disable tpws checks by default in quick mode
-	[ "$SCANLEVEL" = quick -a -z "$SKIP_TPWS" -a "$UNAME" != Darwin ] && SKIP_TPWS=1
+	[ -n "$ENABLE_HTTPS_TLS12" ] || {
+		ENABLE_HTTPS_TLS12=1
+		echo
+		ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
+	}
+
+	[ -n "$ENABLE_HTTPS_TLS13" ] || {
+		ENABLE_HTTPS_TLS13=0
+		echo
+		if [ -n "$TLS13" ]; then
+			echo "TLS 1.3 uses encrypted ServerHello. DPI cannot check domain name in server response."
+			echo "This can allow more bypass strategies to work."
+			echo "What works for TLS 1.2 will also work for TLS 1.3 but not vice versa."
+			echo "Most sites nowadays support TLS 1.3 but not all. If you can't find a strategy for TLS 1.2 use this test."
+			echo "TLS 1.3 only strategy is better than nothing."
+			ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
+		else
+			echo "installed curl version does not support TLS 1.3 . tests disabled."
+		fi
+	}
+
+	[ -n "$ENABLE_HTTP3" ] || {
+		ENABLE_HTTP3=0
+		echo
+		if [ -n "$HTTP3" ]; then
+			echo "make sure target domain(s) support QUIC or result will be negative in any case"
+			ENABLE_HTTP3=1
+			ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
+		else
+			echo "installed curl version does not support http3 QUIC. tests disabled."
+		fi
+	}
+
+	[ -n "$REPEATS" ] || {
+		echo
+		echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
+		printf "how many times to repeat each test (default: 1) : "
+		read REPEATS
+		REPEATS=$((0+${REPEATS:-1}))
+		[ "$REPEATS" = 0 ] && {
+			echo invalid repeat count
+			exitp 1
+		}
+	}
+	[ -z "$PARALLEL" -a $REPEATS -gt 1 ] && {
+		echo
+		echo "parallel scan can greatly increase speed but may also trigger DDoS protection and cause false result"
+		PARALLEL=0
+		ask_yes_no_var PARALLEL "enable parallel scan"
+	}
+	PARALLEL=${PARALLEL:-0}
+
+	[ -n "$SCANLEVEL" ] || {
+		echo
+		echo quick    - scan as fast as possible to reveal any working strategy
+		echo standard - do investigation what works on your DPI
+		echo force    - scan maximum despite of result
+		SCANLEVEL=${SCANLEVEL:-standard}
+		ask_list SCANLEVEL "quick standard force" "$SCANLEVEL"
+		# disable tpws checks by default in quick mode
+		[ "$SCANLEVEL" = quick -a -z "$SKIP_TPWS" -a "$UNAME" != Darwin ] && SKIP_TPWS=1
+	}
 
 	echo
 
@@ -1981,14 +2025,14 @@ check_dns()
 unprepare_all()
 {
 	# make sure we are not in a middle state that impacts connectivity
-	rm -f "$HDRTEMP"
+	ws_kill
 	[ -n "$IPV" ] && {
 		pktws_ipt_unprepare_tcp 80
 		pktws_ipt_unprepare_tcp 443
 		pktws_ipt_unprepare_udp 443
 	}
-	ws_kill
 	cleanup
+	rm -f "${HDRTEMP}"* "${PARALLEL_OUT}"*
 }
 sigint()
 {

@@ -440,4 +440,9 @@ v69.9
 init.d: exclude ipban from tpws redirection
 macos: fix install_easy
 macos: fix national decimal separator in sleep
-nfqws: apply relative markers to partial TLS ClientHello
+ipset: scripts maintenance
+
+v70
+
+blockcheck: override all dialog questions and enable batch mode
+blockcheck: parallel attempts
