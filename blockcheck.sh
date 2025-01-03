@@ -23,7 +23,7 @@ CURL=${CURL:-curl}
 . "$ZAPRET_BASE/common/fwtype.sh"
 . "$ZAPRET_BASE/common/virt.sh"
 
-DOMAINS_DEFAULT="rutracker.org"
+DOMAINS_DEFAULT=${DOMAINS_DEFAULT:-rutracker.org}
 QNUM=${QNUM:-59780}
 SOCKS_PORT=${SOCKS_PORT:-1993}
 TPWS_UID=${TPWS_UID:-1}
@@ -1733,18 +1733,22 @@ ask_params()
 	local dom
 	[ -n "$DOMAINS" ] || {
 		DOMAINS="$DOMAINS_DEFAULT"
-		echo "specify domain(s) to test. multiple domains are space separated."
-		printf "domain(s) (default: $DOMAINS) : "
-		read dom
-		[ -n "$dom" ] && DOMAINS="$dom"
+		[ "$BATCH" = 1 ] || {
+			echo "specify domain(s) to test. multiple domains are space separated."
+			printf "domain(s) (default: $DOMAINS) : "
+			read dom
+			[ -n "$dom" ] && DOMAINS="$dom"
+		}
 	}
 
 	local IPVS_def=4
 	[ -n "$IPVS" ] || {
 		# yandex public dns
 		pingtest 6 2a02:6b8::feed:0ff && IPVS_def=46
-		printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
-		read IPVS
+		[ "$BATCH" = 1 ] || {
+			printf "ip protocol version(s) - 4, 6 or 46 for both (default: $IPVS_def) : "
+			read IPVS
+		}
 		[ -n "$IPVS" ] || IPVS=$IPVS_def
 		[ "$IPVS" = 4 -o "$IPVS" = 6 -o "$IPVS" = 46 ] || {
 			echo 'invalid ip version(s). should be 4, 6 or 46.'
@@ -1757,48 +1761,60 @@ ask_params()
 
 	[ -n "$ENABLE_HTTP" ] || {
 		ENABLE_HTTP=1
-		echo
-		ask_yes_no_var ENABLE_HTTP "check http"
+		[ "$BATCH" = 1 ] || {
+			echo
+			ask_yes_no_var ENABLE_HTTP "check http"
+		}
 	}
 
 	[ -n "$ENABLE_HTTPS_TLS12" ] || {
 		ENABLE_HTTPS_TLS12=1
-		echo
-		ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
+		[ "$BATCH" = 1 ] || {
+			echo
+			ask_yes_no_var ENABLE_HTTPS_TLS12 "check https tls 1.2"
+		}
 	}
 
 	[ -n "$ENABLE_HTTPS_TLS13" ] || {
 		ENABLE_HTTPS_TLS13=0
-		echo
 		if [ -n "$TLS13" ]; then
-			echo "TLS 1.3 uses encrypted ServerHello. DPI cannot check domain name in server response."
-			echo "This can allow more bypass strategies to work."
-			echo "What works for TLS 1.2 will also work for TLS 1.3 but not vice versa."
-			echo "Most sites nowadays support TLS 1.3 but not all. If you can't find a strategy for TLS 1.2 use this test."
-			echo "TLS 1.3 only strategy is better than nothing."
-			ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
+			[ "$BATCH" = 1 ] || {
+				echo
+				echo "TLS 1.3 uses encrypted ServerHello. DPI cannot check domain name in server response."
+				echo "This can allow more bypass strategies to work."
+				echo "What works for TLS 1.2 will also work for TLS 1.3 but not vice versa."
+				echo "Most sites nowadays support TLS 1.3 but not all. If you can't find a strategy for TLS 1.2 use this test."
+				echo "TLS 1.3 only strategy is better than nothing."
+				ask_yes_no_var ENABLE_HTTPS_TLS13 "check https tls 1.3"
+			}
 		else
+			echo
 			echo "installed curl version does not support TLS 1.3 . tests disabled."
 		fi
 	}
 
 	[ -n "$ENABLE_HTTP3" ] || {
 		ENABLE_HTTP3=0
-		echo
 		if [ -n "$HTTP3" ]; then
-			echo "make sure target domain(s) support QUIC or result will be negative in any case"
 			ENABLE_HTTP3=1
-			ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
+			[ "$BATCH" = 1 ] || {
+				echo
+				echo "make sure target domain(s) support QUIC or result will be negative in any case"
+				ask_yes_no_var ENABLE_HTTP3 "check http3 QUIC"
+			}
 		else
+			echo
 			echo "installed curl version does not support http3 QUIC. tests disabled."
 		fi
 	}
 
 	[ -n "$REPEATS" ] || {
-		echo
-		echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
-		printf "how many times to repeat each test (default: 1) : "
-		read REPEATS
+		[ "$BATCH" = 1 ] || {
+			echo
+			echo "sometimes ISPs use multiple DPIs or load balancing. bypass strategies may work unstable."
+			printf "how many times to repeat each test (default: 1) : "
+			read REPEATS
+		}
 		REPEATS=$((0+${REPEATS:-1}))
 		[ "$REPEATS" = 0 ] && {
 			echo invalid repeat count
@@ -1806,22 +1822,26 @@ ask_params()
 		}
 	}
 	[ -z "$PARALLEL" -a $REPEATS -gt 1 ] && {
-		echo
-		echo "parallel scan can greatly increase speed but may also trigger DDoS protection and cause false result"
 		PARALLEL=0
-		ask_yes_no_var PARALLEL "enable parallel scan"
+		[ "$BATCH" = 1 ] || {
+			echo
+			echo "parallel scan can greatly increase speed but may also trigger DDoS protection and cause false result"
+			ask_yes_no_var PARALLEL "enable parallel scan"
+		}
 	}
 	PARALLEL=${PARALLEL:-0}
 
 	[ -n "$SCANLEVEL" ] || {
-		echo
-		echo quick    - scan as fast as possible to reveal any working strategy
-		echo standard - do investigation what works on your DPI
-		echo force    - scan maximum despite of result
-		SCANLEVEL=${SCANLEVEL:-standard}
-		ask_list SCANLEVEL "quick standard force" "$SCANLEVEL"
-		# disable tpws checks by default in quick mode
-		[ "$SCANLEVEL" = quick -a -z "$SKIP_TPWS" -a "$UNAME" != Darwin ] && SKIP_TPWS=1
+		SCANLEVEL=standard
+		[ "$BATCH" = 1 ] || {
+			echo
+			echo quick    - scan as fast as possible to reveal any working strategy
+			echo standard - do investigation what works on your DPI
+			echo force    - scan maximum despite of result
+			ask_list SCANLEVEL "quick standard force" "$SCANLEVEL"
+			# disable tpws checks by default in quick mode
+			[ "$SCANLEVEL" = quick -a -z "$SKIP_TPWS" -a "$UNAME" != Darwin ] && SKIP_TPWS=1
+		}
 	}
 
 	echo
