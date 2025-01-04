@@ -1575,7 +1575,7 @@ check_domain_http_tcp()
 
 	check_domain_prolog $1 $2 $4 || return
 
-	check_dpi_ip_block $1 $4
+	[ "$SKIP_IPBLOCK" = 1 ] || check_dpi_ip_block $1 $4
 
 	[ "$SKIP_TPWS" = 1 ] || {
 		echo
@@ -1621,22 +1621,22 @@ check_domain_http_udp()
 check_domain_http()
 {
 	# $1 - domain
-	check_domain_http_tcp curl_test_http 80 0 $1
+	check_domain_http_tcp curl_test_http $HTTP_PORT 0 $1
 }
 check_domain_https_tls12()
 {
 	# $1 - domain
-	check_domain_http_tcp curl_test_https_tls12 443 1 $1
+	check_domain_http_tcp curl_test_https_tls12 $HTTPS_PORT 1 $1
 }
 check_domain_https_tls13()
 {
 	# $1 - domain
-	check_domain_http_tcp curl_test_https_tls13 443 2 $1
+	check_domain_http_tcp curl_test_https_tls13 $HTTPS_PORT 2 $1
 }
 check_domain_http3()
 {
 	# $1 - domain
-	check_domain_http_udp curl_test_http3 443 $1
+	check_domain_http_udp curl_test_http3 $QUIC_PORT $1
 }
 
 configure_ip_version()
@@ -2051,9 +2051,9 @@ unprepare_all()
 	ws_kill
 	wait
 	[ -n "$IPV" ] && {
-		pktws_ipt_unprepare_tcp 80
-		pktws_ipt_unprepare_tcp 443
-		pktws_ipt_unprepare_udp 443
+		pktws_ipt_unprepare_tcp $HTTP_PORT
+		pktws_ipt_unprepare_tcp $HTTPS_PORT
+		pktws_ipt_unprepare_udp $QUIC_PORT
 	}
 	cleanup
 	rm -f "${HDRTEMP}"* "${PARALLEL_OUT}"*
@@ -2102,10 +2102,10 @@ for dom in $DOMAINS; do
 	for IPV in $IPVS; do
 		configure_ip_version
 		[ "$ENABLE_HTTP" = 1 ] && {
-			check_domain_port_block $dom $HTTP_PORT
+			[ "$SKIP_IPBLOCK" = 1 ] || check_domain_port_block $dom $HTTP_PORT
 			check_domain_http $dom
 		}
-		[ "$ENABLE_HTTPS_TLS12" = 1 -o "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_port_block $dom $HTTPS_PORT
+		[ "$ENABLE_HTTPS_TLS12" = 1 -o "$ENABLE_HTTPS_TLS13" = 1 ] && [ "$SKIP_IPBLOCK" != 1 ] && check_domain_port_block $dom $HTTPS_PORT
 		[ "$ENABLE_HTTPS_TLS12" = 1 ] && check_domain_https_tls12 $dom
 		[ "$ENABLE_HTTPS_TLS13" = 1 ] && check_domain_https_tls13 $dom
 		[ "$ENABLE_HTTP3" = 1 ] && check_domain_http3 $dom
