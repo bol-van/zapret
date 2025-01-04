@@ -2049,6 +2049,7 @@ unprepare_all()
 {
 	# make sure we are not in a middle state that impacts connectivity
 	ws_kill
+	wait
 	[ -n "$IPV" ] && {
 		pktws_ipt_unprepare_tcp 80
 		pktws_ipt_unprepare_tcp 443
