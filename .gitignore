@@ -6,7 +6,6 @@ nfq/nfqws
 nfq/winws.exe
 tpws/tpws
 binaries/my/
-init.d/**/custom
 ipset/zapret-ip*.txt
 ipset/zapret-ip*.gz
 ipset/zapret-hosts*.txt
