@@ -974,7 +974,7 @@ curl_test()
 		rm -f "${PARALLEL_OUT}"*
 		for n in $(seq -s ' ' 1 $REPEATS); do
 			$1 "$IPV" $2 $3 "$4" >"${PARALLEL_OUT}_$n" &
-			pids=${pids:+$pids }$!
+			pids="${pids:+$pids }$!"
 		done
 		n=1
 		for p in $pids; do
