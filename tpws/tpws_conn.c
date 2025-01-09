@@ -169,11 +169,8 @@ static bool send_buffer_realloc(send_buffer_t *sb, size_t extra_bytes)
 
 static void send_buffer_free(send_buffer_t *sb)
 {
-	if (sb->data)
-	{
-		free(sb->data);
-		sb->data = NULL;
-	}
+	free(sb->data);
+	sb->data = NULL;
 }
 static void send_buffers_free(send_buffer_t *sb_array, int count)
 {
@@ -520,7 +517,7 @@ static void free_conn(tproxy_conn_t *conn)
 	}
 	conn_free_buffers(conn);
 	if (conn->partner) conn->partner->partner=NULL;
-	if (conn->track.hostname) free(conn->track.hostname);
+	free(conn->track.hostname);
 	if (conn->socks_ri) conn->socks_ri->ptr = NULL; // detach conn
 	free(conn);
 }
@@ -1762,7 +1759,7 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 
 ex:
 	if (efd) close(efd);
-	if (listen_conn) free(listen_conn);
+	free(listen_conn);
 	resolver_deinit();
 	if (resolve_pipe[0]) close(resolve_pipe[0]);
 	if (resolve_pipe[1]) close(resolve_pipe[1]);

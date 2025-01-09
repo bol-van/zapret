@@ -1,6 +1,7 @@
 #pragma once
 
 #include "params.h"
+#include "linux_compat.h"
 
 #include <sys/types.h>
 #include <stdbool.h>
