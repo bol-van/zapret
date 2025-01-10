@@ -139,7 +139,7 @@ bool strlist_add(struct str_list_head *head, const char *filename)
 }
 static void strlist_entry_destroy(struct str_list *entry)
 {
-	if (entry->str)	free(entry->str);
+	free(entry->str);
 	free(entry);
 }
 void strlist_destroy(struct str_list_head *head)
@@ -178,7 +178,7 @@ struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const
 }
 static void hostlist_files_entry_destroy(struct hostlist_file *entry)
 {
-	if (entry->filename) free(entry->filename);
+	free(entry->filename);
 	StrPoolDestroy(&entry->hostlist);
 	free(entry);
 }
@@ -392,7 +392,7 @@ struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *fi
 }
 static void ipset_files_entry_destroy(struct ipset_file *entry)
 {
-	if (entry->filename) free(entry->filename);
+	free(entry->filename);
 	ipsetDestroy(&entry->ipset);
 	free(entry);
 }

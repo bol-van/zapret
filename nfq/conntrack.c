@@ -27,11 +27,8 @@ static void connswap(const t_conn *c, t_conn *c2)
 
 void ConntrackClearHostname(t_ctrack *track)
 {
-	if (track->hostname)
-	{
-		free(track->hostname);
-		track->hostname = NULL;
-	}
+	free(track->hostname);
+	track->hostname = NULL;
 }
 static void ConntrackClearTrack(t_ctrack *track)
 {
@@ -349,11 +346,8 @@ void ConntrackPoolDump(const t_conntrack *p)
 
 void ReasmClear(t_reassemble *reasm)
 {
-	if (reasm->packet)
-	{
-		free(reasm->packet);
-		reasm->packet = NULL;
-	}
+	free(reasm->packet);
+	reasm->packet = NULL;
 	reasm->size = reasm->size_present = 0;
 }
 bool ReasmInit(t_reassemble *reasm, size_t size_requested, uint32_t seq_start)

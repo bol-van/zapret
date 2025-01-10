@@ -65,11 +65,8 @@ int z_readfile(FILE *F, char **buf, size_t *size)
 
 zerr:
 	inflateEnd(&zs);
-	if (*buf)
-	{
-		free(*buf);
-		*buf = NULL;
-	}
+	free(*buf);
+	*buf = NULL;
 	return r;
 }
 
