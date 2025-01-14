@@ -446,3 +446,4 @@ v70
 
 blockcheck: override all dialog questions and enable batch mode
 blockcheck: parallel attempts
+nfqws: weaken wireguard initiation recognition. use len=148 and data[0]=1 signature
