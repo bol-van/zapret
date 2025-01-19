@@ -1327,7 +1327,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						// do seqovl only to the first packet
 						// otherwise it's prone to race condition on server side
 						// what happens first : server pushes socket buffer to process or another packet with seqovl arrives
-						seqovl = i==0 ? seqovl_pos : 0;
+						seqovl = (i==0 && reasm_offset==0) ? seqovl_pos : 0;
 #ifdef __linux__
 // only linux return error if MTU is exceeded
 						for(;;seqovl=0)
@@ -1573,7 +1573,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
 						return verdict;
 
-					unsigned int seqovl = seqovl_pos;
+					unsigned int seqovl = reasm_offset ? 0 : seqovl_pos;
 #ifdef __linux__
 // only linux return error if MTU is exceeded
 					for(;;seqovl=0)
