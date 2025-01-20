@@ -1,4 +1,4 @@
-name: Build and Release
+name: build
 run-name: ${{ startsWith(github.ref, 'refs/tags/v') && format('Release {0}', github.ref_name) || null }}
 
 on:
@@ -6,10 +6,17 @@ on:
   push:
     tags:
       - v[0-9]+*
+    # branches:
+    #   - master
+    # paths:
+    #   - 'ip2net/**'
+    #   - 'mdig/**'
+    #   - 'nfq/**'
+    #   - 'tpws/**'
 
 jobs:
   build-linux:
-    name: Build Linux
+    name: Linux ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -17,6 +24,32 @@ jobs:
         include:
           - arch: arm64
             tool: aarch64-unknown-linux-musl
+          - arch: arm
+            tool: arm-unknown-linux-musleabi
+          # - arch: armhf
+          #   tool: arm-unknown-linux-musleabihf
+          # - arch: armv7
+          #   tool: armv7-unknown-linux-musleabi
+          # - arch: armv7hf
+          #   tool: armv7-unknown-linux-musleabihf
+          # - arch: mips64el
+          #   tool: mips64el-unknown-linux-musl
+          - arch: mips64
+            tool: mips64-unknown-linux-musl
+          # - arch: mipsel
+          #   tool: mipsel-unknown-linux-musl
+          - arch: mipselsf
+            tool: mipsel-unknown-linux-muslsf
+          # - arch: mips
+          #   tool: mips-unknown-linux-musl
+          - arch: mipssf
+            tool: mips-unknown-linux-muslsf
+          # - arch: ppc64
+          #   tool: powerpc64-unknown-linux-musl
+          - arch: ppc
+            tool: powerpc-unknown-linux-musl
+          - arch: x86
+            tool: i586-unknown-linux-musl
           - arch: x86_64
             tool: x86_64-unknown-linux-musl
           - arch: lexra
@@ -39,43 +72,70 @@ jobs:
           REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
           DIR: ${{ matrix.arch == 'lexra' && matrix.dir || matrix.tool }}
         run: |
-          sudo apt update -qq
-          sudo apt install -y libcap-dev
           if [[ "$ARCH" == lexra ]]; then
             sudo dpkg --add-architecture i386
-            sudo apt install -y libc6:i386 zlib1g:i386
+            sudo apt update -qq
+            sudo apt install -y libcap-dev libc6:i386 zlib1g:i386
             URL=https://github.com/$REPO/raw/refs/heads/master/$DIR.txz
           else
+            sudo apt update -qq
+            sudo apt install -y libcap-dev
             URL=https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz
           fi
           mkdir -p $HOME/tools
-          wget -qO- $URL | tar -C $HOME/tools -xJ
-          echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
+          wget -qO- $URL | tar -C $HOME/tools -xJ || exit 1
+          [[ -d "$HOME/tools/$DIR/bin" ]] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
 
-      - name: Build Project
+      - name: Build
         env:
           ARCH: ${{ matrix.arch }}
           TARGET: ${{ matrix.tool }}
-          CFLAGS: ${{ matrix.env.CFLAGS || '' }}
-          LDFLAGS: ${{ matrix.env.LDFLAGS || '' }}
+          CFLAGS: ${{ matrix.env.CFLAGS != '' && matrix.env.CFLAGS || null }}
+          LDFLAGS: ${{ matrix.env.LDFLAGS != '' && matrix.env.LDFLAGS || null }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Export environment variables
+          DEPS_DIR=$GITHUB_WORKSPACE/deps
           export CC="$TARGET-gcc"
           export LD=$TARGET-ld
           export AR=$TARGET-ar
           export NM=$TARGET-nm
           export STRIP=$TARGET-strip
+          export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
+          export STAGING_DIR=$RUNNER_TEMP
 
-          # Build netfilter dependencies
-          for lib in libmnl libnfnetlink libnetfilter_queue; do
-            wget -qO- https://www.netfilter.org/pub/$lib/$lib-1.0.5.tar.bz2 | tar -xj
-            cd $lib-*
-            ./configure --host=$TARGET --enable-static --disable-shared
-            make install DESTDIR=$GITHUB_WORKSPACE/deps
-            cd ..
+          # netfilter libs
+          wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libnetfilter_queue/libnetfilter_queue-1.0.5.tar.bz2 | tar -xj
+
+          for i in libmnl libnfnetlink libnetfilter_queue ; do
+            (
+              cd $i-*
+              CFLAGS="-Os -flto=auto $CFLAGS" \
+              ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
+              make install -j$(nproc) DESTDIR=$DEPS_DIR
+            )
+            sed -i "s|^prefix=.*|prefix=$DEPS_DIR|g" $DEPS_DIR/lib/pkgconfig/$i.pc
           done
 
-          # Build zapret
+          # zlib
+          gh api repos/madler/zlib/releases/latest --jq '.tag_name' |\
+            xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
+          (
+            cd zlib-*
+            CFLAGS="-Os -flto=auto $CFLAGS" \
+            ./configure --prefix= --static
+            make install -j$(nproc) DESTDIR=$DEPS_DIR
+          )
+
+          # headers
+          # wget https://git.alpinelinux.org/aports/plain/main/bsd-compat-headers/queue.h && \
+          # wget https://git.kernel.org/pub/scm/libs/libcap/libcap.git/plain/libcap/include/sys/capability.h && \
+          install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
+
+          # zapret
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $CFLAGS" \
+          LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
 
@@ -83,6 +143,338 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zapret-linux-${{ matrix.arch }}
-          path: zapret-linux-${{ matrix.arch }}.tar.xz
+          path: zapret-*.tar.xz
+          if-no-files-found: error
 
-# Additional jobs for macOS, Windows, FreeBSD, and Android follow the same pattern
+  build-macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zapret
+        run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
+          make mac -j$(sysctl -n hw.logicalcpu)
+          tar -C binaries/my -cJf zapret-mac-x64.tar.xz .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-mac-x64
+          path: zapret-*.tar.xz
+          if-no-files-found: error
+
+  build-freebsd:
+    name: FreeBSD ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64
+            arch: x86_64
+          # - target: i386
+          #   arch: x86
+    container:
+      image: empterdose/freebsd-cross-build:11.4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install packages
+        run: apk add tar xz
+
+      - name: Build zapret
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
+          settarget $TARGET-freebsd11 make bsd -j$(nproc)
+          tar -C binaries/my -cJf zapret-freebsd-$ARCH.tar.xz .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-freebsd-${{ matrix.arch }}
+          path: zapret-*.tar.xz
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows ${{ matrix.arch }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x86_64, x86 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zapret
+
+      - name: Set up MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.arch == 'x86_64' && 'MINGW64' || 'MINGW32' }}
+          install: >-
+            ${{ matrix.arch == 'x86_64' && 'mingw-w64-x86_64-toolchain' || 'mingw-w64-i686-toolchain' }}
+
+      - name: Build ip2net, mdig
+        shell: msys2 {0}
+        run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
+          mkdir -p output
+          cd zapret
+          mingw32-make -C ip2net win
+          mingw32-make -C mdig win
+          cp -a {ip2net/ip2net,mdig/mdig}.exe ../output
+
+      - name: Restore psmisc from cache
+        id: cache-restore-psmisc
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/psmisc
+          key: psmisc-${{ matrix.arch }}
+
+      - name: Set up Cygwin
+        env:
+          PACKAGES: ${{ steps.cache-restore-psmisc.outputs.cache-hit != 'true' && 'cygport gettext-devel libiconv-devel libncurses-devel' || null }}
+        uses: cygwin/cygwin-install-action@v4
+        with:
+          platform: ${{ matrix.arch }}
+          site: ${{ matrix.arch == 'x86_64' && 'http://ctm.crouchingtigerhiddenfruitbat.org/pub/cygwin/circa/64bit/2024/01/30/231215' || null }}
+          check-sig: ${{ matrix.arch == 'x86_64' && 'false' || null }}
+          packages: >-
+            gcc-core
+            make
+            zlib-devel
+            zip
+            unzip
+            wget
+            ${{ env.PACKAGES }}
+
+      - name: Build psmisc
+        if: steps.cache-restore-psmisc.outputs.cache-hit != 'true'
+        env:
+          URL: https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/psmisc
+        shell: C:\cygwin\bin\bash.exe -eo pipefail '{0}'
+        run: >-
+          export MAKEFLAGS=-j$(nproc) &&
+          mkdir -p psmisc && cd psmisc &&
+          wget -qO- ${URL} | grep -Po 'href=\"\Kpsmisc-(\d+\.)+\d+.+src\.tar\.xz(?=\")' | xargs -I{} wget -O- ${URL}/{} | tar -xJ &&
+          cd psmisc-*.src &&
+          echo CYGCONF_ARGS+=\" --disable-dependency-tracking --disable-nls\" >> psmisc.cygport &&
+          cygport psmisc.cygport prep compile install
+
+      - name: Save psmisc to cache
+        if: steps.cache-restore-psmisc.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/psmisc
+          key: psmisc-${{ matrix.arch }}
+
+      - name: Build winws
+        env:
+          TARGET: ${{ matrix.arch == 'x86_64' && 'cygwin' || 'cygwin32' }}
+        shell: C:\cygwin\bin\bash.exe -eo pipefail '{0}'
+        run: >-
+          export MAKEFLAGS=-j$(nproc) &&
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}" &&
+          cd zapret &&
+          make -C nfq ${TARGET} &&
+          cp -a nfq/winws.exe ../output
+
+      - name: Create zip
+        env:
+          BITS: ${{ matrix.arch == 'x86_64' && '64' || '32' }}
+          DIR: ${{ matrix.arch == 'x86_64' && 'x64' || 'x86' }}
+        shell: C:\cygwin\bin\bash.exe -e '{0}'
+        run: >-
+          cp -a -t output psmisc/psmisc-*.src/psmisc-*/inst/usr/bin/killall.exe /usr/bin/cygwin1.dll &&
+          wget -O WinDivert.zip https://github.com/basil00/WinDivert/releases/download/v2.2.2/WinDivert-2.2.2-A.zip &&
+          unzip -j WinDivert.zip "*/${DIR}/WinDivert.dll" "*/${DIR}/WinDivert${BITS}.sys" -d output &&
+          zip zapret-win-${{ matrix.arch }}.zip -j output/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-win-${{ matrix.arch }}
+          path: zapret-*.zip
+          if-no-files-found: error
+
+  build-android:
+    name: Android ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - abi: armeabi-v7a
+            target: armv7a-linux-androideabi
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: x86
+            target: i686-linux-android
+          - abi: x86_64
+            target: x86_64-linux-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zapret
+
+      - name: Build
+        env:
+          ABI: ${{ matrix.abi }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          DEPS_DIR=$GITHUB_WORKSPACE/deps
+          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          export API=21
+          export CC="$TOOLCHAIN/bin/clang --target=$TARGET$API"
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export AS=$CC
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
+
+          # netfilter libs
+          wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 | tar -xj
+          wget -qO- https://www.netfilter.org/pub/libnetfilter_queue/libnetfilter_queue-1.0.5.tar.bz2 | tar -xj
+          patch -p1 -d libnetfilter_queue-* -i ../zapret/.github/workflows/libnetfilter_queue-android.patch
+
+          for i in libmnl libnfnetlink libnetfilter_queue ; do
+            (
+              cd $i-*
+              CFLAGS="-Os -flto=auto -Wno-implicit-function-declaration" \
+              ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
+              make install -j$(nproc) DESTDIR=$DEPS_DIR
+            )
+            sed -i "s|^prefix=.*|prefix=$DEPS_DIR|g" $DEPS_DIR/lib/pkgconfig/$i.pc
+          done
+
+          # zapret
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -I$DEPS_DIR/include" \
+          LDFLAGS="-L$DEPS_DIR/lib" \
+          make -C zapret android -j$(nproc)
+          zip zapret-android-$ABI.zip -j zapret/binaries/my/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-android-${{ matrix.abi }}
+          path: zapret-*.zip
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [ build-linux, build-windows, build-macos, build-freebsd, build-android ]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    env:
+      repo_dir: zapret-${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.repo_dir }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        id: bins
+        with:
+          path: ${{ env.repo_dir }}/binaries
+          pattern: zapret-*
+
+      - name: Install upx
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          install-only: true
+
+      - name: Prepare binaries
+        shell: bash
+        run: |
+          cd ${{ steps.bins.outputs.download-path }}
+          run_upx() {
+            upx --best --lzma $@ || true
+          }
+          run_dir() {
+            for f in $dir/* ; do
+              # extract binaries
+              case $f in
+                *.tar.xz )
+                  tar -C $dir -xvf $f && rm $f
+                  if [[ $dir == *-linux-x86_64 ]]; then
+                    tar -C $dir -czvf $dir/tpws_wsl.tgz tpws
+                    run_upx $dir/*
+                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]] && [[ $dir != *-linux-lexra ]]; then
+                    run_upx $dir/*
+                  fi
+                  ;;
+                *.zip )
+                  unzip $f -d $dir && rm $f
+                  if [[ $dir =~ win ]]; then
+                    chmod -x $dir/*
+                    run_upx --force $dir/cygwin1.dll
+                  fi
+                  ;;
+              esac
+            done
+            mv $dir $1
+          }
+          for dir in * ; do
+            if [ -d $dir ]; then
+              echo "Processing $dir"
+              case $dir in
+                *-android-arm64-v8a )   run_dir android-aarch64 ;;
+                *-android-armeabi-v7a ) run_dir android-arm ;;
+                *-android-x86 )         run_dir android-x86 ;;
+                *-android-x86_64 )      run_dir android-x86_64 ;;
+                *-freebsd-x86_64 )      run_dir freebsd-x64 ;;
+                *-linux-arm )           run_dir arm ;;
+                *-linux-arm64 )         run_dir aarch64 ;;
+                *-linux-mips64 )        run_dir mips64r2-msb ;;
+                *-linux-mipselsf )      run_dir mips32r1-lsb ;;
+                *-linux-mipssf )        run_dir mips32r1-msb ;;
+                *-linux-ppc )           run_dir ppc ;;
+                *-linux-x86 )           run_dir x86 ;;
+                *-linux-x86_64 )        run_dir x86_64 ;;
+                *-linux-lexra )         run_dir lexra ;;
+                *-mac-x64 )             run_dir mac64 ;;
+                *-win-x86 )             run_dir win32 ;;
+                *-win-x86_64 )          run_dir win64 ;;
+              esac
+            fi
+          done
+          ls -lhR
+
+      - name: Create release bundles
+        run: |
+          rm -rf ${{ env.repo_dir }}/.git*
+          find ${{ env.repo_dir }}/binaries -type f -exec sha256sum {} \; >sha256sum.txt
+          tar --owner=0 --group=0 -czf ${{ env.repo_dir }}.tar.gz ${{ env.repo_dir }}
+          zip -qr ${{ env.repo_dir }}.zip ${{ env.repo_dir }}
+          (
+            cd ${{ env.repo_dir }}
+            rm -rf binaries/{android*,freebsd*,mac*,win*,x86_64/tpws_wsl.tgz} \
+                   init.d/{openrc,macos,pfsense,runit,s6,systemd} \
+                   tpws nfq ip2net mdig docs files/huawei Makefile
+          )
+          tar --owner=0 --group=0 -czf ${{ env.repo_dir }}-openwrt-embedded.tar.gz ${{ env.repo_dir }}
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          prerelease: false
+          draft: false
+          body: |
+            ### zapret ${{ github.ref_name }}
+          files: |
+            zapret*.tar.gz
+            zapret*.zip
+            sha256sum.txt
