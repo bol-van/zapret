@@ -617,11 +617,17 @@ write_config_var()
 	replace_var_def $1 "$M" "$ZAPRET_CONFIG"
 }
 
+no_prereq_exit()
+{
+	echo could not install prerequisites
+	exitp 6
+}
 check_prerequisites_linux()
 {
 	echo \* checking prerequisites
 
 	local s cmd PKGS UTILS req="curl curl"
+	local APTGET DNF YUM PACMAN ZYPPER EOPKG APK
 	case "$FWTYPE" in
 		iptables)
 			req="$req iptables iptables ip6tables iptables ipset ipset"
@@ -650,6 +656,7 @@ check_prerequisites_linux()
 		echo packages required : $PKGS
 
 		APTGET=$(whichq apt-get)
+		DNF=$(whichq dnf)
 		YUM=$(whichq yum)
 		PACMAN=$(whichq pacman)
 		ZYPPER=$(whichq zypper)
@@ -657,39 +664,23 @@ check_prerequisites_linux()
 		APK=$(whichq apk)
 		if [ -x "$APTGET" ] ; then
 			"$APTGET" update
-			"$APTGET" install -y --no-install-recommends $PKGS dnsutils || {
-				echo could not install prerequisites
-				exitp 6
-			}
+			"$APTGET" install -y --no-install-recommends $PKGS dnsutils || no_prereq_exit
+		elif [ -x "$DNF" ] ; then
+			"$DNF" -y install $PKGS || no_prereq_exit
 		elif [ -x "$YUM" ] ; then
-			"$YUM" -y install $PKGS || {
-				echo could not install prerequisites
-				exitp 6
-			}
+			"$YUM" -y install $PKGS || no_prereq_exit
 		elif [ -x "$PACMAN" ] ; then
 			"$PACMAN" -Syy
-			"$PACMAN" --noconfirm -S $PKGS || {
-				echo could not install prerequisites
-				exitp 6
-			}
+			"$PACMAN" --noconfirm -S $PKGS || no_prereq_exit
 		elif [ -x "$ZYPPER" ] ; then
-			"$ZYPPER" --non-interactive install $PKGS || {
-				echo could not install prerequisites
-				exitp 6
-			}
+			"$ZYPPER" --non-interactive install $PKGS || no_prereq_exit
 		elif [ -x "$EOPKG" ] ; then
-			"$EOPKG" -y install $PKGS || {
-				echo could not install prerequisites
-				exitp 6
-			}
+			"$EOPKG" -y install $PKGS || no_prereq_exit
 		elif [ -x "$APK" ] ; then
 			"$APK" update
 			# for alpine
 			[ "$FWTYPE" = iptables ] && [ -n "$($APK list ip6tables)" ] && PKGS="$PKGS ip6tables"
-			"$APK" add $PKGS || {
-				echo could not install prerequisites
-				exitp 6
-			}
+			"$APK" add $PKGS || no_prereq_exit
 		else
 			echo supported package manager not found
 			echo you must manually install : $UTILS
