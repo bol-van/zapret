@@ -317,7 +317,11 @@ time_t file_mod_time(const char *filename)
 bool file_mod_signature(const char *filename, file_mod_sig *ms)
 {
 	struct stat st;
-	if (stat(filename,&st)==-1) return false;
+	if (stat(filename,&st)==-1)
+	{
+		FILE_MOD_RESET(ms);
+		return false;
+	}
 	ms->mod_time=st.st_mtime;
 	ms->size=st.st_size;
 	return true;
