@@ -300,6 +300,14 @@ time_t file_mod_time(const char *filename)
 	struct stat st;
 	return stat(filename,&st)==-1 ? 0 : st.st_mtime;
 }
+bool file_mod_signature(const char *filename, file_mod_sig *ms)
+{
+	struct stat st;
+	if (stat(filename,&st)==-1) return false;
+	ms->mod_time=st.st_mtime;
+	ms->size=st.st_size;
+	return true;
+}
 
 bool pf_in_range(uint16_t port, const port_filter *pf)
 {

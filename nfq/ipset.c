@@ -126,21 +126,21 @@ static bool LoadIpset(struct ipset_file *hfile)
 {
 	if (hfile->filename)
 	{
-		time_t t = file_mod_time(hfile->filename);
-		if (!t)
+		file_mod_sig fsig;
+		if (!file_mod_signature(hfile->filename, &fsig))
 		{
 			// stat() error
 			DLOG_ERR("cannot access ipset file '%s'. in-memory content remains unchanged.\n",hfile->filename);
 			return true;
 		}
-			if (t==hfile->mod_time) return true; // up to date
+		if (FILE_MOD_COMPARE(&hfile->mod_sig,&fsig)) return true; // up to date
 		ipsetDestroy(&hfile->ipset);
 		if (!AppendIpset(&hfile->ipset, hfile->filename))
 		{
 			ipsetDestroy(&hfile->ipset);
 			return false;
 		}
-		hfile->mod_time=t;
+		hfile->mod_sig=fsig;
 	}
 	return true;
 }

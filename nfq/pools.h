@@ -50,7 +50,7 @@ void strlist_destroy(struct str_list_head *head);
 
 struct hostlist_file {
 	char *filename;
-	time_t mod_time;
+	file_mod_sig mod_sig;
 	strpool *hostlist;
 	LIST_ENTRY(hostlist_file) next;
 };
@@ -112,7 +112,7 @@ void ipsetPrint(ipset *ipset);
 
 struct ipset_file {
 	char *filename;
-	time_t mod_time;
+	file_mod_sig mod_sig;
 	ipset ipset;
 	LIST_ENTRY(ipset_file) next;
 };

@@ -169,7 +169,7 @@ struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const
 		}
 		else
 			entry->filename = NULL;
-		entry->mod_time = 0;
+		FILE_MOD_RESET(&entry->mod_sig);
 		entry->hostlist = NULL;
 		LIST_INSERT_HEAD(head, entry, next);
 	}
@@ -206,7 +206,7 @@ void hostlist_files_reset_modtime(struct hostlist_files_head *list)
 	struct hostlist_file *hfile;
 
 	LIST_FOREACH(hfile, list, next)
-		hfile->mod_time=0;
+		FILE_MOD_RESET(&hfile->mod_sig);
 }
 
 struct hostlist_item *hostlist_collection_add(struct hostlist_collection_head *head, struct hostlist_file *hfile)
@@ -390,7 +390,7 @@ struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *fi
 		}
 		else
 			entry->filename = NULL;
-		entry->mod_time = 0;
+		FILE_MOD_RESET(&entry->mod_sig);
 		memset(&entry->ipset,0,sizeof(entry->ipset));
 		LIST_INSERT_HEAD(head, entry, next);
 	}
@@ -427,7 +427,7 @@ void ipset_files_reset_modtime(struct ipset_files_head *list)
 	struct ipset_file *hfile;
 
 	LIST_FOREACH(hfile, list, next)
-		hfile->mod_time=0;
+		FILE_MOD_RESET(&hfile->mod_sig);
 }
 
 struct ipset_item *ipset_collection_add(struct ipset_collection_head *head, struct ipset_file *hfile)
