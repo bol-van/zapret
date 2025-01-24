@@ -37,4 +37,6 @@ getipban || FAIL=1
 
 dl "$URL" "$ZHOSTLIST" 32768 4194304
 
+hup_zapret_daemons
+
 exit 0

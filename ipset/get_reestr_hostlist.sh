@@ -58,6 +58,8 @@ rm -f "$ZREESTR"
 [ "$DISABLE_IPV6" != "1" ] && $AWK '/^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}($|(\/[0-9]{2,3}$))/' "$IPB" | cut_local6 | ip2net6 | zz "$ZIPLIST_IPBAN6"
 rm -f "$IPB"
 
+hup_zapret_daemons
+
 ipban_fin
 
 exit 0
