@@ -1544,6 +1544,8 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 
 	for(;;)
 	{
+		ReloadCheck();
+
 		DBGPRINT("epoll_wait\n");
 
 		if ((num_events = epoll_wait(efd, events, MAX_EPOLL_EVENTS, -1)) == -1)

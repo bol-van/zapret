@@ -6,4 +6,4 @@
 
 #include <sys/param.h>
 
-void dohup(void);
+void ReloadCheck();

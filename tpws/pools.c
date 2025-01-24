@@ -201,6 +201,13 @@ struct hostlist_file *hostlist_files_search(struct hostlist_files_head *head, co
 	}
 	return NULL;
 }
+void hostlist_files_reset_modtime(struct hostlist_files_head *list)
+{
+	struct hostlist_file *hfile;
+
+	LIST_FOREACH(hfile, list, next)
+		hfile->mod_time=0;
+}
 
 struct hostlist_item *hostlist_collection_add(struct hostlist_collection_head *head, struct hostlist_file *hfile)
 {
@@ -414,6 +421,13 @@ struct ipset_file *ipset_files_search(struct ipset_files_head *head, const char 
 			return hfile;
 	}
 	return NULL;
+}
+void ipset_files_reset_modtime(struct ipset_files_head *list)
+{
+	struct ipset_file *hfile;
+
+	LIST_FOREACH(hfile, list, next)
+		hfile->mod_time=0;
 }
 
 struct ipset_item *ipset_collection_add(struct ipset_collection_head *head, struct ipset_file *hfile)

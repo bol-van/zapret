@@ -13,3 +13,5 @@ bool HostlistCheck(const struct desync_profile *dp,const char *host, bool *exclu
 struct hostlist_file *RegisterHostlist(struct desync_profile *dp, bool bExclude, const char *filename);
 bool HostlistsReloadCheckForProfile(const struct desync_profile *dp);
 void HostlistsDebug();
+
+#define ResetAllHostlistsModTime() hostlist_files_reset_modtime(&params.hostlists)

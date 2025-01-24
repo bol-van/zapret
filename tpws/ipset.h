@@ -10,3 +10,5 @@ bool IpsetCheck(const struct desync_profile *dp, const struct in_addr *ipv4, con
 struct ipset_file *RegisterIpset(struct desync_profile *dp, bool bExclude, const char *filename);
 void IpsetsDebug();
 bool AppendIpsetItem(ipset *ips, char *ip);
+
+#define ResetAllIpsetModTime() ipset_files_reset_modtime(&params.ipsets)
