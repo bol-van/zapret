@@ -965,7 +965,8 @@ If you need "all except" mode you dont have to delete zapret-hosts-users.txt. Ju
 
 Subdomains auto apply. For example, "ru" in the list affects "*.ru" .
 
-**tpws** and **nfqws** automatically reload lists if their modification date is changed.
+**tpws** and **nfqws** automatically reload lists if their modification time or file size is changed.
+HUP signal forcibly reloads all lists.
 
 When filtering by domain name, daemons should run without filtering by ipset.
 When using large regulator lists estimate the amount of RAM on the router !

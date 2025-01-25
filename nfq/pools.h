@@ -50,7 +50,7 @@ void strlist_destroy(struct str_list_head *head);
 
 struct hostlist_file {
 	char *filename;
-	time_t mod_time;
+	file_mod_sig mod_sig;
 	strpool *hostlist;
 	LIST_ENTRY(hostlist_file) next;
 };
@@ -59,6 +59,7 @@ LIST_HEAD(hostlist_files_head, hostlist_file);
 struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const char *filename);
 void hostlist_files_destroy(struct hostlist_files_head *head);
 struct hostlist_file *hostlist_files_search(struct hostlist_files_head *head, const char *filename);
+void hostlist_files_reset_modtime(struct hostlist_files_head *list);
 
 struct hostlist_item {
 	struct hostlist_file *hfile;
@@ -111,7 +112,7 @@ void ipsetPrint(ipset *ipset);
 
 struct ipset_file {
 	char *filename;
-	time_t mod_time;
+	file_mod_sig mod_sig;
 	ipset ipset;
 	LIST_ENTRY(ipset_file) next;
 };
@@ -120,6 +121,7 @@ LIST_HEAD(ipset_files_head, ipset_file);
 struct ipset_file *ipset_files_add(struct ipset_files_head *head, const char *filename);
 void ipset_files_destroy(struct ipset_files_head *head);
 struct ipset_file *ipset_files_search(struct ipset_files_head *head, const char *filename);
+void ipset_files_reset_modtime(struct ipset_files_head *list);
 
 struct ipset_item {
 	struct ipset_file *hfile;

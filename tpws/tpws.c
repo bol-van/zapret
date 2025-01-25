@@ -50,10 +50,31 @@
 #define MAX_CONFIG_FILE_SIZE 16384
 
 struct params_s params;
+static bool bReload=false;
 
 static void onhup(int sig)
 {
-	printf("HUP received !\n");
+	printf("HUP received ! Lists will be reloaded.\n");
+	bReload=true;
+}
+void ReloadCheck()
+{
+	if (bReload)
+	{
+		ResetAllHostlistsModTime();
+		if (!LoadAllHostLists())
+		{
+			DLOG_ERR("hostlists load failed. this is fatal.\n");
+			exit(1);
+		}
+		ResetAllIpsetModTime();
+		if (!LoadAllIpsets())
+		{
+			DLOG_ERR("ipset load failed. this is fatal.\n");
+			exit(1);
+		}
+		bReload=false;
+	}
 }
 
 static void onusr2(int sig)

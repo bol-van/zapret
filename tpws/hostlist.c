@@ -105,21 +105,21 @@ static bool LoadHostList(struct hostlist_file *hfile)
 {
 	if (hfile->filename)
 	{
-		time_t t = file_mod_time(hfile->filename);
-		if (!t)
+		file_mod_sig fsig;
+		if (!file_mod_signature(hfile->filename, &fsig))
 		{
 			// stat() error
 			DLOG_ERR("cannot access hostlist file '%s'. in-memory content remains unchanged.\n",hfile->filename);
 			return true;
 		}
-		if (t==hfile->mod_time) return true; // up to date
+		if (FILE_MOD_COMPARE(&hfile->mod_sig,&fsig)) return true; // up to date
 		StrPoolDestroy(&hfile->hostlist);
 		if (!AppendHostList(&hfile->hostlist, hfile->filename))
 		{
 			StrPoolDestroy(&hfile->hostlist);
 			return false;
 		}
-		hfile->mod_time=t;
+		hfile->mod_sig=fsig;
 	}
 	return true;
 }

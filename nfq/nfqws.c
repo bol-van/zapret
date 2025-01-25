@@ -49,14 +49,34 @@
 #define MAX_CONFIG_FILE_SIZE 16384
 
 struct params_s params;
+static bool bReload=false;
 #ifdef __CYGWIN__
 bool bQuit=false;
 #endif
 
 static void onhup(int sig)
 {
-	printf("HUP received !\n");
-	// do not do anything. lists auto reload themselves based on file time.
+	printf("HUP received ! Lists will be reloaded.\n");
+	bReload=true;
+}
+static void ReloadCheck()
+{
+	if (bReload)
+	{
+		ResetAllHostlistsModTime();
+		if (!LoadAllHostLists())
+		{
+			DLOG_ERR("hostlists load failed. this is fatal.\n");
+			exit(1);
+		}
+		ResetAllIpsetModTime();
+		if (!LoadAllIpsets())
+		{
+			DLOG_ERR("ipset load failed. this is fatal.\n");
+			exit(1);
+		}
+		bReload=false;
+	}
 }
 
 static void onusr1(int sig)
@@ -251,6 +271,7 @@ static int nfq_main(void)
 	{
 		while ((rd = recv(fd, buf, sizeof(buf), 0)) >= 0)
 		{
+			ReloadCheck();
 			if (rd)
 			{
 				int r = nfq_handle_packet(h, (char *)buf, (int)rd);
@@ -371,6 +392,8 @@ static int dvt_main(void)
 					uint8_t verdict;
 					size_t len = rd;
 
+					ReloadCheck();
+
 					DLOG("packet: id=%u len=%zu\n", id, len);
 					verdict = processPacketData(&mark, NULL, buf, &len);
 					switch (verdict & VERDICT_MASK)
@@ -488,6 +511,8 @@ static int win_main(const char *windivert_filter)
 				win_dark_deinit();
 				return w_win32_error;
 			}
+
+			ReloadCheck();
 
 			*ifout=0;
 			if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);

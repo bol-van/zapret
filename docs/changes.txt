@@ -448,3 +448,6 @@ blockcheck: override all dialog questions and enable batch mode
 blockcheck: parallel attempts
 nfqws: weaken wireguard initiation recognition. use len=148 and data[0]=1 signature
 nfqws: apply split+seqovl only to the first reasm fragment
+install_easy: dnf packager support
+nfqws,tpws: hostlist/ipset track not only file mod time but also file size
+nfqws,tpws,ipset: return lists reload on HUP

@@ -367,7 +367,8 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 				DLOG_PERROR("write to auto hostlist:");
 				return;
 			}
-			dp->hostlist_auto->mod_time = file_mod_time(dp->hostlist_auto->filename);
+			if (!file_mod_signature(dp->hostlist_auto->filename, &dp->hostlist_auto->mod_sig))
+				DLOG_PERROR("file_mod_signature");
 		}
 		else
 		{
