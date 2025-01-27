@@ -373,6 +373,46 @@ bool IsTLSHandshakeFull(const uint8_t *data, size_t len)
 }
 
 
+bool TLSFindExtLenOffsetInHandshake(const uint8_t *data, size_t len, size_t *off)
+{
+	// +0
+	// u8	HandshakeType: ClientHello
+	// u24	Length
+	// u16	Version
+	// c[32] random
+	// u8	SessionIDLength
+	//	<SessionID>
+	// u16	CipherSuitesLength
+	//	<CipherSuites>
+	// u8	CompressionMethodsLength
+	//	<CompressionMethods>
+	// u16	ExtensionsLength
+
+	size_t l;
+
+	l = 1 + 3 + 2 + 32;
+	// SessionIDLength
+	if (len < (l + 1)) return false;
+	l += data[l] + 1;
+	// CipherSuitesLength
+	if (len < (l + 2)) return false;
+	l += pntoh16(data + l) + 2;
+	// CompressionMethodsLength
+	if (len < (l + 1)) return false;
+	l += data[l] + 1;
+	// ExtensionsLength
+	if (len < (l + 2)) return false;
+	*off = l;
+	return true;
+}
+bool TLSFindExtLen(const uint8_t *data, size_t len, size_t *off)
+{
+	if (!TLSFindExtLenOffsetInHandshake(data+5,len-5,off))
+		return false;
+	*off+=5;
+	return true;
+}
+
 // bPartialIsOK=true - accept partial packets not containing the whole TLS message
 bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const uint8_t **ext, size_t *len_ext, bool bPartialIsOK)
 {
@@ -393,18 +433,7 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 
 	if (!bPartialIsOK && !IsTLSHandshakeFull(data,len)) return false;
 
-	l = 1 + 3 + 2 + 32;
-	// SessionIDLength
-	if (len < (l + 1)) return false;
-	l += data[l] + 1;
-	// CipherSuitesLength
-	if (len < (l + 2)) return false;
-	l += pntoh16(data + l) + 2;
-	// CompressionMethodsLength
-	if (len < (l + 1)) return false;
-	l += data[l] + 1;
-	// ExtensionsLength
-	if (len < (l + 2)) return false;
+	if (!TLSFindExtLenOffsetInHandshake(data,len,&l)) return false;
 
 	data += l; len -= l;
 	l = pntoh16(data);
@@ -451,7 +480,7 @@ bool TLSFindExt(const uint8_t *data, size_t len, uint16_t type, const uint8_t **
 	if (reclen<len) len=reclen; // correct len if it has more data than the first tls record has
 	return TLSFindExtInHandshake(data + 5, len - 5, type, ext, len_ext, bPartialIsOK);
 }
-static bool TLSAdvanceToHostInSNI(const uint8_t **ext, size_t *elen, size_t *slen)
+bool TLSAdvanceToHostInSNI(const uint8_t **ext, size_t *elen, size_t *slen)
 {
 	// u16	data+0 - name list length
 	// u8	data+2 - server name type. 0=host_name
