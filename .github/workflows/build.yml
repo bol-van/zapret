@@ -327,11 +327,12 @@ jobs:
       - name: Build
         env:
           ABI: ${{ matrix.abi }}
+          API: 21
           TARGET: ${{ matrix.target }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           DEPS_DIR=$GITHUB_WORKSPACE/deps
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          export API=21
           export CC="$TOOLCHAIN/bin/clang --target=$TARGET$API"
           export AR=$TOOLCHAIN/bin/llvm-ar
           export AS=$CC
@@ -360,6 +361,12 @@ jobs:
           CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -I$DEPS_DIR/include" \
           LDFLAGS="-L$DEPS_DIR/lib" \
           make -C zapret android -j$(nproc)
+
+          # strip unwanted ELF sections to prevent warnings on old Android versions
+          gh api repos/termux/termux-elf-cleaner/releases/latest --jq '.tag_name' |\
+            xargs -I{} wget -O elf-cleaner https://github.com/termux/termux-elf-cleaner/releases/download/{}/termux-elf-cleaner
+          chmod +x elf-cleaner
+          ./elf-cleaner --api-level $API zapret/binaries/my/*
           zip zapret-android-$ABI.zip -j zapret/binaries/my/*
 
       - name: Upload artifacts
