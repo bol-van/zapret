@@ -38,6 +38,13 @@
 
 #define MAX_SPLITS	64
 
+#define FAKE_TLS_MOD_SAVE_MASK		0x0F
+#define FAKE_TLS_MOD_SET		0x01
+#define FAKE_TLS_MOD_CUSTOM_FAKE	0x02
+#define FAKE_TLS_MOD_RND		0x10
+#define FAKE_TLS_MOD_RND_SNI		0x20
+#define FAKE_TLS_MOD_PADENCAP		0x40
+
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
 struct desync_profile
@@ -66,9 +73,13 @@ struct desync_profile
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
-	uint8_t fake_http[1460],fake_tls[1460],fake_unknown[1460],fake_syndata[1460],seqovl_pattern[1460],fsplit_pattern[1460];
+	uint8_t fake_http[1460],fake_unknown[1460],fake_syndata[1460],seqovl_pattern[1460],fsplit_pattern[1460];
 	uint8_t fake_unknown_udp[1472],udplen_pattern[1472],fake_quic[1472],fake_wg[1472],fake_dht[1472];
-	size_t fake_http_size,fake_tls_size,fake_quic_size,fake_wg_size,fake_dht_size,fake_unknown_size,fake_syndata_size,fake_unknown_udp_size;
+	size_t fake_http_size,fake_quic_size,fake_wg_size,fake_dht_size,fake_unknown_size,fake_syndata_size,fake_unknown_udp_size;
+
+	uint8_t fake_tls[1460],fake_tls_mod;
+	size_t fake_tls_size, fake_tls_extlen_offset, fake_tls_padlen_offset;
+
 	int udplen_increment;
 
 	bool filter_ipv4,filter_ipv6;

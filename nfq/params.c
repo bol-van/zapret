@@ -186,7 +186,7 @@ void dp_init(struct desync_profile *dp)
 	dp->desync_repeats = 1;
 	dp->fake_tls_size = sizeof(fake_tls_clienthello_default);
 	memcpy(dp->fake_tls,fake_tls_clienthello_default,dp->fake_tls_size);
-	randomize_default_tls_payload(dp->fake_tls);
+	dp->fake_tls_mod = 0;
 	dp->fake_http_size = strlen(fake_http_request_default);
 	memcpy(dp->fake_http,fake_http_request_default,dp->fake_http_size);
 	dp->fake_quic_size = 620; // must be 601+ for TSPU hack
