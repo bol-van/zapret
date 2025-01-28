@@ -1,6 +1,6 @@
 ---
-name: issue warning
-about: warn not to write lame questions
+name: bugs
+about: do not write lame questions
 title: ''
 labels: ''
 assignees: ''
