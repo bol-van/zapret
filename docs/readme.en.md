@@ -173,7 +173,7 @@ nfqws takes the following parameters:
  --dpi-desync-any-protocol=0|1                  ; 0(default)=desync only http and tls  1=desync any nonempty data packet
  --dpi-desync-fake-http=<filename>|0xHEX        ; file containing fake http request
  --dpi-desync-fake-tls=<filename>|0xHEX         ; file containing fake TLS ClientHello (for https)
- --dpi-desync-fake-tls-mod=mod[,mod]            ; comma list of TLS fake mods. available mods : none,rnd,rndsni,padencap
+ --dpi-desync-fake-tls-mod=mod[,mod]            ; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,padencap
  --dpi-desync-fake-unknown=<filename>|0xHEX     ; file containing unknown protocol fake payload
  --dpi-desync-fake-syndata=<filename>|0xHEX     ; file containing SYN data payload
  --dpi-desync-fake-quic=<filename>|0xHEX        ; file containing fake QUIC Initial
