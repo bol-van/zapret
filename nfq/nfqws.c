@@ -1281,7 +1281,7 @@ static void exithelp(void)
 		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
-		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma list of TLS fake mods. available mods : none,rnd,rndsni,padencap\n"
+		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,padencap\n"
 		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
 		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
