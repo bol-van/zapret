@@ -451,3 +451,4 @@ nfqws: apply split+seqovl only to the first reasm fragment
 install_easy: dnf packager support
 nfqws,tpws: hostlist/ipset track not only file mod time but also file size
 nfqws,tpws,ipset: return lists reload on HUP
+nfqws,blockcheck: --dpi-desync-fake-tls-mod
