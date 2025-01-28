@@ -1,0 +1,104 @@
+name: branch-build
+run-name: Build for branch ${{ github.ref_name }}
+
+on:
+  push:
+    branches-ignore:
+      - master
+    paths:
+      - '**'
+  pull_request:
+    branches-ignore:
+      - master
+
+jobs:
+  build-linux:
+    name: Linux ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            tool: aarch64-unknown-linux-musl
+          - arch: x86_64
+            tool: x86_64-unknown-linux-musl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zapret
+
+      - name: Set up build tools
+        env:
+          ARCH: ${{ matrix.arch }}
+          TOOL: ${{ matrix.tool }}
+          REPO: 'spvkgn/musl-cross'
+          DIR: ${{ matrix.tool }}
+        run: |
+          sudo apt update -qq
+          sudo apt install -y libcap-dev
+          URL=https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz
+          mkdir -p $HOME/tools
+          wget -qO- $URL | tar -C $HOME/tools -xJ || exit 1
+          [[ -d "$HOME/tools/$DIR/bin" ]] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
+
+      - name: Build
+        env:
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.tool }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export CC="$TARGET-gcc"
+          export LD=$TARGET-ld
+          export AR=$TARGET-ar
+          export NM=$TARGET-nm
+          export STRIP=$TARGET-strip
+
+          # zapret
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static" \
+          make -C zapret -j$(nproc)
+          tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-linux-${{ matrix.arch }}
+          path: zapret-*.tar.xz
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows ${{ matrix.arch }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [ x86_64 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zapret
+
+      - name: Set up MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-toolchain
+
+      - name: Build zapret
+        shell: msys2 {0}
+        run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
+          mkdir -p output
+          cd zapret
+          mingw32-make -C ip2net win
+          mingw32-make -C mdig win
+          cp -a {ip2net/ip2net,mdig/mdig}.exe ../output
+          zip zapret-win-${{ matrix.arch }}.zip -j output/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-win-${{ matrix.arch }}
+          path: zapret-*.zip
+          if-no-files-found: error
