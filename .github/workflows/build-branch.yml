@@ -1,15 +1,17 @@
-name: branch-build
-run-name: Build for branch ${{ github.ref_name }}
+name: build-branch
+run-name: Build for branches
 
 on:
+  workflow_dispatch:
   push:
-    branches-ignore:
-      - master
+    branches:
+      - main
+      - development
     paths:
-      - '**'
-  pull_request:
-    branches-ignore:
-      - master
+      - 'ip2net/**'
+      - 'mdig/**'
+      - 'nfq/**'
+      - 'tpws/**'
 
 jobs:
   build-linux:
@@ -21,6 +23,18 @@ jobs:
         include:
           - arch: arm64
             tool: aarch64-unknown-linux-musl
+          - arch: arm
+            tool: arm-unknown-linux-musleabi
+          - arch: mips64
+            tool: mips64-unknown-linux-musl
+          - arch: mipselsf
+            tool: mipsel-unknown-linux-muslsf
+          - arch: mipssf
+            tool: mips-unknown-linux-muslsf
+          - arch: ppc
+            tool: powerpc-unknown-linux-musl
+          - arch: x86
+            tool: i586-unknown-linux-musl
           - arch: x86_64
             tool: x86_64-unknown-linux-musl
     steps:
@@ -33,15 +47,13 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
-          REPO: 'spvkgn/musl-cross'
-          DIR: ${{ matrix.tool }}
         run: |
           sudo apt update -qq
           sudo apt install -y libcap-dev
-          URL=https://github.com/$REPO/releases/download/latest/$TOOL.tar.xz
+          URL=https://github.com/spvkgn/musl-cross/releases/download/latest/$TOOL.tar.xz
           mkdir -p $HOME/tools
           wget -qO- $URL | tar -C $HOME/tools -xJ || exit 1
-          [[ -d "$HOME/tools/$DIR/bin" ]] && echo "$HOME/tools/$DIR/bin" >> $GITHUB_PATH
+          [[ -d "$HOME/tools/$TOOL/bin" ]] && echo "$HOME/tools/$TOOL/bin" >> $GITHUB_PATH
 
       - name: Build
         env:
@@ -54,9 +66,6 @@ jobs:
           export AR=$TARGET-ar
           export NM=$TARGET-nm
           export STRIP=$TARGET-strip
-
-          # zapret
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
 
@@ -67,12 +76,33 @@ jobs:
           path: zapret-*.tar.xz
           if-no-files-found: error
 
+  build-macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zapret
+        run: |
+          export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
+          make mac -j$(sysctl -n hw.logicalcpu)
+          tar -C binaries/my -cJf zapret-mac-x64.tar.xz .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zapret-mac-x64
+          path: zapret-*.tar.xz
+          if-no-files-found: error
+
   build-windows:
     name: Windows ${{ matrix.arch }}
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
-        arch: [ x86_64 ]
+        arch: [ x86_64, x86 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,10 +112,11 @@ jobs:
       - name: Set up MinGW
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
-          install: mingw-w64-x86_64-toolchain
+          msystem: ${{ matrix.arch == 'x86_64' && 'MINGW64' || 'MINGW32' }}
+          install: >-
+            ${{ matrix.arch == 'x86_64' && 'mingw-w64-x86_64-toolchain' || 'mingw-w64-i686-toolchain' }}
 
-      - name: Build zapret
+      - name: Build ip2net, mdig
         shell: msys2 {0}
         run: |
           export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
@@ -94,6 +125,11 @@ jobs:
           mingw32-make -C ip2net win
           mingw32-make -C mdig win
           cp -a {ip2net/ip2net,mdig/mdig}.exe ../output
+
+      - name: Create zip
+        env:
+          BITS: ${{ matrix.arch == 'x86_64' && '64' || '32' }}
+        run: |
           zip zapret-win-${{ matrix.arch }}.zip -j output/*
 
       - name: Upload artifacts
