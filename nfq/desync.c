@@ -606,17 +606,17 @@ static uint16_t IP4_IP_ID_FIX(const struct ip *ip)
 // fake_mod buffer must at least sizeof(desync_profile->fake_tls)
 // size does not change
 // return : true - altered, false - not altered
-static bool runtime_tls_mod(const struct desync_profile *dp, size_t encap_len, uint8_t *fake_mod)
+static bool runtime_tls_mod(const struct desync_profile *dp, uint8_t *fake_mod, const uint8_t *payload, size_t payload_len)
 {
 	bool b=false;
 	if (dp->fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
 	{
-		size_t sz_rec = pntoh16(dp->fake_tls+3) + encap_len;
-		size_t sz_handshake = pntoh24(dp->fake_tls+6) + encap_len;
-		size_t sz_ext = pntoh16(dp->fake_tls+dp->fake_tls_extlen_offset) + encap_len;
-		size_t sz_pad = pntoh16(dp->fake_tls+dp->fake_tls_padlen_offset) + encap_len;
+		size_t sz_rec = pntoh16(dp->fake_tls+3) + payload_len;
+		size_t sz_handshake = pntoh24(dp->fake_tls+6) + payload_len;
+		size_t sz_ext = pntoh16(dp->fake_tls+dp->fake_tls_extlen_offset) + payload_len;
+		size_t sz_pad = pntoh16(dp->fake_tls+dp->fake_tls_padlen_offset) + payload_len;
 		if ((sz_rec & ~0xFFFF) || (sz_handshake & ~0xFFFFFF) || (sz_ext & ~0xFFFF) || (sz_pad & ~0xFFFF))
-			DLOG("cannot apply tls mod. length overflow.\n");
+			DLOG("cannot apply padencap tls mod. length overflow.\n");
 		else
 		{
 			memcpy(fake_mod,dp->fake_tls,dp->fake_tls_size);
@@ -633,6 +633,19 @@ static bool runtime_tls_mod(const struct desync_profile *dp, size_t encap_len, u
 		fill_random_bytes(fake_mod+11,32); // random
 		fill_random_bytes(fake_mod+44,fake_mod[43]); // session id
 		b=true;
+	}
+	if (dp->fake_tls_mod & FAKE_TLS_MOD_DUP_SID)
+	{
+		if (dp->fake_tls[43]!=payload[43])
+			DLOG("cannot apply dupsid tls mod. fake and orig session id length mismatch.\n");
+		else if (payload_len<(44+payload[43]))
+			DLOG("cannot apply dupsid tls mod. data payload is not valid.\n");
+		else
+		{
+			if (!b)	memcpy(fake_mod,dp->fake_tls,dp->fake_tls_size);
+			memcpy(fake_mod+44,payload+44,fake_mod[43]); // session id
+			b=true;
+		}
 	}
 	return b;
 }
@@ -1174,7 +1187,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				fake_size = dp->fake_http_size;
 				break;
 			case TLS:
-				fake = runtime_tls_mod(dp,rlen_payload,fake_mod) ? fake_mod : dp->fake_tls;
+				fake = runtime_tls_mod(dp,fake_mod,rdata_payload,rlen_payload) ? fake_mod : dp->fake_tls;
 				fake_size = dp->fake_tls_size;
 				break;
 			default:

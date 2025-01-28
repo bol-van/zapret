@@ -934,6 +934,8 @@ static bool parse_tlsmod_list(char *opt, uint8_t *mod)
 			*mod |= FAKE_TLS_MOD_RND_SNI;
 		else if (!strcmp(p,"padencap"))
 			*mod |= FAKE_TLS_MOD_PADENCAP;
+		else if (!strcmp(p,"dupsid"))
+			*mod |= FAKE_TLS_MOD_DUP_SID;
 		else if (strcmp(p,"none"))
 			return false;
 
@@ -979,10 +981,10 @@ static void onetime_tls_mod(struct desync_profile *dp)
 	size_t extlen, slen;
 
 	if (dp->n && !(dp->fake_tls_mod & (FAKE_TLS_MOD_SET|FAKE_TLS_MOD_CUSTOM_FAKE)))
-		dp->fake_tls_mod |= FAKE_TLS_MOD_RND|FAKE_TLS_MOD_RND_SNI; // old behavior compat
+		dp->fake_tls_mod |= FAKE_TLS_MOD_RND|FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_DUP_SID; // old behavior compat + dup_sid
 	if (!(dp->fake_tls_mod & ~FAKE_TLS_MOD_SAVE_MASK))
 		return; // nothing to do
-	if (!IsTLSClientHello(dp->fake_tls,dp->fake_tls_size,false))
+	if (!IsTLSClientHello(dp->fake_tls,dp->fake_tls_size,false) || (dp->fake_tls_size<(44+dp->fake_tls[43]))) // has session id ?
 	{
 		DLOG_ERR("profile %d tls mod set but tls fake structure invalid\n", dp->n);
 		exit_clean(1);
@@ -1291,7 +1293,7 @@ static void exithelp(void)
 		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
-		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,padencap\n"
+		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,dupsid,padencap\n"
 		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
 		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
