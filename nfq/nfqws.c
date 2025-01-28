@@ -1025,9 +1025,19 @@ static void onetime_tls_mod(struct desync_profile *dp)
 	}
 	if (dp->fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
 	{
-		if (!TLSFindExt(dp->fake_tls,dp->fake_tls_size,0,&ext,&extlen,false) || !TLSAdvanceToHostInSNI(&ext,&extlen,&slen))
+		if (!TLSFindExt(dp->fake_tls,dp->fake_tls_size,0,&ext,&extlen,false))
 		{
-			DLOG_ERR("profile %d rndsni set but tls fake structure invalid or does not have SNI\n", dp->n);
+			DLOG_ERR("profile %d rndsni set but tls fake does not have SNI\n", dp->n);
+			exit_clean(1);
+		}
+		if (!TLSAdvanceToHostInSNI(&ext,&extlen,&slen))
+		{
+			DLOG_ERR("profile %d rndsni set but tls fake has invalid SNI structure\n", dp->n);
+			exit_clean(1);
+		}
+		if (!slen)
+		{
+			DLOG_ERR("profile %d rndsni set but tls fake has zero sized SNI\n", dp->n);
 			exit_clean(1);
 		}
 		uint8_t *sni = dp->fake_tls + (ext - dp->fake_tls);
@@ -1048,7 +1058,7 @@ static void onetime_tls_mod(struct desync_profile *dp)
 			sni[slen-4] = '.';
 			memcpy(sni+slen-3,tld[random()%(sizeof(tld)/sizeof(*tld))],3);
 		}
-		else if (slen>=1)
+		else
 			fill_random_az09(sni+1,slen-1);
 
 		if (params.debug)
