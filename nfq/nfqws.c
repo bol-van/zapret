@@ -1035,7 +1035,7 @@ static void onetime_tls_mod(struct desync_profile *dp)
 		char *s1=NULL, *s2=NULL;
 		if (params.debug)
 		{
-			if (s1 = malloc(slen+1))
+			if ((s1 = malloc(slen+1)))
 			{
 				memcpy(s1,sni,slen); s1[slen]=0;
 			}
