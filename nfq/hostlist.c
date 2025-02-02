@@ -109,6 +109,7 @@ static bool LoadHostList(struct hostlist_file *hfile)
 		if (!file_mod_signature(hfile->filename, &fsig))
 		{
 			// stat() error
+			DLOG_PERROR("file_mod_signature");
 			DLOG_ERR("cannot access hostlist file '%s'. in-memory content remains unchanged.\n",hfile->filename);
 			return true;
 		}
