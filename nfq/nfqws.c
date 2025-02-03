@@ -120,6 +120,29 @@ static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *dat
 }
 
 
+static bool test_list_files()
+{
+	struct hostlist_file *hfile;
+	struct ipset_file *ifile;
+
+	LIST_FOREACH(hfile, &params.hostlists, next)
+		if (!file_mod_time(hfile->filename))
+		{
+			DLOG_PERROR("file_mod_time");
+			DLOG_ERR("cannot access hostlist file '%s'\n",hfile->filename);
+			return false;
+		}
+	LIST_FOREACH(ifile, &params.ipsets, next)
+		if (!file_mod_time(ifile->filename))
+		{
+			DLOG_PERROR("file_mod_time");
+			DLOG_ERR("cannot access ipset file '%s'\n",ifile->filename);
+			return false;
+		}
+	return true;
+}
+
+
 #ifdef __linux__
 static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *cookie)
 {
@@ -260,6 +283,8 @@ static int nfq_main(void)
 	if (params.droproot && !droproot(params.uid, params.gid))
 		return 1;
 	print_id();
+	if (params.droproot && !test_list_files())
+		return 1;
 
 	pre_desync();
 
@@ -357,6 +382,8 @@ static int dvt_main(void)
 	if (params.droproot && !droproot(params.uid, params.gid))
 		goto exiterr;
 	print_id();
+	if (params.droproot && !test_list_files())
+		goto exiterr;
 
 	pre_desync();
 

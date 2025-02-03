@@ -116,6 +116,27 @@ static int8_t block_sigpipe(void)
 	return 0;
 }
 
+static bool test_list_files()
+{
+	struct hostlist_file *hfile;
+	struct ipset_file *ifile;
+
+	LIST_FOREACH(hfile, &params.hostlists, next)
+		if (!file_mod_time(hfile->filename))
+		{
+			DLOG_PERROR("file_mod_time");
+			DLOG_ERR("cannot access hostlist file '%s'\n",hfile->filename);
+			return false;
+		}
+	LIST_FOREACH(ifile, &params.ipsets, next)
+		if (!file_mod_time(ifile->filename))
+		{
+			DLOG_PERROR("file_mod_time");
+			DLOG_ERR("cannot access ipset file '%s'\n",ifile->filename);
+			return false;
+		}
+	return true;
+}
 
 static bool is_interface_online(const char *ifname)
 {
@@ -1918,10 +1939,12 @@ int main(int argc, char *argv[])
 
 	set_ulimit();
 	sec_harden();
-
 	if (params.droproot && !droproot(params.uid,params.gid))
 		goto exiterr;
 	print_id();
+	if (params.droproot && !test_list_files())
+		goto exiterr;
+
 	//splice() causes the process to receive the SIGPIPE-signal if one part (for
 	//example a socket) is closed during splice(). I would rather have splice()
 	//fail and return -1, so blocking SIGPIPE.
