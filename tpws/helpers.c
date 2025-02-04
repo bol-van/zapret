@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #ifdef __ANDROID__
 #include "andr/ifaddrs.h"
@@ -325,6 +326,17 @@ bool file_mod_signature(const char *filename, file_mod_sig *ms)
 	ms->mod_time=st.st_mtime;
 	ms->size=st.st_size;
 	return true;
+}
+
+bool file_open_test(const char *filename, int flags)
+{
+	int fd = open(filename,flags);
+	if (fd>=0)
+	{
+		close(fd);
+		return true;
+	}
+	return false;
 }
 
 bool pf_in_range(uint16_t port, const port_filter *pf)

@@ -71,6 +71,7 @@ typedef struct
 #define FILE_MOD_RESET(ms) memset(ms,0,sizeof(file_mod_sig))
 bool file_mod_signature(const char *filename, file_mod_sig *ms);
 time_t file_mod_time(const char *filename);
+bool file_open_test(const char *filename, int flags);
 
 typedef struct
 {
