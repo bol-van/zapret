@@ -133,6 +133,7 @@ nfqws takes the following parameters:
 
  --debug=0|1
  --dry-run                                      ; verify parameters and exit with code 0 if successful
+ --version                                      ; print version and exit
  --comment                                      ; any text (ignored)
  --qnum=<nfqueue_number>
  --daemon                                       ; daemonize
@@ -660,6 +661,7 @@ tpws is transparent proxy.
  --debug=0|1|2|syslog|@<filename>        ; 1 and 2 means log to console and set debug level. for other targets use --debug-level.
  --debug-level=0|1|2                     ; specify debug level for syslog and @<filename>
  --dry-run                               ; verify parameters and exit with code 0 if successful
+ --version                                      ; print version and exit
  --bind-addr=<v4_addr>|<v6_addr>         ; for v6 link locals append %interface_name : fe80::1%br-lan
  --bind-iface4=<interface_name>          ; bind to the first ipv4 addr of interface
  --bind-iface6=<interface_name>          ; bind to the first ipv6 addr of interface

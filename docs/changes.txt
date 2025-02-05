@@ -457,3 +457,4 @@ v70.1
 
 nfqws: --dpi-desync-fake-tls-mod=dupsid
 nfqws,tpws: test accessibility of list files after privs drop
+nfqws,tpws: --version

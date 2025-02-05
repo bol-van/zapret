@@ -218,6 +218,7 @@ static void exithelp(void)
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		" --dry-run\t\t\t\t; verify parameters and exit with code 0 if successful\n"
+		" --version\t\t\t\t; print version and exit\n"
 		" --comment=any_text\n"
 		"\nMULTI-STRATEGY:\n"
 		" --new\t\t\t\t\t; begin new strategy\n"
@@ -712,41 +713,42 @@ void parse_params(int argc, char *argv[])
 		{ "debug",optional_argument,0,0 },// optidx=45
 		{ "debug-level",required_argument,0,0 },// optidx=46
 		{ "dry-run",no_argument,0,0 },// optidx=47
-		{ "comment",optional_argument,0,0 },// optidx=48
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=49
-		{ "local-sndbuf",required_argument,0,0 },// optidx=50
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=51
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=52
-		{ "socks",no_argument,0,0 },// optidx=53
-		{ "no-resolve",no_argument,0,0 },// optidx=54
-		{ "resolver-threads",required_argument,0,0 },// optidx=55
-		{ "skip-nodelay",no_argument,0,0 },// optidx=56
-		{ "tamper-start",required_argument,0,0 },// optidx=57
-		{ "tamper-cutoff",required_argument,0,0 },// optidx=58
-		{ "connect-bind-addr",required_argument,0,0 },// optidx=59
+		{ "version",no_argument,0,0 },// optidx=48
+		{ "comment",optional_argument,0,0 },// optidx=49
+		{ "local-rcvbuf",required_argument,0,0 },// optidx=50
+		{ "local-sndbuf",required_argument,0,0 },// optidx=51
+		{ "remote-rcvbuf",required_argument,0,0 },// optidx=52
+		{ "remote-sndbuf",required_argument,0,0 },// optidx=53
+		{ "socks",no_argument,0,0 },// optidx=54
+		{ "no-resolve",no_argument,0,0 },// optidx=55
+		{ "resolver-threads",required_argument,0,0 },// optidx=56
+		{ "skip-nodelay",no_argument,0,0 },// optidx=57
+		{ "tamper-start",required_argument,0,0 },// optidx=58
+		{ "tamper-cutoff",required_argument,0,0 },// optidx=59
+		{ "connect-bind-addr",required_argument,0,0 },// optidx=60
 
-		{ "new",no_argument,0,0 },				// optidx=60
-		{ "skip",no_argument,0,0 },				// optidx=61
-		{ "filter-l3",required_argument,0,0 },			// optidx=62
-		{ "filter-tcp",required_argument,0,0 },			// optidx=63
-		{ "filter-l7",required_argument,0,0 },			// optidx=64
-		{ "ipset",required_argument,0,0 },			// optidx=65
-		{ "ipset-ip",required_argument,0,0 },			// optidx=66
-		{ "ipset-exclude",required_argument,0,0 },		// optidx=67
-		{ "ipset-exclude-ip",required_argument,0,0 },		// optidx=68
+		{ "new",no_argument,0,0 },				// optidx=61
+		{ "skip",no_argument,0,0 },				// optidx=62
+		{ "filter-l3",required_argument,0,0 },			// optidx=63
+		{ "filter-tcp",required_argument,0,0 },			// optidx=64
+		{ "filter-l7",required_argument,0,0 },			// optidx=65
+		{ "ipset",required_argument,0,0 },			// optidx=66
+		{ "ipset-ip",required_argument,0,0 },			// optidx=67
+		{ "ipset-exclude",required_argument,0,0 },		// optidx=68
+		{ "ipset-exclude-ip",required_argument,0,0 },		// optidx=69
 
 #if defined(__FreeBSD__)
 		{ "enable-pf",no_argument,0,0 },// optidx=69
 #elif defined(__APPLE__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=69
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=70
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=79
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=71
 #elif defined(__linux__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=69
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=70
-		{ "mss",required_argument,0,0 },			// optidx=71
-		{ "fix-seg",optional_argument,0,0 },			// optidx=72
+		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=70
+		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=71
+		{ "mss",required_argument,0,0 },			// optidx=72
+		{ "fix-seg",optional_argument,0,0 },			// optidx=73
 #ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },				// optidx=73
+		{ "nosplice",no_argument,0,0 },				// optidx=74
 #endif
 #endif
 		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
@@ -1197,43 +1199,46 @@ void parse_params(int argc, char *argv[])
 		case 47: /* dry-run */
 			bDry = true;
 			break;
-		case 48: /* comment */
+		case 48: /* version */
+			exit_clean(0);
 			break;
-		case 49: /* local-rcvbuf */
+		case 49: /* comment */
+			break;
+		case 50: /* local-rcvbuf */
 #ifdef __linux__
 			params.local_rcvbuf = atoi(optarg)/2;
 #else
 			params.local_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 50: /* local-sndbuf */
+		case 51: /* local-sndbuf */
 #ifdef __linux__
 			params.local_sndbuf = atoi(optarg)/2;
 #else
 			params.local_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 51: /* remote-rcvbuf */
+		case 52: /* remote-rcvbuf */
 #ifdef __linux__
 			params.remote_rcvbuf = atoi(optarg)/2;
 #else
 			params.remote_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 52: /* remote-sndbuf */
+		case 53: /* remote-sndbuf */
 #ifdef __linux__
 			params.remote_sndbuf = atoi(optarg)/2;
 #else
 			params.remote_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 53: /* socks */
+		case 54: /* socks */
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 54: /* no-resolve */
+		case 55: /* no-resolve */
 			params.no_resolve = true;
 			break;
-		case 55: /* resolver-threads */
+		case 56: /* resolver-threads */
 			params.resolver_threads = atoi(optarg);
 			if (params.resolver_threads<1 || params.resolver_threads>300)
 			{
@@ -1241,10 +1246,10 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 56: /* skip-nodelay */
+		case 57: /* skip-nodelay */
 			params.skip_nodelay = true;
 			break;
-		case 57: /* tamper-start */
+		case 58: /* tamper-start */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -1258,7 +1263,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper_lim = true;
 			break;
-		case 58: /* tamper-cutoff */
+		case 59: /* tamper-cutoff */
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -1272,7 +1277,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper_lim = true;
 			break;
-		case 59: /* connect-bind-addr */
+		case 60: /* connect-bind-addr */
 			{
 				char *p = strchr(optarg,'%');
 				if (p) *p++=0;
@@ -1300,7 +1305,7 @@ void parse_params(int argc, char *argv[])
 			break;
 
 
-		case 60: /* new */
+		case 61: /* new */
 			if (bSkip)
 			{
 				dp_clear(dp);
@@ -1321,31 +1326,31 @@ void parse_params(int argc, char *argv[])
 			anon_hl = anon_hl_exclude = NULL;
 			anon_ips = anon_ips_exclude = NULL;
 			break;
-		case 61: /* skip */
+		case 62: /* skip */
 			bSkip = true;
 			break;
-		case 62: /* filter-l3 */
+		case 63: /* filter-l3 */
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 63: /* filter-tcp */
+		case 64: /* filter-tcp */
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 64: /* filter-l7 */
+		case 65: /* filter-l7 */
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 65: /* ipset */
+		case 66: /* ipset */
 			if (bSkip) break;
 			if (!RegisterIpset(dp, false, optarg))
 			{
@@ -1354,7 +1359,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 66: /* ipset-ip */
+		case 67: /* ipset-ip */
 			if (bSkip) break;
 			if (!anon_ips && !(anon_ips=RegisterIpset(dp, false, NULL)))
 			{
@@ -1368,7 +1373,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 67: /* ipset-exclude */
+		case 68: /* ipset-exclude */
 			if (bSkip) break;
 			if (!RegisterIpset(dp, true, optarg))
 			{
@@ -1377,7 +1382,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 68: /* ipset-exclude-ip */
+		case 69: /* ipset-exclude-ip */
 			if (bSkip) break;
 			if (!anon_ips_exclude && !(anon_ips_exclude=RegisterIpset(dp, true, NULL)))
 			{
@@ -1393,11 +1398,11 @@ void parse_params(int argc, char *argv[])
 			break;
 
 #if defined(__FreeBSD__)
-		case 69: /* enable-pf */
+		case 70: /* enable-pf */
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__) || defined(__APPLE__)
-		case 69: /* local-tcp-user-timeout */
+		case 70: /* local-tcp-user-timeout */
 			params.tcp_user_timeout_local = atoi(optarg);
 			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
 			{
@@ -1405,7 +1410,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 70: /* remote-tcp-user-timeout */
+		case 71: /* remote-tcp-user-timeout */
 			params.tcp_user_timeout_remote = atoi(optarg);
 			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
 			{
@@ -1416,7 +1421,7 @@ void parse_params(int argc, char *argv[])
 #endif
 
 #if defined(__linux__)
-		case 71: /* mss */
+		case 72: /* mss */
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			dp->mss = atoi(optarg);
 			if (dp->mss<88 || dp->mss>32767)
@@ -1425,7 +1430,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 72: /* fix-seg */
+		case 73: /* fix-seg */
 			if (!params.fix_seg_avail)
 			{
 				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
@@ -1445,7 +1450,7 @@ void parse_params(int argc, char *argv[])
 				params.fix_seg = FIX_SEG_DEFAULT_MAX_WAIT;
 			break;
 #ifdef SPLICE_PRESENT
-		case 73: /* nosplice */
+		case 74: /* nosplice */
 			params.nosplice = true;
 			break;
 #endif
