@@ -50,17 +50,30 @@ TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"
 TPWS_OPT_BASE6_PRE="--bind-linklocal=prefer $TPWS_WAIT --bind-wait-ip-linklocal=3"
 
+DAEMON_CFGNAME="main"
+
 run_daemon()
 {
 	# $1 - daemon string id or number. can use 1,2,3,...
+	local DAEMON_IDNUM=$1
 	# $2 - daemon
+	local DAEMON_PATH="$2"
 	# $3 - daemon args
-	# use $PIDDIR/$DAEMONBASE$1.pid as pidfile
-	local DAEMONBASE="$(basename "$2")"
-	echo "Starting daemon $1: $2 $3"
+	local DAEMON_ARGS="$3"
+	# use $PIDDIR/$DAEMON_NAME$DAEMON_IDNUM.pid as pidfile
+	local DAEMON_NAME="$(basename "$DAEMON_PATH")"
+	local DAEMON_LOG
+	echo "Starting daemon $DAEMON_IDNUM: $DAEMON_PATH $DAEMON_ARGS"
+	if [ -n "$DAEMON_LOG_FILE" -a "$DAEMON_NAME" = "nfqws" ]; then
+		DAEMON_LOG="$DAEMON_LOG_FILE"
+		DAEMON_LOG=${DAEMON_LOG/<DAEMON_NAME>/$DAEMON_NAME}
+		DAEMON_LOG=${DAEMON_LOG/<DAEMON_IDNUM>/$DAEMON_IDNUM}
+		DAEMON_LOG=${DAEMON_LOG/<DAEMON_CFGNAME>/$DAEMON_CFGNAME}
+		DAEMON_ARGS="--debug=@$DAEMON_LOG $DAEMON_ARGS"
+	fi
 	procd_open_instance
-	procd_set_param command $2 $3
-	procd_set_param pidfile $PIDDIR/$DAEMONBASE$1.pid
+	procd_set_param command $DAEMON_PATH $DAEMON_ARGS
+	procd_set_param pidfile $PIDDIR/$DAEMON_NAME$DAEMON_IDNUM.pid
 	procd_close_instance
 }
 

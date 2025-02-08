@@ -13,9 +13,16 @@ custom_runner()
 		dir_is_not_empty "$CUSTOM_DIR/custom.d" && {
 			for script in "$CUSTOM_DIR/custom.d/"*; do
 				[ -f "$script" ] || continue
+				DAEMON_CFGNAME_SAVED="$DAEMON_CFGNAME"
+				unset DAEMON_CFGNAME
 				unset -f $FUNC
 				. "$script"
+				if [ -z "$DAEMON_CFGNAME" ]; then
+					DAEMON_CFGNAME="$(basename "$script")"
+					DAEMON_CFGNAME="${DAEMON_CFGNAME%%.*}"
+				fi
 				existf $FUNC && $FUNC "$@"
+				DAEMON_CFGNAME="$DAEMON_CFGNAME_SAVED"
 			done
 		}
 	}

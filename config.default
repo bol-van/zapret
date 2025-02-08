@@ -133,3 +133,5 @@ DISABLE_IPV6=1
 # possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
 # comment if not required
 #GETLIST=
+
+DAEMON_LOG_FILE="/tmp/zapret+<DAEMON_NAME>+<DAEMON_IDNUM>+<DAEMON_CFGNAME>.log"
