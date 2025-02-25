@@ -121,6 +121,7 @@ static bool test_list_files()
 	struct hostlist_file *hfile;
 	struct ipset_file *ifile;
 
+printf("1\n");
 	LIST_FOREACH(hfile, &params.hostlists, next)
 		if (hfile->filename && !file_open_test(hfile->filename, O_RDONLY))
 		{
@@ -129,12 +130,13 @@ static bool test_list_files()
 			return false;
 		}
 	LIST_FOREACH(ifile, &params.ipsets, next)
-		if (hfile->filename && !file_open_test(ifile->filename, O_RDONLY))
+		if (ifile->filename && !file_open_test(ifile->filename, O_RDONLY))
 		{
 			DLOG_PERROR("file_open_test");
 			DLOG_ERR("cannot access ipset file '%s'\n",ifile->filename);
 			return false;
 		}
+printf("2\n");
 	return true;
 }
 

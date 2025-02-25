@@ -133,7 +133,7 @@ static bool test_list_files()
 			return false;
 		}
 	LIST_FOREACH(ifile, &params.ipsets, next)
-		if (hfile->filename && !file_open_test(ifile->filename, O_RDONLY))
+		if (ifile->filename && !file_open_test(ifile->filename, O_RDONLY))
 		{
 			DLOG_PERROR("file_open_test");
 			DLOG_ERR("cannot access ipset file '%s'\n",ifile->filename);
