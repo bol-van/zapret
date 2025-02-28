@@ -1848,6 +1848,16 @@ ask_params()
 		}
 	}
 
+	[ -n "$ENABLE_SAVE_TO_FILE" ] || {
+		ENABLE_SAVE_TO_FILE=0
+		[ "$BATCH" = 1 ] || {
+			echo
+			echo "Will duplicate report to '${DOMAINS}.txt' if enabled"
+			echo "Not recomended if you have little free disk space"
+			ask_yes_no_var ENABLE_SAVE_TO_FILE "enable save report"
+		}
+	}
+
 	echo
 
 	configure_defrag
@@ -2123,6 +2133,7 @@ cleanup
 echo
 echo \* SUMMARY
 report_print
+[ "$ENABLE_SAVE_TO_FILE" = 1 ] && report_print > "$ZAPRET_BASE/$DOMAINS.txt"
 echo
 echo "Please note this SUMMARY does not guarantee a magic pill for you to copy/paste and be happy."
 echo "Understanding how strategies work is very desirable."
