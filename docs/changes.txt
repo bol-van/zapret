@@ -453,8 +453,12 @@ nfqws,tpws: hostlist/ipset track not only file mod time but also file size
 nfqws,tpws,ipset: return lists reload on HUP
 nfqws,blockcheck: --dpi-desync-fake-tls-mod
 
-v70.3
+v70.1
 
 nfqws: --dpi-desync-fake-tls-mod=dupsid
 nfqws,tpws: test accessibility of list files after privs drop
 nfqws,tpws: --version
+
+v70.4
+
+nfqws,tpws: ^ prefix in hostlist to disable subdomain matches

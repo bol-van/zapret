@@ -1,4 +1,4 @@
-# zapret v70.3
+# zapret v70.4
 
 # SCAMMER WARNING
 
@@ -185,9 +185,9 @@ nfqws takes the following parameters:
  --dpi-desync-udplen-pattern=<filename>|0xHEX   ; udp tail fill pattern
  --dpi-desync-start=[n|d|s]N                    ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N
  --dpi-desync-cutoff=[n|d|s]N                   ; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
- --hostlist=<filename>                          ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist=<filename>                          ; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply if not prefixed with `^`, gzip supported, multiple hostlists allowed)
  --hostlist-domains=<domain_list>               ; comma separated fixed domain list
- --hostlist-exclude=<filename>                  ; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude=<filename>                  ; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply if not prefixed with `^`, gzip supported, multiple hostlists allowed)
  --hostlist-exclude-domains=<domain_list>       ; comma separated fixed domain list
  --hostlist-auto=<filename>                     ; detect DPI blocks and build hostlist automatically
  --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
@@ -984,6 +984,7 @@ If all include lists are empty it works like no include lists exist at all.
 If you need "all except" mode you dont have to delete zapret-hosts-users.txt. Just make it empty.
 
 Subdomains auto apply. For example, "ru" in the list affects "*.ru" .
+`^` prefix symbol disables subdomain match.
 
 **tpws** and **nfqws** automatically reload lists if their modification time or file size is changed.
 HUP signal forcibly reloads all lists.
