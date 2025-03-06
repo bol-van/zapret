@@ -901,7 +901,7 @@ static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits
 	return true;
 }
 
-static bool parse_domain_list(char *opt, strpool **pp)
+static bool parse_domain_list(char *opt, hostlist_pool **pp)
 {
 	char *e,*p,c;
 

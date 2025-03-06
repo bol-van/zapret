@@ -4,10 +4,10 @@
 #include "pools.h"
 #include "params.h"
 
-bool AppendHostlistItem(strpool **hostlist, char *s);
-bool AppendHostList(strpool **hostlist, const char *filename);
+bool AppendHostlistItem(hostlist_pool **hostlist, char *s);
+bool AppendHostList(hostlist_pool **hostlist, const char *filename);
 bool LoadAllHostLists();
-bool NonEmptyHostlist(strpool **hostlist);
+bool NonEmptyHostlist(hostlist_pool **hostlist);
 // return : true = apply fooling, false = do not apply
 bool HostlistCheck(const struct desync_profile *dp,const char *host, bool *excluded, bool bSkipReloadCheck);
 struct hostlist_file *RegisterHostlist(struct desync_profile *dp, bool bExclude, const char *filename);

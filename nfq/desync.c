@@ -347,7 +347,7 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		{
 			DLOG("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto->filename);
 			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto->filename);
-			if (!StrPoolAddStr(&dp->hostlist_auto->hostlist, hostname))
+			if (!HostlistPoolAddStr(&dp->hostlist_auto->hostlist, hostname, 0))
 			{
 				DLOG_ERR("StrPoolAddStr out of memory\n");
 				return;

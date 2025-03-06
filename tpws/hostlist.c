@@ -4,7 +4,7 @@
 #include "helpers.h"
 
 // inplace tolower() and add to pool
-static bool addpool(strpool **hostlist, char **s, const char *end, int *ct)
+static bool addpool(hostlist_pool **hostlist, char **s, const char *end, int *ct)
 {
 	char *p=*s;
 
@@ -17,10 +17,16 @@ static bool addpool(strpool **hostlist, char **s, const char *end, int *ct)
 	else
 	{
 		// advance until eol lowering all chars
-		for (; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
-		if (!StrPoolAddStrLen(hostlist, *s, p-*s))
+		uint32_t flags = 0;
+		if (*p=='^')
 		{
-			StrPoolDestroy(hostlist);
+			p = ++(*s);
+			flags |= HOSTLIST_POOL_FLAG_STRICT_MATCH;
+		}
+		for (; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
+		if (!HostlistPoolAddStrLen(hostlist, *s, p-*s, flags))
+		{
+			HostlistPoolDestroy(hostlist);
 			*hostlist = NULL;
 			return false;
 		}
@@ -32,12 +38,12 @@ static bool addpool(strpool **hostlist, char **s, const char *end, int *ct)
 	return true;
 }
 
-bool AppendHostlistItem(strpool **hostlist, char *s)
+bool AppendHostlistItem(hostlist_pool **hostlist, char *s)
 {
 	return addpool(hostlist,&s,s+strlen(s),NULL);
 }
 
-bool AppendHostList(strpool **hostlist, const char *filename)
+bool AppendHostList(hostlist_pool **hostlist, const char *filename)
 {
 	char *p, *e, s[256], *zbuf;
 	size_t zsize;
@@ -114,10 +120,10 @@ static bool LoadHostList(struct hostlist_file *hfile)
 			return true;
 		}
 		if (FILE_MOD_COMPARE(&hfile->mod_sig,&fsig)) return true; // up to date
-		StrPoolDestroy(&hfile->hostlist);
+		HostlistPoolDestroy(&hfile->hostlist);
 		if (!AppendHostList(&hfile->hostlist, hfile->filename))
 		{
-			StrPoolDestroy(&hfile->hostlist);
+			HostlistPoolDestroy(&hfile->hostlist);
 			return false;
 		}
 		hfile->mod_sig=fsig;
@@ -138,10 +144,10 @@ static bool LoadHostLists(struct hostlist_files_head *list)
 	return bres;
 }
 
-bool NonEmptyHostlist(strpool **hostlist)
+bool NonEmptyHostlist(hostlist_pool **hostlist)
 {
 	// add impossible hostname if the list is empty
-	return *hostlist ? true : StrPoolAddStrLen(hostlist, "@&()", 4);
+	return *hostlist ? true : HostlistPoolAddStrLen(hostlist, "@&()", 4, 0);
 }
 
 static void MakeAutolistsNonEmpty()
@@ -164,19 +170,34 @@ bool LoadAllHostLists()
 
 
 
-static bool SearchHostList(strpool *hostlist, const char *host)
+static bool SearchHostList(hostlist_pool *hostlist, const char *host)
 {
 	if (hostlist)
 	{
 		const char *p = host;
-		bool bInHostList;
+		const struct hostlist_pool *hp;
+		bool bHostFull=true;
 		while (p)
 		{
-			bInHostList = StrPoolCheckStr(hostlist, p);
-			VPRINT("hostlist check for %s : %s\n", p, bInHostList ? "positive" : "negative");
-			if (bInHostList) return true;
+			VPRINT("hostlist check for %s : ", p);
+			hp = HostlistPoolGetStr(hostlist, p);
+			if (hp)
+			{
+				if ((hp->flags & HOSTLIST_POOL_FLAG_STRICT_MATCH) && !bHostFull)
+				{
+					VPRINT("negative : strict_mismatch : %s != %s\n", p, host);
+				}
+				else
+				{
+					VPRINT("positive\n");
+					return true;
+				}
+			}
+			else
+				VPRINT("negative\n");
 			p = strchr(p, '.');
 			if (p) p++;
+			bHostFull = false;
 		}
 	}
 	return false;

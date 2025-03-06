@@ -121,7 +121,6 @@ static bool test_list_files()
 	struct hostlist_file *hfile;
 	struct ipset_file *ifile;
 
-printf("1\n");
 	LIST_FOREACH(hfile, &params.hostlists, next)
 		if (hfile->filename && !file_open_test(hfile->filename, O_RDONLY))
 		{
@@ -136,7 +135,6 @@ printf("1\n");
 			DLOG_ERR("cannot access ipset file '%s'\n",ifile->filename);
 			return false;
 		}
-printf("2\n");
 	return true;
 }
 
@@ -535,7 +533,7 @@ static bool parse_pf_list(char *opt, struct port_filters_head *pfl)
 	return true;
 }
 
-static bool parse_domain_list(char *opt, strpool **pp)
+static bool parse_domain_list(char *opt, hostlist_pool **pp)
 {
 	char *e,*p,c;
 

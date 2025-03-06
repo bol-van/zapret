@@ -31,6 +31,9 @@
 		free(elem); \
 		return false; \
 	}
+#define ADD_HOSTLIST_POOL(etype, ppool, keystr, keystr_len, flg) \
+	ADD_STR_POOL(etype,ppool,keystr,keystr_len); \
+	elem->flags = flg;
 
 
 #undef uthash_nonfatal_oom
@@ -42,27 +45,31 @@ static void ut_oom_recover(void *elem)
 }
 
 // for not zero terminated strings
-bool StrPoolAddStrLen(strpool **pp, const char *s, size_t slen)
+bool HostlistPoolAddStrLen(hostlist_pool **pp, const char *s, size_t slen, uint32_t flags)
 {
-	ADD_STR_POOL(strpool, pp, s, slen)
+	ADD_HOSTLIST_POOL(hostlist_pool, pp, s, slen, flags)
 	return true;
 }
 // for zero terminated strings
-bool StrPoolAddStr(strpool **pp, const char *s)
+bool HostlistPoolAddStr(hostlist_pool **pp, const char *s, uint32_t flags)
 {
-	return StrPoolAddStrLen(pp, s, strlen(s));
+	return HostlistPoolAddStrLen(pp, s, strlen(s), flags);
 }
 
-bool StrPoolCheckStr(strpool *p, const char *s)
+hostlist_pool *HostlistPoolGetStr(hostlist_pool *p, const char *s)
 {
-	strpool *elem;
+	hostlist_pool *elem;
 	HASH_FIND_STR(p, s, elem);
-	return elem != NULL;
+	return elem;
+}
+bool HostlistPoolCheckStr(hostlist_pool *p, const char *s)
+{
+	return !!HostlistPoolGetStr(p,s);
 }
 
-void StrPoolDestroy(strpool **pp)
+void HostlistPoolDestroy(hostlist_pool **pp)
 {
-	DESTROY_STR_POOL(strpool, pp)
+	DESTROY_STR_POOL(hostlist_pool, pp)
 }
 
 
@@ -178,7 +185,7 @@ struct hostlist_file *hostlist_files_add(struct hostlist_files_head *head, const
 static void hostlist_files_entry_destroy(struct hostlist_file *entry)
 {
 	free(entry->filename);
-	StrPoolDestroy(&entry->hostlist);
+	HostlistPoolDestroy(&entry->hostlist);
 	free(entry);
 }
 void hostlist_files_destroy(struct hostlist_files_head *head)

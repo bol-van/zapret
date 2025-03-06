@@ -12,15 +12,18 @@
 #define HASH_FUNCTION HASH_BER
 #include "uthash.h"
 
-typedef struct strpool {
-    char *str;		/* key */
-    UT_hash_handle hh;	/* makes this structure hashable */
-} strpool;
+#define HOSTLIST_POOL_FLAG_STRICT_MATCH		1
 
-void StrPoolDestroy(strpool **pp);
-bool StrPoolAddStr(strpool **pp,const char *s);
-bool StrPoolAddStrLen(strpool **pp,const char *s,size_t slen);
-bool StrPoolCheckStr(strpool *p,const char *s);
+typedef struct hostlist_pool {
+	char *str;		/* key */
+	uint32_t flags;		/* custom data */
+	UT_hash_handle hh;	/* makes this structure hashable */
+} hostlist_pool;
+
+void HostlistPoolDestroy(hostlist_pool **pp);
+bool HostlistPoolAddStr(hostlist_pool **pp, const char *s, uint32_t flags);
+bool HostlistPoolAddStrLen(hostlist_pool **pp, const char *s, size_t slen, uint32_t flags);
+hostlist_pool *HostlistPoolGetStr(hostlist_pool *p, const char *s);
 
 struct str_list {
 	char *str;
@@ -29,10 +32,10 @@ struct str_list {
 LIST_HEAD(str_list_head, str_list);
 
 typedef struct hostfail_pool {
-    char *str;		/* key */
-    int counter;	/* value */
-    time_t expire;	/* when to expire record (unixtime) */
-    UT_hash_handle hh;	/* makes this structure hashable */
+	char *str;		/* key */
+	int counter;	/* value */
+	time_t expire;	/* when to expire record (unixtime) */
+	UT_hash_handle hh;	/* makes this structure hashable */
 } hostfail_pool;
 
 void HostFailPoolDestroy(hostfail_pool **pp);
@@ -51,7 +54,7 @@ void strlist_destroy(struct str_list_head *head);
 struct hostlist_file {
 	char *filename;
 	file_mod_sig mod_sig;
-	strpool *hostlist;
+	hostlist_pool *hostlist;
 	LIST_ENTRY(hostlist_file) next;
 };
 LIST_HEAD(hostlist_files_head, hostlist_file);
