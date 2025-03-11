@@ -11,6 +11,8 @@ all: ip2net
 ip2net: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o ip2net $(SRC_FILES) $(LIBS) $(LDFLAGS)
 
+systemd: ip2net
+
 android: ip2net
 
 bsd: $(SRC_FILES)

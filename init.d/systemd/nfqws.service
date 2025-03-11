@@ -1,0 +1,48 @@
+# Example systemd service unit for nfqws. Adjust for your installation.
+
+[Unit]
+After=network.target
+
+[Service]
+Type=notify
+Restart=on-failure
+
+ExecSearchPath=/opt/zapret/binaries/my
+ExecStart=nfqws @${CONFIG_FILE}
+Environment=CONFIG_FILE=/etc/zapret/nfqws.config
+
+StateDirectory=nfqws
+StateDirectoryMode=0700
+WorkingDirectory=%S/nfqws
+
+DynamicUser=true
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+RestrictAddressFamilies=AF_NETLINK AF_UNIX AF_INET6 AF_INET
+
+LockPersonality=true
+MemoryDenyWriteExecute=true
+PrivateDevices=true
+PrivateMounts=true
+PrivateTmp=true
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+RemoveIPC=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@resources @privileged
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

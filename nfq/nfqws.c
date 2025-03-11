@@ -35,6 +35,10 @@
 #include "win.h"
 #endif
 
+#ifdef USE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 #ifdef __linux__
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #define NF_DROP 0
@@ -271,6 +275,15 @@ exiterr:
 	return false;
 }
 
+static void notify_ready(void)
+{
+#ifdef USE_SYSTEMD
+	int r = sd_notify(0, "READY=1");
+	if (r < 0)
+		DLOG_ERR("sd_notify: %s\n", strerror(-r));
+#endif
+}
+
 static int nfq_main(void)
 {
 	uint8_t buf[16384] __attribute__((aligned));
@@ -290,6 +303,8 @@ static int nfq_main(void)
 
 	if (!nfq_init(&h,&qh))
 		return 1;
+
+	notify_ready();
 
 	fd = nfq_fd(h);
 	do
