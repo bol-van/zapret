@@ -69,7 +69,14 @@ check_bins()
 		echo found architecture "\"$arch\""
 	elif [ -f "$EXEDIR/Makefile" ] && exists make; then
 		echo trying to compile
-		[ "$SYSTEM" = "macos" ] && make_target=mac
+		case $SYSTEM in
+			macos)
+				make_target=mac
+				;;
+			systemd)
+				make_target=systemd
+				;;
+		esac
 		CFLAGS="-march=native ${CFLAGS}" make -C "$EXEDIR" $make_target || {
 			echo could not compile
 			make -C "$EXEDIR" clean
