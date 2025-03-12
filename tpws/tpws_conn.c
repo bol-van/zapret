@@ -1548,6 +1548,8 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 
 		DBGPRINT("epoll_wait\n");
 
+		fflush(stdout); fflush(stderr);
+
 		if ((num_events = epoll_wait(efd, events, MAX_EPOLL_EVENTS, -1)) == -1)
 		{
 			if (errno == EINTR) continue; // system call was interrupted
@@ -1755,8 +1757,6 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 			// at least one leg was removed. recount legs
 			print_legs();
 		}
-
-		fflush(stderr); fflush(stdout); // for console messages
 	}
 
 ex:
