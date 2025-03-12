@@ -30,10 +30,6 @@
 #include <ifaddrs.h>
 #endif
 
-#ifdef USE_SYSTEMD
-#include <systemd/sd-daemon.h>
-#endif
-
 #include "tpws.h"
 
 #ifdef BSD
@@ -1692,15 +1688,6 @@ static const char *bindll_s[] = { "unwanted","no","prefer","force" };
 #define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
 #endif
 
-static void notify_ready(void)
-{
-#ifdef USE_SYSTEMD
-	int r = sd_notify(0, "READY=1");
-	if (r < 0)
-		DLOG_ERR("sd_notify: %s\n", strerror(-r));
-#endif
-}
-
 int main(int argc, char *argv[])
 {
 	int i, listen_fd[MAX_BINDS], yes = 1, retval = 0, if_index, exit_v=EXIT_FAILURE;
@@ -1978,7 +1965,6 @@ int main(int argc, char *argv[])
 	signal(SIGHUP, onhup); 
 	signal(SIGUSR2, onusr2);
 
-	notify_ready();
 	retval = event_loop(listen_fd,params.binds_last+1);
 	exit_v = retval < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 	DLOG_CONDUP("Exiting\n");

@@ -16,6 +16,10 @@
 #include <fcntl.h>
 #include <netdb.h>
 
+#ifdef USE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 #include "tpws.h"
 #include "tpws_conn.h"
 #include "redirect.h"
@@ -24,6 +28,15 @@
 #include "helpers.h"
 #include "hostlist.h"
 #include "linux_compat.h"
+
+static void notify_ready(void)
+{
+#ifdef USE_SYSTEMD
+	int r = sd_notify(0, "READY=1");
+	if (r < 0)
+		DLOG_ERR("sd_notify: %s\n", strerror(-r));
+#endif
+}
 
 // keep separate legs counter. counting every time thousands of legs can consume cpu
 static int legs_local, legs_remote;
@@ -1541,6 +1554,8 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 		}
 		VPRINT("initialized multi threaded resolver with %d threads\n",resolver_thread_count());
 	}
+
+	notify_ready();
 
 	for(;;)
 	{
