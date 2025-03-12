@@ -92,6 +92,7 @@ void fill_random_bytes(uint8_t *p,size_t sz);
 void fill_random_az(uint8_t *p,size_t sz);
 void fill_random_az09(uint8_t *p,size_t sz);
 
+void disable_console_io_buffering(void);
 bool set_env_exedir(const char *argv0);
 
 

@@ -499,7 +499,6 @@ static int win_main(const char *windivert_filter)
 		if (!logical_net_filter_match())
 		{
 			DLOG_CONDUP("logical network is not present. waiting it to appear.\n");
-			fflush(stdout);
 			do
 			{
 				if (bQuit)
@@ -512,7 +511,6 @@ static int win_main(const char *windivert_filter)
 			}
 			while (!logical_net_filter_match());
 			DLOG_CONDUP("logical network now present\n");
-			fflush(stdout);
 		}
 
 		if (!windivert_init(windivert_filter))
@@ -522,10 +520,6 @@ static int win_main(const char *windivert_filter)
 		}
 
 		DLOG_CONDUP("windivert initialized. capture is started.\n");
-
-		// cygwin auto flush fails when piping
-		fflush(stdout);
-		fflush(stderr);
 
 		for (id=0;;id++)
 		{
@@ -589,10 +583,6 @@ static int win_main(const char *windivert_filter)
 				default:
 					DLOG("packet: id=%u drop\n", id);
 			}
-	
-			// cygwin auto flush fails when piping
-			fflush(stdout);
-			fflush(stderr);
 		}
 	}
 	win_dark_deinit();
@@ -1424,6 +1414,7 @@ void check_dp(const struct desync_profile *dp)
 
 int main(int argc, char **argv)
 {
+	disable_console_io_buffering();
 	set_env_exedir(argv[0]);
 
 #ifdef __CYGWIN__

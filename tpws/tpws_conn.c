@@ -1755,8 +1755,6 @@ int event_loop(const int *listen_fd, size_t listen_fd_ct)
 			// at least one leg was removed. recount legs
 			print_legs();
 		}
-
-		fflush(stderr); fflush(stdout); // for console messages
 	}
 
 ex:

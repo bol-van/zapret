@@ -383,6 +383,11 @@ bool pf_is_empty(const port_filter *pf)
 	return !pf->neg && !pf->from && !pf->to;
 }
 
+void disable_console_io_buffering(void)
+{
+	setvbuf(stdout, NULL, _IOLBF, 0);
+	setvbuf(stderr, NULL, _IOLBF, 0);
+}
 
 bool set_env_exedir(const char *argv0)
 {
