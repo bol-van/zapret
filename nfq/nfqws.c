@@ -294,6 +294,7 @@ static int nfq_main(void)
 	fd = nfq_fd(h);
 	do
 	{
+		fflush(stdout); fflush(stderr);
 		while ((rd = recv(fd, buf, sizeof(buf), 0)) >= 0)
 		{
 			ReloadCheck();
@@ -304,6 +305,7 @@ static int nfq_main(void)
 			}
 			else
 				DLOG("recv from nfq returned 0 !\n");
+			fflush(stdout);	fflush(stderr);
 		}
 		e=errno;
 		DLOG_ERR("recv: recv=%zd errno %d\n",rd,e);
@@ -389,6 +391,8 @@ static int dvt_main(void)
 
 	for(;;)
 	{
+		fflush(stdout);	fflush(stderr);
+
 		FD_ZERO(&fdset);
 		for(i=0;i<fdct;i++) FD_SET(fd[i], &fdset);
 		r = select(fdmax,&fdset,NULL,NULL,NULL);
@@ -509,8 +513,7 @@ static int win_main(const char *windivert_filter)
 		DLOG_CONDUP("windivert initialized. capture is started.\n");
 
 		// cygwin auto flush fails when piping
-		fflush(stdout);
-		fflush(stderr);
+		fflush(stdout);	fflush(stderr);
 
 		for (id=0;;id++)
 		{
@@ -576,8 +579,7 @@ static int win_main(const char *windivert_filter)
 			}
 	
 			// cygwin auto flush fails when piping
-			fflush(stdout);
-			fflush(stderr);
+			fflush(stdout);	fflush(stderr);
 		}
 	}
 	win_dark_deinit();
