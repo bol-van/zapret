@@ -15,6 +15,19 @@ all:	clean
 		done \
 	done
 
+systemd: clean
+	@mkdir -p "$(TGT)"; \
+	for dir in $(DIRS); do \
+		find "$$dir" -type f  \( -name "*.c" -o -name "*.h" -o -name "*akefile" \) -exec chmod -x {} \; ; \
+		$(MAKE) -C "$$dir" systemd || exit; \
+		for exe in "$$dir/"*; do \
+			if [ -f "$$exe" ] && [ -x "$$exe" ]; then \
+				mv -f "$$exe" "${TGT}" ; \
+				ln -fs "../${TGT}/$$(basename "$$exe")" "$$exe" ; \
+			fi \
+		done \
+	done
+
 android: clean
 	@mkdir -p "$(TGT)"; \
 	for dir in $(DIRS); do \

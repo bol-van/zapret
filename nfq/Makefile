@@ -1,8 +1,10 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Os -flto=auto
+CFLAGS_SYSTEMD = -DUSE_SYSTEMD
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
+LIBS_SYSTEMD = -lsystemd
 LIBS_BSD = -lz
 LIBS_CYGWIN = -lz -Lwindows/windivert -Iwindows -lwlanapi -lole32 -loleaut32
 LIBS_CYGWIN32 = -lwindivert32
@@ -15,6 +17,9 @@ all: nfqws
 
 nfqws: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o nfqws $(SRC_FILES) $(LIBS_LINUX) $(LDFLAGS)
+
+systemd: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) $(CFLAGS_SYSTEMD) -o nfqws $(SRC_FILES) $(LIBS_LINUX) $(LIBS_SYSTEMD) $(LDFLAGS)
 
 android: nfqws
 

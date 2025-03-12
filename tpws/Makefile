@@ -1,7 +1,9 @@
 CC ?= gcc
 CFLAGS += -std=gnu99 -Os -flto=auto
+CFLAGS_SYSTEMD = -DUSE_SYSTEMD
 CFLAGS_BSD = -Wno-address-of-packed-member
 LIBS = -lz -lpthread
+LIBS_SYSTEMD = -lz -lsystemd
 LIBS_ANDROID = -lz
 SRC_FILES = *.c
 SRC_FILES_ANDROID = $(SRC_FILES) andr/*.c
@@ -10,6 +12,9 @@ all: tpws
 
 tpws: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o tpws $(SRC_FILES) $(LIBS) $(LDFLAGS)
+
+systemd: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) $(CFLAGS_SYSTEMD) -o tpws $(SRC_FILES) $(LIBS_SYSTEMD) $(LDFLAGS)
 
 android: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o tpws $(SRC_FILES_ANDROID) $(LIBS_ANDROID) $(LDFLAGS)

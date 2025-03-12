@@ -12,6 +12,8 @@ all: mdig
 mdig: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LIBS) $(LDFLAGS)
 
+systemd: mdig
+
 android: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LIBS_ANDROID) $(LDFLAGS)
 
