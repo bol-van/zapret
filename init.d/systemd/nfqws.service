@@ -1,5 +1,8 @@
 # Example systemd service unit for nfqws. Adjust for your installation.
 
+# WARNING ! This unit requires to compile nfqws using `make systemd`
+# WARNING ! This makefile target enabled special systemd notify support.
+
 [Unit]
 After=network.target
 
