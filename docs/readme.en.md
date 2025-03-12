@@ -703,9 +703,9 @@ tpws is transparent proxy.
  --ipset-exclude=<filename>              ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
  --ipset-exclude-ip=<ip_list>            ; comma separated fixed subnet list
 
- --hostlist=<filename>                   ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist=<filename>                   ; only act on hosts in the list (one host per line, subdomains auto apply if not prefixed with '^', gzip supported, multiple hostlists allowed)
  --hostlist-domains=<domain_list>        ; comma separated fixed domain list
- --hostlist-exclude=<filename>           ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
+ --hostlist-exclude=<filename>           ; do not act on hosts in the list (one host per line, subdomains auto apply if not prefixed with '^', gzip supported, multiple hostlists allowed)
  --hostlist-exclude-domains=<domain_list> ; comma separated fixed domain list
  --hostlist-auto=<filename>              ; detect DPI blocks and build hostlist automatically
  --hostlist-auto-fail-threshold=<int>    ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
