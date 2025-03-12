@@ -462,3 +462,5 @@ nfqws,tpws: --version
 v70.4
 
 nfqws,tpws: ^ prefix in hostlist to disable subdomain matches
+nfqws,tpws: optional systemd notify support. compile using 'make systemd'
+nfqws,tpws: systemd instance templates for nfqws and tpws
