@@ -7,10 +7,10 @@
 # install build depends
 # make -C /opt/zapret systemd
 # cp nfqws@service /lib/systemd/system
+# systemctl daemon-reload
 
 # MANAGE INSTANCE
 # prepare /etc/zapret/nfqws1.conf with nfqws parameters
-# systemctl daemon-reload
 # systemctl start nfqws@nfqws1
 # systemctl status nfqws@nfqws1
 # systemctl restart nfqws@nfqws1

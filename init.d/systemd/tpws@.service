@@ -7,10 +7,10 @@
 # install build depends
 # make -C /opt/zapret systemd
 # cp tpws@service /lib/systemd/system
+# systemctl daemon-reload
 
 # MANAGE INSTANCE
 # prepare /etc/zapret/tpws1.conf with tpws parameters
-# systemctl daemon-reload
 # systemctl start tpws@tpws1
 # systemctl status tpws@tpws1
 # systemctl restart tpws@tpws1
