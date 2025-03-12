@@ -1414,7 +1414,7 @@ void check_dp(const struct desync_profile *dp)
 
 int main(int argc, char **argv)
 {
-	disable_console_io_buffering();
+	set_console_io_buffering();
 	set_env_exedir(argv[0]);
 
 #ifdef __CYGWIN__

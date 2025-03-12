@@ -82,7 +82,7 @@ bool pf_in_range(uint16_t port, const port_filter *pf);
 bool pf_parse(const char *s, port_filter *pf);
 bool pf_is_empty(const port_filter *pf);
 
-void disable_console_io_buffering(void);
+void set_console_io_buffering(void);
 bool set_env_exedir(const char *argv0);
 
 #ifndef IN_LOOPBACK

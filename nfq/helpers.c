@@ -391,7 +391,7 @@ void fill_random_az09(uint8_t *p,size_t sz)
 	}
 }
 
-void disable_console_io_buffering(void)
+void set_console_io_buffering(void)
 {
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	setvbuf(stderr, NULL, _IOLBF, 0);

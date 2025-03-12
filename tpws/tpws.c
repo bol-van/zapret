@@ -1707,7 +1707,7 @@ int main(int argc, char *argv[])
 	struct salisten_s list[MAX_BINDS];
 	char ip_port[48];
 
-	disable_console_io_buffering();
+	set_console_io_buffering();
 	set_env_exedir(argv[0]);
 	srand(time(NULL));
 	mask_from_preflen6_prepare();
