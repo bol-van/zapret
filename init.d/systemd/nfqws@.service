@@ -1,0 +1,65 @@
+# Example systemd service unit for nfqws. Adjust for your installation.
+
+# WARNING ! This unit requires to compile nfqws using `make systemd`
+# WARNING ! This makefile target enabled special systemd notify support.
+
+# PREPARE
+# install build depends
+# make -C /opt/zapret systemd
+# cp nfqws@service /lib/systemd/system
+
+# MANAGE INSTANCE
+# prepare /etc/zapret/nfqws1.conf with nfqws parameters
+# systemctl daemon-reload
+# systemctl start nfqws@nfqws1
+# systemctl status nfqws@nfqws1
+# systemctl restart nfqws@nfqws1
+# systemctl enable nfqws@nfqws1
+# systemctl disable nfqws@nfqws1
+# systemctl stop nfqws@nfqws1
+
+# DELETE
+# rm /lib/systemd/system/nfqws@.service
+# systemctl daemon-reload
+
+
+[Unit]
+After=network.target
+
+[Service]
+Type=notify
+Restart=on-failure
+
+ExecSearchPath=/opt/zapret/binaries/my
+ExecStart=nfqws @${CONFIG_DIR}/${INSTANCE}.conf
+Environment=CONFIG_DIR=/etc/zapret
+Environment=INSTANCE=%i
+
+RestrictAddressFamilies=AF_NETLINK AF_UNIX AF_INET6 AF_INET
+
+LockPersonality=true
+MemoryDenyWriteExecute=true
+PrivateDevices=true
+PrivateMounts=true
+PrivateTmp=true
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=full
+RemoveIPC=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

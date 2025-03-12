@@ -3,6 +3,26 @@
 # WARNING ! This unit requires to compile nfqws using `make systemd`
 # WARNING ! This makefile target enabled special systemd notify support.
 
+# PREPARE
+# install build depends
+# make -C /opt/zapret systemd
+# cp tpws@service /lib/systemd/system
+
+# MANAGE INSTANCE
+# prepare /etc/zapret/tpws1.conf with tpws parameters
+# systemctl daemon-reload
+# systemctl start tpws@tpws1
+# systemctl status tpws@tpws1
+# systemctl restart tpws@tpws1
+# systemctl enable tpws@tpws1
+# systemctl disable tpws@tpws1
+# systemctl stop tpws@tpws1
+
+# DELETE
+# rm /lib/systemd/system/tpws@.service
+# systemctl daemon-reload
+
+
 [Unit]
 After=network.target
 
@@ -11,16 +31,10 @@ Type=notify
 Restart=on-failure
 
 ExecSearchPath=/opt/zapret/binaries/my
-ExecStart=nfqws @${CONFIG_FILE}
-Environment=CONFIG_FILE=/etc/zapret/nfqws.config
+ExecStart=tpws @${CONFIG_DIR}/${INSTANCE}.conf
+Environment=CONFIG_DIR=/etc/zapret
+Environment=INSTANCE=%i
 
-StateDirectory=nfqws
-StateDirectoryMode=0700
-WorkingDirectory=%S/nfqws
-
-DynamicUser=true
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 RestrictAddressFamilies=AF_NETLINK AF_UNIX AF_INET6 AF_INET
 
 LockPersonality=true
@@ -35,16 +49,14 @@ ProtectHome=true
 ProtectHostname=true
 ProtectKernelLogs=true
 ProtectKernelModules=true
-ProtectKernelTunables=true
 ProtectProc=invisible
-ProtectSystem=strict
+ProtectSystem=full
 RemoveIPC=true
 RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
-SystemCallFilter=~@resources @privileged
 UMask=0077
 
 [Install]
