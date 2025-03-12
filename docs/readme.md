@@ -2010,7 +2010,7 @@ zapret_custom_firewall_nft поднимает правила nftables.
 и каким-то образом их поднимать. Например, написать дополнительный systemd unit для этого.
 Так же требуется собрать бинарники особым образом через `make systemd`.
 
-В комплекте zapret есть шаблоны `init.d/systemd/{nfqws@.service,tpws@.service}'.
+В комплекте zapret есть шаблоны `init.d/systemd/{nfqws@.service,tpws@.service}`.
 Краткий перечень команд для их использования приведен в комментариях в этих файлах.
 
 ## Простая установка на openwrt
