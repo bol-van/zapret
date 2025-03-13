@@ -293,7 +293,7 @@ static int nfq_main(void)
 	ssize_t rd;
 
 	sec_harden();
-	if (params.droproot && !droproot(params.uid, params.gid))
+	if (params.droproot && !droproot(params.uid, params.gid) || !dropcaps())
 		return 1;
 	print_id();
 	if (params.droproot && !test_list_files())

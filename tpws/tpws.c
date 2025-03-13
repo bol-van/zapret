@@ -1947,6 +1947,10 @@ int main(int argc, char *argv[])
 	sec_harden();
 	if (params.droproot && !droproot(params.uid,params.gid))
 		goto exiterr;
+#ifdef __linux__
+	if (!dropcaps())
+		goto exiterr;
+#endif
 	print_id();
 	if (params.droproot && !test_list_files())
 		goto exiterr;

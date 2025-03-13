@@ -287,7 +287,7 @@ bool can_drop_root(void)
 {
 #ifdef __linux__
 	// has some caps
-	return checkpcap((1<<CAP_SETUID)|(1<<CAP_SETGID)|(1<<CAP_SETPCAP));
+	return checkpcap((1<<CAP_SETUID)|(1<<CAP_SETGID));
 #else
 	// effective root
 	return !geteuid();
@@ -319,11 +319,7 @@ bool droproot(uid_t uid, gid_t gid)
 		DLOG_PERROR("setuid");
 		return false;
 	}
-#ifdef __linux__
-	return dropcaps();
-#else
 	return true;
-#endif
 }
 
 void print_id(void)
