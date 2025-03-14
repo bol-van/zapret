@@ -1474,7 +1474,7 @@ void parse_params(int argc, char *argv[])
 		params.binds_last=0; // default bind to all
 	}
 	if (!params.resolver_threads) params.resolver_threads = 5 + params.maxconn/50;
-	
+
 	VPRINT("adding low-priority default empty desync profile\n");
 	// add default empty profile
 	if (!(dpl = dp_list_add(&params.desync_profiles)))
@@ -1490,6 +1490,10 @@ void parse_params(int argc, char *argv[])
 		fprintf(stderr, "could not chown %s. log file may not be writable after privilege drop\n", params.debug_logfile);
 	if (params.droproot && *params.hostlist_auto_debuglog && chown(params.hostlist_auto_debuglog, params.uid, -1))
 		DLOG_ERR("could not chown %s. auto hostlist debug log may not be writable after privilege drop\n", params.hostlist_auto_debuglog);
+
+#ifdef __linux__
+	bool bHasMSS=false, bHasOOB=false, bHasDisorder=false;
+#endif
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
@@ -1500,7 +1504,22 @@ void parse_params(int argc, char *argv[])
 		}
 		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
 			DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", dp->hostlist_auto->filename);
+#ifdef __linux__
+		if (dp->mss) bHasMSS=true;
+		if (dp->oob || dp->oob_http || dp->oob_tls) bHasOOB=true;
+		if (dp->disorder || dp->disorder_http || dp->disorder_tls) bHasDisorder=true;
+#endif
 	}
+#ifdef __linux__
+	if (is_wsl()==1)
+	{
+		if (!params.nosplice) DLOG_CONDUP("WARNING ! WSL1 may have problems with splice. Consider using `--nosplice`.\n");
+		if (bHasMSS) DLOG_CONDUP("WARNING ! WSL1 does not support MSS socket option. MSS will likely fail.\n");
+		if (bHasOOB) DLOG_CONDUP("WARNING ! WSL1 does not support OOB. OOB will likely fail.\n");
+		if (bHasDisorder) DLOG_CONDUP("WARNING ! Windows retransmits whole TCP segment. Disorder will not function properly.\n");
+		fflush(stdout);
+	}
+#endif
 
 	if (!LoadAllHostLists())
 	{

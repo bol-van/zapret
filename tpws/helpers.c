@@ -78,6 +78,13 @@ char *strncasestr(const char *s, const char *find, size_t slen)
 	return (char *)s;
 }
 
+bool str_ends_with(const char *s, const char *suffix)
+{
+    size_t slen = strlen(s);
+    size_t suffix_len = strlen(suffix);
+    return suffix_len <= slen && !strcmp(s + slen - suffix_len, suffix);
+}
+
 bool load_file(const char *filename, void *buffer, size_t *buffer_size)
 {
 	FILE *F;
@@ -564,5 +571,21 @@ bool socket_wait_notsent(int sfd, unsigned int delay_ms, unsigned int *wasted_ms
 		delay_ms-=mtick;
 	}
 	return false;
+}
+
+int is_wsl(void)
+{
+  struct utsname buf;
+  if (uname(&buf) != 0)
+    return -1;
+
+  if (strcmp(buf.sysname, "Linux") != 0)
+    return 0;
+  if (str_ends_with(buf.release, "microsoft-standard-WSL2"))
+    return 2;
+  if (str_ends_with(buf.release, "-Microsoft"))
+    return 1;
+
+  return 0;
 }
 #endif

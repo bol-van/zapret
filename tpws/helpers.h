@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/utsname.h>
 
 // this saves memory. sockaddr_storage is larger than required. it can be 128 bytes. sockaddr_in6 is 28 bytes.
 typedef union
@@ -21,6 +22,8 @@ void qsort_size_t(size_t *array,size_t ct);
 void rtrim(char *s);
 void replace_char(char *s, char from, char to);
 char *strncasestr(const char *s,const char *find, size_t slen);
+
+bool str_ends_with(const char *s, const char *suffix);
 
 bool load_file(const char *filename,void *buffer,size_t *buffer_size);
 bool append_to_list_file(const char *filename, const char *s);
@@ -133,4 +136,6 @@ void msleep(unsigned int ms);
 bool socket_supports_notsent();
 bool socket_has_notsent(int sfd);
 bool socket_wait_notsent(int sfd, unsigned int delay_ms, unsigned int *wasted_ms);
+
+int is_wsl();
 #endif
