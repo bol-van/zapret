@@ -1748,7 +1748,7 @@ nofix:
 	if (bytes==-1)
 	{
 		char s[40];
-		snprintf(s,sizeof(s),"rawsend: sendto (%zu)\n",len);
+		snprintf(s,sizeof(s),"rawsend: sendto (%zu)",len);
 		DLOG_PERROR(s);
 		return false;
 	}
