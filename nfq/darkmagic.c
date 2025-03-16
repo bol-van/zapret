@@ -1747,7 +1747,9 @@ nofix:
 	bytes = sendto(sock, data, len, 0, (struct sockaddr*)&dst2, salen);
 	if (bytes==-1)
 	{
-		DLOG_PERROR("rawsend: sendto");
+		char s[40];
+		snprintf(s,sizeof(s),"rawsend: sendto (%zu)\n",len);
+		DLOG_PERROR(s);
 		return false;
 	}
 	return true;
