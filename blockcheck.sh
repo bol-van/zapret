@@ -1145,7 +1145,10 @@ test_has_fake()
 warn_fool()
 {
 	case "$1" in
-		md5sig) echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.' ;;
+		md5sig) echo 'WARNING ! although md5sig fooling worked it will not work on all sites. it typically works only on linux servers.'
+			[ "$2" = "fakedsplit" -o "$2" = "fakeddisorder" ] && \
+				echo "WARNING ! fakedsplit/fakeddisorder with md5sig fooling and low split position causes MTU overflow with multi-segment TLS (kyber)"
+			;;
 		datanoack) echo 'WARNING ! although datanoack fooling worked it may break NAT and may only work with external IP. Additionally it may require nftables to work correctly.' ;;
 	esac
 }
@@ -1272,7 +1275,7 @@ pktws_check_domain_http_bypass_()
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
 				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling $e && {
-					warn_fool $fooling
+					warn_fool $fooling $desync
 					[ "$SCANLEVEL" = quick ] && return
 					need_wssize=0
 				}
