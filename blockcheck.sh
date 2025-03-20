@@ -1168,7 +1168,7 @@ pktws_curl_test_update_vary()
 	[ "$sec" = 0 ] || proto=tls
 	test_has_fake $desync && {
 		zerofake="--dpi-desync-fake-$proto=0x00000000"
-		[ "$sec" = 0 ] || tlsmod="--dpi-desync-fake-tls-mod=rnd,rndsni,padencap"
+		[ "$sec" = 0 ] || tlsmod="--dpi-desync-fake-tls-mod=rnd,dupsid,rndsni,padencap"
 	}
 	if test_has_fakedsplit $desync ; then
 		splits="method+2 midsld"
