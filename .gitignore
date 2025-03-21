@@ -4,6 +4,7 @@ mdig/mdig
 nfq/dvtws
 nfq/nfqws
 nfq/winws.exe
+nfq/WinDivert*
 tpws/tpws
 binaries/my/
 ipset/zapret-ip*.txt
