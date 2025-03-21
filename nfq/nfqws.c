@@ -1116,7 +1116,7 @@ static bool onetime_tls_mod(struct desync_profile *dp)
 		++n;
 		if (!IsTLSClientHello(fake_tls->data,fake_tls->size,false) || (fake_tls->size < (44+fake_tls->data[43]))) // has session id ?
 		{
-			DLOG_ERR("profile %d fake[%d] tls mod set but tls fake structure invalid. mod skipped.\n", dp->n, n);
+			DLOG("profile %d fake[%d] tls mod set but tls fake structure invalid. mod skipped.\n", dp->n, n);
 			continue;
 
 		}
