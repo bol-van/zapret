@@ -466,3 +466,7 @@ nfqws,tpws: optional systemd notify support. compile using 'make systemd'
 nfqws,tpws: systemd instance templates for nfqws and tpws
 nfqws,tpws: separate droproot from dropcaps
 tpws: detect WSL 1 and warn about non-working options
+
+v70.5
+
+nfqws: multiple --dpi-desync-fake-xxx
