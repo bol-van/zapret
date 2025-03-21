@@ -2044,6 +2044,7 @@ int main(int argc, char **argv)
 			break;
 		case 39: /* dpi-desync-fake-tls */
 			load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4);
+			dp->fake_tls_mod |= FAKE_TLS_MOD_CUSTOM_FAKE;
 			break;
 		case 40: /* dpi-desync-fake-tls-mod */
 			if (!parse_tlsmod_list(optarg,&dp->fake_tls_mod))
