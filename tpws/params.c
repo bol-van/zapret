@@ -50,6 +50,7 @@ static int DLOG_VA(const char *format, int syslog_priority, bool condup, int lev
 	{
 		va_copy(args2,args);
 		DLOG_CON(format,syslog_priority,args2);
+		va_end(args2);
 	}
 	if (params.debug>=level)
 	{
