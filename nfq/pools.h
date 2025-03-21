@@ -146,3 +146,17 @@ bool port_filter_add(struct port_filters_head *head, const port_filter *pf);
 void port_filters_destroy(struct port_filters_head *head);
 bool port_filters_in_range(const struct port_filters_head *head, uint16_t port);
 bool port_filters_deny_if_empty(struct port_filters_head *head);
+
+
+struct blob_item {
+	uint8_t *data;	// main data blob
+	size_t size;	// main data blob size
+	size_t size_buf;// main data blob allocated size
+	void *extra;	// any data without size
+	LIST_ENTRY(blob_item) next;
+};
+LIST_HEAD(blob_collection_head, blob_item);
+struct blob_item *blob_collection_add(struct blob_collection_head *head);
+struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve);
+void blob_collection_destroy(struct blob_collection_head *head);
+bool blob_collection_empty(const struct blob_collection_head *head);

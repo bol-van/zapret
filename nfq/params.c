@@ -184,18 +184,8 @@ void dp_init(struct desync_profile *dp)
 	dp->desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
 	dp->desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
 	dp->desync_repeats = 1;
-	dp->fake_tls_size = sizeof(fake_tls_clienthello_default);
-	memcpy(dp->fake_tls,fake_tls_clienthello_default,dp->fake_tls_size);
 	dp->fake_tls_mod = 0;
-	dp->fake_http_size = strlen(fake_http_request_default);
-	memcpy(dp->fake_http,fake_http_request_default,dp->fake_http_size);
-	dp->fake_quic_size = 620; // must be 601+ for TSPU hack
-	dp->fake_quic[0] = 0x40; // russian TSPU QUIC short header fake
-	dp->fake_wg_size = 64;
-	dp->fake_dht_size = 64;
-	dp->fake_unknown_size = 256;
 	dp->fake_syndata_size = 16;
-	dp->fake_unknown_udp_size = 64;
 	dp->wscale=-1; // default - dont change scale factor (client)
 	dp->desync_ttl6 = 0xFF; // unused
 	dp->desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
@@ -207,11 +197,55 @@ void dp_init(struct desync_profile *dp)
 	dp->hostlist_auto_retrans_threshold = HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT;
 	dp->filter_ipv4 = dp->filter_ipv6 = true;
 }
+bool dp_fake_defaults(struct desync_profile *dp)
+{
+	struct blob_item *item;
+	if (blob_collection_empty(&dp->fake_http))
+		if (!blob_collection_add_blob(&dp->fake_http,fake_http_request_default,strlen(fake_http_request_default),0))
+			return false;
+	if (blob_collection_empty(&dp->fake_tls))
+	{
+		if (!blob_collection_add_blob(&dp->fake_tls,fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),4))
+			return false;
+	}
+	if (blob_collection_empty(&dp->fake_unknown))
+	{
+		if (!(item=blob_collection_add_blob(&dp->fake_unknown,NULL,256,0)))
+			return false;
+		memset(item->data,0,item->size);
+	}
+	if (blob_collection_empty(&dp->fake_quic))
+	{
+		if (!(item=blob_collection_add_blob(&dp->fake_quic,NULL,620,0)))
+			return false;
+		memset(item->data,0,item->size);
+		item->data[0] = 0x40;
+	}
+	if (blob_collection_empty(&dp->fake_wg))
+	{
+		if (!(item=blob_collection_add_blob(&dp->fake_wg,NULL,64,0)))
+			return false;
+		memset(item->data,0,item->size);
+	}
+	if (blob_collection_empty(&dp->fake_dht))
+	{
+		if (!(item=blob_collection_add_blob(&dp->fake_dht,NULL,64,0)))
+			return false;
+		memset(item->data,0,item->size);
+	}
+	if (blob_collection_empty(&dp->fake_unknown_udp))
+	{
+		if (!(item=blob_collection_add_blob(&dp->fake_unknown_udp,NULL,64,0)))
+			return false;
+		memset(item->data,0,item->size);
+	}
+	return true;
+}
 struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 {
 	struct desync_profile_list *entry = calloc(1,sizeof(struct desync_profile_list));
 	if (!entry) return NULL;
-	
+
 	dp_init(&entry->dp);
 
 	// add to the tail
@@ -234,6 +268,13 @@ static void dp_clear_dynamic(struct desync_profile *dp)
 	ipset_collection_destroy(&dp->ips_collection_exclude);
 	port_filters_destroy(&dp->pf_tcp);
 	port_filters_destroy(&dp->pf_udp);
+	blob_collection_destroy(&dp->fake_http);
+	blob_collection_destroy(&dp->fake_tls);
+	blob_collection_destroy(&dp->fake_unknown);
+	blob_collection_destroy(&dp->fake_unknown_udp);
+	blob_collection_destroy(&dp->fake_quic);
+	blob_collection_destroy(&dp->fake_wg);
+	blob_collection_destroy(&dp->fake_dht);
 	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
 }
 void dp_clear(struct desync_profile *dp)

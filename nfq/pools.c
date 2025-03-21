@@ -517,3 +517,64 @@ bool port_filters_deny_if_empty(struct port_filters_head *head)
 	if (LIST_FIRST(head)) return true;
 	return pf_parse("0",&pf) && port_filter_add(head,&pf);
 }
+
+
+		
+struct blob_item *blob_collection_add(struct blob_collection_head *head)
+{
+	struct blob_item *entry = calloc(1,sizeof(struct blob_item));
+	if (entry)
+	{
+		// insert to the end
+		struct blob_item *itemc,*iteml=LIST_FIRST(head);
+		if (iteml)
+		{
+			while ((itemc=LIST_NEXT(iteml,next))) iteml = itemc;
+			LIST_INSERT_AFTER(iteml, entry, next);
+		}
+		else
+			LIST_INSERT_HEAD(head, entry, next);
+	}
+	return entry;
+}
+struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve)
+{
+	struct blob_item *entry = calloc(1,sizeof(struct blob_item));
+	if (!entry) return NULL;
+	if (!(entry->data = malloc(size+size_reserve))) 
+	{
+		free(entry);
+		return NULL;
+	}
+	if (data) memcpy(entry->data,data,size);
+	entry->size = size;
+	entry->size_buf = size+size_reserve;
+	
+	// insert to the end
+	struct blob_item *itemc,*iteml=LIST_FIRST(head);
+	if (iteml)
+	{
+		while ((itemc=LIST_NEXT(iteml,next))) iteml = itemc;
+		LIST_INSERT_AFTER(iteml, entry, next);
+	}
+	else
+		LIST_INSERT_HEAD(head, entry, next);
+
+	return entry;
+}
+
+void blob_collection_destroy(struct blob_collection_head *head)
+{
+	struct blob_item *entry;
+	while ((entry = LIST_FIRST(head)))
+	{
+		LIST_REMOVE(entry, next);
+		free(entry->extra);
+		free(entry->data);
+		free(entry);
+	}
+}
+bool blob_collection_empty(const struct blob_collection_head *head)
+{
+	return !LIST_FIRST(head);
+}

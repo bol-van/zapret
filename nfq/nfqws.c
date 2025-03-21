@@ -1007,74 +1007,67 @@ static void SplitDebug(void)
 }
 
 static const char * tld[]={"com","org","net","edu","gov","biz"};
-static void onetime_tls_mod(struct desync_profile *dp)
+
+static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint8_t fake_tls_mod, uint8_t *fake_tls, size_t *fake_tls_size, size_t fake_tls_buf_size, struct fake_tls_mod_cache *modcache)
 {
 	const uint8_t *ext;
 	size_t extlen, slen;
 
-	if (dp->n && !(dp->fake_tls_mod & (FAKE_TLS_MOD_SET|FAKE_TLS_MOD_CUSTOM_FAKE)))
-		dp->fake_tls_mod |= FAKE_TLS_MOD_RND|FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_DUP_SID; // old behavior compat + dup_sid
-	if (!(dp->fake_tls_mod & ~FAKE_TLS_MOD_SAVE_MASK))
-		return; // nothing to do
-	if (!IsTLSClientHello(dp->fake_tls,dp->fake_tls_size,false) || (dp->fake_tls_size<(44+dp->fake_tls[43]))) // has session id ?
+	modcache->extlen_offset = modcache->padlen_offset = 0;
+	if (fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
 	{
-		DLOG_ERR("profile %d tls mod set but tls fake structure invalid\n", dp->n);
-		exit_clean(1);
-	}
-	if (dp->fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
-	{
-		if (!TLSFindExtLen(dp->fake_tls,dp->fake_tls_size,&dp->fake_tls_extlen_offset))
+		if (!TLSFindExtLen(fake_tls,*fake_tls_size,&modcache->extlen_offset))
 		{
-			DLOG_ERR("profile %d padencap set but tls fake structure invalid\n", dp->n);
-			exit_clean(1);
+			DLOG_ERR("profile %d fake[%d] padencap set but tls fake structure invalid\n", profile_n, fake_n);
+			return false;
 		}
-		DLOG("profile %d fake tls extensions length offset : %zu\n", dp->n, dp->fake_tls_extlen_offset);
-		if (TLSFindExt(dp->fake_tls,dp->fake_tls_size,21,&ext,&extlen,false))
+		DLOG("profile %d fake[%d] tls extensions length offset : %zu\n", profile_n, fake_n, modcache->extlen_offset);
+		if (TLSFindExt(fake_tls,*fake_tls_size,21,&ext,&extlen,false))
 		{
-			if ((ext-dp->fake_tls+extlen)!=dp->fake_tls_size)
+			if ((ext-fake_tls+extlen)!=*fake_tls_size)
 			{
-				DLOG_ERR("profile %d fake tls padding ext is present but it's not at the end. padding ext offset %zu, padding ext size %zu, fake size %zu\n", dp->n, ext-dp->fake_tls, extlen, dp->fake_tls_size);
-				exit_clean(1);
+				DLOG_ERR("profile %d fake[%d] tls padding ext is present but it's not at the end. padding ext offset %zu, padding ext size %zu, fake size %zu\n", profile_n, fake_n, ext-fake_tls, extlen, *fake_tls_size);
+				return false;
 			}
-			dp->fake_tls_padlen_offset = ext-dp->fake_tls-2;
-			DLOG("profile %d fake tls padding ext is present, padding length offset %zu\n", dp->n, dp->fake_tls_padlen_offset);
+			modcache->padlen_offset = ext-fake_tls-2;
+			DLOG("profile %d fake[%d] tls padding ext is present, padding length offset %zu\n", profile_n, fake_n, modcache->padlen_offset);
 		}
 		else
 		{
-			if ((dp->fake_tls_size+4)>sizeof(dp->fake_tls))
+			if ((*fake_tls_size+4)>fake_tls_buf_size)
 			{
-				DLOG_ERR("profile %d fake tls padding is absent and there's not space to add it\n", dp->n);
-				exit_clean(1);
+				DLOG_ERR("profile %d fake[%d] tls padding is absent and there's no space to add it\n", profile_n, fake_n);
+				return false;
 			}
-			phton16(dp->fake_tls+dp->fake_tls_size,21);
-			dp->fake_tls_size+=2;
-			dp->fake_tls_padlen_offset=dp->fake_tls_size;
-			phton16(dp->fake_tls+dp->fake_tls_size,0);
-			dp->fake_tls_size+=2;
-			phton16(dp->fake_tls+dp->fake_tls_extlen_offset,pntoh16(dp->fake_tls+dp->fake_tls_extlen_offset)+4);
-			phton16(dp->fake_tls+3,pntoh16(dp->fake_tls+3)+4); // increase tls record len
-			phton24(dp->fake_tls+6,pntoh24(dp->fake_tls+6)+4); // increase tls handshake len
-			DLOG("profile %d fake tls padding is absent. added. padding ledgth offset %zu\n", dp->n, dp->fake_tls_padlen_offset);
+			phton16(fake_tls+*fake_tls_size,21);
+			*fake_tls_size+=2;
+			modcache->padlen_offset=*fake_tls_size;
+			phton16(fake_tls+*fake_tls_size,0);
+			*fake_tls_size+=2;
+			phton16(fake_tls+modcache->extlen_offset,pntoh16(fake_tls+modcache->extlen_offset)+4);
+			phton16(fake_tls+3,pntoh16(fake_tls+3)+4); // increase tls record len
+			phton24(fake_tls+6,pntoh24(fake_tls+6)+4); // increase tls handshake len
+			DLOG("profile %d fake[%d] tls padding is absent. added. padding length offset %zu\n", profile_n, fake_n, modcache->padlen_offset);
 		}
 	}
-	if (dp->fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
+	if (fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
 	{
-		if (!TLSFindExt(dp->fake_tls,dp->fake_tls_size,0,&ext,&extlen,false))
+		if (!TLSFindExt(fake_tls,*fake_tls_size,0,&ext,&extlen,false))
 		{
-			DLOG_ERR("profile %d rndsni set but tls fake does not have SNI\n", dp->n);
-			exit_clean(1);
+			DLOG_ERR("profile %d fake[%d] rndsni set but tls fake does not have SNI\n", profile_n, fake_n);
+			return false;
 		}
 		if (!TLSAdvanceToHostInSNI(&ext,&extlen,&slen))
 		{
-			DLOG_ERR("profile %d rndsni set but tls fake has invalid SNI structure\n", dp->n);
-			exit_clean(1);
+			DLOG_ERR("profile %d fake[%d] rndsni set but tls fake has invalid SNI structure\n", profile_n, fake_n);
+			return false;
 		}
 		if (!slen)
 		{
-			DLOG_ERR("profile %d rndsni set but tls fake has zero sized SNI\n", dp->n);
-			exit_clean(1);
+			DLOG_ERR("profile %d fake[%d] rndsni set but tls fake has zero sized SNI\n", profile_n, fake_n);
+			return false;
 		}
-		uint8_t *sni = dp->fake_tls + (ext - dp->fake_tls);
+		uint8_t *sni = fake_tls + (ext - fake_tls);
 
 		char *s1=NULL, *s2=NULL;
 		if (params.debug)
@@ -1100,11 +1093,66 @@ static void onetime_tls_mod(struct desync_profile *dp)
 			if (s1 && (s2 = malloc(slen+1)))
 			{
 				memcpy(s2,sni,slen); s2[slen]=0;
-				DLOG("profile %d generated random SNI : %s -> %s\n",dp->n,s1,s2);
+				DLOG("profile %d fake[%d] generated random SNI : %s -> %s\n",profile_n,fake_n,s1,s2);
 			}
 			free(s1); free(s2);
 		}
 	}
+	return true;
+}
+static bool onetime_tls_mod(struct desync_profile *dp)
+{
+	if (dp->n && !(dp->fake_tls_mod & (FAKE_TLS_MOD_SET|FAKE_TLS_MOD_CUSTOM_FAKE)))
+		dp->fake_tls_mod |= FAKE_TLS_MOD_RND|FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_DUP_SID; // old behavior compat + dup_sid
+	if (!(dp->fake_tls_mod & ~FAKE_TLS_MOD_SAVE_MASK))
+		return true; // nothing to do
+
+	struct blob_item *fake_tls;
+	int n=0;
+	bool bMod=false;
+
+	LIST_FOREACH(fake_tls, &dp->fake_tls, next)
+	{
+		++n;
+		if (!IsTLSClientHello(fake_tls->data,fake_tls->size,false) || (fake_tls->size < (44+fake_tls->data[43]))) // has session id ?
+		{
+			DLOG_ERR("profile %d fake[%d] tls mod set but tls fake structure invalid. mod skipped.\n", dp->n, n);
+			continue;
+
+		}
+		bMod = true;
+		if (!fake_tls->extra)
+		{
+			fake_tls->extra = malloc(sizeof(struct fake_tls_mod_cache));
+			if (!fake_tls->extra) return false;
+		}
+		if (!onetime_tls_mod_blob(dp->n,n,dp->fake_tls_mod,fake_tls->data,&fake_tls->size,fake_tls->size_buf,(struct fake_tls_mod_cache*)fake_tls->extra))
+			return false;
+	}
+	if (!bMod)
+		DLOG_ERR("profile %d tls fake list does not have any valid TLS ClientHello\n", dp->n);
+	return bMod;
+}
+
+static void load_blob_to_collection(const char *filename, struct blob_collection_head *blobs, size_t max_size, size_t size_reserve)
+{
+	struct blob_item *blob = blob_collection_add(blobs);
+	uint8_t *p;
+	if (!blob || (!(blob->data = malloc(max_size+size_reserve))))
+	{
+		DLOG_ERR("out of memory\n");
+		exit_clean(1);
+	}
+	blob->size = max_size;
+	load_file_or_exit(filename,blob->data,&blob->size);
+	p = realloc(blob->data,blob->size+size_reserve);
+	if (!p)
+	{
+		DLOG_ERR("out of memory\n");
+		exit_clean(1);
+	}
+	blob->data = p;
+	blob->size_buf = blob->size+size_reserve;
 }
 
 
@@ -1992,13 +2040,10 @@ int main(int argc, char **argv)
 			dp->desync_any_proto = !optarg || atoi(optarg);
 			break;
 		case 38: /* dpi-desync-fake-http */
-			dp->fake_http_size = sizeof(dp->fake_http);
-			load_file_or_exit(optarg,dp->fake_http,&dp->fake_http_size);
+			load_blob_to_collection(optarg, &dp->fake_http, FAKE_MAX_TCP,0);
 			break;
 		case 39: /* dpi-desync-fake-tls */
-			dp->fake_tls_size = sizeof(dp->fake_tls);
-			load_file_or_exit(optarg,dp->fake_tls,&dp->fake_tls_size);
-			dp->fake_tls_mod |= FAKE_TLS_MOD_CUSTOM_FAKE;
+			load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4);
 			break;
 		case 40: /* dpi-desync-fake-tls-mod */
 			if (!parse_tlsmod_list(optarg,&dp->fake_tls_mod))
@@ -2008,28 +2053,23 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 41: /* dpi-desync-fake-unknown */
-			dp->fake_unknown_size = sizeof(dp->fake_unknown);
-			load_file_or_exit(optarg,dp->fake_unknown,&dp->fake_unknown_size);
+			load_blob_to_collection(optarg, &dp->fake_unknown, FAKE_MAX_TCP, 0);
 			break;
 		case 42: /* dpi-desync-fake-syndata */
 			dp->fake_syndata_size = sizeof(dp->fake_syndata);
 			load_file_or_exit(optarg,dp->fake_syndata,&dp->fake_syndata_size);
 			break;
 		case 43: /* dpi-desync-fake-quic */
-			dp->fake_quic_size = sizeof(dp->fake_quic);
-			load_file_or_exit(optarg,dp->fake_quic,&dp->fake_quic_size);
+			load_blob_to_collection(optarg, &dp->fake_quic, FAKE_MAX_UDP, 0);
 			break;
 		case 44: /* dpi-desync-fake-wireguard */
-			dp->fake_wg_size = sizeof(dp->fake_wg);
-			load_file_or_exit(optarg,dp->fake_wg,&dp->fake_wg_size);
+			load_blob_to_collection(optarg, &dp->fake_wg, FAKE_MAX_UDP, 0);
 			break;
 		case 45: /* dpi-desync-fake-dht */
-			dp->fake_dht_size = sizeof(dp->fake_dht);
-			load_file_or_exit(optarg,dp->fake_dht,&dp->fake_dht_size);
+			load_blob_to_collection(optarg, &dp->fake_dht, FAKE_MAX_UDP, 0);
 			break;
 		case 46: /* dpi-desync-fake-unknown-udp */
-			dp->fake_unknown_udp_size = sizeof(dp->fake_unknown_udp);
-			load_file_or_exit(optarg,dp->fake_unknown_udp,&dp->fake_unknown_udp_size);
+			load_blob_to_collection(optarg, &dp->fake_unknown_udp, FAKE_MAX_UDP, 0);
 			break;
 		case 47: /* dpi-desync-udplen-increment */
 			if (sscanf(optarg,"%d",&dp->udplen_increment)<1 || dp->udplen_increment>0x7FFF || dp->udplen_increment<-0x8000)
@@ -2475,7 +2515,16 @@ int main(int argc, char **argv)
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
 			DLOG("profile %d autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		split_compat(dp);
-		onetime_tls_mod(dp);
+		if (!dp_fake_defaults(dp))
+		{
+			DLOG_ERR("could not fill fake defaults\n");
+			exit_clean(1);
+		}
+		if (!onetime_tls_mod(dp))
+		{
+			DLOG_ERR("could not mod tls\n");
+			exit_clean(1);
+		}
 #ifndef __CYGWIN__
 		if (params.droproot && dp->hostlist_auto && chown(dp->hostlist_auto->filename, params.uid, -1))
 			DLOG_ERR("could not chown %s. auto hostlist file may not be writable after privilege drop\n", dp->hostlist_auto->filename);

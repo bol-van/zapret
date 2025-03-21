@@ -46,7 +46,15 @@
 #define FAKE_TLS_MOD_RND_SNI		0x40
 #define FAKE_TLS_MOD_PADENCAP		0x80
 
+#define FAKE_MAX_TCP	1460
+#define FAKE_MAX_UDP	1472
+
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
+
+struct fake_tls_mod_cache
+{
+	size_t extlen_offset, padlen_offset;
+};
 
 struct desync_profile
 {
@@ -74,12 +82,12 @@ struct desync_profile
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
-	uint8_t fake_http[1460],fake_unknown[1460],fake_syndata[1460],seqovl_pattern[1460],fsplit_pattern[1460];
-	uint8_t fake_unknown_udp[1472],udplen_pattern[1472],fake_quic[1472],fake_wg[1472],fake_dht[1472];
-	size_t fake_http_size,fake_quic_size,fake_wg_size,fake_dht_size,fake_unknown_size,fake_syndata_size,fake_unknown_udp_size;
 
-	uint8_t fake_tls[1460],fake_tls_mod;
-	size_t fake_tls_size, fake_tls_extlen_offset, fake_tls_padlen_offset;
+	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht;
+	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],fsplit_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
+	size_t fake_syndata_size;
+
+	uint8_t fake_tls_mod;
 
 	int udplen_increment;
 
@@ -113,6 +121,7 @@ void dp_entry_destroy(struct desync_profile_list *entry);
 void dp_list_destroy(struct desync_profile_list_head *head);
 bool dp_list_have_autohostlist(struct desync_profile_list_head *head);
 void dp_init(struct desync_profile *dp);
+bool dp_fake_defaults(struct desync_profile *dp);
 void dp_clear(struct desync_profile *dp);
 
 struct params_s
