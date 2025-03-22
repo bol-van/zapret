@@ -609,7 +609,7 @@ static uint16_t IP4_IP_ID_FIX(const struct ip *ip)
 static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache, uint8_t fake_tls_mod, const uint8_t *fake_data, size_t fake_data_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod)
 {
 	bool b=false;
-	if (IsTLSClientHello(fake_data,fake_data_size,false))
+	if (modcache) // it's filled only if it's TLS
 	{
 		if (fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
 		{
@@ -1300,7 +1300,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						switch(l7proto)
 						{
 							case TLS:
-								if ((fake_item->size <= sizeof(fake_data_buf)) && 
+								if ((fake_item->size <= sizeof(fake_data_buf)) &&
 									runtime_tls_mod(n,(struct fake_tls_mod_cache *)fake_item->extra, dp->fake_tls_mod, fake_item->data, fake_item->size, rdata_payload, rlen_payload, fake_data_buf))
 								{
 									fake_data = fake_data_buf;
@@ -1359,6 +1359,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					(!multisplit_count && (dp->desync_mode2==DESYNC_MULTISPLIT || dp->desync_mode2==DESYNC_MULTIDISORDER))))
 				{
 					reasm_orig_cancel(ctrack);
+					rdata_payload=NULL;
 
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
