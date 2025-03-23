@@ -844,7 +844,16 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	return !memcmp(data + pn_offset + pkn_len + cryptlen, atag, 16);
 }
 
-bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len)
+struct range64
+{
+	uint64_t offset,len;
+};
+#define MAX_DEFRAG_PIECES	128
+static int cmp_range64(const void * a, const void * b)
+{
+	return (((struct range64*)a)->offset < ((struct range64*)b)->offset) ? -1 : (((struct range64*)a)->offset > ((struct range64*)b)->offset) ? 1 : 0;
+}
+bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len, bool *bFull)
 {
 	// Crypto frame can be split into multiple chunks
 	// chromium randomly splits it and pads with zero/one bytes to force support the standard
@@ -853,13 +862,15 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 	if (*defrag_len<10) return false;
 	uint8_t *defrag_data = defrag+10;
 	size_t defrag_data_len = *defrag_len-10;
-
 	uint8_t ft;
 	uint64_t offset,sz,szmax=0,zeropos=0,pos=0;
 	bool found=false;
+	struct range64 ranges[MAX_DEFRAG_PIECES];
+	int i,range=0;
 
 	while(pos<clean_len)
 	{
+		// frame type
 		ft = clean[pos];
 		pos++;
 		if (ft>1) // 00 - padding, 01 - ping
@@ -867,6 +878,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 			if (ft!=6) return false; // dont want to know all possible frame type formats
 
 			if (pos>=clean_len) return false;
+			if (range>=MAX_DEFRAG_PIECES) return false;
 
 			if ((pos+tvb_get_size(clean[pos])>=clean_len)) return false;
 			pos += tvb_get_varint(clean+pos, &offset);
@@ -875,7 +887,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 			pos += tvb_get_varint(clean+pos, &sz);
 			if ((pos+sz)>clean_len) return false;
 
-			if ((offset+sz)>defrag_data_len) return false;
+			if ((offset+sz)>defrag_data_len) return false; // defrag buf overflow
 			if (zeropos < offset)
 				// make sure no uninitialized gaps exist in case of not full fragment coverage
 				memset(defrag_data+zeropos,0,offset-zeropos);
@@ -886,6 +898,10 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 
 			found=true;
 			pos+=sz;
+
+			ranges[range].offset = offset;
+			ranges[range].len = sz;
+			range++;
 		}
 	}
 	if (found)
@@ -897,6 +913,23 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 		phton64(defrag+2,szmax);
 		defrag[2] |= 0xC0; // 64 bit value
 		*defrag_len = (size_t)(szmax+10);
+
+		qsort(ranges, range, sizeof(*ranges), cmp_range64);
+
+		for(i=0 ; i<range ; i++)
+			printf("RANGE %zu len %zu\n",ranges[i].offset,ranges[i].len);
+
+		for(i=0,offset=0,*bFull=true ; i<range ; i++)
+		{
+			if (ranges[i].offset!=offset)
+			{
+				*bFull = false;
+				break;
+			}
+			offset += ranges[i].len;
+		}
+
+printf("bFull=%d\n",*bFull);
 	}
 	return found;
 }
