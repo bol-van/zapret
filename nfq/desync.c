@@ -1963,6 +1963,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				{
 					if (bFull)
 					{
+						DLOG("QUIC initial contains CRYPTO with full fragment coverage\n");
+
 						bool bIsHello = IsQUICCryptoHello(defrag, defrag_len, &hello_offset, &hello_len);
 						bool bReqFull = bIsHello ? IsTLSHandshakeFull(defrag+hello_offset,hello_len) : false;
 

@@ -916,8 +916,8 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 
 		qsort(ranges, range, sizeof(*ranges), cmp_range64);
 
-		for(i=0 ; i<range ; i++)
-			printf("RANGE %zu len %zu\n",ranges[i].offset,ranges[i].len);
+		//for(i=0 ; i<range ; i++)
+		//	printf("RANGE %zu len %zu\n",ranges[i].offset,ranges[i].len);
 
 		for(i=0,offset=0,*bFull=true ; i<range ; i++)
 		{
@@ -929,7 +929,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 			offset += ranges[i].len;
 		}
 
-printf("bFull=%d\n",*bFull);
+		//printf("bFull=%u\n",*bFull);
 	}
 	return found;
 }
