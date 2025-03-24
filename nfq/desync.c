@@ -2020,7 +2020,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					else
 					{
-						DLOG("QUIC initial contains CRYPTO without full fragment coverage\n");
+						DLOG("QUIC initial contains CRYPTO with partial fragment coverage\n");
 						if (ctrack)
 						{
 							if (ReasmIsEmpty(&ctrack->reasm_orig))
