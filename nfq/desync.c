@@ -66,6 +66,9 @@ const uint8_t fake_tls_clienthello_default[648] = {
 #define PKTDATA_MAXDUMP 32
 #define IP_MAXDUMP 80
 
+#define TCP_MAX_REASM 16384
+#define UDP_MAX_REASM 16384
+
 bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 {
 	return mode==DESYNC_SYNACK || mode==DESYNC_SYNDATA;
@@ -954,7 +957,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					!(ctrack->req_seq_finalized && seq_within(ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end)))
 				{
 					// do not reconstruct unexpected large payload (they are feeding garbage ?)
-					if (!reasm_orig_start(ctrack,IPPROTO_TCP,TLSRecordLen(dis->data_payload),16384,dis->data_payload,dis->len_payload))
+					if (!reasm_orig_start(ctrack,IPPROTO_TCP,TLSRecordLen(dis->data_payload),TCP_MAX_REASM,dis->data_payload,dis->len_payload))
 					{
 						reasm_orig_cancel(ctrack);
 						return verdict;
@@ -1953,7 +1956,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 						return verdict; // cannot be first packet
 					}
 				}
-				uint8_t defrag[16384];
+				uint8_t defrag[UDP_MAX_REASM];
 				size_t hello_offset, hello_len, defrag_len = sizeof(defrag);
 				bool bFull;
 				if (QUICDefragCrypto(pclean,clean_len,defrag,&defrag_len,&bFull))
@@ -1970,7 +1973,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 							if (bIsHello && !bReqFull && ReasmIsEmpty(&ctrack->reasm_orig))
 							{
 								// preallocate max buffer to avoid reallocs that cause memory copy
-								if (!reasm_orig_start(ctrack,IPPROTO_UDP,16384,16384,clean,clean_len))
+								if (!reasm_orig_start(ctrack,IPPROTO_UDP,UDP_MAX_REASM,UDP_MAX_REASM,clean,clean_len))
 								{
 									reasm_orig_cancel(ctrack);
 									return verdict;
@@ -2021,7 +2024,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 							if (ReasmIsEmpty(&ctrack->reasm_orig))
 							{
 								// preallocate max buffer to avoid reallocs that cause memory copy
-								if (!reasm_orig_start(ctrack,IPPROTO_UDP,16384,16384,clean,clean_len))
+								if (!reasm_orig_start(ctrack,IPPROTO_UDP,UDP_MAX_REASM,UDP_MAX_REASM,clean,clean_len))
 								{
 									reasm_orig_cancel(ctrack);
 									return verdict;
