@@ -35,6 +35,8 @@ const char *l7proto_str(t_l7proto l7)
 		case QUIC: return "quic";
 		case WIREGUARD: return "wireguard";
 		case DHT: return "dht";
+		case DISCORD: return "discord";
+		case STUN: return "stun";
 		default: return "unknown";
 	}
 }
@@ -45,7 +47,9 @@ bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
 		(l7proto==TLS && (filter_l7 & L7_PROTO_TLS)) ||
 		(l7proto==QUIC && (filter_l7 & L7_PROTO_QUIC)) ||
 		(l7proto==WIREGUARD && (filter_l7 & L7_PROTO_WIREGUARD)) ||
-		(l7proto==DHT && (filter_l7 & L7_PROTO_DHT));
+		(l7proto==DHT && (filter_l7 & L7_PROTO_DHT)) ||
+		(l7proto==DISCORD && (filter_l7 & L7_PROTO_DISCORD)) ||
+		(l7proto==STUN && (filter_l7 & L7_PROTO_STUN));
 }
 
 #define PM_ABS		0
@@ -1005,4 +1009,19 @@ bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len)
 bool IsDhtD1(const uint8_t *data, size_t len)
 {
 	return len>=7 && data[0]=='d' && data[1]=='1' && data[len-1]=='e';
+}
+bool IsDiscordIpDiscoveryRequest(const uint8_t *data, size_t len)
+{
+	return len==74 &&
+		data[0]==0 && data[1]==1 &&
+		data[2]==0 && data[3]==70 &&
+		data[8]==0 && memcmp(&data[8],&data[9],63)==0; // address is not set in requests
+}
+bool IsStunMessage(const uint8_t *data, size_t len)
+{
+	return len>=20 && // header size
+		(data[0]&0xC0)==0 && // 2 most significant bits must be zeroes
+		(data[3]&0b11)==0 && // length must be a multiple of 4
+		ntohl(*(uint32_t*)(&data[4]))==0x2112A442 && // magic cookie
+		ntohs(*(uint16_t*)(&data[2]))==len-20;
 }

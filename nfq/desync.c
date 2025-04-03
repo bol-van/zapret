@@ -2079,6 +2079,18 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				l7proto = DHT;
 				if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
 			}
+			else if (IsDiscordIpDiscoveryRequest(dis->data_payload,dis->len_payload))
+			{
+				DLOG("packet contains Discord Voice IP Discovery\n");
+				l7proto = DISCORD;
+				if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
+			}
+			else if (IsStunMessage(dis->data_payload,dis->len_payload))
+			{
+				DLOG("packet contains STUN message\n");
+				l7proto = STUN;
+				if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
+			}
 			else
 			{
 				if (!dp->desync_any_proto)
@@ -2190,6 +2202,12 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				break;
 			case DHT:
 				fake = &dp->fake_dht;
+				break;
+			case DISCORD:
+				fake = &dp->fake_discord;
+				break;
+			case STUN:
+				fake = &dp->fake_stun;
 				break;
 			default:
 				fake = &dp->fake_unknown_udp;
