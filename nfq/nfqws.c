@@ -1325,7 +1325,7 @@ static void exithelp(void)
 		" --filter-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --filter-tcp=[~]port1[-port2]|*\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list allowed.\n"
 		" --filter-udp=[~]port1[-port2]|*\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
-		" --filter-l7=[http|tls|quic|wireguard|dht|discord|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
+		" --filter-l7=[http|tls|quic|wireguard|dht|discord|stun|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
 		" --ipset=<filename>\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
 		" --ipset-ip=<ip_list>\t\t\t\t; comma separated fixed subnet list\n"
 		" --ipset-exclude=<filename>\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
