@@ -180,6 +180,7 @@ nfqws takes the following parameters:
  --dpi-desync-fake-quic=<filename>|0xHEX        ; file containing fake QUIC Initial
  --dpi-desync-fake-wireguard=<filename>|0xHEX   ; file containing fake wireguard handshake initiation
  --dpi-desync-fake-dht=<filename>|0xHEX         ; file containing fake DHT (d1..e)
+ --dpi-desync-fake-discord=<filename>|0xHEX     ; file containing fake Discord voice connection initiation packet (IP Discovery)
  --dpi-desync-fake-unknown-udp=<filename>|0xHEX ; file containing unknown udp protocol fake payload
  --dpi-desync-udplen-increment=<int>            ; increase or decrease udp packet length by N bytes (default 2). negative values decrease length.
  --dpi-desync-udplen-pattern=<filename>|0xHEX   ; udp tail fill pattern
@@ -193,13 +194,13 @@ nfqws takes the following parameters:
  --hostlist-auto-fail-threshold=<int>           ; how many failed attempts cause hostname to be added to auto hostlist (default : 3)
  --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
  --hostlist-auto-retrans-threshold=<int>        ; how many request retransmissions cause attempt to fail (default : 3)
- --hostlist-auto-debug=<logfile>        	; debug auto hostlist positives
+ --hostlist-auto-debug=<logfile>                ; debug auto hostlist positives
  --new                                          ; begin new strategy (new profile)
  --skip                                         ; do not use this profile
  --filter-l3=ipv4|ipv6                          ; L3 protocol filter. multiple comma separated values allowed.
  --filter-tcp=[~]port1[-port2]|*                ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list supported.
  --filter-udp=[~]port1[-port2]|*                ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list supported.
- --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
+ --filter-l7=<proto>                            ; L6-L7 protocol filter. multiple comma separated values allowed. proto: http tls quic wireguard dht discord unknown
  --ipset=<filename>                             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
  --ipset-ip=<ip_list>                           ; comma separated fixed subnet list
  --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
@@ -474,7 +475,7 @@ This option can resist DPIs that track outgoing UDP packet sizes.
 Requires that application protocol does not depend on udp payload size.
 
 QUIC initial packets are recognized. Decryption and hostname extraction is supported so `--hostlist` parameter will work.
-Wireguard handshake initiation and DHT packets are also recognized.
+Wireguard handshake initiation, DHT and [Discord Voice IP Discovery](https://discord.com/developers/docs/topics/voice-connections#ip-discovery) packets are also recognized.
 For other protocols desync use `--dpi-desync-any-protocol`.
 
 Conntrack supports udp. `--dpi-desync-cutoff` will work. UDP conntrack timeout can be set in the 4th parameter of `--ctrack-timeouts`.

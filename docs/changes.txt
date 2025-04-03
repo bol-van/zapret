@@ -471,3 +471,7 @@ v70.5
 
 nfqws: multiple --dpi-desync-fake-xxx
 nfqws: support of inter-packet fragmented QUIC CRYPTO
+
+v70.6
+
+nfqws: detect Discord Voice IP discovery packets

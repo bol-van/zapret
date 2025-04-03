@@ -83,7 +83,7 @@ struct desync_profile
 	uint32_t desync_fooling_mode;
 	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
 
-	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht;
+	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht,fake_discord;
 	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],fsplit_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
 	size_t fake_syndata_size;
 
