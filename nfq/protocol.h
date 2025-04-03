@@ -7,13 +7,14 @@
 #include "crypto/aes-gcm.h"
 #include "helpers.h"
 
-typedef enum {UNKNOWN=0, HTTP, TLS, QUIC, WIREGUARD, DHT, DISCORD} t_l7proto;
+typedef enum {UNKNOWN=0, HTTP, TLS, QUIC, WIREGUARD, DHT, DISCORD, STUN} t_l7proto;
 #define L7_PROTO_HTTP		0x00000001
 #define L7_PROTO_TLS		0x00000002
 #define L7_PROTO_QUIC		0x00000004
 #define L7_PROTO_WIREGUARD	0x00000008
 #define L7_PROTO_DHT		0x00000010
 #define L7_PROTO_DISCORD	0x00000020
+#define L7_PROTO_STUN		0x00000040
 #define L7_PROTO_UNKNOWN	0x80000000
 const char *l7proto_str(t_l7proto l7);
 bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7);
@@ -74,6 +75,7 @@ bool TLSHelloExtractHostFromHandshake(const uint8_t *data, size_t len, char *hos
 bool IsWireguardHandshakeInitiation(const uint8_t *data, size_t len);
 bool IsDhtD1(const uint8_t *data, size_t len);
 bool IsDiscordIpDiscoveryRequest(const uint8_t *data, size_t len);
+bool IsStunMessage(const uint8_t *data, size_t len);
 
 #define QUIC_MAX_CID_LENGTH  20
 typedef struct quic_cid {

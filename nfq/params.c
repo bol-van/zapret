@@ -240,6 +240,12 @@ bool dp_fake_defaults(struct desync_profile *dp)
 			return false;
 		memset(item->data,0,item->size);
 	}
+	if (blob_collection_empty(&dp->fake_stun))
+	{
+		if (!(item=blob_collection_add_blob(&dp->fake_stun,NULL,64,0)))
+			return false;
+		memset(item->data,0,item->size);
+	}
 	if (blob_collection_empty(&dp->fake_unknown_udp))
 	{
 		if (!(item=blob_collection_add_blob(&dp->fake_unknown_udp,NULL,64,0)))
@@ -283,6 +289,7 @@ static void dp_clear_dynamic(struct desync_profile *dp)
 	blob_collection_destroy(&dp->fake_wg);
 	blob_collection_destroy(&dp->fake_dht);
 	blob_collection_destroy(&dp->fake_discord);
+	blob_collection_destroy(&dp->fake_stun);
 	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
 }
 void dp_clear(struct desync_profile *dp)
