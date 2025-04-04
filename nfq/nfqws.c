@@ -1040,7 +1040,7 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 	size_t extlen;
 
 	modcache->extlen_offset = modcache->padlen_offset = 0;
-	if (fake_tls_mod & (FAKE_TLS_MOD_PADENCAP|FAKE_TLS_MOD_SNI))
+	if (fake_tls_mod & (FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_SNI))
 	{
 		if (!TLSFindExtLen(fake_tls,*fake_tls_size,&modcache->extlen_offset))
 		{
