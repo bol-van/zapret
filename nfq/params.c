@@ -281,16 +281,9 @@ static void dp_clear_dynamic(struct desync_profile *dp)
 	ipset_collection_destroy(&dp->ips_collection_exclude);
 	port_filters_destroy(&dp->pf_tcp);
 	port_filters_destroy(&dp->pf_udp);
-	blob_collection_destroy(&dp->fake_http);
-	blob_collection_destroy(&dp->fake_tls);
-	blob_collection_destroy(&dp->fake_unknown);
-	blob_collection_destroy(&dp->fake_unknown_udp);
-	blob_collection_destroy(&dp->fake_quic);
-	blob_collection_destroy(&dp->fake_wg);
-	blob_collection_destroy(&dp->fake_dht);
-	blob_collection_destroy(&dp->fake_discord);
-	blob_collection_destroy(&dp->fake_stun);
 	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
+	struct blob_collection_head **fake,*fakes[] = {&dp->fake_http, &dp->fake_tls, &dp->fake_unknown, &dp->fake_unknown_udp, &dp->fake_quic, &dp->fake_wg, &dp->fake_dht, &dp->fake_discord, &dp->fake_stun, NULL};
+	for(fake=fakes;*fake;fake++) blob_collection_destroy(*fake);
 }
 void dp_clear(struct desync_profile *dp)
 {
