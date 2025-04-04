@@ -609,7 +609,7 @@ static uint16_t IP4_IP_ID_FIX(const struct ip *ip)
 // fake_mod buffer must at least sizeof(desync_profile->fake_tls)
 // size does not change
 // return : true - altered, false - not altered
-static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache, uint8_t fake_tls_mod, const uint8_t *fake_data, size_t fake_data_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod)
+static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache, uint32_t fake_tls_mod, const uint8_t *fake_data, size_t fake_data_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod)
 {
 	bool b=false;
 	if (modcache) // it's filled only if it's TLS
@@ -630,6 +630,7 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 				phton16(fake_mod+modcache->extlen_offset,(uint16_t)sz_ext);
 				phton16(fake_mod+modcache->padlen_offset,(uint16_t)sz_pad);
 				b=true;
+				DLOG("fake[%d] applied padencap tls mod. sizes increased by %zu bytes.\n", fake_n, payload_len);
 			}
 		}
 		if (fake_tls_mod & FAKE_TLS_MOD_RND)
@@ -638,6 +639,7 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 			fill_random_bytes(fake_mod+11,32); // random
 			fill_random_bytes(fake_mod+44,fake_mod[43]); // session id
 			b=true;
+			DLOG("fake[%d] applied rnd tls mod\n", fake_n);
 		}
 		if (fake_tls_mod & FAKE_TLS_MOD_DUP_SID)
 		{
@@ -650,6 +652,7 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 				if (!b)	memcpy(fake_mod,fake_data,fake_data_size);
 				memcpy(fake_mod+44,payload+44,fake_mod[43]); // session id
 				b=true;
+				DLOG("fake[%d] applied dupsid tls mod\n", fake_n);
 			}
 		}
 	}

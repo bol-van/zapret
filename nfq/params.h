@@ -44,7 +44,8 @@
 #define FAKE_TLS_MOD_RND		0x10
 #define FAKE_TLS_MOD_DUP_SID		0x20
 #define FAKE_TLS_MOD_RND_SNI		0x40
-#define FAKE_TLS_MOD_PADENCAP		0x80
+#define FAKE_TLS_MOD_SNI		0x80
+#define FAKE_TLS_MOD_PADENCAP		0x100
 
 #define FAKE_MAX_TCP	1460
 #define FAKE_MAX_UDP	1472
@@ -87,7 +88,8 @@ struct desync_profile
 	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],fsplit_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
 	size_t fake_syndata_size;
 
-	uint8_t fake_tls_mod;
+	uint32_t fake_tls_mod;
+	char fake_tls_sni[64];
 
 	int udplen_increment;
 

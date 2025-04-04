@@ -174,7 +174,7 @@ nfqws takes the following parameters:
  --dpi-desync-any-protocol=0|1                  ; 0(default)=desync only http and tls  1=desync any nonempty data packet
  --dpi-desync-fake-http=<filename>|0xHEX        ; file containing fake http request
  --dpi-desync-fake-tls=<filename>|0xHEX         ; file containing fake TLS ClientHello (for https)
- --dpi-desync-fake-tls-mod=mod[,mod]            ; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,dupsid,padencap
+ --dpi-desync-fake-tls-mod=mod[,mod]            ; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap
  --dpi-desync-fake-unknown=<filename>|0xHEX     ; file containing unknown protocol fake payload
  --dpi-desync-fake-syndata=<filename>|0xHEX     ; file containing SYN data payload
  --dpi-desync-fake-quic=<filename>|0xHEX        ; file containing fake QUIC Initial
@@ -285,6 +285,7 @@ It's possible to use TLS Client Hello with any fingerprint and any SNI.
  * `rnd`. Randomize `random` and `session id` fields. Applied on every request.
  * `rndsni`. Randomize SNI. If SNI >=7 symbols random SLD is applied with known TLD. Otherwise filled with random symbols. Applied only once at startup.
  * `dupsid`. Copy `session ID` from original TLS Client Hello. Takes precedence over `rnd`. Applied on every request.
+ * `sni=<sni>`. Set specified SNI value. Changes TLS fake length, fixes lengths in TLS structure. Applied once at startup before `rndsni`.
  * `padencap`. Padding extension is extended by original TLS Client Hello size (including multi packet variation with kyber). Padding extension is added to the end if not present, otherwise it must be the last extension. All lengths are increased. Fake size is not changed. Can be useful if DPI does not analyze sequence numbers properly. Applied on every request.
 
 By default if custom fake is not defined `rnd,rndsni,dupsid` mods are applied. If defined - `none`.

@@ -206,7 +206,7 @@ bool dp_fake_defaults(struct desync_profile *dp)
 			return false;
 	if (blob_collection_empty(&dp->fake_tls))
 	{
-		if (!blob_collection_add_blob(&dp->fake_tls,fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),4))
+		if (!blob_collection_add_blob(&dp->fake_tls,fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),4+sizeof(dp->fake_tls_sni)))
 			return false;
 	}
 	if (blob_collection_empty(&dp->fake_unknown))
@@ -222,35 +222,15 @@ bool dp_fake_defaults(struct desync_profile *dp)
 		memset(item->data,0,item->size);
 		item->data[0] = 0x40;
 	}
-	if (blob_collection_empty(&dp->fake_wg))
+	struct blob_collection_head **fake,*fakes_z64[] = {&dp->fake_wg, &dp->fake_dht, &dp->fake_discord, &dp->fake_stun, &dp->fake_unknown_udp,NULL};
+	for(fake=fakes_z64;*fake;fake++)
 	{
-		if (!(item=blob_collection_add_blob(&dp->fake_wg,NULL,64,0)))
-			return false;
-		memset(item->data,0,item->size);
-	}
-	if (blob_collection_empty(&dp->fake_dht))
-	{
-		if (!(item=blob_collection_add_blob(&dp->fake_dht,NULL,64,0)))
-			return false;
-		memset(item->data,0,item->size);
-	}
-	if (blob_collection_empty(&dp->fake_discord))
-	{
-		if (!(item=blob_collection_add_blob(&dp->fake_discord,NULL,64,0)))
-			return false;
-		memset(item->data,0,item->size);
-	}
-	if (blob_collection_empty(&dp->fake_stun))
-	{
-		if (!(item=blob_collection_add_blob(&dp->fake_stun,NULL,64,0)))
-			return false;
-		memset(item->data,0,item->size);
-	}
-	if (blob_collection_empty(&dp->fake_unknown_udp))
-	{
-		if (!(item=blob_collection_add_blob(&dp->fake_unknown_udp,NULL,64,0)))
-			return false;
-		memset(item->data,0,item->size);
+		if (blob_collection_empty(*fake))
+		{
+			if (!(item=blob_collection_add_blob(*fake,NULL,64,0)))
+				return false;
+			memset(item->data,0,item->size);
+		}
 	}
 	return true;
 }

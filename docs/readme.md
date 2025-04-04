@@ -1,4 +1,4 @@
-# zapret v70.5
+# zapret v70.6
 
 # ВНИМАНИЕ, остерегайтесь мошенников
 
@@ -196,7 +196,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-any-protocol=0|1                      ; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
 --dpi-desync-fake-http=<filename>|0xHEX	           ; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному www.iana.org
 --dpi-desync-fake-tls=<filename>|0xHEX             ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному
---dpi-desync-fake-tls-mod=mod[,mod]                ; список через запятую режимов runtime модификации фейков : none,rnd,rndsni,dupsid,padencap
+--dpi-desync-fake-tls-mod=mod[,mod]                ; список через запятую режимов runtime модификации фейков : none,rnd,rndsni,sni=<sni>,dupsid,padencap
 --dpi-desync-fake-unknown=<filename>|0xHEX         ; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
 --dpi-desync-fake-syndata=<filename>|0xHEX         ; файл, содержащий фейковый пейлоад пакета SYN для режима десинхронизации syndata
 --dpi-desync-fake-quic=<filename>|0xHEX            ; файл, содержащий фейковый QUIC Initial
@@ -340,6 +340,7 @@ dvtws, собираемый из тех же исходников (см. [док
  * `rnd`. Рандомизировать поля `random` и `session id`. Выполняется на каждый запрос.
  * `dupsid`. Копировать `session ID` из передаваемого TLS Client Hello. Имеет приоритет над `rnd`. Выполняется на каждый запрос.
  * `rndsni`. Рандомизировать SNI. Если SNI >=7 символов, применяется случайный домен 2 уровня с известным TLD, иначе заполняется случайными символами без точки. Выполняется один раз при старте.
+ * `sni=<sni>`. Заменить sni на указанное значение. Макс длина SNI - 63 байта. Общая длина TLS фейка и длины в структуре TLS Client Hello меняются. Выполняется один раз при старте. Если сочетается с `rndsni`, выполняется до него.
  * `padencap`. Расширяется padding extension на размер передаваемого TLS Client Hello (включая многопакетный вариант с kyber). Если padding отсутствует, он добавляется в конец. Если присутствует - требуется, чтобы padding шел последним extension. Правятся все длины, чтобы создать видимость включения передаваемого TLS Client Hello в padding extension. Размер фейка не изменяется. Расчет идет на DPI, который не анализирует sequence numbers должным образом. Выполняется на каждый запрос.
 
 По умолчанию если не задан собственный фейк для TLS используются модификации `rnd,rndsni,dupsid`. Если фейк задан, используется `none`.
