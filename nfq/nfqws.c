@@ -1067,11 +1067,20 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 			{
 				size_t slen_new = strlen(fake_tls_sni);
 				ssize_t slen_delta = slen_new-slen;
+				char *s1=NULL;
+				if (params.debug)
+				{
+					if ((s1 = malloc(slen+1)))
+					{
+						memcpy(s1,sni,slen); s1[slen]=0;
+					}
+				}
 				if (slen_delta)
 				{
 					if ((*fake_tls_size+slen_delta)>fake_tls_buf_size)
 					{
 						DLOG_ERR("profile %d fake[%d] not enough space for new SNI\n", profile_n, fake_n);
+						free(s1);
 						return false;
 					}
 					memmove(sni+slen_new,sni+slen,fake_tls+*fake_tls_size-(sni+slen));
@@ -1084,7 +1093,9 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 					*fake_tls_size+=slen_delta;
 					slen = slen_new;
 				}
-				DLOG("profile %d fake[%d] change sni to %s size_delta=%zd\n", profile_n, fake_n, fake_tls_sni,slen_delta);
+				DLOG("profile %d fake[%d] change SNI : %s => %s size_delta=%zd\n", profile_n, fake_n, s1, fake_tls_sni, slen_delta);
+				free(s1);
+
 				memcpy(sni,fake_tls_sni,slen_new);
 			}
 			if (fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
@@ -1125,35 +1136,35 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 				}
 			}
 		}
-	}
-	if (fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
-	{
-		if (TLSFindExt(fake_tls,*fake_tls_size,21,&ext,&extlen,false))
+		if (fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
 		{
-			if ((ext-fake_tls+extlen)!=*fake_tls_size)
+			if (TLSFindExt(fake_tls,*fake_tls_size,21,&ext,&extlen,false))
 			{
-				DLOG_ERR("profile %d fake[%d] tls padding ext is present but it's not at the end. padding ext offset %zu, padding ext size %zu, fake size %zu\n", profile_n, fake_n, ext-fake_tls, extlen, *fake_tls_size);
-				return false;
+				if ((ext-fake_tls+extlen)!=*fake_tls_size)
+				{
+					DLOG_ERR("profile %d fake[%d] tls padding ext is present but it's not at the end. padding ext offset %zu, padding ext size %zu, fake size %zu\n", profile_n, fake_n, ext-fake_tls, extlen, *fake_tls_size);
+					return false;
+				}
+				modcache->padlen_offset = ext-fake_tls-2;
+				DLOG("profile %d fake[%d] tls padding ext is present, padding length offset %zu\n", profile_n, fake_n, modcache->padlen_offset);
 			}
-			modcache->padlen_offset = ext-fake_tls-2;
-			DLOG("profile %d fake[%d] tls padding ext is present, padding length offset %zu\n", profile_n, fake_n, modcache->padlen_offset);
-		}
-		else
-		{
-			if ((*fake_tls_size+4)>fake_tls_buf_size)
+			else
 			{
-				DLOG_ERR("profile %d fake[%d] tls padding is absent and there's no space to add it\n", profile_n, fake_n);
-				return false;
+				if ((*fake_tls_size+4)>fake_tls_buf_size)
+				{
+					DLOG_ERR("profile %d fake[%d] tls padding is absent and there's no space to add it\n", profile_n, fake_n);
+					return false;
+				}
+				phton16(fake_tls+*fake_tls_size,21);
+				*fake_tls_size+=2;
+				modcache->padlen_offset=*fake_tls_size;
+				phton16(fake_tls+*fake_tls_size,0);
+				*fake_tls_size+=2;
+				phton16(fake_tls+modcache->extlen_offset,pntoh16(fake_tls+modcache->extlen_offset)+4);
+				phton16(fake_tls+3,pntoh16(fake_tls+3)+4); // increase tls record len
+				phton24(fake_tls+6,pntoh24(fake_tls+6)+4); // increase tls handshake len
+				DLOG("profile %d fake[%d] tls padding is absent. added. padding length offset %zu\n", profile_n, fake_n, modcache->padlen_offset);
 			}
-			phton16(fake_tls+*fake_tls_size,21);
-			*fake_tls_size+=2;
-			modcache->padlen_offset=*fake_tls_size;
-			phton16(fake_tls+*fake_tls_size,0);
-			*fake_tls_size+=2;
-			phton16(fake_tls+modcache->extlen_offset,pntoh16(fake_tls+modcache->extlen_offset)+4);
-			phton16(fake_tls+3,pntoh16(fake_tls+3)+4); // increase tls record len
-			phton24(fake_tls+6,pntoh24(fake_tls+6)+4); // increase tls handshake len
-			DLOG("profile %d fake[%d] tls padding is absent. added. padding length offset %zu\n", profile_n, fake_n, modcache->padlen_offset);
 		}
 	}
 	return true;
