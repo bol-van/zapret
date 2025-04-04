@@ -48,7 +48,7 @@ static build :  make CFLAGS=-static package/{tpws,nfqws,mdig,ip2net}/compile
 executables only : build_dir/target/<progname>
 ipk or apk packages : bin/packages/*/base
 
-8) Installating to openwrt to use with zapret
+8) Installing to openwrt to use with zapret
 
 zapret with or without binaries should be already installed in /opt/zapret.
 Install ipk's or apk's with all compiled progs using opkg or apk.
