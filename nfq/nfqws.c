@@ -1040,7 +1040,7 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 	size_t extlen;
 
 	modcache->extlen_offset = modcache->padlen_offset = 0;
-	if (fake_tls_mod & (FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_SNI))
+	if (fake_tls_mod & (FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_SNI|FAKE_TLS_MOD_PADENCAP))
 	{
 		if (!TLSFindExtLen(fake_tls,*fake_tls_size,&modcache->extlen_offset))
 		{
@@ -1048,79 +1048,81 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 			return false;
 		}
 		DLOG("profile %d fake[%d] tls extensions length offset : %zu\n", profile_n, fake_n, modcache->extlen_offset);
-		size_t slen;
-		if (!TLSFindExt(fake_tls,*fake_tls_size,0,&ext,&extlen,false))
+		if (fake_tls_mod & (FAKE_TLS_MOD_RND_SNI|FAKE_TLS_MOD_SNI))
 		{
-			DLOG_ERR("profile %d fake[%d] sni mod is set but tls fake does not have SNI\n", profile_n, fake_n);
-			return false;
-		}
-		uint8_t *sniext = fake_tls + (ext - fake_tls);
-		if (!TLSAdvanceToHostInSNI(&ext,&extlen,&slen))
-		{
-			DLOG_ERR("profile %d fake[%d] sni set but tls fake has invalid SNI structure\n", profile_n, fake_n);
-			return false;
-		}
-		uint8_t *sni = fake_tls + (ext - fake_tls);
-
-		if (fake_tls_mod & FAKE_TLS_MOD_SNI)
-		{
-			size_t slen_new = strlen(fake_tls_sni);
-			ssize_t slen_delta = slen_new-slen;
-			if (slen_delta)
+			size_t slen;
+			if (!TLSFindExt(fake_tls,*fake_tls_size,0,&ext,&extlen,false))
 			{
-				if ((*fake_tls_size+slen_delta)>fake_tls_buf_size)
-				{
-					DLOG_ERR("profile %d fake[%d] not enough space for new SNI\n", profile_n, fake_n);
-					return false;
-				}
-				memmove(sni+slen_new,sni+slen,fake_tls+*fake_tls_size-(sni+slen));
-				phton16(fake_tls+3,(uint16_t)(pntoh16(fake_tls+3)+slen_delta));
-				phton24(fake_tls+6,(uint32_t)(pntoh24(fake_tls+6)+slen_delta));
-				phton16(fake_tls+modcache->extlen_offset,(uint16_t)(pntoh16(fake_tls+modcache->extlen_offset)+slen_delta));
-				phton16(sniext-2,(uint16_t)(pntoh16(sniext-2)+slen_delta));
-				phton16(sniext,(uint16_t)(pntoh16(sniext)+slen_delta));
-				phton16(sni-2,(uint16_t)(pntoh16(sni-2)+slen_delta));
-				*fake_tls_size+=slen_delta;
-				slen = slen_new;
-			}
-			DLOG_ERR("profile %d fake[%d] change sni to %s size_delta=%zd\n", profile_n, fake_n, fake_tls_sni,slen_delta);
-			memcpy(sni,fake_tls_sni,slen_new);
-		}
-		if (fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
-		{
-			if (!slen)
-			{
-				DLOG_ERR("profile %d fake[%d] rndsni set but tls fake has zero sized SNI\n", profile_n, fake_n);
+				DLOG_ERR("profile %d fake[%d] sni mod is set but tls fake does not have SNI\n", profile_n, fake_n);
 				return false;
 			}
-
-			char *s1=NULL, *s2=NULL;
-			if (params.debug)
+			uint8_t *sniext = fake_tls + (ext - fake_tls);
+			if (!TLSAdvanceToHostInSNI(&ext,&extlen,&slen))
 			{
-				if ((s1 = malloc(slen+1)))
-				{
-					memcpy(s1,sni,slen); s1[slen]=0;
-				}
+				DLOG_ERR("profile %d fake[%d] sni set but tls fake has invalid SNI structure\n", profile_n, fake_n);
+				return false;
 			}
-
-			fill_random_az(sni,1);
-			if (slen>=7) // domain name in SNI must be at least 3 chars long to enable xxx.tls randomization
+			uint8_t *sni = fake_tls + (ext - fake_tls);
+			if (fake_tls_mod & FAKE_TLS_MOD_SNI)
 			{
-				fill_random_az09(sni+1,slen-5);
-				sni[slen-4] = '.';
+				size_t slen_new = strlen(fake_tls_sni);
+				ssize_t slen_delta = slen_new-slen;
+				if (slen_delta)
+				{
+					if ((*fake_tls_size+slen_delta)>fake_tls_buf_size)
+					{
+						DLOG_ERR("profile %d fake[%d] not enough space for new SNI\n", profile_n, fake_n);
+						return false;
+					}
+					memmove(sni+slen_new,sni+slen,fake_tls+*fake_tls_size-(sni+slen));
+					phton16(fake_tls+3,(uint16_t)(pntoh16(fake_tls+3)+slen_delta));
+					phton24(fake_tls+6,(uint32_t)(pntoh24(fake_tls+6)+slen_delta));
+					phton16(fake_tls+modcache->extlen_offset,(uint16_t)(pntoh16(fake_tls+modcache->extlen_offset)+slen_delta));
+					phton16(sniext-2,(uint16_t)(pntoh16(sniext-2)+slen_delta));
+					phton16(sniext,(uint16_t)(pntoh16(sniext)+slen_delta));
+					phton16(sni-2,(uint16_t)(pntoh16(sni-2)+slen_delta));
+					*fake_tls_size+=slen_delta;
+					slen = slen_new;
+				}
+				DLOG("profile %d fake[%d] change sni to %s size_delta=%zd\n", profile_n, fake_n, fake_tls_sni,slen_delta);
+				memcpy(sni,fake_tls_sni,slen_new);
+			}
+			if (fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
+			{
+				if (!slen)
+				{
+					DLOG_ERR("profile %d fake[%d] rndsni set but tls fake has zero sized SNI\n", profile_n, fake_n);
+					return false;
+				}
+
+				char *s1=NULL, *s2=NULL;
+				if (params.debug)
+				{
+					if ((s1 = malloc(slen+1)))
+					{
+						memcpy(s1,sni,slen); s1[slen]=0;
+					}
+				}
+
+				fill_random_az(sni,1);
+				if (slen>=7) // domain name in SNI must be at least 3 chars long to enable xxx.tls randomization
+				{
+					fill_random_az09(sni+1,slen-5);
+					sni[slen-4] = '.';
 					memcpy(sni+slen-3,tld[random()%(sizeof(tld)/sizeof(*tld))],3);
-			}
-			else
-				fill_random_az09(sni+1,slen-1);
-
-			if (params.debug)
-			{
-				if (s1 && (s2 = malloc(slen+1)))
-				{
-					memcpy(s2,sni,slen); s2[slen]=0;
-					DLOG("profile %d fake[%d] generated random SNI : %s -> %s\n",profile_n,fake_n,s1,s2);
 				}
-				free(s1); free(s2);
+				else
+					fill_random_az09(sni+1,slen-1);
+
+				if (params.debug)
+				{
+					if (s1 && (s2 = malloc(slen+1)))
+					{
+						memcpy(s2,sni,slen); s2[slen]=0;
+						DLOG("profile %d fake[%d] generated random SNI : %s -> %s\n",profile_n,fake_n,s1,s2);
+					}
+					free(s1); free(s2);
+				}
 			}
 		}
 	}
