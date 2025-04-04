@@ -1081,10 +1081,10 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, uint32_t fake_tls_mo
 				phton16(sniext,(uint16_t)(pntoh16(sniext)+slen_delta));
 				phton16(sni-2,(uint16_t)(pntoh16(sni-2)+slen_delta));
 				*fake_tls_size+=slen_delta;
+				slen = slen_new;
 			}
 			DLOG_ERR("profile %d fake[%d] change sni to %s size_delta=%zd\n", profile_n, fake_n, fake_tls_sni,slen_delta);
 			memcpy(sni,fake_tls_sni,slen_new);
-			slen = slen_new;
 		}
 		if (fake_tls_mod & FAKE_TLS_MOD_RND_SNI)
 		{
