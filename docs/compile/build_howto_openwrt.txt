@@ -12,10 +12,10 @@ Other packages may be required on your distribution. Look for the errors.
 
 examples :
 
-curl -o - https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz | tar -Jxvf -
+curl -o - https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz | tar -Jxv
 cd openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
 
-curl -o - https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst | tar --zstd -xvf -
+curl -o - https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst | tar --zstd -xv
 cd openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64
 
 3) Install required libs
