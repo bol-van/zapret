@@ -1444,7 +1444,7 @@ tpws_check_domain_http_bypass_()
 	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
-	local s mss s2 s3 oobdis pos sec="$2" fseg
+	local s mss s2 s3 oobdis pos sec="$2"
 	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld,endhost-1'
 	local splits_http='method+2 midsld method+2,midsld'
 
@@ -1462,8 +1462,7 @@ tpws_check_domain_http_bypass_()
 		done
 		for s2 in '' '--hostcase' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 			for s in $splits_http ; do
-				fseg=$(fix_seg $s)
-				tpws_curl_test_update $1 $3 --split-pos=$s $fseg $s2 && [ "$SCANLEVEL" != force ] && {
+				tpws_curl_test_update $1 $3 --split-pos=$s $(fix_seg $s) $s2 && [ "$SCANLEVEL" != force ] && {
 					[ "$SCANLEVEL" = quick ] && return
 					break
 				}
@@ -1478,8 +1477,7 @@ tpws_check_domain_http_bypass_()
 			s3=${mss:+--mss=$mss}
 			for s2 in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 				for pos in $splits_tls; do
-					fseg=$(fix_seg $pos)
-					tpws_curl_test_update $1 $3 --split-pos=$pos $fseg $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
+					tpws_curl_test_update $1 $3 --split-pos=$pos $(fix_seg $pos) $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
 						break
