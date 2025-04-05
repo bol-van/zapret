@@ -1478,7 +1478,7 @@ tpws_check_domain_http_bypass_()
 				done
 			done
 			for s in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
-				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld --fix-seg' '--tlsrec=sniext+1 --split-pos=1,midsld --fix-seg' '--tlsrec=sniext+4 --split-pos=1,midsld --fix-seg' ; do
+				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' '--tlsrec=sniext+1 --split-pos=1,midsld --fix-seg' '--tlsrec=sniext+4 --split-pos=1,midsld --fix-seg' ; do
 					tpws_curl_test_update $1 $3 $s2 $s $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
