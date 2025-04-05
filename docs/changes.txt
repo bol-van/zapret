@@ -477,4 +477,5 @@ v70.6
 nfqws: detect Discord Voice IP discovery packets
 nfqws: detect STUN message packets
 nfqws: change SNI to specified value tls mod : --dpi-desync-fake-tls-mod sni=<sni>
+nfqws: update default TLS ClientHello fake. firefox 136.0.4 finger, no kyber, SNI=microsoft.com
 init.d: remove 50-discord
