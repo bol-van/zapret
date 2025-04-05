@@ -355,7 +355,7 @@ check_system()
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
-			FIX_SEG=' --fix-seg'
+			FIX_SEG='--fix-seg'
 			linux_fwtype
 			[ "$FWTYPE" = iptables -o "$FWTYPE" = nftables ] || {
 				echo firewall type $FWTYPE not supported in $UNAME
@@ -1487,7 +1487,7 @@ tpws_check_domain_http_bypass_()
 				done
 			done
 			for s in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
-				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' "--tlsrec=sniext+1 --split-pos=1,midsld$FIX_SEG" "--tlsrec=sniext+4 --split-pos=1,midsld$FIX_SEG" ; do
+				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' "--tlsrec=sniext+1 --split-pos=1,midsld $FIX_SEG" "--tlsrec=sniext+4 --split-pos=1,midsld $FIX_SEG" ; do
 					tpws_curl_test_update $1 $3 $s2 $s $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
