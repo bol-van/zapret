@@ -274,7 +274,9 @@ hup_zapret_daemons()
  if exists killall; then
   killall -HUP tpws nfqws dvtws 2>/dev/null
  elif exists pkill; then
-  pkill -HUP ^tpws$ ^nfqws$ ^dvtws$
+  pkill -HUP ^tpws$
+  pkill -HUP ^nfqws$
+  pkill -HUP ^dvtws$
  else
   echo no mass killer available ! cant HUP zapret daemons
  fi
