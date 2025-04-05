@@ -347,6 +347,7 @@ check_system()
 
 	UNAME=$(uname)
 	SUBSYS=
+	FIX_SEG=
 	local s
 
 	# can be passed FWTYPE=iptables to override default nftables preference
@@ -354,6 +355,7 @@ check_system()
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
+			FIX_SEG=' --fix-seg'
 			linux_fwtype
 			[ "$FWTYPE" = iptables -o "$FWTYPE" = nftables ] || {
 				echo firewall type $FWTYPE not supported in $UNAME
@@ -1430,6 +1432,11 @@ warn_mss()
 	[ -n "$1" ] && echo 'WARNING ! although mss worked it may not work on all sites and will likely cause significant slowdown. it may only be required for TLS1.2, not TLS1.3'
 	return 0
 }
+fix_seg()
+{
+	# $1 - split-pos
+	[ -n "$FIX_SEG" ] && contains "$1" , && echo "$FIX_SEG"
+}
 
 tpws_check_domain_http_bypass_()
 {
@@ -1437,7 +1444,7 @@ tpws_check_domain_http_bypass_()
 	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
-	local s mss s2 s3 oobdis pos sec="$2"
+	local s mss s2 s3 oobdis pos sec="$2" fseg
 	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld,endhost-1'
 	local splits_http='method+2 midsld method+2,midsld'
 
@@ -1455,7 +1462,8 @@ tpws_check_domain_http_bypass_()
 		done
 		for s2 in '' '--hostcase' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 			for s in $splits_http ; do
-				tpws_curl_test_update $1 $3 --split-pos=$s --fix-seg $s2 && [ "$SCANLEVEL" != force ] && {
+				fseg=$(fix_seg $s)
+				tpws_curl_test_update $1 $3 --split-pos=$s $fseg $s2 && [ "$SCANLEVEL" != force ] && {
 					[ "$SCANLEVEL" = quick ] && return
 					break
 				}
@@ -1470,7 +1478,8 @@ tpws_check_domain_http_bypass_()
 			s3=${mss:+--mss=$mss}
 			for s2 in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 				for pos in $splits_tls; do
-					tpws_curl_test_update $1 $3 --split-pos=$pos --fix-seg $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
+					fseg=$(fix_seg $pos)
+					tpws_curl_test_update $1 $3 --split-pos=$pos $fseg $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
 						break
@@ -1478,7 +1487,7 @@ tpws_check_domain_http_bypass_()
 				done
 			done
 			for s in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
-				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' '--tlsrec=sniext+1 --split-pos=1,midsld --fix-seg' '--tlsrec=sniext+4 --split-pos=1,midsld --fix-seg' ; do
+				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' "--tlsrec=sniext+1 --split-pos=1,midsld$FIX_SEG" "--tlsrec=sniext+4 --split-pos=1,midsld$FIX_SEG" ; do
 					tpws_curl_test_update $1 $3 $s2 $s $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
