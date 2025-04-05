@@ -1455,7 +1455,7 @@ tpws_check_domain_http_bypass_()
 		done
 		for s2 in '' '--hostcase' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 			for s in $splits_http ; do
-				tpws_curl_test_update $1 $3 --split-pos=$s $s2 && [ "$SCANLEVEL" != force ] && {
+				tpws_curl_test_update $1 $3 --split-pos=$s --fix-seg $s2 && [ "$SCANLEVEL" != force ] && {
 					[ "$SCANLEVEL" = quick ] && return
 					break
 				}
@@ -1470,7 +1470,7 @@ tpws_check_domain_http_bypass_()
 			s3=${mss:+--mss=$mss}
 			for s2 in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
 				for pos in $splits_tls; do
-					tpws_curl_test_update $1 $3 --split-pos=$pos $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
+					tpws_curl_test_update $1 $3 --split-pos=$pos --fix-seg $s2 $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
 						break
@@ -1478,7 +1478,7 @@ tpws_check_domain_http_bypass_()
 				done
 			done
 			for s in '' '--oob' '--disorder' ${oobdis:+"$oobdis"}; do
-				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld' '--tlsrec=sniext+1 --split-pos=1,midsld' '--tlsrec=sniext+4 --split-pos=1,midsld' ; do
+				for s2 in '--tlsrec=midsld' '--tlsrec=sniext+1 --split-pos=midsld' '--tlsrec=sniext+4 --split-pos=midsld --fix-seg' '--tlsrec=sniext+1 --split-pos=1,midsld --fix-seg' '--tlsrec=sniext+4 --split-pos=1,midsld --fix-seg' ; do
 					tpws_curl_test_update $1 $3 $s2 $s $s3 && warn_mss $s3 && [ "$SCANLEVEL" != force ] && {
 						[ "$SCANLEVEL" = quick ] && return
 						need_mss=0
