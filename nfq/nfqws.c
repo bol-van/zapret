@@ -950,12 +950,12 @@ static bool parse_ip_list(char *opt, ipset *pp)
 	return true;
 }
 
-static bool parse_tlsmod_list(char *opt, uint32_t *mod, char *sni, size_t sni_buf_len)
+static bool parse_tlsmod_list(char *opt, struct fake_tls_mod *tls_mod)
 {
 	char *e,*e2,*p,c,c2;
 
-	*mod &= FAKE_TLS_MOD_SAVE_MASK;
-	*mod |= FAKE_TLS_MOD_SET;
+	tls_mod->mod &= FAKE_TLS_MOD_SAVE_MASK;
+	tls_mod->mod |= FAKE_TLS_MOD_SET;
 	for (p=opt ; p ; )
 	{
 		for (e2=p ; *e2 && *e2!=',' && *e2!='=' ; e2++);
@@ -975,20 +975,20 @@ static bool parse_tlsmod_list(char *opt, uint32_t *mod, char *sni, size_t sni_bu
 			e2=NULL;
 
 		if (!strcmp(p,"rnd"))
-			*mod |= FAKE_TLS_MOD_RND;
+			tls_mod->mod |= FAKE_TLS_MOD_RND;
 		else if (!strcmp(p,"rndsni"))
-			*mod |= FAKE_TLS_MOD_RND_SNI;
+			tls_mod->mod |= FAKE_TLS_MOD_RND_SNI;
 		else if (!strcmp(p,"sni"))
 		{
-			*mod |= FAKE_TLS_MOD_SNI;
+			tls_mod->mod |= FAKE_TLS_MOD_SNI;
 			if (!e2 || !e2[1] || e2[1]==',') goto err;
-			strncpy(sni,e2+1,sni_buf_len-1);
-			sni[sni_buf_len-1]=0;
+			strncpy(tls_mod->sni,e2+1,sizeof(tls_mod->sni)-1);
+			tls_mod->sni[sizeof(tls_mod->sni)-1-1]=0;
 		}
 		else if (!strcmp(p,"padencap"))
-			*mod |= FAKE_TLS_MOD_PADENCAP;
+			tls_mod->mod |= FAKE_TLS_MOD_PADENCAP;
 		else if (!strcmp(p,"dupsid"))
-			*mod |= FAKE_TLS_MOD_DUP_SID;
+			tls_mod->mod |= FAKE_TLS_MOD_DUP_SID;
 		else if (strcmp(p,"none"))
 			goto err;
 
@@ -2128,7 +2128,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 40: /* dpi-desync-fake-tls-mod */
-			if (!parse_tlsmod_list(optarg,&dp->tls_mod_last.mod,dp->tls_mod_last.sni,sizeof(dp->tls_mod_last.sni)))
+			if (!parse_tlsmod_list(optarg,&dp->tls_mod_last))
 			{
 				DLOG_ERR("Invalid tls mod : %s\n",optarg);
 				exit_clean(1);
