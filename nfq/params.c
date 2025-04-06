@@ -185,7 +185,6 @@ void dp_init(struct desync_profile *dp)
 	dp->desync_ipfrag_pos_udp = IPFRAG_UDP_DEFAULT;
 	dp->desync_ipfrag_pos_tcp = IPFRAG_TCP_DEFAULT;
 	dp->desync_repeats = 1;
-	dp->fake_tls_mod = 0;
 	dp->fake_syndata_size = 16;
 	dp->wscale=-1; // default - dont change scale factor (client)
 	dp->desync_ttl6 = 0xFF; // unused
@@ -206,8 +205,11 @@ bool dp_fake_defaults(struct desync_profile *dp)
 			return false;
 	if (blob_collection_empty(&dp->fake_tls))
 	{
-		if (!blob_collection_add_blob(&dp->fake_tls,fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),4+sizeof(dp->fake_tls_sni)))
+		if (!(item=blob_collection_add_blob(&dp->fake_tls,fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),4+sizeof(((struct fake_tls_mod*)0)->sni))))
 			return false;
+		if (!(item->extra2 = malloc(sizeof(struct fake_tls_mod))))
+			return false;
+		*(struct fake_tls_mod*)item->extra2 = dp->tls_mod_last;
 	}
 	if (blob_collection_empty(&dp->fake_unknown))
 	{

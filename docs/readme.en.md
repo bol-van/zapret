@@ -291,9 +291,13 @@ It's possible to use TLS Client Hello with any fingerprint and any SNI.
 By default if custom fake is not defined `rnd,rndsni,dupsid` mods are applied. If defined - `none`.
 This behaviour is compatible with previous versions with addition of `dupsid`.
 
-If TLS mod is enabled and there're multiple TLS fakes, all valid TLS Client Hello fakes are modified.
-If there's no TLS Client Hello program exits with error.
+If multiple TLS fakes are present each one takes the last mod.
+If a mod is specified after fake it replaces previous mod.
+This way it's possible to use different mods for every TLS fake.
 
+If a mod is set to non-TLS fake it causes error. Use `--dpi-desync-fake-tls-mod=none'.
+
+Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni --dpi-desync-fake-tls=0xaabbccdd --dpi-desync-fake-tls-mod=none'
 
 ### TCP segmentation
 

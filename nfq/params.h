@@ -56,6 +56,11 @@ struct fake_tls_mod_cache
 {
 	size_t extlen_offset, padlen_offset;
 };
+struct fake_tls_mod
+{
+	char sni[64];
+	uint32_t mod;
+};
 
 struct desync_profile
 {
@@ -88,8 +93,8 @@ struct desync_profile
 	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],fsplit_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
 	size_t fake_syndata_size;
 
-	uint32_t fake_tls_mod;
-	char fake_tls_sni[64];
+	struct fake_tls_mod tls_mod_last;
+	struct blob_item *tls_fake_last;
 
 	int udplen_increment;
 

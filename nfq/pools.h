@@ -153,6 +153,7 @@ struct blob_item {
 	size_t size;	// main data blob size
 	size_t size_buf;// main data blob allocated size
 	void *extra;	// any data without size
+	void *extra2;	// any data without size
 	LIST_ENTRY(blob_item) next;
 };
 LIST_HEAD(blob_collection_head, blob_item);

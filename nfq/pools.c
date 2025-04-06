@@ -570,6 +570,7 @@ void blob_collection_destroy(struct blob_collection_head *head)
 	{
 		LIST_REMOVE(entry, next);
 		free(entry->extra);
+		free(entry->extra2);
 		free(entry->data);
 		free(entry);
 	}

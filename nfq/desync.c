@@ -623,12 +623,12 @@ static uint16_t IP4_IP_ID_FIX(const struct ip *ip)
 // fake_mod buffer must at least sizeof(desync_profile->fake_tls)
 // size does not change
 // return : true - altered, false - not altered
-static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache, uint32_t fake_tls_mod, const uint8_t *fake_data, size_t fake_data_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod)
+static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache, const struct fake_tls_mod *tls_mod, const uint8_t *fake_data, size_t fake_data_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod)
 {
 	bool b=false;
 	if (modcache) // it's filled only if it's TLS
 	{
-		if (fake_tls_mod & FAKE_TLS_MOD_PADENCAP)
+		if (tls_mod->mod & FAKE_TLS_MOD_PADENCAP)
 		{
 			size_t sz_rec = pntoh16(fake_data+3) + payload_len;
 			size_t sz_handshake = pntoh24(fake_data+6) + payload_len;
@@ -647,7 +647,7 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 				DLOG("fake[%d] applied padencap tls mod. sizes increased by %zu bytes.\n", fake_n, payload_len);
 			}
 		}
-		if (fake_tls_mod & FAKE_TLS_MOD_RND)
+		if (tls_mod->mod & FAKE_TLS_MOD_RND)
 		{
 			if (!b)	memcpy(fake_mod,fake_data,fake_data_size);
 			fill_random_bytes(fake_mod+11,32); // random
@@ -655,7 +655,7 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 			b=true;
 			DLOG("fake[%d] applied rnd tls mod\n", fake_n);
 		}
-		if (fake_tls_mod & FAKE_TLS_MOD_DUP_SID)
+		if (tls_mod->mod & FAKE_TLS_MOD_DUP_SID)
 		{
 			if (fake_data[43]!=payload[43])
 				DLOG("fake[%d] cannot apply dupsid tls mod. fake and orig session id length mismatch.\n",fake_n);
@@ -1321,7 +1321,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						{
 							case TLS:
 								if ((fake_item->size <= sizeof(fake_data_buf)) &&
-									runtime_tls_mod(n,(struct fake_tls_mod_cache *)fake_item->extra, dp->fake_tls_mod, fake_item->data, fake_item->size, rdata_payload, rlen_payload, fake_data_buf))
+									runtime_tls_mod(n,(struct fake_tls_mod_cache *)fake_item->extra,(struct fake_tls_mod *)fake_item->extra2, fake_item->data, fake_item->size, rdata_payload, rlen_payload, fake_data_buf))
 								{
 									fake_data = fake_data_buf;
 									break;
