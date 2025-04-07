@@ -225,6 +225,28 @@ static void exithelp(void)
 #define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
 #endif
 
+enum opt_indices {
+	IDX_HELP,
+	IDX_H,
+	IDX_4,
+	IDX_6,
+	IDX_PREFIX_LENGTH,
+	IDX_V4_THRESHOLD,
+	IDX_V6_THRESHOLD,
+	IDX_LAST,
+};
+
+static const struct option long_options[] = {
+	[IDX_HELP] = {"help", no_argument, 0, 0},
+	[IDX_H] = {"h", no_argument, 0, 0},
+	[IDX_4] = {"4", no_argument, 0, 0},
+	[IDX_6] = {"6", no_argument, 0, 0},
+	[IDX_PREFIX_LENGTH] = {"prefix-length", required_argument, 0, 0},
+	[IDX_V4_THRESHOLD] = {"v4-threshold", required_argument, 0, 0},
+	[IDX_V6_THRESHOLD] = {"v6-threshold", required_argument, 0, 0},
+	[IDX_LAST] = {NULL, 0, NULL, 0},
+};
+
 static void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
@@ -236,33 +258,23 @@ static void parse_params(int argc, char *argv[])
 	params.pctdiv = DEFAULT_PCTDIV;
 	params.v6_threshold = DEFAULT_V6_THRESHOLD;
 
-	const struct option long_options[] = {
-		{ "help",no_argument,0,0 },// optidx=0
-		{ "h",no_argument,0,0 },// optidx=1
-		{ "4",no_argument,0,0 },// optidx=2
-		{ "6",no_argument,0,0 },// optidx=3
-		{ "prefix-length",required_argument,0,0 },// optidx=4
-		{ "v4-threshold",required_argument,0,0 },// optidx=5
-		{ "v6-threshold",required_argument,0,0 },// optidx=6
-		{ NULL,0,NULL,0 }
-	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
 		if (v) exithelp();
 		switch (option_index)
 		{
-		case 0:
-		case 1:
+		case IDX_HELP:
+		case IDX_H:
 			PRINT_VER;
 			exithelp();
 			break;
-		case 2:
+		case IDX_4:
 			params.ipv6 = false;
 			break;
-		case 3:
+		case IDX_6:
 			params.ipv6 = true;
 			break;
-		case 4:
+		case IDX_PREFIX_LENGTH:
 			i = sscanf(optarg,"%u-%u",&plen1,&plen2);
 			if (i == 1) plen2 = plen1;
 			if (i<=0 || plen2<plen1 || !plen1 || !plen2)
@@ -271,7 +283,7 @@ static void parse_params(int argc, char *argv[])
 				exit(1);
 			}
 			break;
-		case 5:
+		case IDX_V4_THRESHOLD:
 			i = sscanf(optarg, "%u/%u", &params.pctmult, &params.pctdiv);
 			if (i!=2 || params.pctdiv<2 || params.pctmult<1 || params.pctmult>=params.pctdiv)
 			{
@@ -279,7 +291,7 @@ static void parse_params(int argc, char *argv[])
 				exit(1);
 			}
 			break;
-		case 6:
+		case IDX_V6_THRESHOLD:
 			i = sscanf(optarg, "%u", &params.v6_threshold);
 			if (i != 1 || params.v6_threshold<1)
 			{

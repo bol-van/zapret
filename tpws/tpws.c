@@ -610,6 +610,188 @@ static bool check_oob_disorder(const struct desync_profile *dp)
 }
 #endif
 
+enum opt_indices {
+	IDX_HELP,
+	IDX_H,
+	IDX_BIND_ADDR,
+	IDX_BIND_IFACE4,
+	IDX_BIND_IFACE6,
+	IDX_BIND_LINKLOCAL,
+	IDX_BIND_WAIT_IFUP,
+	IDX_BIND_WAIT_IP,
+	IDX_BIND_WAIT_IP_LINKLOCAL,
+	IDX_BIND_WAIT_ONLY,
+	IDX_PORT,
+	IDX_DAEMON,
+	IDX_USER,
+	IDX_UID,
+	IDX_MAXCONN,
+	IDX_MAXFILES,
+	IDX_MAX_ORPHAN_TIME,
+	IDX_HOSTCASE,
+	IDX_HOSTSPELL,
+	IDX_HOSTDOT,
+	IDX_HOSTNOSPACE,
+	IDX_HOSTPAD,
+	IDX_DOMCASE,
+	IDX_SPLIT_HTTP_REQ,
+	IDX_SPLIT_TLS,
+	IDX_SPLIT_POS,
+	IDX_SPLIT_ANY_PROTOCOL,
+	IDX_DISORDER,
+	IDX_OOB,
+	IDX_OOB_DATA,
+	IDX_METHODSPACE,
+	IDX_METHODEOL,
+	IDX_HOSTTAB,
+	IDX_UNIXEOL,
+	IDX_TLSREC,
+	IDX_TLSREC_POS,
+	IDX_HOSTLIST,
+	IDX_HOSTLIST_DOMAINS,
+	IDX_HOSTLIST_EXCLUDE,
+	IDX_HOSTLIST_EXCLUDE_DOMAINS,
+	IDX_HOSTLIST_AUTO,
+	IDX_HOSTLIST_AUTO_FAIL_THRESHOLD,
+	IDX_HOSTLIST_AUTO_FAIL_TIME,
+	IDX_HOSTLIST_AUTO_DEBUG,
+	IDX_PIDFILE,
+	IDX_DEBUG,
+	IDX_DEBUG_LEVEL,
+	IDX_DRY_RUN,
+	IDX_VERSION,
+	IDX_COMMENT,
+	IDX_LOCAL_RCVBUF,
+	IDX_LOCAL_SNDBUF,
+	IDX_REMOTE_RCVBUF,
+	IDX_REMOTE_SNDBUF,
+	IDX_SOCKS,
+	IDX_NO_RESOLVE,
+	IDX_RESOLVER_THREADS,
+	IDX_SKIP_NODELAY,
+	IDX_TAMPER_START,
+	IDX_TAMPER_CUTOFF,
+	IDX_CONNECT_BIND_ADDR,
+
+	IDX_NEW,
+	IDX_SKIP,
+	IDX_FILTER_L3,
+	IDX_FILTER_TCP,
+	IDX_FILTER_L7,
+	IDX_IPSET,
+	IDX_IPSET_IP,
+	IDX_IPSET_EXCLUDE,
+	IDX_IPSET_EXCLUDE_IP,
+
+#if defined(__FreeBSD__)
+	IDX_ENABLE_PF,
+#elif defined(__APPLE__)
+	IDX_LOCAL_TCP_USER_TIMEOUT,
+	IDX_REMOTE_TCP_USER_TIMEOUT,
+#elif defined(__linux__)
+	IDX_LOCAL_TCP_USER_TIMEOUT,
+	IDX_REMOTE_TCP_USER_TIMEOUT,
+	IDX_MSS,
+	IDX_FIX_SEG,
+#ifdef SPLICE_PRESENT
+	IDX_NOSPLICE,
+#endif
+#endif
+	IDX_HOSTLIST_AUTO_RETRANS_TRESHOLD, // ignored. for nfqws command line compatibility
+	IDX_LAST,
+};
+
+static const struct option long_options[] = {
+	[IDX_HELP] = {"help", no_argument, 0, 0},
+	[IDX_H] = {"h", no_argument, 0, 0},
+	[IDX_BIND_ADDR] = {"bind-addr", required_argument, 0, 0},
+	[IDX_BIND_IFACE4] = {"bind-iface4", required_argument, 0, 0},
+	[IDX_BIND_IFACE6] = {"bind-iface6", required_argument, 0, 0},
+	[IDX_BIND_LINKLOCAL] = {"bind-linklocal", required_argument, 0, 0},
+	[IDX_BIND_WAIT_IFUP] = {"bind-wait-ifup", required_argument, 0, 0},
+	[IDX_BIND_WAIT_IP] = {"bind-wait-ip", required_argument, 0, 0},
+	[IDX_BIND_WAIT_IP_LINKLOCAL] = {"bind-wait-ip-linklocal", required_argument, 0, 0},
+	[IDX_BIND_WAIT_ONLY] = {"bind-wait-only", no_argument, 0, 0},
+	[IDX_PORT] = {"port", required_argument, 0, 0},
+	[IDX_DAEMON] = {"daemon", no_argument, 0, 0},
+	[IDX_USER] = {"user", required_argument, 0, 0},
+	[IDX_UID] = {"uid", required_argument, 0, 0},
+	[IDX_MAXCONN] = {"maxconn", required_argument, 0, 0},
+	[IDX_MAXFILES] = {"maxfiles", required_argument, 0, 0},
+	[IDX_MAX_ORPHAN_TIME] = {"max-orphan-time", required_argument, 0, 0},
+	[IDX_HOSTCASE] = {"hostcase", no_argument, 0, 0},
+	[IDX_HOSTSPELL] = {"hostspell", required_argument, 0, 0},
+	[IDX_HOSTDOT] = {"hostdot", no_argument, 0, 0},
+	[IDX_HOSTNOSPACE] = {"hostnospace", no_argument, 0, 0},
+	[IDX_HOSTPAD] = {"hostpad", required_argument, 0, 0},
+	[IDX_DOMCASE] = {"domcase", no_argument, 0, 0},
+	[IDX_SPLIT_HTTP_REQ] = {"split-http-req", required_argument, 0, 0},
+	[IDX_SPLIT_TLS] = {"split-tls", required_argument, 0, 0},
+	[IDX_SPLIT_POS] = {"split-pos", required_argument, 0, 0},
+	[IDX_SPLIT_ANY_PROTOCOL] = {"split-any-protocol", optional_argument, 0, 0},
+	[IDX_DISORDER] = {"disorder", optional_argument, 0, 0},
+	[IDX_OOB] = {"oob", optional_argument, 0, 0},
+	[IDX_OOB_DATA] = {"oob-data", required_argument, 0, 0},
+	[IDX_METHODSPACE] = {"methodspace", no_argument, 0, 0},
+	[IDX_METHODEOL] = {"methodeol", no_argument, 0, 0},
+	[IDX_HOSTTAB] = {"hosttab", no_argument, 0, 0},
+	[IDX_UNIXEOL] = {"unixeol", no_argument, 0, 0},
+	[IDX_TLSREC] = {"tlsrec", required_argument, 0, 0},
+	[IDX_TLSREC_POS] = {"tlsrec-pos", required_argument, 0, 0},
+	[IDX_HOSTLIST] = {"hostlist", required_argument, 0, 0},
+	[IDX_HOSTLIST_DOMAINS] = {"hostlist-domains", required_argument, 0, 0},
+	[IDX_HOSTLIST_EXCLUDE] = {"hostlist-exclude", required_argument, 0, 0},
+	[IDX_HOSTLIST_EXCLUDE_DOMAINS] = {"hostlist-exclude-domains", required_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO] = {"hostlist-auto", required_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO_FAIL_THRESHOLD] = {"hostlist-auto-fail-threshold", required_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO_FAIL_TIME] = {"hostlist-auto-fail-time", required_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO_DEBUG] = {"hostlist-auto-debug", required_argument, 0, 0},
+	[IDX_PIDFILE] = {"pidfile", required_argument, 0, 0},
+	[IDX_DEBUG] = {"debug", optional_argument, 0, 0},
+	[IDX_DEBUG_LEVEL] = {"debug-level", required_argument, 0, 0},
+	[IDX_DRY_RUN] = {"dry-run", no_argument, 0, 0},
+	[IDX_VERSION] = {"version", no_argument, 0, 0},
+	[IDX_COMMENT] = {"comment", optional_argument, 0, 0},
+	[IDX_LOCAL_RCVBUF] = {"local-rcvbuf", required_argument, 0, 0},
+	[IDX_LOCAL_SNDBUF] = {"local-sndbuf", required_argument, 0, 0},
+	[IDX_REMOTE_RCVBUF] = {"remote-rcvbuf", required_argument, 0, 0},
+	[IDX_REMOTE_SNDBUF] = {"remote-sndbuf", required_argument, 0, 0},
+	[IDX_SOCKS] = {"socks", no_argument, 0, 0},
+	[IDX_NO_RESOLVE] = {"no-resolve", no_argument, 0, 0},
+	[IDX_RESOLVER_THREADS] = {"resolver-threads", required_argument, 0, 0},
+	[IDX_SKIP_NODELAY] = {"skip-nodelay", no_argument, 0, 0},
+	[IDX_TAMPER_START] = {"tamper-start", required_argument, 0, 0},
+	[IDX_TAMPER_CUTOFF] = {"tamper-cutoff", required_argument, 0, 0},
+	[IDX_CONNECT_BIND_ADDR] = {"connect-bind-addr", required_argument, 0, 0},
+
+	[IDX_NEW] = {"new", no_argument, 0, 0},
+	[IDX_SKIP] = {"skip", no_argument, 0, 0},
+	[IDX_FILTER_L3] = {"filter-l3", required_argument, 0, 0},
+	[IDX_FILTER_TCP] = {"filter-tcp", required_argument, 0, 0},
+	[IDX_FILTER_L7] = {"filter-l7", required_argument, 0, 0},
+	[IDX_IPSET] = {"ipset", required_argument, 0, 0},
+	[IDX_IPSET_IP] = {"ipset-ip", required_argument, 0, 0},
+	[IDX_IPSET_EXCLUDE] = {"ipset-exclude", required_argument, 0, 0},
+	[IDX_IPSET_EXCLUDE_IP] = {"ipset-exclude-ip", required_argument, 0, 0},
+
+#if defined(__FreeBSD__)
+	[IDX_ENABLE_PF] = {"enable-pf", no_argument, 0, 0},
+#elif defined(__APPLE__)
+	[IDX_LOCAL_TCP_USER_TIMEOUT] = {"local-tcp-user-timeout", required_argument, 0, 0},
+	[IDX_REMOTE_TCP_USER_TIMEOUT] = {"remote-tcp-user-timeout", required_argument, 0, 0},
+#elif defined(__linux__)
+	[IDX_LOCAL_TCP_USER_TIMEOUT] = {"local-tcp-user-timeout", required_argument, 0, 0},
+	[IDX_REMOTE_TCP_USER_TIMEOUT] = {"remote-tcp-user-timeout", required_argument, 0, 0},
+	[IDX_MSS] = {"mss", required_argument, 0, 0},
+	[IDX_FIX_SEG] = {"fix-seg", optional_argument, 0, 0},
+#ifdef SPLICE_PRESENT
+	[IDX_NOSPLICE] = {"nosplice", no_argument, 0, 0},
+#endif
+#endif
+	[IDX_HOSTLIST_AUTO_RETRANS_TRESHOLD] = {"hostlist-auto-retrans-threshold", optional_argument, 0, 0},
+	[IDX_LAST] = {NULL, 0, NULL, 0},
+};
+
 void parse_params(int argc, char *argv[])
 {
 	int option_index = 0;
@@ -664,96 +846,6 @@ void parse_params(int argc, char *argv[])
 	}
 #endif
 	
-	const struct option long_options[] = {
-		{ "help",no_argument,0,0 },// optidx=0
-		{ "h",no_argument,0,0 },// optidx=1
-		{ "bind-addr",required_argument,0,0 },// optidx=2
-		{ "bind-iface4",required_argument,0,0 },// optidx=3
-		{ "bind-iface6",required_argument,0,0 },// optidx=4
-		{ "bind-linklocal",required_argument,0,0 },// optidx=5
-		{ "bind-wait-ifup",required_argument,0,0 },// optidx=6
-		{ "bind-wait-ip",required_argument,0,0 },// optidx=7
-		{ "bind-wait-ip-linklocal",required_argument,0,0 },// optidx=8
-		{ "bind-wait-only",no_argument,0,0 },// optidx=9
-		{ "port",required_argument,0,0 },// optidx=10
-		{ "daemon",no_argument,0,0 },// optidx=11
-		{ "user",required_argument,0,0 },// optidx=12
-		{ "uid",required_argument,0,0 },// optidx=13
-		{ "maxconn",required_argument,0,0 },// optidx=14
-		{ "maxfiles",required_argument,0,0 },// optidx=15
-		{ "max-orphan-time",required_argument,0,0 },// optidx=16
-		{ "hostcase",no_argument,0,0 },// optidx=17
-		{ "hostspell",required_argument,0,0 },// optidx=18
-		{ "hostdot",no_argument,0,0 },// optidx=19
-		{ "hostnospace",no_argument,0,0 },// optidx=20
-		{ "hostpad",required_argument,0,0 },// optidx=21
-		{ "domcase",no_argument,0,0 },// optidx=22
-		{ "split-http-req",required_argument,0,0 },// optidx=23
-		{ "split-tls",required_argument,0,0 },// optidx=24
-		{ "split-pos",required_argument,0,0 },// optidx=25
-		{ "split-any-protocol",optional_argument,0,0},// optidx=26
-		{ "disorder",optional_argument,0,0 },// optidx=27
-		{ "oob",optional_argument,0,0 },// optidx=28
-		{ "oob-data",required_argument,0,0 },// optidx=29
-		{ "methodspace",no_argument,0,0 },// optidx=30
-		{ "methodeol",no_argument,0,0 },// optidx=31
-		{ "hosttab",no_argument,0,0 },// optidx=32
-		{ "unixeol",no_argument,0,0 },// optidx=33
-		{ "tlsrec",required_argument,0,0 },// optidx=34
-		{ "tlsrec-pos",required_argument,0,0 },// optidx=35
-		{ "hostlist",required_argument,0,0 },// optidx=36
-		{ "hostlist-domains",required_argument,0,0 },// optidx=37
-		{ "hostlist-exclude",required_argument,0,0 },// optidx=38
-		{ "hostlist-exclude-domains",required_argument,0,0 },// optidx=39
-		{ "hostlist-auto",required_argument,0,0}, // optidx=40
-		{ "hostlist-auto-fail-threshold",required_argument,0,0}, // optidx=41
-		{ "hostlist-auto-fail-time",required_argument,0,0},	// optidx=42
-		{ "hostlist-auto-debug",required_argument,0,0}, // optidx=43
-		{ "pidfile",required_argument,0,0 },// optidx=44
-		{ "debug",optional_argument,0,0 },// optidx=45
-		{ "debug-level",required_argument,0,0 },// optidx=46
-		{ "dry-run",no_argument,0,0 },// optidx=47
-		{ "version",no_argument,0,0 },// optidx=48
-		{ "comment",optional_argument,0,0 },// optidx=49
-		{ "local-rcvbuf",required_argument,0,0 },// optidx=50
-		{ "local-sndbuf",required_argument,0,0 },// optidx=51
-		{ "remote-rcvbuf",required_argument,0,0 },// optidx=52
-		{ "remote-sndbuf",required_argument,0,0 },// optidx=53
-		{ "socks",no_argument,0,0 },// optidx=54
-		{ "no-resolve",no_argument,0,0 },// optidx=55
-		{ "resolver-threads",required_argument,0,0 },// optidx=56
-		{ "skip-nodelay",no_argument,0,0 },// optidx=57
-		{ "tamper-start",required_argument,0,0 },// optidx=58
-		{ "tamper-cutoff",required_argument,0,0 },// optidx=59
-		{ "connect-bind-addr",required_argument,0,0 },// optidx=60
-
-		{ "new",no_argument,0,0 },				// optidx=61
-		{ "skip",no_argument,0,0 },				// optidx=62
-		{ "filter-l3",required_argument,0,0 },			// optidx=63
-		{ "filter-tcp",required_argument,0,0 },			// optidx=64
-		{ "filter-l7",required_argument,0,0 },			// optidx=65
-		{ "ipset",required_argument,0,0 },			// optidx=66
-		{ "ipset-ip",required_argument,0,0 },			// optidx=67
-		{ "ipset-exclude",required_argument,0,0 },		// optidx=68
-		{ "ipset-exclude-ip",required_argument,0,0 },		// optidx=69
-
-#if defined(__FreeBSD__)
-		{ "enable-pf",no_argument,0,0 },// optidx=69
-#elif defined(__APPLE__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=79
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=71
-#elif defined(__linux__)
-		{ "local-tcp-user-timeout",required_argument,0,0 },	// optidx=70
-		{ "remote-tcp-user-timeout",required_argument,0,0 },	// optidx=71
-		{ "mss",required_argument,0,0 },			// optidx=72
-		{ "fix-seg",optional_argument,0,0 },			// optidx=73
-#ifdef SPLICE_PRESENT
-		{ "nosplice",no_argument,0,0 },				// optidx=74
-#endif
-#endif
-		{ "hostlist-auto-retrans-threshold",optional_argument,0,0}, // ignored. for nfqws command line compatibility
-		{ NULL,0,NULL,0 }
-	};
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
 		if (v)
@@ -765,11 +857,11 @@ void parse_params(int argc, char *argv[])
 		}
 		switch (option_index)
 		{
-		case 0:
-		case 1:
+		case IDX_HELP:
+		case IDX_H:
 			exithelp_clean();
 			break;
-		case 2: /* bind-addr */
+		case IDX_BIND_ADDR:
 			nextbind_clean();
 			{
 				char *p = strchr(optarg,'%');
@@ -782,19 +874,19 @@ void parse_params(int argc, char *argv[])
 			}
 			params.binds[params.binds_last].bindaddr[sizeof(params.binds[params.binds_last].bindaddr) - 1] = 0;
 			break;
-		case 3: /* bind-iface4 */
+		case IDX_BIND_IFACE4:
 			nextbind_clean();
 			params.binds[params.binds_last].bind_if6=false;
 			strncpy(params.binds[params.binds_last].bindiface, optarg, sizeof(params.binds[params.binds_last].bindiface));
 			params.binds[params.binds_last].bindiface[sizeof(params.binds[params.binds_last].bindiface) - 1] = 0;
 			break;
-		case 4: /* bind-iface6 */
+		case IDX_BIND_IFACE6:
 			nextbind_clean();
 			params.binds[params.binds_last].bind_if6=true;
 			strncpy(params.binds[params.binds_last].bindiface, optarg, sizeof(params.binds[params.binds_last].bindiface));
 			params.binds[params.binds_last].bindiface[sizeof(params.binds[params.binds_last].bindiface) - 1] = 0;
 			break;
-		case 5: /* bind-linklocal */
+		case IDX_BIND_LINKLOCAL:
 			checkbind_clean();
 			params.binds[params.binds_last].bindll = true;
 			if (!strcmp(optarg, "no"))
@@ -811,22 +903,22 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 6: /* bind-wait-ifup */
+		case IDX_BIND_WAIT_IFUP:
 			checkbind_clean();
 			params.binds[params.binds_last].bind_wait_ifup = atoi(optarg);
 			break;
-		case 7: /* bind-wait-ip */
+		case IDX_BIND_WAIT_IP:
 			checkbind_clean();
 			params.binds[params.binds_last].bind_wait_ip = atoi(optarg);
 			break;
-		case 8: /* bind-wait-ip-linklocal */
+		case IDX_BIND_WAIT_IP_LINKLOCAL:
 			checkbind_clean();
 			params.binds[params.binds_last].bind_wait_ip_ll = atoi(optarg);
 			break;
-		case 9: /* bind-wait-only */
+		case IDX_BIND_WAIT_ONLY:
 			params.bind_wait_only = true;
 			break;
-		case 10: /* port */
+		case IDX_PORT:
 			i = atoi(optarg);
 			if (i <= 0 || i > 65535)
 			{
@@ -835,10 +927,10 @@ void parse_params(int argc, char *argv[])
 			}
 			params.port = (uint16_t)i;
 			break;
-		case 11: /* daemon */
+		case IDX_DAEMON:
 			params.daemon = true;
 			break;
-		case 12: /* user */
+		case IDX_USER:
 		{
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
@@ -851,7 +943,7 @@ void parse_params(int argc, char *argv[])
 			params.droproot = true;
 			break;
 		}
-		case 13: /* uid */
+		case IDX_UID:
 			params.gid=0x7FFFFFFF; // default git. drop gid=0
 			params.droproot = true;
 			if (sscanf(optarg,"%u:%u",&params.uid,&params.gid)<1)
@@ -860,7 +952,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 14: /* maxconn */
+		case IDX_MAXCONN:
 			params.maxconn = atoi(optarg);
 			if (params.maxconn <= 0 || params.maxconn > 10000)
 			{
@@ -868,7 +960,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 15: /* maxfiles */
+		case IDX_MAXFILES:
 			params.maxfiles = atoi(optarg);
 			if (params.maxfiles < 0)
 			{
@@ -876,7 +968,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 16: /* max-orphan-time */
+		case IDX_MAX_ORPHAN_TIME:
 			params.max_orphan_time = atoi(optarg);
 			if (params.max_orphan_time < 0)
 			{
@@ -884,11 +976,11 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 17: /* hostcase */
+		case IDX_HOSTCASE:
 			dp->hostcase = true;
 			params.tamper = true;
 			break;
-		case 18: /* hostspell */
+		case IDX_HOSTSPELL:
 			if (strlen(optarg) != 4)
 			{
 				DLOG_ERR("hostspell must be exactly 4 chars long\n");
@@ -898,23 +990,23 @@ void parse_params(int argc, char *argv[])
 			memcpy(dp->hostspell, optarg, 4);
 			params.tamper = true;
 			break;
-		case 19: /* hostdot */
+		case IDX_HOSTDOT:
 			dp->hostdot = true;
 			params.tamper = true;
 			break;
-		case 20: /* hostnospace */
+		case IDX_HOSTNOSPACE:
 			dp->hostnospace = true;
 			params.tamper = true;
 			break;
-		case 21: /* hostpad */
+		case IDX_HOSTPAD:
 			dp->hostpad = atoi(optarg);
 			params.tamper = true;
 			break;
-		case 22: /* domcase */
+		case IDX_DOMCASE:
 			dp->domcase = true;
 			params.tamper = true;
 			break;
-		case 23: /* split-http-req */
+		case IDX_SPLIT_HTTP_REQ:
 			DLOG_CONDUP("WARNING ! --split-http-req is deprecated. use --split-pos with markers.\n",MAX_SPLITS);
 			if (dp->split_count>=MAX_SPLITS)
 			{
@@ -929,7 +1021,7 @@ void parse_params(int argc, char *argv[])
 			dp->split_count++;
 			params.tamper = true;
 			break;
-		case 24: /* split-tls */
+		case IDX_SPLIT_TLS:
 			// obsolete arg
 			DLOG_CONDUP("WARNING ! --split-tls is deprecated. use --split-pos with markers.\n",MAX_SPLITS);
 			if (dp->split_count>=MAX_SPLITS)
@@ -945,7 +1037,7 @@ void parse_params(int argc, char *argv[])
 			dp->split_count++;
 			params.tamper = true;
 			break;
-		case 25: /* split-pos */
+		case IDX_SPLIT_POS:
 			{
 				int ct;
 				if (!parse_split_pos_list(optarg,dp->splits+dp->split_count,MAX_SPLITS-dp->split_count,&ct))
@@ -957,10 +1049,10 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 26: /* split-any-protocol */
+		case IDX_SPLIT_ANY_PROTOCOL:
 			dp->split_any_protocol = true;
 			break;
-		case 27: /* disorder */
+		case IDX_DISORDER:
 			if (optarg)
 			{
 				if (!strcmp(optarg,"http")) dp->disorder_http=true;
@@ -981,7 +1073,7 @@ void parse_params(int argc, char *argv[])
 			}
 #endif
 			break;
-		case 28: /* oob */
+		case IDX_OOB:
 			if (optarg)
 			{
 				if (!strcmp(optarg,"http")) dp->oob_http=true;
@@ -1002,7 +1094,7 @@ void parse_params(int argc, char *argv[])
 			}
 #endif
 			break;
-		case 29: /* oob-data */
+		case IDX_OOB_DATA:
 			{
 				size_t l = strlen(optarg);
 				unsigned int bt;
@@ -1015,23 +1107,23 @@ void parse_params(int argc, char *argv[])
 				else dp->oob_byte = (uint8_t)bt;
 			}
 			break;
-		case 30: /* methodspace */
+		case IDX_METHODSPACE:
 			dp->methodspace = true;
 			params.tamper = true;
 			break;
-		case 31: /* methodeol */
+		case IDX_METHODEOL:
 			dp->methodeol = true;
 			params.tamper = true;
 			break;
-		case 32: /* hosttab */
+		case IDX_HOSTTAB:
 			dp->hosttab = true;
 			params.tamper = true;
 			break;
-		case 33: /* unixeol */
+		case IDX_UNIXEOL:
 			dp->unixeol = true;
 			params.tamper = true;
 			break;
-		case 34: /* tlsrec */
+		case IDX_TLSREC:
 			if (!parse_split_pos(optarg, &dp->tlsrec) && !parse_tlspos(optarg, &dp->tlsrec))
 			{
 				DLOG_ERR("Invalid argument for tlsrec\n");
@@ -1039,7 +1131,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 35: /* tlsrec-pos */
+		case IDX_TLSREC_POS:
 			// obsolete arg
 			i = atoi(optarg);
 			dp->tlsrec.marker = PM_ABS;
@@ -1051,7 +1143,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 36: /* hostlist */
+		case IDX_HOSTLIST:
 			if (bSkip) break;
 			if (!RegisterHostlist(dp, false, optarg))
 			{
@@ -1060,7 +1152,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 37: /* hostlist-domains */
+		case IDX_HOSTLIST_DOMAINS:
 			if (bSkip) break;
 			if (!anon_hl && !(anon_hl=RegisterHostlist(dp, false, NULL)))
 			{
@@ -1074,7 +1166,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 38: /* hostlist-exclude */
+		case IDX_HOSTLIST_EXCLUDE:
 			if (bSkip) break;
 			if (!RegisterHostlist(dp, true, optarg))
 			{
@@ -1083,7 +1175,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 39: /* hostlist-exclude-domains */
+		case IDX_HOSTLIST_EXCLUDE_DOMAINS:
 			if (bSkip) break;
 			if (!anon_hl_exclude && !(anon_hl_exclude=RegisterHostlist(dp, true, NULL)))
 			{
@@ -1097,7 +1189,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 40: /* hostlist-auto */
+		case IDX_HOSTLIST_AUTO:
 			if (bSkip) break;
 			if (dp->hostlist_auto)
 			{
@@ -1126,7 +1218,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true; // need to detect blocks and update autohostlist. cannot just slice.
 			break;
-		case 41: /* hostlist-auto-fail-threshold */
+		case IDX_HOSTLIST_AUTO_FAIL_THRESHOLD:
 			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_threshold<1 || dp->hostlist_auto_fail_threshold>20)
 			{
@@ -1134,7 +1226,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 42: /* hostlist-auto-fail-time */
+		case IDX_HOSTLIST_AUTO_FAIL_TIME:
 			dp->hostlist_auto_fail_time = (uint8_t)atoi(optarg);
 			if (dp->hostlist_auto_fail_time<1)
 			{
@@ -1142,7 +1234,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 43: /* hostlist-auto-debug */
+		case IDX_HOSTLIST_AUTO_DEBUG:
 			{
 				FILE *F = fopen(optarg,"a+t");
 				if (!F)
@@ -1155,11 +1247,11 @@ void parse_params(int argc, char *argv[])
 				params.hostlist_auto_debuglog[sizeof(params.hostlist_auto_debuglog) - 1] = '\0';
 			}
 			break;
-		case 44: /* pidfile */
+		case IDX_PIDFILE:
 			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
 			params.pidfile[sizeof(params.pidfile)-1]='\0';
 			break;
-		case 45: /* debug */
+		case IDX_DEBUG:
 			if (optarg)
 			{
 				if (*optarg=='@')
@@ -1193,52 +1285,52 @@ void parse_params(int argc, char *argv[])
 				params.debug_target = LOG_TARGET_CONSOLE;
 			}
 			break;
-		case 46: /* debug-level */
+		case IDX_DEBUG_LEVEL:
 			params.debug = atoi(optarg);
 			break;
-		case 47: /* dry-run */
+		case IDX_DRY_RUN:
 			bDry = true;
 			break;
-		case 48: /* version */
+		case IDX_VERSION:
 			exit_clean(0);
 			break;
-		case 49: /* comment */
+		case IDX_COMMENT:
 			break;
-		case 50: /* local-rcvbuf */
+		case IDX_LOCAL_RCVBUF:
 #ifdef __linux__
 			params.local_rcvbuf = atoi(optarg)/2;
 #else
 			params.local_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 51: /* local-sndbuf */
+		case IDX_LOCAL_SNDBUF:
 #ifdef __linux__
 			params.local_sndbuf = atoi(optarg)/2;
 #else
 			params.local_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 52: /* remote-rcvbuf */
+		case IDX_REMOTE_RCVBUF:
 #ifdef __linux__
 			params.remote_rcvbuf = atoi(optarg)/2;
 #else
 			params.remote_rcvbuf = atoi(optarg);
 #endif
 			break;
-		case 53: /* remote-sndbuf */
+		case IDX_REMOTE_SNDBUF:
 #ifdef __linux__
 			params.remote_sndbuf = atoi(optarg)/2;
 #else
 			params.remote_sndbuf = atoi(optarg);
 #endif
 			break;
-		case 54: /* socks */
+		case IDX_SOCKS:
 			params.proxy_type = CONN_TYPE_SOCKS;
 			break;
-		case 55: /* no-resolve */
+		case IDX_NO_RESOLVE:
 			params.no_resolve = true;
 			break;
-		case 56: /* resolver-threads */
+		case IDX_RESOLVER_THREADS:
 			params.resolver_threads = atoi(optarg);
 			if (params.resolver_threads<1 || params.resolver_threads>300)
 			{
@@ -1246,10 +1338,10 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 57: /* skip-nodelay */
+		case IDX_SKIP_NODELAY:
 			params.skip_nodelay = true;
 			break;
-		case 58: /* tamper-start */
+		case IDX_TAMPER_START:
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -1263,7 +1355,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper_lim = true;
 			break;
-		case 59: /* tamper-cutoff */
+		case IDX_TAMPER_CUTOFF:
 			{
 				const char *p=optarg;
 				if (*p=='n')
@@ -1277,7 +1369,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper_lim = true;
 			break;
-		case 60: /* connect-bind-addr */
+		case IDX_CONNECT_BIND_ADDR:
 			{
 				char *p = strchr(optarg,'%');
 				if (p) *p++=0;
@@ -1305,7 +1397,7 @@ void parse_params(int argc, char *argv[])
 			break;
 
 
-		case 61: /* new */
+		case IDX_NEW:
 			if (bSkip)
 			{
 				dp_clear(dp);
@@ -1326,31 +1418,31 @@ void parse_params(int argc, char *argv[])
 			anon_hl = anon_hl_exclude = NULL;
 			anon_ips = anon_ips_exclude = NULL;
 			break;
-		case 62: /* skip */
+		case IDX_SKIP:
 			bSkip = true;
 			break;
-		case 63: /* filter-l3 */
+		case IDX_FILTER_L3:
 			if (!wf_make_l3(optarg,&dp->filter_ipv4,&dp->filter_ipv6))
 			{
 				DLOG_ERR("bad value for --filter-l3\n");
 				exit_clean(1);
 			}
 			break;
-		case 64: /* filter-tcp */
+		case IDX_FILTER_TCP:
 			if (!parse_pf_list(optarg,&dp->pf_tcp))
 			{
 				DLOG_ERR("Invalid port filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 65: /* filter-l7 */
+		case IDX_FILTER_L7:
 			if (!parse_l7_list(optarg,&dp->filter_l7))
 			{
 				DLOG_ERR("Invalid l7 filter : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;
-		case 66: /* ipset */
+		case IDX_IPSET:
 			if (bSkip) break;
 			if (!RegisterIpset(dp, false, optarg))
 			{
@@ -1359,7 +1451,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 67: /* ipset-ip */
+		case IDX_IPSET_IP:
 			if (bSkip) break;
 			if (!anon_ips && !(anon_ips=RegisterIpset(dp, false, NULL)))
 			{
@@ -1373,7 +1465,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 68: /* ipset-exclude */
+		case IDX_IPSET_EXCLUDE:
 			if (bSkip) break;
 			if (!RegisterIpset(dp, true, optarg))
 			{
@@ -1382,7 +1474,7 @@ void parse_params(int argc, char *argv[])
 			}
 			params.tamper = true;
 			break;
-		case 69: /* ipset-exclude-ip */
+		case IDX_IPSET_EXCLUDE_IP:
 			if (bSkip) break;
 			if (!anon_ips_exclude && !(anon_ips_exclude=RegisterIpset(dp, true, NULL)))
 			{
@@ -1398,11 +1490,11 @@ void parse_params(int argc, char *argv[])
 			break;
 
 #if defined(__FreeBSD__)
-		case 70: /* enable-pf */
+		case IDX_ENABLE_PF:
 			params.pf_enable = true;
 			break;
 #elif defined(__linux__) || defined(__APPLE__)
-		case 70: /* local-tcp-user-timeout */
+		case IDX_LOCAL_TCP_USER_TIMEOUT:
 			params.tcp_user_timeout_local = atoi(optarg);
 			if (params.tcp_user_timeout_local<0 || params.tcp_user_timeout_local>86400)
 			{
@@ -1410,7 +1502,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 71: /* remote-tcp-user-timeout */
+		case IDX_REMOTE_TCP_USER_TIMEOUT:
 			params.tcp_user_timeout_remote = atoi(optarg);
 			if (params.tcp_user_timeout_remote<0 || params.tcp_user_timeout_remote>86400)
 			{
@@ -1421,7 +1513,7 @@ void parse_params(int argc, char *argv[])
 #endif
 
 #if defined(__linux__)
-		case 72: /* mss */
+		case IDX_MSS:
 			// this option does not work in any BSD and MacOS. OS may accept but it changes nothing
 			dp->mss = atoi(optarg);
 			if (dp->mss<88 || dp->mss>32767)
@@ -1430,7 +1522,7 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			break;
-		case 73: /* fix-seg */
+		case IDX_FIX_SEG:
 			if (!params.fix_seg_avail)
 			{
 				DLOG_ERR("--fix-seg is supported since kernel 4.6\n");
@@ -1450,7 +1542,7 @@ void parse_params(int argc, char *argv[])
 				params.fix_seg = FIX_SEG_DEFAULT_MAX_WAIT;
 			break;
 #ifdef SPLICE_PRESENT
-		case 74: /* nosplice */
+		case IDX_NOSPLICE:
 			params.nosplice = true;
 			break;
 #endif
