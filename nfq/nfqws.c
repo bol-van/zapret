@@ -1616,7 +1616,7 @@ enum opt_indices {
 #ifdef __linux__
 	IDX_BIND_FIX4,
 	IDX_BIND_FIX6,
-#elif defined(__CYGWIN__),
+#elif defined(__CYGWIN__)
 	IDX_WF_IFACE,
 	IDX_WF_L3,
 	IDX_WF_TCP,
@@ -1895,15 +1895,17 @@ int main(int argc, char **argv)
 			break;
 #ifndef __CYGWIN__
 		case IDX_USER:
-			struct passwd *pwd = getpwnam(optarg);
-			if (!pwd)
 			{
-				DLOG_ERR("non-existent username supplied\n");
-				exit_clean(1);
+				struct passwd *pwd = getpwnam(optarg);
+				if (!pwd)
+				{
+					DLOG_ERR("non-existent username supplied\n");
+					exit_clean(1);
+				}
+				params.uid = pwd->pw_uid;
+				params.gid = pwd->pw_gid;
+				params.droproot = true;
 			}
-			params.uid = pwd->pw_uid;
-			params.gid = pwd->pw_gid;
-			params.droproot = true;
 			break;
 		case IDX_UID:
 			params.gid = 0x7FFFFFFF; // default gid. drop gid=0
