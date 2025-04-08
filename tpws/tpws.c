@@ -697,7 +697,7 @@ enum opt_indices {
 	IDX_NOSPLICE,
 #endif
 #endif
-	IDX_HOSTLIST_AUTO_RETRANS_TRESHOLD, // ignored. for nfqws command line compatibility
+	IDX_HOSTLIST_AUTO_RETRANS_THRESHOLD, // ignored. for nfqws command line compatibility
 	IDX_LAST,
 };
 
@@ -788,7 +788,7 @@ static const struct option long_options[] = {
 	[IDX_NOSPLICE] = {"nosplice", no_argument, 0, 0},
 #endif
 #endif
-	[IDX_HOSTLIST_AUTO_RETRANS_TRESHOLD] = {"hostlist-auto-retrans-threshold", optional_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO_RETRANS_THRESHOLD] = {"hostlist-auto-retrans-threshold", optional_argument, 0, 0},
 	[IDX_LAST] = {NULL, 0, NULL, 0},
 };
 
