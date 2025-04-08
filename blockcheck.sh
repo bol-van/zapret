@@ -361,11 +361,13 @@ check_system()
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
-			if tpws_can_fix_seg ; then
-				echo tpws supports --fix-seg on this system
-				FIX_SEG='--fix-seg'
-			else
-				echo tpws does not support --fix-seg on this system
+			if [ -x "$TPWS" ] ; then
+				if tpws_can_fix_seg ; then
+					echo tpws supports --fix-seg on this system
+					FIX_SEG='--fix-seg'
+				else
+					echo tpws does not support --fix-seg on this system
+				fi
 			fi
 			linux_fwtype
 			[ "$FWTYPE" = iptables -o "$FWTYPE" = nftables ] || {
