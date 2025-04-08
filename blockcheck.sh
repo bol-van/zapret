@@ -341,6 +341,12 @@ netcat_test()
 	}
 }
 
+tpws_can_fix_seg()
+{
+	# fix-seg requires kernel 4.6+
+	"$TPWS" --port 1 --dry-run --fix-seg >/dev/null 2>/dev/null
+}
+
 check_system()
 {
 	echo \* checking system
@@ -355,7 +361,12 @@ check_system()
 		Linux)
 			PKTWS="$NFQWS"
 			PKTWSD=nfqws
-			FIX_SEG='--fix-seg'
+			if tpws_can_fix_seg ; then
+				echo tpws supports --fix-seg on this system
+				FIX_SEG='--fix-seg'
+			else
+				echo tpws does not support --fix-seg on this system
+			fi
 			linux_fwtype
 			[ "$FWTYPE" = iptables -o "$FWTYPE" = nftables ] || {
 				echo firewall type $FWTYPE not supported in $UNAME
