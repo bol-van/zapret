@@ -467,24 +467,37 @@ static void exithelp(void)
 #define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
 #endif
 
+enum opt_indices {
+	IDX_HELP,
+	IDX_THREADS,
+	IDX_FAMILY,
+	IDX_VERBOSE,
+	IDX_STATS,
+	IDX_LOG_RESOLVED,
+	IDX_LOG_FAILED,
+	IDX_DNS_MAKE_QUERY,
+	IDX_DNS_PARSE_QUERY,
+	IDX_LAST,
+};
+
+static const struct option long_options[] = {
+	[IDX_HELP] = {"help", no_argument, 0, 0},
+	[IDX_THREADS] = {"threads", required_argument, 0, 0},
+	[IDX_FAMILY] = {"family", required_argument, 0, 0},
+	[IDX_VERBOSE] = {"verbose", no_argument, 0, 0},
+	[IDX_STATS] = {"stats", required_argument, 0, 0},
+	[IDX_LOG_RESOLVED] = {"log-resolved", required_argument, 0, 0},
+	[IDX_LOG_FAILED] = {"log-failed", required_argument, 0, 0},
+	[IDX_DNS_MAKE_QUERY] = {"dns-make-query", required_argument, 0, 0},
+	[IDX_DNS_PARSE_QUERY] = {"dns-parse-query", no_argument, 0, 0},
+	[IDX_LAST] = {NULL, 0, NULL, 0},
+};
+
 int main(int argc, char **argv)
 {
 	int r, v, option_index = 0;
 	char fn1[256],fn2[256];
 	char dom[256];
-
-	static const struct option long_options[] = {
-			{"help",no_argument,0,0},			// optidx=0
-			{"threads",required_argument,0,0},		// optidx=1
-			{"family",required_argument,0,0},		// optidx=2
-			{"verbose",no_argument,0,0},			// optidx=3
-			{"stats",required_argument,0,0},		// optidx=4
-			{"log-resolved",required_argument,0,0},		// optidx=5
-			{"log-failed",required_argument,0,0},		// optidx=6
-			{"dns-make-query",required_argument,0,0},	// optidx=7
-			{"dns-parse-query",no_argument,0,0},		// optidx=8
-			{NULL,0,NULL,0}
-	};
 
 	memset(&glob, 0, sizeof(glob));
 	*fn1 = *fn2 = *dom = 0;
@@ -495,11 +508,11 @@ int main(int argc, char **argv)
 		if (v) exithelp();
 		switch (option_index)
 		{
-		case 0: /* help */
+		case IDX_HELP:
 			PRINT_VER;
 			exithelp();
 			break;
-		case 1: /* threads */
+		case IDX_THREADS:
 			glob.threads = optarg ? atoi(optarg) : 0;
 			if (glob.threads <= 0 || glob.threads > 100)
 			{
@@ -507,7 +520,7 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			break;
-		case 2: /* family */
+		case IDX_FAMILY:
 			if (!strcmp(optarg, "4"))
 				glob.family = FAMILY4;
 			else if (!strcmp(optarg, "6"))
@@ -520,25 +533,25 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			break;
-		case 3: /* verbose */
+		case IDX_VERBOSE:
 			glob.verbose = '\1';
 			break;
-		case 4: /* stats */
+		case IDX_STATS:
 			glob.stats_every = optarg ? atoi(optarg) : 0;
 			break;
-		case 5: /* log-resolved */
+		case IDX_LOG_RESOLVED:
 			strncpy(fn1,optarg,sizeof(fn1));
 			fn1[sizeof(fn1)-1] = 0;
 			break;
-		case 6: /* log-failed */
+		case IDX_LOG_FAILED:
 			strncpy(fn2,optarg,sizeof(fn2));
 			fn2[sizeof(fn2)-1] = 0;
 			break;
-		case 7: /* dns-make-query */
+		case IDX_DNS_MAKE_QUERY:
 			strncpy(dom,optarg,sizeof(dom));
 			dom[sizeof(dom)-1] = 0;
 			break;
-		case 8: /* dns-parse-query */
+		case IDX_DNS_PARSE_QUERY:
 			return dns_parse_query();
 		}
 	}
