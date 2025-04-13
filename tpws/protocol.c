@@ -339,6 +339,20 @@ size_t HttpPos(uint8_t posmarker, int16_t pos, const uint8_t *data, size_t sz)
 
 
 
+const char *TLSVersionStr(uint16_t tlsver)
+{
+	switch(tlsver)
+	{
+		case 0x0301: return "TLS 1.0";
+		case 0x0302: return "TLS 1.1";
+		case 0x0303: return "TLS 1.2";
+		case 0x0304: return "TLS 1.3";
+		default:
+			// 0x0a0a, 0x1a1a, ..., 0xfafa
+			return (((tlsver & 0x0F0F) == 0x0A0A) && ((tlsver>>12)==((tlsver>>4)&0xF))) ? "GREASE" : "UNKNOWN";
+	}
+}
+
 uint16_t TLSRecordDataLen(const uint8_t *data)
 {
 	return pntoh16(data + 3);

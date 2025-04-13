@@ -57,6 +57,7 @@ int HttpReplyCode(const uint8_t *data, size_t len);
 // must be pre-checked by IsHttpReply
 bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *host);
 
+const char *TLSVersionStr(uint16_t tlsver);
 uint16_t TLSRecordDataLen(const uint8_t *data);
 size_t TLSRecordLen(const uint8_t *data);
 bool IsTLSRecordFull(const uint8_t *data, size_t len);

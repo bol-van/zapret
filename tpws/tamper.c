@@ -15,6 +15,34 @@ void packet_debug(const uint8_t *data, size_t sz)
 	hexdump_limited_dlog(data, sz, PKTDATA_MAXDUMP); VPRINT("\n");
 }
 
+void TLSDebug(const uint8_t *tls,size_t sz)
+{
+	if (sz<11) return;
+
+	uint16_t v_rec=pntoh16(tls+1), v_handshake=pntoh16(tls+9), v;
+	VPRINT("TLS record layer version : %s\nTLS handshake version : %s\n",TLSVersionStr(v_rec),TLSVersionStr(v_handshake));
+
+	const uint8_t *ext_supvers;
+	size_t len_supvers,len_supvers2;
+	if (TLSFindExt(tls,sz,43,&ext_supvers,&len_supvers,false))
+	{
+		if (len_supvers)
+		{
+			len_supvers2 = ext_supvers[0];
+			if (len_supvers2<len_supvers)
+			{
+				for(ext_supvers++,len_supvers2&=~1 ; len_supvers2 ; len_supvers2-=2,ext_supvers+=2)
+				{
+					v = pntoh16(ext_supvers);
+					VPRINT("TLS supported versions ext : %s\n",TLSVersionStr(v));
+				}
+			}
+		}
+	}
+	else
+		VPRINT("TLS supported versions ext : not present\n");
+}
+
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
 	bool bHostlistsEmpty;
@@ -130,6 +158,7 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 	{
 		VPRINT("Data block contains TLS ClientHello\n");
 		l7proto=TLS;
+		if (params.debug) TLSDebug(segment,*size);
 		bHaveHost=TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false);
 	}
 	else

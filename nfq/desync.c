@@ -83,6 +83,35 @@ const uint8_t fake_tls_clienthello_default[680] = {
 #define TCP_MAX_REASM 16384
 #define UDP_MAX_REASM 16384
 
+void TLSDebug(const uint8_t *tls,size_t sz)
+{
+	if (sz<11) return;
+
+	uint16_t v_rec=pntoh16(tls+1), v_handshake=pntoh16(tls+9), v;
+	DLOG("TLS record layer version : %s\nTLS handshake version : %s\n",TLSVersionStr(v_rec),TLSVersionStr(v_handshake));
+
+	const uint8_t *ext_supvers;
+	size_t len_supvers,len_supvers2;
+	if (TLSFindExt(tls,sz,43,&ext_supvers,&len_supvers,false))
+	{
+		if (len_supvers)
+		{
+			len_supvers2 = ext_supvers[0];
+			if (len_supvers2<len_supvers)
+			{
+				for(ext_supvers++,len_supvers2&=~1 ; len_supvers2 ; len_supvers2-=2,ext_supvers+=2)
+				{
+					v = pntoh16(ext_supvers);
+					DLOG("TLS supported versions ext : %s\n",TLSVersionStr(v));
+				}
+			}
+		}
+	}
+	else
+		DLOG("TLS supported versions ext : not present\n");
+}
+
+
 bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 {
 	return mode==DESYNC_SYNACK || mode==DESYNC_SYNDATA;
@@ -965,6 +994,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			bool bReqFull = IsTLSRecordFull(rdata_payload,rlen_payload);
 			DLOG(bReqFull ? "packet contains full TLS ClientHello\n" : "packet contains partial TLS ClientHello\n");
 			l7proto = TLS;
+
+			if (bReqFull && params.debug) TLSDebug(rdata_payload,rlen_payload);
 
 			bHaveHost=TLSHelloExtractHost(rdata_payload,rlen_payload,host,sizeof(host),TLS_PARTIALS_ENABLE);
 

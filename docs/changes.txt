@@ -481,3 +481,7 @@ nfqws: update default TLS ClientHello fake. firefox 136.0.4 finger, no kyber, SN
 nfqws: multiple mods for multiple TLS fakes
 init.d: remove 50-discord
 blockcheck: use tpws --fix-seg on linux for multiple splits
+
+v70.7
+
+nfqws,tpws: debug tls version
