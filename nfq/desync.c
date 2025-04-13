@@ -87,21 +87,21 @@ void TLSDebug(const uint8_t *tls,size_t sz)
 {
 	if (sz<11) return;
 
-	uint16_t v_rec=pntoh16(tls+1), v_handshake=pntoh16(tls+9), v;
+	uint16_t v_rec=pntoh16(tls+1), v_handshake=pntoh16(tls+9), v, v2;
 	DLOG("TLS record layer version : %s\nTLS handshake version : %s\n",TLSVersionStr(v_rec),TLSVersionStr(v_handshake));
 
-	const uint8_t *ext_supvers;
-	size_t len_supvers,len_supvers2;
-	if (TLSFindExt(tls,sz,43,&ext_supvers,&len_supvers,false))
+	const uint8_t *ext;
+	size_t len,len2;
+	if (TLSFindExt(tls,sz,43,&ext,&len,false))
 	{
-		if (len_supvers)
+		if (len)
 		{
-			len_supvers2 = ext_supvers[0];
-			if (len_supvers2<len_supvers)
+			len2 = ext[0];
+			if (len2<len)
 			{
-				for(ext_supvers++,len_supvers2&=~1 ; len_supvers2 ; len_supvers2-=2,ext_supvers+=2)
+				for(ext++,len2&=~1 ; len2 ; len2-=2,ext+=2)
 				{
-					v = pntoh16(ext_supvers);
+					v = pntoh16(ext);
 					DLOG("TLS supported versions ext : %s\n",TLSVersionStr(v));
 				}
 			}
@@ -109,6 +109,37 @@ void TLSDebug(const uint8_t *tls,size_t sz)
 	}
 	else
 		DLOG("TLS supported versions ext : not present\n");
+
+	if (TLSFindExt(tls,sz,16,&ext,&len,false))
+	{
+		if (len>=2)
+		{
+			len2 = pntoh16(ext);
+			if (len2<=(len-2))
+			{
+				char s[32];
+				for(ext+=2; len2 ;)
+				{
+					v = *ext; ext++; len2--;
+					if (v<=len2)
+					{
+						v2 = v<sizeof(s) ? v : sizeof(s)-1;
+						memcpy(s,ext,v2);
+						s[v2]=0;
+						DLOG("TLS ALPN ext : %s\n",s);
+						len2-=v;
+						ext+=v;
+					}
+					else
+						break;
+				}
+			}
+		}
+	}
+	else
+		DLOG("TLS ALPN ext : not present\n");
+
+	DLOG("TLS ECH ext : %s\n",TLSFindExt(tls,sz,65037,NULL,NULL,false) ? "present" : "not present");
 }
 
 
