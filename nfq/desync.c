@@ -152,6 +152,9 @@ static void TLSDebug(const uint8_t *tls,size_t sz)
 
 	DLOG("TLS record layer version : %s\n",TLSVersionStr(pntoh16(tls+1)));
 
+	size_t reclen=TLSRecordLen(tls);
+	if (reclen<sz) sz=reclen; // correct len if it has more data than the first tls record has
+
 	TLSDebugHandshake(tls+5,sz-5);
 }
 
