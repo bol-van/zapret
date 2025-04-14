@@ -15,16 +15,19 @@ void packet_debug(const uint8_t *data, size_t sz)
 	hexdump_limited_dlog(data, sz, PKTDATA_MAXDUMP); VPRINT("\n");
 }
 
-void TLSDebug(const uint8_t *tls,size_t sz)
+static void TLSDebugHandshake(const uint8_t *tls,size_t sz)
 {
-	if (sz<11) return;
+	if (!params.debug) return;
 
-	uint16_t v_rec=pntoh16(tls+1), v_handshake=pntoh16(tls+9), v, v2;
-	VPRINT("TLS record layer version : %s\nTLS handshake version : %s\n",TLSVersionStr(v_rec),TLSVersionStr(v_handshake));
+	if (sz<6) return;
 
 	const uint8_t *ext;
 	size_t len,len2;
-	if (TLSFindExt(tls,sz,43,&ext,&len,false))
+
+	uint16_t v_handshake=pntoh16(tls+4), v, v2;
+	VPRINT("TLS handshake version : %s\n",TLSVersionStr(v_handshake));
+
+	if (TLSFindExtInHandshake(tls,sz,43,&ext,&len,false))
 	{
 		if (len)
 		{
@@ -42,7 +45,7 @@ void TLSDebug(const uint8_t *tls,size_t sz)
 	else
 		VPRINT("TLS supported versions ext : not present\n");
 
-	if (TLSFindExt(tls,sz,16,&ext,&len,false))
+	if (TLSFindExtInHandshake(tls,sz,16,&ext,&len,false))
 	{
 		if (len>=2)
 		{
@@ -71,7 +74,17 @@ void TLSDebug(const uint8_t *tls,size_t sz)
 	else
 		VPRINT("TLS ALPN ext : not present\n");
 
-	VPRINT("TLS ECH ext : %s\n",TLSFindExt(tls,sz,65037,NULL,NULL,false) ? "present" : "not present");
+	VPRINT("TLS ECH ext : %s\n",TLSFindExtInHandshake(tls,sz,65037,NULL,NULL,false) ? "present" : "not present");
+}
+static void TLSDebug(const uint8_t *tls,size_t sz)
+{
+	if (!params.debug) return;
+
+	if (sz<11) return;
+
+	VPRINT("TLS record layer version : %s\n",TLSVersionStr(pntoh16(tls+1)));
+
+	TLSDebugHandshake(tls+5,sz-5);
 }
 
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
