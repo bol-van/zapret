@@ -202,7 +202,7 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 	{
 		VPRINT("Data block contains TLS ClientHello\n");
 		l7proto=TLS;
-		if (params.debug) TLSDebug(segment,*size);
+		TLSDebug(segment,*size);
 		bHaveHost=TLSHelloExtractHost((uint8_t*)segment,*size,Host,sizeof(Host),false);
 	}
 	else
