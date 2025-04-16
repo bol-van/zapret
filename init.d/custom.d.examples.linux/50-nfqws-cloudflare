@@ -1,0 +1,117 @@
+NFQWS_OPT_DESYNC_NFQWS_MY1_TCP80="${NFQWS_OPT_DESYNC_NFQWS_MY1_TCP80:---dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-any-protocol}"
+NFQWS_OPT_DESYNC_NFQWS_MY1_TCP443="${NFQWS_OPT_DESYNC_NFQWS_MY1_TCP443:---dpi-desync=fake,split --dpi-desync-repeats=4 --dpi-desync-any-protocol}"
+NFQWS_OPT_DESYNC_NFQWS_MY1_UDP443="${NFQWS_OPT_DESYNC_NFQWS_MY1_UDP443:---dpi-desync=fake,disorder --dpi-desync-repeats=8 --dpi-desync-any-protocol}"
+NFQWS_MY1_PORTS_TCP=${NFQWS_MY1_PORTS_TCP:-80,443}
+NFQWS_MY1_PORTS_UDP=${NFQWS_MY1_PORTS_UDP:-443}
+NFQWS_MY1_SUBNETS_IPV4="${NFQWS_MY1_SUBNETS_IPV4:-103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 104.16.0.0/12 108.162.192.0/18 131.0.72.0/22 141.101.64.0/18 162.158.0.0/15 172.64.0.0/13 173.245.48.0/20 188.114.96.0/20 190.93.240.0/20 197.234.240.0/22 198.41.128.0/17 199.27.128.0/21}"
+NFQWS_MY1_SUBNETS_IPV6="${NFQWS_MY1_SUBNETS_IPV6:-2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32}"
+
+alloc_dnum DNUM_NFQWS_MY1_TCP80
+alloc_dnum DNUM_NFQWS_MY1_TCP443
+alloc_dnum DNUM_NFQWS_MY1_UDP443
+alloc_qnum QNUM_NFQWS_MY1_TCP80
+alloc_qnum QNUM_NFQWS_MY1_TCP443
+alloc_qnum QNUM_NFQWS_MY1_UDP443
+NFQWS_MY1_SET_NAME_IPV4=my1nfqws4
+NFQWS_MY1_SET_NAME_IPV6=my1nfqws6
+
+zapret_custom_daemons()
+{
+	local opt_tcp80="--qnum=$QNUM_NFQWS_MY1_TCP80 $NFQWS_OPT_DESYNC_NFQWS_MY1_TCP80"
+	local opt_tcp443="--qnum=$QNUM_NFQWS_MY1_TCP443 $NFQWS_OPT_DESYNC_NFQWS_MY1_TCP443"
+	local opt_udp443="--qnum=$QNUM_NFQWS_MY1_UDP443 $NFQWS_OPT_DESYNC_NFQWS_MY1_UDP443"
+	do_nfqws $1 $DNUM_NFQWS_MY1_TCP80 "$opt_tcp80"
+	do_nfqws $1 $DNUM_NFQWS_MY1_TCP443 "$opt_tcp443"
+	do_nfqws $1 $DNUM_NFQWS_MY1_UDP443 "$opt_udp443"
+}
+
+zapret_custom_firewall()
+{
+	local f
+	local first_packets_only="$ipt_connbytes 1:3"
+	local NFQWS_MY1_PORTS_TCP_IPT=$(replace_char - , $NFQWS_MY1_PORTS_TCP)
+	local NFQWS_MY1_PORTS_UDP_IPT=$(replace_char - , $NFQWS_MY1_PORTS_UDP)
+	local dest_set_ipv4="-m set --match-set $NFQWS_MY1_SET_NAME_IPV4 dst"
+	local dest_set_ipv6="-m set --match-set $NFQWS_MY1_SET_NAME_IPV6 dst"
+	local subnet
+	local subnet_count_ipv4=$(echo $NFQWS_MY1_SUBNETS_IPV4 | wc -w)
+	local subnet_count_ipv6=$(echo $NFQWS_MY1_SUBNETS_IPV6 | wc -w)
+	local hashsize_ipv4=$((subnet_count_ipv4 * 2))
+	local maxelem_ipv4=$((subnet_count_ipv4 * 4))
+	local hashsize_ipv6=$((subnet_count_ipv6 * 2))
+	local maxelem_ipv6=$((subnet_count_ipv6 * 4))
+
+	[ "$1" = 1 ] && {
+		ipset create $NFQWS_MY1_SET_NAME_IPV4 hash:net hashsize $hashsize_ipv4 maxelem $maxelem_ipv4 2>/dev/null
+		ipset flush $NFQWS_MY1_SET_NAME_IPV4
+		for subnet in $NFQWS_MY1_SUBNETS_IPV4; do
+			echo add $NFQWS_MY1_SET_NAME_IPV4 $subnet
+		done | ipset -! restore
+
+		ipset create $NFQWS_MY1_SET_NAME_IPV6 hash:net family inet6 hashsize $hashsize_ipv6 maxelem $maxelem_ipv6 2>/dev/null
+		ipset flush $NFQWS_MY1_SET_NAME_IPV6
+		for subnet in $NFQWS_MY1_SUBNETS_IPV6; do
+			echo add $NFQWS_MY1_SET_NAME_IPV6 $subnet
+		done | ipset -! restore
+	}
+
+	f="-p tcp -m multiport --dports 80"
+	fw_nfqws_post $1 "$f $first_packets_only $dest_set_ipv4" "" $QNUM_NFQWS_MY1_TCP80
+	fw_nfqws_post $1 "$f $first_packets_only $dest_set_ipv6" "" $QNUM_NFQWS_MY1_TCP80
+
+	f="-p tcp -m multiport --dports 443"
+	fw_nfqws_post $1 "$f $first_packets_only $dest_set_ipv4" "" $QNUM_NFQWS_MY1_TCP443
+	fw_nfqws_post $1 "$f $first_packets_only $dest_set_ipv6" "" $QNUM_NFQWS_MY1_TCP443
+
+	f="-p udp -m multiport --dports $NFQWS_MY1_PORTS_UDP_IPT"
+	fw_nfqws_post $1 "$f $first_packets_only $dest_set_ipv4" "" $QNUM_NFQWS_MY1_UDP443
+	fw_nfqws_post $1 "$f $first_packets_only $dest_set_ipv6" "" $QNUM_NFQWS_MY1_UDP443
+
+	[ "$1" = 0 ] && {
+		ipset destroy $NFQWS_MY1_SET_NAME_IPV4 2>/dev/null
+		ipset destroy $NFQWS_MY1_SET_NAME_IPV6 2>/dev/null
+	}
+}
+
+zapret_custom_firewall_nft()
+{
+	local f
+	local first_packets_only="$nft_connbytes 1-3"
+	local dest_set_ipv4="ip daddr @$NFQWS_MY1_SET_NAME_IPV4"
+	local dest_set_ipv6="ip6 daddr @$NFQWS_MY1_SET_NAME_IPV6"
+	local subnets_ipv4
+	local subnets_ipv6
+	local subnet_count_ipv4=$(echo $NFQWS_MY1_SUBNETS_IPV4 | wc -w)
+	local subnet_count_ipv6=$(echo $NFQWS_MY1_SUBNETS_IPV6 | wc -w)
+	local size_ipv4=$((subnet_count_ipv4 * 4))
+	local size_ipv6=$((subnet_count_ipv6 * 4))
+
+	make_comma_list subnets_ipv4 $NFQWS_MY1_SUBNETS_IPV4
+	make_comma_list subnets_ipv6 $NFQWS_MY1_SUBNETS_IPV6
+
+	nft_create_set $NFQWS_MY1_SET_NAME_IPV4 "type ipv4_addr; size $size_ipv4; auto-merge; flags interval;"
+	nft_flush_set $NFQWS_MY1_SET_NAME_IPV4
+	nft_add_set_element $NFQWS_MY1_SET_NAME_IPV4 "$subnets_ipv4"
+
+	nft_create_set $NFQWS_MY1_SET_NAME_IPV6 "type ipv6_addr; size $size_ipv6; auto-merge; flags interval;"
+	nft_flush_set $NFQWS_MY1_SET_NAME_IPV6
+	nft_add_set_element $NFQWS_MY1_SET_NAME_IPV6 "$subnets_ipv6"
+
+	f="tcp dport 80"
+	nft_fw_nfqws_post "$f $first_packets_only $dest_set_ipv4" "" $QNUM_NFQWS_MY1_TCP80
+	nft_fw_nfqws_post "$f $first_packets_only $dest_set_ipv6" "" $QNUM_NFQWS_MY1_TCP80
+
+	f="tcp dport 443"
+	nft_fw_nfqws_post "$f $first_packets_only $dest_set_ipv4" "" $QNUM_NFQWS_MY1_TCP443
+	nft_fw_nfqws_post "$f $first_packets_only $dest_set_ipv6" "" $QNUM_NFQWS_MY1_TCP443
+
+	f="udp dport {$NFQWS_MY1_PORTS_UDP}"
+	nft_fw_nfqws_post "$f $first_packets_only $dest_set_ipv4" "" $QNUM_NFQWS_MY1_UDP443
+	nft_fw_nfqws_post "$f $first_packets_only $dest_set_ipv6" "" $QNUM_NFQWS_MY1_UDP443
+}
+
+zapret_custom_firewall_nft_flush()
+{
+	nft_del_set $NFQWS_MY1_SET_NAME_IPV4 2>/dev/null
+	nft_del_set $NFQWS_MY1_SET_NAME_IPV6 2>/dev/null
+}
