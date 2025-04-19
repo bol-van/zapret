@@ -1145,7 +1145,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			struct desync_profile *dp_prev = dp;
 
-			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay ? ctrack_replay->hostname : host, ctrack_replay ? ctrack_replay->l7proto : l7proto, &bCheckDone, &bCheckResult, &bCheckExcluded);
+			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst,
+				ctrack_replay ? ctrack_replay->hostname : bHaveHost ? host : NULL,
+				ctrack_replay ? ctrack_replay->l7proto : l7proto,
+				&bCheckDone, &bCheckResult, &bCheckExcluded);
 			if (ctrack_replay)
 			{
 				ctrack_replay->dp = dp;
