@@ -111,6 +111,14 @@ unprepare_route_localnet()
 	set_route_localnet 0 "$@"
 }
 
+get_uevent_devtype()
+{
+	local DEVTYPE INTERFACE IFINDEX OF_NAME OF_FULLNAME OF_COMPATIBLE_N
+	[ -f "/sys/class/net/$1/uevent" ] && {
+		. "/sys/class/net/$1/uevent"
+		echo -n $DEVTYPE
+	}
+}
 resolve_lower_devices()
 {
 	# $1 - bridge interface name

@@ -320,7 +320,7 @@ nft_fill_ifsets()
 	# $5 - space separated wan physical interface names (optional)
 	# $6 - space separated wan6 physical interface names (optional)
 
-	local script i j ALLDEVS devs
+	local script i j ALLDEVS devs devtype b
 
 	# if large sets exist nft works very ineffectively
 	# looks like it analyzes the whole table blob to find required data pieces
@@ -348,15 +348,18 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 			nft_create_or_update_flowtable 'offload' 2>/dev/null
 			# then add elements. some of them can cause error because unsupported
 			for i in $ALLDEVS; do
-				# first try to add interface itself
-				nft_create_or_update_flowtable 'offload' $i 2>/dev/null
 				# bridge members must be added instead of the bridge itself
 				# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
+				b=
 				devs=$(resolve_lower_devices $i)
 				for j in $devs; do
 					# do not display error if addition failed
-					nft_create_or_update_flowtable 'offload' $j 2>/dev/null
+					nft_create_or_update_flowtable 'offload' $j && b=1 2>/dev/null
 				done
+				[ -n "$b" ] || {
+					# no lower devices added ? try to add interface itself
+					nft_create_or_update_flowtable 'offload' $i 2>/dev/null
+				}
 			done
 			;;
 	esac
