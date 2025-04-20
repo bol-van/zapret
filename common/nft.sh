@@ -320,7 +320,7 @@ nft_fill_ifsets()
 	# $5 - space separated wan physical interface names (optional)
 	# $6 - space separated wan6 physical interface names (optional)
 
-	local script i j ALLDEVS devs devtype b
+	local script i j ALLDEVS devs b
 
 	# if large sets exist nft works very ineffectively
 	# looks like it analyzes the whole table blob to find required data pieces
