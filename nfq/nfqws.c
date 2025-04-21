@@ -1222,6 +1222,19 @@ static struct blob_item *load_blob_to_collection(const char *filename, struct bl
 	blob->size_buf = blob->size+size_reserve;
 	return blob;
 }
+static struct blob_item *load_const_blob_to_collection(const void *data,size_t sz, struct blob_collection_head *blobs, size_t size_reserve)
+{
+	struct blob_item *blob = blob_collection_add(blobs);
+	if (!blob || (!(blob->data = malloc(sz+size_reserve))))
+	{
+		DLOG_ERR("out of memory\n");
+		exit_clean(1);
+	}
+	blob->size = sz;
+	blob->size_buf = sz+size_reserve;
+	memcpy(blob->data,data,sz);
+	return blob;
+}
 
 
 #ifdef __CYGWIN__
@@ -1441,7 +1454,7 @@ static void exithelp(void)
 		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
-		" --dpi-desync-fake-tls=<filename>|0xHEX\t\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-fake-tls=<filename>|0xHEX|!\t; file containing fake TLS ClientHello (for https)\n"
 		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap\n"
 		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
@@ -2211,7 +2224,9 @@ int main(int argc, char **argv)
 			break;
 		case IDX_DPI_DESYNC_FAKE_TLS:
 			{
-				dp->tls_fake_last = load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4+sizeof(dp->tls_mod_last.sni));
+				dp->tls_fake_last = strcmp(optarg,"!") ?
+					load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4+sizeof(dp->tls_mod_last.sni)) :
+					load_const_blob_to_collection(fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),&dp->fake_tls,4+sizeof(dp->tls_mod_last.sni));
 				if (!(dp->tls_fake_last->extra2 = malloc(sizeof(struct fake_tls_mod))))
 				{
 					DLOG_ERR("out of memory\n");
