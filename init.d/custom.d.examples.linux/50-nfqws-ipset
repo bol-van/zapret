@@ -1,7 +1,7 @@
 # this custom script demonstrates how to launch extra nfqws instance limited by ipset
 
 # can override in config :
-NFQWS_MY1_OPT="${NFQWS_MY1_OPT:--filter-udp=* --dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-any-protocol --new --filter-tcp=* --dpi-desync=multisplit}"
+NFQWS_MY1_OPT="${NFQWS_MY1_OPT:---filter-udp=* --dpi-desync=fake --dpi-desync-repeats=6 --dpi-desync-any-protocol --new --filter-tcp=* --dpi-desync=multisplit}"
 NFQWS_MY1_SUBNETS4="${NFQWS_MY1_SUBNETS4:-173.194.0.0/16 108.177.0.0/17 74.125.0.0/16 64.233.160.0/19 172.217.0.0/16}"
 NFQWS_MY1_SUBNETS6="${NFQWS_MY1_SUBNETS6:-2a00:1450::/29}"
 NFQWS_MY1_PORTS_TCP=${NFQWS_MY1_PORTS_TCP:-$NFQWS_PORTS_TCP}
