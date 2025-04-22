@@ -87,7 +87,7 @@ zapret_custom_firewall()
 
 zapret_custom_firewall_nft()
 {
-	local f4 f6 subnet
+	local f4 f6 subnets
 	local first_packets_only="$nft_connbytes 1-$NFQWS_MY1_PKT_OUT"
 
 	[ "$DISABLE_IPV4" != 1 ] && {

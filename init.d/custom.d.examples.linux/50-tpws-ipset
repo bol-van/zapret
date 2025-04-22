@@ -57,7 +57,7 @@ zapret_custom_firewall()
 
 zapret_custom_firewall_nft()
 {
-	local f4 f6 subnet
+	local f4 f6 subnets
 
 	[ "$DISABLE_IPV4" != 1 ] && {
 	        make_comma_list subnets $TPWS_MY1_SUBNETS4
