@@ -28,7 +28,6 @@ zapret_custom_firewall()
 
 	local f4 f6 subnet
 	local PORTS_IPT=$(replace_char - : $TPWS_MY1_PORTS)
-	local dest_set="-m set --match-set $TPWS_MY1_NAME4 dst"
 
 	[ "$1" = 1 -a "$DISABLE_IPV4" != 1 ] && {
 		ipset create $TPWS_MY1_NAME4 $TPWS_MY1_IPSET_OPT family inet 2>/dev/null
