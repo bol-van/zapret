@@ -1003,6 +1003,33 @@ err:
 	return false;
 }
 
+static bool parse_fooling(char *opt, unsigned int *fooling_mode)
+{
+	char *e,*p = opt;
+	while (p)
+	{
+		e = strchr(p,',');
+		if (e) *e++=0;
+		if (!strcmp(p,"md5sig"))
+			*fooling_mode |= FOOL_MD5SIG;
+		else if (!strcmp(p,"ts"))
+			*fooling_mode |= FOOL_TS;
+		else if (!strcmp(p,"badsum"))
+			*fooling_mode |= FOOL_BADSUM;
+		else if (!strcmp(p,"badseq"))
+			*fooling_mode |= FOOL_BADSEQ;
+		else if (!strcmp(p,"datanoack"))
+			*fooling_mode |= FOOL_DATANOACK;
+		else if (!strcmp(p,"hopbyhop"))
+			*fooling_mode |= FOOL_HOPBYHOP;
+		else if (!strcmp(p,"hopbyhop2"))
+			*fooling_mode |= FOOL_HOPBYHOP2;
+		else if (strcmp(p,"none"))
+			return false;
+		p = e;
+	}
+	return true;
+}
 
 static void split_compat(struct desync_profile *dp)
 {
@@ -1421,6 +1448,19 @@ static void exithelp(void)
 		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
+		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
+		" --orig-mod-start=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
+		" --orig-mod-cutoff=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --dup=<int>\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
+		" --dup-ttl=<int>\t\t\t\t; set TTL for dups\n"
+		" --dup-replace=[0|1]\t\t\t\t; 1 or no argument means do not send original, only dups\n"
+		" --dup-ttl6=<int>\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
+		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
+		" --dup-start=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
+		" --dup-cutoff=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
+		" --dup-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment for dup. default %d\n"
 		" --hostcase\t\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
@@ -1434,11 +1474,11 @@ static void exithelp(void)
 #elif defined(SO_USER_COOKIE)
 		" --dpi-desync-sockarg=<int|0xHEX>\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
 #endif
-		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for desync packet\n"
-		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for desync packet. by default ttl value is used.\n"
+		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for fakes packets\n"
+		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
 		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
 		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
@@ -1470,6 +1510,7 @@ static void exithelp(void)
 		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
+		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
@@ -1574,6 +1615,19 @@ enum opt_indices {
 #elif defined(SO_USER_COOKIE)
 	IDX_DPI_DESYNC_SOCKARG,
 #endif
+	IDX_DUP,
+	IDX_DUP_TTL,
+	IDX_DUP_TTL6,
+	IDX_DUP_FOOLING,
+	IDX_DUP_BADSEQ_INCREMENT,
+	IDX_DUP_BADACK_INCREMENT,
+	IDX_DUP_REPLACE,
+	IDX_DUP_START,
+	IDX_DUP_CUTOFF,
+	IDX_ORIG_TTL,
+	IDX_ORIG_TTL6,
+	IDX_ORIG_MOD_START,
+	IDX_ORIG_MOD_CUTOFF,
 	IDX_DPI_DESYNC_TTL,
 	IDX_DPI_DESYNC_TTL6,
 	IDX_DPI_DESYNC_AUTOTTL,
@@ -1674,6 +1728,19 @@ static const struct option long_options[] = {
 #elif defined(SO_USER_COOKIE)
 	[IDX_DPI_DESYNC_SOCKARG] = {"dpi-desync-sockarg", required_argument, 0, 0},
 #endif
+	[IDX_DUP] = {"dup", required_argument, 0, 0},
+	[IDX_DUP_TTL] = {"dup-ttl", required_argument, 0, 0},
+	[IDX_DUP_TTL6] = {"dup-ttl6", required_argument, 0, 0},
+	[IDX_DUP_FOOLING] = {"dup-fooling", required_argument, 0, 0},
+	[IDX_DUP_BADSEQ_INCREMENT] = {"dup-badseq-increment", required_argument, 0, 0},
+	[IDX_DUP_BADACK_INCREMENT] = {"dup-badack-increment", required_argument, 0, 0},
+	[IDX_DUP_REPLACE] = {"dup-replace", optional_argument, 0, 0},
+	[IDX_DUP_START] = {"dup-start", required_argument, 0, 0},
+	[IDX_DUP_CUTOFF] = {"dup-cutoff", required_argument, 0, 0},
+	[IDX_ORIG_TTL] = {"orig-ttl", required_argument, 0, 0},
+	[IDX_ORIG_TTL6] = {"orig-ttl6", required_argument, 0, 0},
+	[IDX_ORIG_MOD_START] = {"orig-mod-start", required_argument, 0, 0},
+	[IDX_ORIG_MOD_CUTOFF] = {"orig-mod-cutoff", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TTL] = {"dpi-desync-ttl", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TTL6] = {"dpi-desync-ttl6", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_AUTOTTL] = {"dpi-desync-autottl", optional_argument, 0, 0},
@@ -2043,6 +2110,80 @@ int main(int argc, char **argv)
 			}
 			break;
 #endif
+
+		case IDX_DUP:
+			if (sscanf(optarg,"%u",&dp->dup_repeats)<1 || dp->dup_repeats>1024)
+			{
+				DLOG_ERR("dup-repeats must be within 0..1024\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DUP_TTL:
+			dp->dup_ttl = (uint8_t)atoi(optarg);
+			break;
+		case IDX_DUP_TTL6:
+			dp->dup_ttl6 = (uint8_t)atoi(optarg);
+			break;
+		case IDX_DUP_REPLACE:
+			dp->dup_replace = optarg ? !!atoi(optarg) : true;
+			break;
+		case IDX_DUP_FOOLING:
+			if (!parse_fooling(optarg,&dp->dup_fooling_mode))
+			{
+				DLOG_ERR("fooling allowed values : none,md5sig,ts,badseq,badsum,datanoack,hopbyhop,hopbyhop2\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DUP_BADSEQ_INCREMENT:
+			if (!parse_badseq_increment(optarg,&dp->dup_badseq_increment))
+			{
+				DLOG_ERR("dup-badseq-increment should be signed decimal or signed 0xHEX\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DUP_BADACK_INCREMENT:
+			if (!parse_badseq_increment(optarg,&dp->dup_badseq_ack_increment))
+			{
+				DLOG_ERR("dup-badack-increment should be signed decimal or signed 0xHEX\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DUP_CUTOFF:
+			if (!parse_cutoff(optarg, &dp->dup_cutoff, &dp->dup_cutoff_mode))
+			{
+				DLOG_ERR("invalid dup-cutoff value\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DUP_START:
+			if (!parse_cutoff(optarg, &dp->dup_start, &dp->dup_start_mode))
+			{
+				DLOG_ERR("invalid dup-start value\n");
+				exit_clean(1);
+			}
+			break;
+
+		case IDX_ORIG_TTL:
+			dp->orig_mod_ttl = (uint8_t)atoi(optarg);
+			break;
+		case IDX_ORIG_TTL6:
+			dp->orig_mod_ttl6 = (uint8_t)atoi(optarg);
+			break;
+		case IDX_ORIG_MOD_CUTOFF:
+			if (!parse_cutoff(optarg, &dp->orig_mod_cutoff, &dp->orig_mod_cutoff_mode))
+			{
+				DLOG_ERR("invalid orig-mod-cutoff value\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_ORIG_MOD_START:
+			if (!parse_cutoff(optarg, &dp->orig_mod_start, &dp->orig_mod_start_mode))
+			{
+				DLOG_ERR("invalid orig-mod-start value\n");
+				exit_clean(1);
+			}
+			break;
+
 		case IDX_DPI_DESYNC_TTL:
 			dp->desync_ttl = (uint8_t)atoi(optarg);
 			break;
@@ -2064,44 +2205,16 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_DPI_DESYNC_FOOLING:
+			if (!parse_fooling(optarg,&dp->desync_fooling_mode))
 			{
-				char *e,*p = optarg;
-				while (p)
-				{
-					e = strchr(p,',');
-					if (e) *e++=0;
-					if (!strcmp(p,"md5sig"))
-						dp->desync_fooling_mode |= FOOL_MD5SIG;
-					else if (!strcmp(p,"ts"))
-						dp->desync_fooling_mode |= FOOL_TS;
-					else if (!strcmp(p,"badsum"))
-					{
-						#ifdef __OpenBSD__
-						DLOG_CONDUP("\nWARNING !!! OpenBSD may forcibly recompute tcp/udp checksums !!! In this case badsum fooling will not work.\nYou should check tcp checksum correctness in tcpdump manually before using badsum.\n\n");
-						#endif
-						dp->desync_fooling_mode |= FOOL_BADSUM;
-					}
-					else if (!strcmp(p,"badseq"))
-						dp->desync_fooling_mode |= FOOL_BADSEQ;
-					else if (!strcmp(p,"datanoack"))
-						dp->desync_fooling_mode |= FOOL_DATANOACK;
-					else if (!strcmp(p,"hopbyhop"))
-						dp->desync_fooling_mode |= FOOL_HOPBYHOP;
-					else if (!strcmp(p,"hopbyhop2"))
-						dp->desync_fooling_mode |= FOOL_HOPBYHOP2;
-					else if (strcmp(p,"none"))
-					{
-						DLOG_ERR("dpi-desync-fooling allowed values : none,md5sig,ts,badseq,badsum,datanoack,hopbyhop,hopbyhop2\n");
-						exit_clean(1);
-					}
-					p = e;
-				}
+				DLOG_ERR("fooling allowed values : none,md5sig,ts,badseq,badsum,datanoack,hopbyhop,hopbyhop2\n");
+				exit_clean(1);
 			}
 			break;
 		case IDX_DPI_DESYNC_REPEATS:
-			if (sscanf(optarg,"%u",&dp->desync_repeats)<1 || !dp->desync_repeats || dp->desync_repeats>20)
+			if (sscanf(optarg,"%u",&dp->desync_repeats)<1 || !dp->desync_repeats || dp->desync_repeats>1024)
 			{
-				DLOG_ERR("dpi-desync-repeats must be within 1..20\n");
+				DLOG_ERR("dpi-desync-repeats must be within 1..1024\n");
 				exit_clean(1);
 			}
 			break;
@@ -2709,6 +2822,8 @@ int main(int argc, char **argv)
 		dp = &dpl->dp;
 		// not specified - use desync_ttl value instead
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
+		if (dp->dup_ttl6 == 0xFF) dp->dup_ttl6=dp->dup_ttl;
+		if (dp->orig_mod_ttl6 == 0xFF) dp->orig_mod_ttl6=dp->orig_mod_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
 		if (AUTOTTL_ENABLED(dp->desync_autottl))
 			DLOG("profile %d autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);

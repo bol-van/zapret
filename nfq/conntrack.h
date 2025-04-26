@@ -80,7 +80,7 @@ typedef struct
 	uint8_t incoming_ttl, autottl;
 
 	bool b_cutoff;				// mark for deletion
-	bool b_wssize_cutoff, b_desync_cutoff;
+	bool b_wssize_cutoff, b_desync_cutoff, b_dup_cutoff, b_orig_mod_cutoff;
 
 	t_l7proto l7proto;
 	bool l7proto_discovered;

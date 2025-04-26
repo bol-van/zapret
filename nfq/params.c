@@ -187,10 +187,10 @@ void dp_init(struct desync_profile *dp)
 	dp->desync_repeats = 1;
 	dp->fake_syndata_size = 16;
 	dp->wscale=-1; // default - dont change scale factor (client)
-	dp->desync_ttl6 = 0xFF; // unused
-	dp->desync_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
-	dp->desync_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
-	dp->wssize_cutoff_mode = dp->desync_start_mode = dp->desync_cutoff_mode = 'n'; // packet number by default
+	dp->desync_ttl6 = dp->dup_ttl6 = dp->orig_mod_ttl6 = 0xFF; // unused
+	dp->desync_badseq_increment = dp->dup_badseq_increment = BADSEQ_INCREMENT_DEFAULT;
+	dp->desync_badseq_ack_increment = dp->dup_badseq_ack_increment = BADSEQ_ACK_INCREMENT_DEFAULT;
+	dp->wssize_cutoff_mode = dp->desync_start_mode = dp->desync_cutoff_mode = dp->dup_start_mode = dp->dup_cutoff_mode = dp->orig_mod_start_mode = dp->orig_mod_cutoff_mode = 'n'; // packet number by default
 	dp->udplen_increment = UDPLEN_INCREMENT_DEFAULT;
 	dp->hostlist_auto_fail_threshold = HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT;
 	dp->hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;

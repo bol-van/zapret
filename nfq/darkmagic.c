@@ -83,10 +83,22 @@ bool tcp_has_fastopen(const struct tcphdr *tcp)
 	opt = tcp_find_option((struct tcphdr*)tcp, 254);
 	return opt && opt[1]>=4 && opt[2]==0xF9 && opt[3]==0x89;
 }
+uint16_t tcp_find_mss(struct tcphdr *tcp)
+{
+	uint8_t *t = tcp_find_option(tcp,2);
+	return (t && t[1]==4) ? *(uint16_t*)(t+2) : 0;
+}
+bool tcp_has_sack(struct tcphdr *tcp)
+{
+	uint8_t *t = tcp_find_option(tcp,4);
+	return !!t;
+}
 
 // n prefix (nsport, nwsize) means network byte order
 static void fill_tcphdr(
 	struct tcphdr *tcp, uint32_t fooling, uint8_t tcp_flags,
+	bool sack,
+	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
 	uint16_t nsport, uint16_t ndport,
 	uint16_t nwsize, uint8_t scale_factor,
@@ -111,20 +123,32 @@ static void fill_tcphdr(
 		tcp->th_seq = nseq;
 		tcp->th_ack = nack_seq;
 	}
-	tcp->th_off       = 5;
+	tcp->th_off = 5;
 	if ((fooling & FOOL_DATANOACK) && !(tcp_flags & (TH_SYN|TH_RST)) && data_len)
 		tcp_flags &= ~TH_ACK;
 	*((uint8_t*)tcp+13)= tcp_flags;
 	tcp->th_win     = nwsize;
+	if (nmss)
+	{
+		tcpopt[t++] = 2; // kind
+		tcpopt[t++] = 4; // len
+		*(uint16_t*)(tcpopt+t) = nmss;
+		t+=2;
+	}
+	if (sack)
+	{
+		tcpopt[t++] = 4; // kind
+		tcpopt[t++] = 2; // len
+	}
 	if (fooling & FOOL_MD5SIG)
 	{
-		tcpopt[0] = 19; // kind
-		tcpopt[1] = 18; // len
-		*(uint32_t*)(tcpopt+2)=random();
-		*(uint32_t*)(tcpopt+6)=random();
-		*(uint32_t*)(tcpopt+10)=random();
-		*(uint32_t*)(tcpopt+14)=random();
-		t=18;
+		tcpopt[t] = 19; // kind
+		tcpopt[t+1] = 18; // len
+		*(uint32_t*)(tcpopt+t+2)=random();
+		*(uint32_t*)(tcpopt+t+6)=random();
+		*(uint32_t*)(tcpopt+t+10)=random();
+		*(uint32_t*)(tcpopt+t+14)=random();
+		t+=18;
 	}
 	if (timestamps || (fooling & FOOL_TS))
 	{
@@ -145,10 +169,12 @@ static void fill_tcphdr(
 	tcp->th_off += t>>2;
 	tcp->th_sum = 0;
 }
-static uint16_t tcpopt_len(uint32_t fooling, const uint32_t *timestamps, uint8_t scale_factor)
+static uint16_t tcpopt_len(bool sack, bool mss, uint32_t fooling, const uint32_t *timestamps, uint8_t scale_factor)
 {
 	uint16_t t=0;
-	if (fooling & FOOL_MD5SIG) t=18;
+	if (sack) t+=2;
+	if (mss) t+=4;
+	if (fooling & FOOL_MD5SIG) t+=18;
 	if ((fooling & FOOL_TS) || timestamps) t+=10;
 	if (scale_factor!=SCALE_NONE) t+=3;
 	return (t+3)&~3;
@@ -190,6 +216,8 @@ static void fill_ip6hdr(struct ip6_hdr *ip6, const struct in6_addr *src, const s
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
 	uint8_t tcp_flags,
+	bool sack,
+	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
 	uint16_t nwsize,
 	uint8_t scale_factor,
@@ -203,7 +231,7 @@ bool prepare_tcp_segment4(
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
+	uint16_t tcpoptlen = tcpopt_len(sack,!!nmss,fooling,timestamps,scale_factor);
 	uint16_t ip_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
 	uint16_t pktlen = sizeof(struct ip) + ip_payload_len;
 	if (pktlen>*buflen) return false;
@@ -213,11 +241,11 @@ bool prepare_tcp_segment4(
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
 	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_TCP, ttl, tos, ip_id);
-	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
+	fill_tcphdr(tcp,fooling,tcp_flags,sack,nmss,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
 	tcp4_fix_checksum(tcp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
-	if (fooling & FOOL_BADSUM) tcp->th_sum^=htons(0xBEAF);
+	if (fooling & FOOL_BADSUM) tcp->th_sum^=(uint16_t)(1+random()%0xFFFF);
 
 	*buflen = pktlen;
 	return true;
@@ -226,6 +254,8 @@ bool prepare_tcp_segment4(
 bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
 	uint8_t tcp_flags,
+	bool sack,
+	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
 	uint16_t nwsize,
 	uint8_t scale_factor,
@@ -238,7 +268,7 @@ bool prepare_tcp_segment6(
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
-	uint16_t tcpoptlen = tcpopt_len(fooling,timestamps,scale_factor);
+	uint16_t tcpoptlen = tcpopt_len(sack,!!nmss,fooling,timestamps,scale_factor);
 	uint16_t transport_payload_len = sizeof(struct tcphdr) + tcpoptlen + len;
 	uint16_t ip_payload_len = transport_payload_len +
 		8*!!((fooling & (FOOL_HOPBYHOP|FOOL_HOPBYHOP2))==FOOL_HOPBYHOP) +
@@ -297,11 +327,11 @@ bool prepare_tcp_segment6(
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
 	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl, flow_label);
-	fill_tcphdr(tcp,fooling,tcp_flags,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
+	fill_tcphdr(tcp,fooling,tcp_flags,sack,nmss,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
 	tcp6_fix_checksum(tcp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
-	if (fooling & FOOL_BADSUM) tcp->th_sum^=htons(0xBEAF);
+	if (fooling & FOOL_BADSUM) tcp->th_sum^=(1+random()%0xFFFF);
 
 	*buflen = pktlen;
 	return true;
@@ -310,6 +340,8 @@ bool prepare_tcp_segment6(
 bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
 	uint8_t tcp_flags,
+	bool sack,
+	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
 	uint16_t nwsize,
 	uint8_t scale_factor,
@@ -325,9 +357,9 @@ bool prepare_tcp_segment(
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,tos,ip_id,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,sack,nmss,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,tos,ip_id,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,flow_label,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,sack,nmss,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,flow_label,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
 		false;
 }
 
@@ -370,7 +402,7 @@ bool prepare_udp_segment4(
 	else
 		memset(payload+len,0,padlen);
 	udp4_fix_checksum(udp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
-	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
+	if (fooling & FOOL_BADSUM) udp->uh_sum^=(1+random()%0xFFFF);
 
 	*buflen = pktlen;
 	return true;
@@ -459,7 +491,7 @@ bool prepare_udp_segment6(
 	else
 		memset(payload+len,0,padlen);
 	udp6_fix_checksum(udp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
-	if (fooling & FOOL_BADSUM) udp->uh_sum^=htons(0xBEAF);
+	if (fooling & FOOL_BADSUM) udp->uh_sum^=(1+random()%0xFFFF);
 
 	*buflen = pktlen;
 	return true;
@@ -601,10 +633,29 @@ bool ip_frag(
 		return false;
 }
 
-void rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl)
+bool rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl)
 {
-	if (ip)	ip->ip_ttl = ttl;
-	if (ip6) ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = ttl;
+	if (ttl)
+	{
+		if (ip)
+		{
+			if (ip->ip_ttl!=ttl)
+			{
+				ip->ip_ttl = ttl;
+				ip4_fix_checksum(ip);
+				return true;
+			}
+		}
+		else if (ip6)
+		{
+			if (ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim!=ttl)
+			{
+				ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = ttl;
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 

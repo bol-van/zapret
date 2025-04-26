@@ -82,6 +82,18 @@ struct desync_profile
 	int split_count;
 	struct proto_pos seqovl;
 
+	char dup_start_mode, dup_cutoff_mode; // n - packets, d - data packets, s - relative sequence
+	bool dup_replace;
+	unsigned int dup_start, dup_cutoff;
+	unsigned int dup_repeats;
+	uint8_t dup_ttl, dup_ttl6;
+	uint32_t dup_fooling_mode;
+	uint32_t dup_badseq_increment, dup_badseq_ack_increment;
+
+	char orig_mod_start_mode, orig_mod_cutoff_mode; // n - packets, d - data packets, s - relative sequence
+	unsigned int orig_mod_start, orig_mod_cutoff;
+	uint8_t orig_mod_ttl, orig_mod_ttl6;
+
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
 	uint8_t desync_ttl, desync_ttl6;
@@ -117,6 +129,7 @@ struct desync_profile
 #define PROFILE_IPSETS_ABSENT(dp) (!LIST_FIRST(&dp->ips_collection) && !LIST_FIRST(&dp->ips_collection_exclude))
 #define PROFILE_IPSETS_EMPTY(dp) (ipset_collection_is_empty(&dp->ips_collection) && ipset_collection_is_empty(&dp->ips_collection_exclude))
 #define PROFILE_HOSTLISTS_EMPTY(dp) (hostlist_collection_is_empty(&dp->hl_collection) && hostlist_collection_is_empty(&dp->hl_collection_exclude))
+#define PROFILE_HAS_ORIG_MOD(dp) (dp->orig_mod_ttl || dp->orig_mod_ttl6)
 
 struct desync_profile_list {
 	struct desync_profile dp;

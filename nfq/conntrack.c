@@ -338,8 +338,8 @@ void ConntrackPoolDump(const t_conntrack *p)
 			printf("rseq=%u pos_orig=%u rack=%u pos_reply=%u",
 				t->track.seq_last, t->track.pos_orig,
 				t->track.ack_last, t->track.pos_reply);
-		printf(" req_retrans=%u cutoff=%u wss_cutoff=%u d_cutoff=%u hostname=%s l7proto=%s\n",
-			t->track.req_retrans_counter, t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff, t->track.hostname, l7proto_str(t->track.l7proto));
+		printf(" req_retrans=%u cutoff=%u wss_cutoff=%u desync_cutoff=%u dup_cutoff=%u orig_cutoff=%u hostname=%s l7proto=%s\n",
+			t->track.req_retrans_counter, t->track.b_cutoff, t->track.b_wssize_cutoff, t->track.b_desync_cutoff, t->track.b_dup_cutoff, t->track.b_orig_mod_cutoff, t->track.hostname, l7proto_str(t->track.l7proto));
 	};
 }
 
