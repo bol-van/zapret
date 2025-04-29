@@ -75,6 +75,7 @@ bool prepare_tcp_segment4(
 	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
+	bool DF,
 	uint8_t ttl,
 	uint8_t tos,
 	uint16_t ip_id,
@@ -108,6 +109,7 @@ bool prepare_tcp_segment(
 	uint16_t nwsize,
 	uint8_t scale_factor,
 	uint32_t *timestamps,
+	bool DF,
 	uint8_t ttl,
 	uint8_t tos,
 	uint16_t ip_id,
@@ -121,6 +123,7 @@ bool prepare_tcp_segment(
 
 bool prepare_udp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
+	bool DF,
 	uint8_t ttl,
 	uint8_t tos,
 	uint16_t ip_id,
@@ -140,6 +143,7 @@ bool prepare_udp_segment6(
 	uint8_t *buf, size_t *buflen);
 bool prepare_udp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
+	bool DF,
 	uint8_t ttl,
 	uint8_t tos,
 	uint16_t ip_id,
@@ -180,6 +184,8 @@ uint16_t tcp_find_mss(struct tcphdr *tcp);
 bool tcp_has_sack(struct tcphdr *tcp);
 
 bool tcp_has_fastopen(const struct tcphdr *tcp);
+
+bool ip_has_df(const struct ip *ip);
 
 #ifdef __CYGWIN__
 extern uint32_t w_win32_error;
