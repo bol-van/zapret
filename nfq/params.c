@@ -294,3 +294,12 @@ bool dp_list_have_autohostlist(struct desync_profile_list_head *head)
 			return true;
 	return false;
 }
+// check if we need empty outgoing ACK
+bool dp_list_need_all_out(struct desync_profile_list_head *head)
+{
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, head, next)
+		if (dpl->dp.dup_repeats || PROFILE_HAS_ORIG_MOD(&dpl->dp))
+			return true;
+	return false;
+}

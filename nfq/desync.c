@@ -879,7 +879,7 @@ static bool orig_send_rewrite(
 }
 
 // return : true - orig was sent completely, false - should send orig another way
-static bool tcp_orig_send(uint32_t fwmark, const char *ifout, const struct desync_profile *dp, const t_ctrack *ctrack, struct dissect *dis, bool bForceSend)
+static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, const struct desync_profile *dp, const t_ctrack *ctrack, struct dissect *dis, bool bForceSend)
 {
 	if (dp->dup_repeats || bForceSend)
 	{
@@ -893,6 +893,8 @@ static bool tcp_orig_send(uint32_t fwmark, const char *ifout, const struct desyn
 		bool sack;
 
 		extract_endpoints(dis->ip, dis->ip6, dis->tcp, NULL, &src, &dst);
+
+		verdict_tcp_csum_fix(verdict, dis->tcp, dis->transport_len, dis->ip, dis->ip6);
 
 		if (dp->dup_repeats && check_dup_interval(dp,ctrack))
 		{
@@ -920,7 +922,6 @@ static bool tcp_orig_send(uint32_t fwmark, const char *ifout, const struct desyn
 					DLOG_ERR("dup: packet reconstruct failed\n");
 					return false;
 				}
-
 				DLOG("sending %u dups with packet reconstruct\n", dp->dup_repeats);
 
 				// send dups
@@ -956,7 +957,7 @@ static bool tcp_orig_send(uint32_t fwmark, const char *ifout, const struct desyn
 	return false;
 }
 // return : true - orig was sent completely, false - should send orig another way
-static bool udp_orig_send(uint32_t fwmark, const char *ifout, const struct desync_profile *dp, const t_ctrack *ctrack, struct dissect *dis, bool bForceSend)
+static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, const struct desync_profile *dp, const t_ctrack *ctrack, struct dissect *dis, bool bForceSend)
 {
 	if (dp->dup_repeats || bForceSend)
 	{
@@ -968,6 +969,8 @@ static bool udp_orig_send(uint32_t fwmark, const char *ifout, const struct desyn
 		uint8_t ttl_orig,ttl_fake;
 
 		extract_endpoints(dis->ip, dis->ip6, NULL, dis->udp, &src, &dst);
+
+		verdict_udp_csum_fix(verdict, dis->udp, dis->transport_len, dis->ip, dis->ip6);
 
 		if (dp->dup_repeats && check_dup_interval(dp,ctrack))
 		{
@@ -2168,9 +2171,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			default:
 				break;
 		}
-
-		if (bFake)
-			verdict_tcp_csum_fix(verdict, dis->tcp, dis->transport_len, dis->ip, dis->ip6);
 	}
 
 send_orig:
@@ -2178,7 +2178,7 @@ send_orig:
 	if ((verdict & VERDICT_MASK)==VERDICT_DROP)
 		verdict = ct_new_postnat_fix_tcp(ctrack, dis->ip, dis->ip6, dis->tcp);
 	else
-		if (tcp_orig_send(desync_fwmark,ifout,dp,ctrack_replay,dis,bFake))
+		if (tcp_orig_send(verdict,desync_fwmark,ifout,dp,ctrack_replay,dis,bFake))
 			verdict = ct_new_postnat_fix_tcp(ctrack, dis->ip, dis->ip6, dis->tcp);
 	return verdict;
 }
@@ -2770,16 +2770,13 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			default:
 				break;
 		}
-
-		if (bFake)
-			verdict_udp_csum_fix(verdict, dis->udp, dis->transport_len, dis->ip, dis->ip6);
 	}
 
 send_orig:
 	if ((verdict & VERDICT_MASK)==VERDICT_DROP)
 		verdict = ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
 	else
-		if (udp_orig_send(desync_fwmark,ifout,dp,ctrack_replay,dis,bFake))
+		if (udp_orig_send(verdict,desync_fwmark,ifout,dp,ctrack_replay,dis,bFake))
 			verdict = ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
 	return verdict;
 }

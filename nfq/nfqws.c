@@ -1343,8 +1343,7 @@ static bool wf_make_filter(
 	char pf_dst_buf[512],iface[64];
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? dp_list_have_autohostlist(&params.desync_profiles) ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
-	const char *f_tcp_not_empty = *pf_tcp_src ? DIVERT_TCP_NOT_EMPTY " and " : "";
-
+	const char *f_tcp_not_empty = (*pf_tcp_src && !dp_list_need_all_out(&params.desync_profiles)) ? DIVERT_TCP_NOT_EMPTY " and " : "";
 	snprintf(iface,sizeof(iface)," ifIdx=%u and subIfIdx=%u and",IfIdx,SubIfIdx);
 
 	if (!*pf_tcp_src && !*pf_udp_src) return false;
@@ -1453,14 +1452,14 @@ static void exithelp(void)
 		" --orig-mod-start=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --orig-mod-cutoff=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --dup=<int>\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
-		" --dup-ttl=<int>\t\t\t\t; set TTL for dups\n"
 		" --dup-replace=[0|1]\t\t\t\t; 1 or no argument means do not send original, only dups\n"
+		" --dup-ttl=<int>\t\t\t\t; set TTL for dups\n"
 		" --dup-ttl6=<int>\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
 		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
+		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
+		" --dup-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
 		" --dup-start=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --dup-cutoff=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
-		" --dup-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment for dup. default %d\n"
 		" --hostcase\t\t\t\t\t; change Host: => host:\n"
 		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
 		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
@@ -2757,48 +2756,6 @@ int main(int argc, char **argv)
 		DLOG_ERR("Need divert port (--port)\n");
 		exit_clean(1);
 	}
-#elif defined(__CYGWIN__)
-	if (!*windivert_filter)
-	{
-		if (!*wf_pf_tcp_src && !*wf_pf_udp_src)
-		{
-			DLOG_ERR("windivert filter : must specify port filter\n");
-			exit_clean(1);
-		}
-		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), IfIdx, SubIfIdx, wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
-		{
-			DLOG_ERR("windivert filter : could not make filter\n");
-			exit_clean(1);
-		}
-	}
-	DLOG("windivert filter size: %zu\nwindivert filter:\n%s\n",strlen(windivert_filter),windivert_filter);
-	if (*wf_save_file)
-	{
-		if (save_file(wf_save_file,windivert_filter,strlen(windivert_filter)))
-		{
-			DLOG_ERR("windivert filter: raw filter saved to %s\n", wf_save_file);
-			exit_clean(0);
-		}
-		else
-		{
-			DLOG_ERR("windivert filter: could not save raw filter to %s\n", wf_save_file);
-			exit_clean(1);
-		}
-	}
-	HANDLE hMutexArg;
-	{
-		char mutex_name[128];
-		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_ssid_filter,hash_nlm_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
-
-		hMutexArg = CreateMutexA(NULL,TRUE,mutex_name);
-		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)
-		{
-			CloseHandle(hMutexArg);	hMutexArg = NULL;
-			DLOG_ERR("A copy of winws is already running with the same filter\n");
-			goto exiterr;
-		}
-		
-	}
 #endif
 
 	DLOG("adding low-priority default empty desync profile\n");
@@ -2864,6 +2821,49 @@ int main(int argc, char **argv)
 	DLOG("\nsplits summary:\n");
 	SplitDebug();
 	DLOG("\n");
+
+#ifdef __CYGWIN__
+	if (!*windivert_filter)
+	{
+		if (!*wf_pf_tcp_src && !*wf_pf_udp_src)
+		{
+			DLOG_ERR("windivert filter : must specify port filter\n");
+			exit_clean(1);
+		}
+		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), IfIdx, SubIfIdx, wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
+		{
+			DLOG_ERR("windivert filter : could not make filter\n");
+			exit_clean(1);
+		}
+	}
+	DLOG("windivert filter size: %zu\nwindivert filter:\n%s\n",strlen(windivert_filter),windivert_filter);
+	if (*wf_save_file)
+	{
+		if (save_file(wf_save_file,windivert_filter,strlen(windivert_filter)))
+		{
+			DLOG_ERR("windivert filter: raw filter saved to %s\n", wf_save_file);
+			exit_clean(0);
+		}
+		else
+		{
+			DLOG_ERR("windivert filter: could not save raw filter to %s\n", wf_save_file);
+			exit_clean(1);
+		}
+	}
+	HANDLE hMutexArg;
+	{
+		char mutex_name[128];
+		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_ssid_filter,hash_nlm_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
+
+		hMutexArg = CreateMutexA(NULL,TRUE,mutex_name);
+		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)
+		{
+			CloseHandle(hMutexArg);	hMutexArg = NULL;
+			DLOG_ERR("A copy of winws is already running with the same filter\n");
+			goto exiterr;
+		}
+	}
+#endif
 
 	if (bDry)
 	{

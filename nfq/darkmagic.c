@@ -1900,15 +1900,15 @@ void verdict_tcp_csum_fix(uint8_t verdict, struct tcphdr *tcphdr, size_t transpo
 {
 	if (!(verdict & VERDICT_NOCSUM))
 	{
+		#ifdef __CYGWIN__
 		// always fix csum for windivert. original can be partial or bad
-		#ifndef __CYGWIN__
-		#ifdef __FreeBSD__
+		if ((verdict & VERDICT_MASK)!=VERDICT_DROP)
+		#elif defined(__FreeBSD__)
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
 		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
 		#else
 		// if original packet was tampered earlier it needs checksum fixed
 		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
-		#endif
 		#endif
 			tcp_fix_checksum(tcphdr,transport_len,ip,ip6hdr);
 	}
@@ -1917,15 +1917,15 @@ void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transpo
 {
 	if (!(verdict & VERDICT_NOCSUM))
 	{
+		#ifdef __CYGWIN__
 		// always fix csum for windivert. original can be partial or bad
-		#ifndef __CYGWIN__
-		#ifdef __FreeBSD__
+		if ((verdict & VERDICT_MASK)!=VERDICT_DROP)
+		#elif defined(__FreeBSD__)
 		// FreeBSD tend to pass ipv6 frames with wrong checksum
 		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY || ip6hdr)
 		#else
 		// if original packet was tampered earlier it needs checksum fixed
 		if ((verdict & VERDICT_MASK)==VERDICT_MODIFY)
-		#endif
 		#endif
 			udp_fix_checksum(udphdr,transport_len,ip,ip6hdr);
 	}

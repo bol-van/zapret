@@ -126,10 +126,10 @@ struct desync_profile
 	hostfail_pool *hostlist_auto_fail_counters;
 };
 
-#define PROFILE_IPSETS_ABSENT(dp) (!LIST_FIRST(&dp->ips_collection) && !LIST_FIRST(&dp->ips_collection_exclude))
-#define PROFILE_IPSETS_EMPTY(dp) (ipset_collection_is_empty(&dp->ips_collection) && ipset_collection_is_empty(&dp->ips_collection_exclude))
-#define PROFILE_HOSTLISTS_EMPTY(dp) (hostlist_collection_is_empty(&dp->hl_collection) && hostlist_collection_is_empty(&dp->hl_collection_exclude))
-#define PROFILE_HAS_ORIG_MOD(dp) (dp->orig_mod_ttl || dp->orig_mod_ttl6)
+#define PROFILE_IPSETS_ABSENT(dp) (!LIST_FIRST(&(dp)->ips_collection) && !LIST_FIRST(&(dp)->ips_collection_exclude))
+#define PROFILE_IPSETS_EMPTY(dp) (ipset_collection_is_empty(&(dp)->ips_collection) && ipset_collection_is_empty(&(dp)->ips_collection_exclude))
+#define PROFILE_HOSTLISTS_EMPTY(dp) (hostlist_collection_is_empty(&(dp)->hl_collection) && hostlist_collection_is_empty(&(dp)->hl_collection_exclude))
+#define PROFILE_HAS_ORIG_MOD(dp) ((dp)->orig_mod_ttl || (dp)->orig_mod_ttl6)
 
 struct desync_profile_list {
 	struct desync_profile dp;
@@ -140,6 +140,7 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head);
 void dp_entry_destroy(struct desync_profile_list *entry);
 void dp_list_destroy(struct desync_profile_list_head *head);
 bool dp_list_have_autohostlist(struct desync_profile_list_head *head);
+bool dp_list_need_all_out(struct desync_profile_list_head *head);
 void dp_init(struct desync_profile *dp);
 bool dp_fake_defaults(struct desync_profile *dp);
 void dp_clear(struct desync_profile *dp);
