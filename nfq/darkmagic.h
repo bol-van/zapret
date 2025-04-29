@@ -258,9 +258,10 @@ void tcp_rewrite_winsize(struct tcphdr *tcp, uint16_t winsize, uint8_t scale_fac
 
 typedef struct
 {
-	uint8_t delta, min, max;
+	int8_t delta;
+	uint8_t min, max;
 } autottl;
-#define AUTOTTL_DEFAULT_DELTA 1
+#define AUTOTTL_DEFAULT_DELTA -1
 #define AUTOTTL_DEFAULT_MIN 3
 #define AUTOTTL_DEFAULT_MAX 20
 #define AUTOTTL_ENABLED(a) (!!(a).delta)

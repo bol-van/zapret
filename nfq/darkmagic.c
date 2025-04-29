@@ -1837,6 +1837,7 @@ bool rawsend_queue(struct rawpacket_tailhead *q)
 uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 {
 	uint8_t orig, path, fake;
+	int d;
 
 	// 18.65.168.125 ( cloudfront ) 	255
 	// 157.254.246.178 			128
@@ -1853,11 +1854,13 @@ uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 
 	path = orig - ttl;
 
-	fake = path > attl->delta ? path - attl->delta : attl->min;
-	if (fake<attl->min) fake=attl->min;
-	else if (fake>attl->max) fake=attl->max;
+	d = (int)path + attl->delta;
+	if (d<attl->min) fake=attl->min;
+	else if (d>attl->max) fake=attl->max;
+	else fake=(uint8_t)d;
 
-	if (fake>=path) return 0;
+	if (attl->delta<0 && fake>=path || attl->delta>=0 && fake<path)
+		return 0;
 
 	return fake;
 }

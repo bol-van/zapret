@@ -1461,6 +1461,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				if (!replay)
 				{
 					maybe_cutoff(ctrack, IPPROTO_TCP);
+					if (orig_mod(dp,ctrack,dis)) // ttl can change !
+						verdict = VERDICT_MODIFY;
 					if (!process_desync_interval(dp, ctrack))
 					{
 						reasm_orig_cancel(ctrack);
@@ -2558,6 +2560,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				if (!replay)
 				{
 					maybe_cutoff(ctrack, IPPROTO_UDP);
+					if (orig_mod(dp,ctrack,dis)) // ttl can change !
+						verdict = VERDICT_MODIFY;
 					if (!process_desync_interval(dp, ctrack)) goto send_orig;
 				}
 			}

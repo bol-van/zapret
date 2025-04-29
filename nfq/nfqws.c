@@ -692,11 +692,18 @@ static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 
 static bool parse_autottl(const char *s, autottl *t)
 {
+	bool neg=true;
 	unsigned int delta,min,max;
 	AUTOTTL_SET_DEFAULT(*t);
 	if (s)
 	{
 		max = t->max;
+		if (*s=='+')
+		{
+			neg=false;
+			s++;
+		} else if (*s=='-')
+			s++;
 		switch (sscanf(s,"%u:%u-%u",&delta,&min,&max))
 		{
 			case 3:
@@ -706,8 +713,8 @@ static bool parse_autottl(const char *s, autottl *t)
 				if ((delta && !min) || min>255 || min>max) return false;
 				t->min=(uint8_t)min;
 			case 1:
-				if (delta>255) return false;
-				t->delta=(uint8_t)delta;
+				if (delta>127) return false;
+				t->delta=(int8_t)(neg ? -delta : delta);
 				break;
 			default:
 				return false;
@@ -1475,7 +1482,7 @@ static void exithelp(void)
 #endif
 		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for fakes packets\n"
 		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
-		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %u:%u-%u\n"
+		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
@@ -2783,9 +2790,9 @@ int main(int argc, char **argv)
 		if (dp->orig_mod_ttl6 == 0xFF) dp->orig_mod_ttl6=dp->orig_mod_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
 		if (AUTOTTL_ENABLED(dp->desync_autottl))
-			DLOG("profile %d autottl ipv4 %u:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
+			DLOG("profile %d autottl ipv4 %d:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
-			DLOG("profile %d autottl ipv6 %u:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+			DLOG("profile %d autottl ipv6 %d:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
 		split_compat(dp);
 		if (!dp_fake_defaults(dp))
 		{
