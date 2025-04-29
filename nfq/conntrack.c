@@ -143,8 +143,11 @@ static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct tcphdr 
 		}
 		else if (tcp_synack_segment(tcphdr))
 		{
-			if (t->state!=SYN) ConntrackReInitTrack(t); // erase current entry
-			if (!t->seq0) t->seq0 = ntohl(tcphdr->th_ack)-1;
+			// ignore SA dups
+			uint32_t seq0 = ntohl(tcphdr->th_ack)-1;
+			if (t->state!=SYN && t->seq0!=seq0)
+				ConntrackReInitTrack(t); // erase current entry
+			if (!t->seq0) t->seq0 = seq0;
 			t->ack0 = ntohl(tcphdr->th_seq);
 		}
 		else if (tcphdr->th_flags & (TH_FIN|TH_RST))
