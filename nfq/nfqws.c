@@ -637,6 +637,7 @@ static void cleanup_params(void)
 
 	hostlist_files_destroy(&params.hostlists);
 	ipset_files_destroy(&params.ipsets);
+	ipcacheDestroy(&params.ipcache);
 #ifdef __CYGWIN__
 	strlist_destroy(&params.ssid_filter);
 	strlist_destroy(&params.nlm_filter);
