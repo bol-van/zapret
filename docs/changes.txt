@@ -489,3 +489,4 @@ nfqws: --dpi-desync-fake-tls=! means default tls fake
 nfqws: --dup*
 nfqws: --orig*
 nfqws: autottl cache
+init.d: remove --ipset parameter prohibition
