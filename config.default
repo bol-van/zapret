@@ -76,9 +76,9 @@ NFQWS_PORTS_UDP=443
 # PKT_IN means connbytes dir reply
 # this is --dpi-desync-cutoff=nX kernel mode implementation for linux. it saves a lot of CPU.
 NFQWS_TCP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
-NFQWS_TCP_PKT_IN=3
+NFQWS_TCP_PKT_IN=4
 NFQWS_UDP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
-NFQWS_UDP_PKT_IN=0
+NFQWS_UDP_PKT_IN=1
 # redirect outgoing traffic without connbytes limiter and incoming with connbytes limiter
 # normally it's needed only for stateless DPI that matches every packet in a single TCP session
 # typical example are plain HTTP keep alives
