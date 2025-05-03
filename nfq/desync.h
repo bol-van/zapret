@@ -52,4 +52,4 @@ bool desync_valid_second_stage(enum dpi_desync_mode mode);
 bool desync_valid_second_stage_tcp(enum dpi_desync_mode mode);
 bool desync_valid_second_stage_udp(enum dpi_desync_mode mode);
 
-uint8_t dpi_desync_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt);
+uint8_t dpi_desync_packet(uint32_t fwmark, const char *ifin, const char *ifout, uint8_t *data_pkt, size_t *len_pkt);

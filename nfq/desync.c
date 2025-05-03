@@ -745,21 +745,57 @@ static size_t pos_normalize(size_t split_pos, size_t reasm_offset, size_t len_pa
 	return (split_pos>reasm_offset && (split_pos-reasm_offset)<len_payload) ? split_pos-reasm_offset : 0;
 }
 
-static void autottl_discover(t_ctrack *ctrack, bool bIpv6)
+static uint8_t autottl_guess(autottl *attl, uint8_t hop_count, const char *attl_kind)
 {
-	if (ctrack && ctrack->incoming_ttl)
-	{
-		autottl *attl = bIpv6 ? &ctrack->dp->desync_autottl6 : &ctrack->dp->desync_autottl;
 		if (AUTOTTL_ENABLED(*attl))
 		{
-			ctrack->autottl = autottl_guess(ctrack->incoming_ttl, attl);
-			if (ctrack->autottl)
-				DLOG("autottl: guessed %u\n",ctrack->autottl);
+			uint8_t autottl = autottl_eval(hop_count, attl);
+			if (autottl)
+				DLOG("%s autottl: guessed %u\n",attl_kind,autottl);
 			else
-				DLOG("autottl: could not guess\n");
+				DLOG("%s autottl: could not guess\n",attl_kind);
+			return autottl;
 		}
 		else
-			ctrack->autottl = 0;
+			return 0;
+}
+static void autottl_discover(t_ctrack *ctrack, const struct in_addr *a4, const struct in6_addr *a6, const char *iface)
+{
+	if (ctrack && params.autottl_present && !ctrack->b_autottl_discovered)
+	{
+		ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,iface);
+		if (!ipc)
+		{
+			DLOG_ERR("ipcache: out of memory\n");
+			return;
+		}
+		if (ctrack->incoming_ttl)
+		{
+			uint8_t old_hops = ipc->hops;
+			ipc->hops = hop_count_guess(ctrack->incoming_ttl);
+			DLOG("incoming hops guessed %u\n", ipc->hops);
+			if (old_hops!=ipc->hops)
+				DLOG("updated autottl cache\n");
+		}
+		else if (ipc->hops)
+			DLOG("using cached hops %u\n", ipc->hops);
+		else
+			DLOG("hop count unknown\n");
+		if (ipc->hops)
+		{
+			ctrack->desync_autottl = autottl_guess(a6 ? &ctrack->dp->desync_autottl6 : &ctrack->dp->desync_autottl, ipc->hops, "desync");
+			ctrack->orig_autottl = autottl_guess(a6 ? &ctrack->dp->orig_autottl6 : &ctrack->dp->orig_autottl, ipc->hops, "orig");
+			ctrack->dup_autottl = autottl_guess(a6 ? &ctrack->dp->dup_autottl6 : &ctrack->dp->dup_autottl, ipc->hops, "dup");
+		}
+		ctrack->b_autottl_discovered = true;
+	}
+}
+static void autottl_rediscover(t_ctrack *ctrack, const struct in_addr *a4, const struct in6_addr *a6, const char *iface)
+{
+	if (ctrack)
+	{
+		ctrack->b_autottl_discovered = false;
+		autottl_discover(ctrack,a4,a6,iface);
 	}
 }
 
@@ -837,8 +873,8 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 uint8_t orig_mod(const struct desync_profile *dp, const t_ctrack *ctrack, struct dissect *dis)
 {
 	uint8_t ttl,ttl_orig;
-	
-	ttl = dis->ip6 ? dp->orig_mod_ttl6 : dp->orig_mod_ttl;
+
+	ttl = (ctrack && ctrack->orig_autottl) ? ctrack->orig_autottl : dis->ip6 ? dp->orig_mod_ttl6 : dp->orig_mod_ttl;
 	if (ttl && check_orig_mod_interval(dp,ctrack))
 	{
 		ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
@@ -893,14 +929,13 @@ static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 		bool sack,DF;
 
 		extract_endpoints(dis->ip, dis->ip6, dis->tcp, NULL, &src, &dst);
+		ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 
 		verdict_tcp_csum_fix(verdict, dis->tcp, dis->transport_len, dis->ip, dis->ip6);
 
 		if (dp->dup_repeats && check_dup_interval(dp,ctrack))
 		{
-			ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-			ttl_fake = dis->ip6 ? dp->dup_ttl6 : dp->dup_ttl;
-			if (!ttl_fake) ttl_fake = ttl_orig;
+			ttl_fake = (ctrack && ctrack->dup_autottl) ? ctrack->dup_autottl : (dis->ip6 ? (dp->dup_ttl6 ? dp->dup_ttl6 : ttl_orig) : (dp->dup_ttl ? dp->dup_ttl : ttl_orig));
 
 			if (dp->dup_fooling_mode)
 			{
@@ -910,20 +945,19 @@ static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 				sack = tcp_has_sack(dis->tcp);
 				nmss = tcp_find_mss(dis->tcp);
 	 		       	ip_id = IP4_IP_ID_FIX(dis->ip);
-				DF = ip_has_df(dis->ip);
 
 				len = sizeof(pkt);
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
 						flags_orig, sack, nmss,
 						dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
-						DF,ttl_fake,IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
+						ip_has_df(dis->ip),ttl_fake,IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
 						dp->dup_fooling_mode,dp->dup_badseq_increment,dp->dup_badseq_ack_increment,
 						dis->data_payload, dis->len_payload, pkt, &len))
 				{
 					DLOG_ERR("dup: packet reconstruct failed\n");
 					return false;
 				}
-				DLOG("sending %u dups with packet reconstruct\n", dp->dup_repeats);
+				DLOG("sending %u dups with packet reconstruct. ttl %u => %u\n", dp->dup_repeats, ttl_orig, ttl_fake);
 
 				// send dups
 				for (k=0;k<dp->dup_repeats;k++)
@@ -941,7 +975,7 @@ static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 				DLOG("NOT sending original because of dup_replace\n");
 			else
 			{
-				DLOG("sending original\n", dp->dup_repeats);
+				DLOG("sending original ttl %u\n", ttl_orig);
 				if (!rawsend((struct sockaddr *)&dst, fwmark, ifout , dis->data_pkt, dis->len_pkt))
 					return false;
 			}
@@ -949,7 +983,7 @@ static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 		}
 		if (bForceSend)
 		{
-			DLOG("sending original\n", dp->dup_repeats);
+			DLOG("sending original ttl %u\n", ttl_orig);
 			if (!rawsend((struct sockaddr *)&dst, fwmark, ifout , dis->data_pkt, dis->len_pkt))
 				return false;
 			return true;
@@ -968,18 +1002,15 @@ static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 		uint16_t ip_id;
 		struct sockaddr_storage src, dst;
 		uint8_t ttl_orig,ttl_fake;
-		bool DF;
 
 		extract_endpoints(dis->ip, dis->ip6, NULL, dis->udp, &src, &dst);
+		ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 
 		verdict_udp_csum_fix(verdict, dis->udp, dis->transport_len, dis->ip, dis->ip6);
 
 		if (dp->dup_repeats && check_dup_interval(dp,ctrack))
 		{
-			ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-			ttl_fake = dis->ip6 ? dp->dup_ttl6 : dp->dup_ttl;
-			if (!ttl_fake) ttl_fake = ttl_orig;
-			DF = ip_has_df(dis->ip);
+			ttl_fake = (ctrack && ctrack->dup_autottl) ? ctrack->dup_autottl : (dis->ip6 ? (dp->dup_ttl6 ? dp->dup_ttl6 : ttl_orig) : (dp->dup_ttl ? dp->dup_ttl : ttl_orig));
 
 			if (dp->dup_fooling_mode)
 			{
@@ -987,7 +1018,7 @@ static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 
 				len = sizeof(pkt);
 				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
-					DF,ttl_fake, IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
+					ip_has_df(dis->ip),ttl_fake, IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
 					dp->dup_fooling_mode, NULL, 0, 0,
 					dis->data_payload, dis->len_payload, pkt, &len))
 				{
@@ -995,7 +1026,7 @@ static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 					return false;
 				}
 
-				DLOG("sending %u dups with packet reconstruct\n", dp->dup_repeats);
+				DLOG("sending %u dups with packet reconstruct. ttl %u => %u\n", dp->dup_repeats, ttl_orig, ttl_fake);
 
 				// send dups
 				for (k=0;k<dp->dup_repeats;k++)
@@ -1013,7 +1044,7 @@ static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 				DLOG("NOT sending original because of dup_replace\n");
 			else
 			{
-				DLOG("sending original\n", dp->dup_repeats);
+				DLOG("sending original ttl %u\n", ttl_orig);
 				if (!rawsend((struct sockaddr *)&dst, fwmark, ifout , dis->data_pkt, dis->len_pkt))
 					return false;
 			}
@@ -1021,7 +1052,7 @@ static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 		}
 		if (bForceSend)
 		{
-			DLOG("sending original\n", dp->dup_repeats);
+			DLOG("sending original ttl %u\n", ttl_orig);
 			if (!rawsend((struct sockaddr *)&dst, fwmark, ifout , dis->data_pkt, dis->len_pkt))
 				return false;
 			return true;
@@ -1030,7 +1061,7 @@ static bool udp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 	return false;
 }
 
-static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, struct dissect *dis)
+static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifin, const char *ifout, struct dissect *dis)
 {
 	uint8_t verdict=VERDICT_PASS;
 
@@ -1121,10 +1152,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 				if (!ctrack->incoming_ttl)
 				{
-					DLOG("incoming TTL %u\n",ttl_orig);
 					ctrack->incoming_ttl = ttl_orig;
+					DLOG("incoming TTL %u\n",ttl_orig);
+					autottl_rediscover(ctrack,dis->ip ? &dis->ip->ip_src : NULL,dis->ip6 ? &dis->ip6->ip6_src : NULL , ifin);
 				}
-				if (!ctrack->autottl) autottl_discover(ctrack,!!dis->ip6);
 			}
 
 			// process reply packets for auto hostlist mode
@@ -1178,6 +1209,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			return verdict; // nothing to do. do not waste cpu
 		}
 
+		autottl_discover(ctrack,dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout);
+
 		if (orig_mod(dp,ctrack,dis)) // ttl can change !
 			verdict = VERDICT_MODIFY;
 		
@@ -1207,7 +1240,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	} // !replay
 
 	ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-	ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
+	ttl_fake = (ctrack_replay && ctrack_replay->desync_autottl) ? ctrack_replay->desync_autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 	flags_orig = *((uint8_t*)dis->tcp+13);
 	scale_factor = tcp_find_scale_factor(dis->tcp);
 	timestamps = tcp_find_timestamps(dis->tcp);
@@ -1368,7 +1401,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				if (!ReasmIsEmpty(&ctrack->reasm_orig))
 				{
 					verdict_tcp_csum_fix(verdict, dis->tcp, dis->transport_len, dis->ip, dis->ip6);
-					if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload))
+					if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifin, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload))
 					{
 						DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
 					}
@@ -1455,10 +1488,14 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (dp!=dp_prev)
 			{
 				DLOG("desync profile changed by revealed l7 protocol or hostname !\n");
-				// rediscover autottl
-				autottl_discover(ctrack_replay,!!dis->ip6);
+				autottl_rediscover(ctrack_replay,dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout);
 				// re-evaluate start/cutoff limiters
-				if (!replay)
+				if (replay)
+				{
+					if (orig_mod(dp,ctrack_replay,dis)) // ttl can change !
+						verdict = VERDICT_MODIFY;
+				}
+				else
 				{
 					maybe_cutoff(ctrack, IPPROTO_TCP);
 					if (orig_mod(dp,ctrack,dis)) // ttl can change !
@@ -1509,7 +1546,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("applying tampering to unknown protocol\n");
 		}
 
-		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
+		ttl_fake = (ctrack_replay && ctrack_replay->desync_autottl) ? ctrack_replay->desync_autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 		if ((l7proto == HTTP) && (dp->hostcase || dp->hostnospace || dp->domcase || dp->methodeol) && HttpFindHost(&phost,dis->data_payload,dis->len_payload))
 		{
 			if (dp->hostcase)
@@ -2207,7 +2244,7 @@ static bool quic_reasm_cancel(t_ctrack *ctrack, const char *reason)
 	}
 }
 
-static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, struct dissect *dis)
+static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifin, const char *ifout, struct dissect *dis)
 {
 	uint8_t verdict=VERDICT_PASS;
 
@@ -2294,11 +2331,13 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				{
 					DLOG("incoming TTL %u\n",ttl_orig);
 					ctrack->incoming_ttl = ttl_orig;
+					autottl_rediscover(ctrack,dis->ip ? &dis->ip->ip_src : NULL,dis->ip6 ? &dis->ip6->ip6_src : NULL , ifin);
 				}
-				if (!ctrack->autottl) autottl_discover(ctrack,!!dis->ip6);
 			}
 			return verdict; // nothing to do. do not waste cpu
 		}
+
+		autottl_discover(ctrack,dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout);
 
 		if (orig_mod(dp,ctrack,dis)) // ttl can change !
 			verdict = VERDICT_MODIFY;
@@ -2384,7 +2423,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 							if (!ReasmIsEmpty(&ctrack->reasm_orig))
 							{
 								verdict_udp_csum_fix(verdict, dis->udp, dis->transport_len, dis->ip, dis->ip6);
-								if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload))
+								if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifin, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload))
 								{
 									DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
 								}
@@ -2433,7 +2472,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 								}
 							}
 							verdict_udp_csum_fix(verdict, dis->udp, dis->transport_len, dis->ip, dis->ip6);
-							if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload))
+							if (rawpacket_queue(&ctrack->delayed, &dst, desync_fwmark, ifin, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload))
 							{
 								DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
 							}
@@ -2554,10 +2593,14 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			if (dp!=dp_prev)
 			{
 				DLOG("desync profile changed by revealed l7 protocol or hostname !\n");
-				// rediscover autottl
-				autottl_discover(ctrack_replay,!!dis->ip6);
+				autottl_rediscover(ctrack_replay,dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout);
 				// re-evaluate start/cutoff limiters
-				if (!replay)
+				if (replay)
+				{
+					if (orig_mod(dp,ctrack_replay,dis)) // ttl can change !
+						verdict = VERDICT_MODIFY;
+				}
+				else
 				{
 					maybe_cutoff(ctrack, IPPROTO_UDP);
 					if (orig_mod(dp,ctrack,dis)) // ttl can change !
@@ -2619,7 +2662,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				break;
 		}
 
-		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
+		ttl_fake = (ctrack_replay && ctrack_replay->desync_autottl) ? ctrack_replay->desync_autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 
 		uint32_t fooling_orig = FOOL_NONE;
 
@@ -2832,7 +2875,7 @@ static void packet_debug(bool replay, const struct dissect *dis)
 }
 
 
-static uint8_t dpi_desync_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
+static uint8_t dpi_desync_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifin, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
 	struct dissect dis;
 	uint8_t verdict = VERDICT_PASS;
@@ -2846,14 +2889,14 @@ static uint8_t dpi_desync_packet_play(bool replay, size_t reasm_offset, uint32_t
 			case IPPROTO_TCP:
 				if (dis.tcp)
 				{
-					verdict = dpi_desync_tcp_packet_play(replay, reasm_offset, fwmark, ifout, &dis);
+					verdict = dpi_desync_tcp_packet_play(replay, reasm_offset, fwmark, ifin, ifout, &dis);
 					verdict_tcp_csum_fix(verdict, dis.tcp, dis.transport_len, dis.ip, dis.ip6);
 				}
 				break;
 			case IPPROTO_UDP:
 				if (dis.udp)
 				{
-					verdict = dpi_desync_udp_packet_play(replay, reasm_offset, fwmark, ifout, &dis);
+					verdict = dpi_desync_udp_packet_play(replay, reasm_offset, fwmark, ifin, ifout, &dis);
 					verdict_udp_csum_fix(verdict, dis.udp, dis.transport_len, dis.ip, dis.ip6);
 				}
 				break;
@@ -2862,9 +2905,10 @@ static uint8_t dpi_desync_packet_play(bool replay, size_t reasm_offset, uint32_t
 	}
 	return verdict;
 }
-uint8_t dpi_desync_packet(uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
+uint8_t dpi_desync_packet(uint32_t fwmark, const char *ifin, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
-	return dpi_desync_packet_play(false, 0, fwmark, ifout, data_pkt, len_pkt);
+	ipcachePurgeRateLimited(&params.ipcache, params.autottl_cache_lifetime);
+	return dpi_desync_packet_play(false, 0, fwmark, ifin, ifout, data_pkt, len_pkt);
 }
 
 
@@ -2878,7 +2922,7 @@ static bool replay_queue(struct rawpacket_tailhead *q)
 	for (i=1,offset=0 ; (rp=rawpacket_dequeue(q)) ; offset+=rp->len_payload, rawpacket_free(rp), i++)
 	{
 		DLOG("REPLAYING delayed packet #%u offset %zu\n",i,offset);
-		uint8_t verdict = dpi_desync_packet_play(true, offset, rp->fwmark, rp->ifout, rp->packet, &rp->len);
+		uint8_t verdict = dpi_desync_packet_play(true, offset, rp->fwmark, rp->ifin, rp->ifout, rp->packet, &rp->len);
 		switch(verdict & VERDICT_MASK)
 		{
 			case VERDICT_MODIFY:

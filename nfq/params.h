@@ -36,6 +36,18 @@
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
 
+#define AUTOTTL_CACHE_LIFETIME		86400
+#define AUTOTTL_DEFAULT_DESYNC_DELTA	-1
+#define AUTOTTL_DEFAULT_DESYNC_MIN	3
+#define AUTOTTL_DEFAULT_DESYNC_MAX	20
+#define AUTOTTL_DEFAULT_ORIG_DELTA	+5
+#define AUTOTTL_DEFAULT_ORIG_MIN	3
+#define AUTOTTL_DEFAULT_ORIG_MAX	64
+#define AUTOTTL_DEFAULT_DUP_DELTA	-1
+#define AUTOTTL_DEFAULT_DUP_MIN		3
+#define AUTOTTL_DEFAULT_DUP_MAX		64
+
+
 #define MAX_SPLITS	64
 
 #define FAKE_TLS_MOD_SAVE_MASK		0x0F
@@ -89,10 +101,12 @@ struct desync_profile
 	uint8_t dup_ttl, dup_ttl6;
 	uint32_t dup_fooling_mode;
 	uint32_t dup_badseq_increment, dup_badseq_ack_increment;
+	autottl dup_autottl, dup_autottl6;
 
 	char orig_mod_start_mode, orig_mod_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int orig_mod_start, orig_mod_cutoff;
 	uint8_t orig_mod_ttl, orig_mod_ttl6;
+	autottl orig_autottl, orig_autottl6;
 
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
@@ -182,6 +196,10 @@ struct params_s
 
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;
 	t_conntrack conntrack;
+
+	unsigned int autottl_cache_lifetime;
+	bool autottl_present;
+	ip_cache ipcache;
 };
 
 extern struct params_s params;

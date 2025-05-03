@@ -1832,17 +1832,15 @@ bool rawsend_queue(struct rawpacket_tailhead *q)
 }
 
 
-// return guessed fake ttl value. 0 means unsuccessfull, should not perform autottl fooling
-// ttl = TTL of incoming packet
-uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
+uint8_t hop_count_guess(uint8_t ttl)
 {
-	uint8_t orig, path, fake;
-	int d;
-
 	// 18.65.168.125 ( cloudfront ) 	255
 	// 157.254.246.178 			128
 	// 1.1.1.1				 64
 	// guess original ttl. consider path lengths less than 32 hops
+
+	uint8_t orig;
+
 	if (ttl>223)
 		orig=255;
 	else if (ttl<128 && ttl>96)
@@ -1852,15 +1850,22 @@ uint8_t autottl_guess(uint8_t ttl, const autottl *attl)
 	else
 		return 0;
 
-	path = orig - ttl;
+	return orig - ttl;
+}
+// return guessed fake ttl value. 0 means unsuccessfull, should not perform autottl fooling
+uint8_t autottl_eval(uint8_t hop_count, const autottl *attl)
+{
+	uint8_t fake;
+	int d;
 
-	d = (int)path + attl->delta;
+	d = (int)hop_count + attl->delta;
 	if (d<attl->min) fake=attl->min;
 	else if (d>attl->max) fake=attl->max;
 	else fake=(uint8_t)d;
 
-	if (attl->delta<0 && fake>=path || attl->delta>=0 && fake<path)
-		return 0;
+	// path length check disabled
+//	if (attl->delta<0 && fake>=hop_count || attl->delta>=0 && fake<hop_count)
+//		return 0;
 
 	return fake;
 }

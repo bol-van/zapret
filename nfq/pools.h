@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <sys/queue.h>
+#include <net/if.h>
 #include <time.h>
 
 #include "helpers.h"
@@ -161,3 +162,42 @@ struct blob_item *blob_collection_add(struct blob_collection_head *head);
 struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve);
 void blob_collection_destroy(struct blob_collection_head *head);
 bool blob_collection_empty(const struct blob_collection_head *head);
+
+
+typedef struct ip4if
+{
+	char iface[IFNAMSIZ];
+	struct in_addr addr;
+} ip4if;
+typedef struct ip6if
+{
+	char iface[IFNAMSIZ];
+	struct in6_addr addr;
+} ip6if;
+typedef struct ip_cache_item
+{
+	time_t last;
+	uint8_t hops;
+} ip_cache_item;
+typedef struct ip_cache4
+{
+	ip4if key;
+	ip_cache_item data;
+	UT_hash_handle hh;	/* makes this structure hashable */
+} ip_cache4;
+typedef struct ip_cache6
+{
+	ip6if key;
+	ip_cache_item data;
+	UT_hash_handle hh;	/* makes this structure hashable */
+} ip_cache6;
+typedef struct ip_cache
+{
+	ip_cache4 *ipcache4;
+	ip_cache6 *ipcache6;
+} ip_cache;
+
+ip_cache_item *ipcacheTouch(ip_cache *ipcache, const struct in_addr *a4, const struct in6_addr *a6, const char *iface);
+void ipcachePurgeRateLimited(ip_cache *ipcache, time_t lifetime);
+void ipcacheDestroy(ip_cache *ipcache);
+void ipcachePrint(ip_cache *ipcache);

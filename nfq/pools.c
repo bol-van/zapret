@@ -579,3 +579,210 @@ bool blob_collection_empty(const struct blob_collection_head *head)
 {
 	return !LIST_FIRST(head);
 }
+
+
+
+static void ipcache_item_touch(ip_cache_item *item)
+{
+	time(&item->last);
+}
+static void ipcache_item_init(ip_cache_item *item)
+{
+	ipcache_item_touch(item);
+	item->hops = 0;
+}
+
+static void ipcache4Destroy(ip_cache4 **ipcache)
+{
+	ip_cache4 *elem, *tmp;
+	HASH_ITER(hh, *ipcache, elem, tmp)
+	{
+		HASH_DEL(*ipcache, elem);
+		free(elem);
+	}
+}
+static void ipcache4Key(ip4if *key, const struct in_addr *a, const char *iface)
+{
+	memset(key,0,sizeof(*key)); // make sure everything is zero
+	key->addr = *a;
+	if (iface) snprintf(key->iface,sizeof(key->iface),"%s",iface);
+}
+static ip_cache4 *ipcache4Find(ip_cache4 *ipcache, const struct in_addr *a, const char *iface)
+{
+	ip_cache4 *entry;
+	struct ip4if key;
+
+	ipcache4Key(&key,a,iface);
+	HASH_FIND(hh, ipcache, &key, sizeof(key), entry);
+	return entry;
+}
+static ip_cache4 *ipcache4Add(ip_cache4 **ipcache, const struct in_addr *a, const char *iface)
+{
+	// avoid dups
+	ip_cache4 *entry = ipcache4Find(*ipcache,a,iface);
+	if (entry) return entry; // already included
+
+	entry = malloc(sizeof(ip_cache4));
+	if (!entry) return NULL;
+	ipcache4Key(&entry->key,a,iface);
+
+	oom = false;
+	HASH_ADD(hh, *ipcache, key, sizeof(entry->key), entry);
+	if (oom) { free(entry); return NULL; }
+
+	ipcache_item_init(&entry->data);
+
+	return entry;
+}
+static void ipcache4Print(ip_cache4 *ipcache)
+{
+	char s_ip[16];
+	time_t now;
+	ip_cache4 *ipc, *tmp;
+
+	time(&now);
+	HASH_ITER(hh, ipcache , ipc, tmp)
+	{
+		*s_ip=0;
+		inet_ntop(AF_INET, &ipc->key.addr, s_ip, sizeof(s_ip));
+		printf("%s iface=%s : hops %u now=last+%llu\n", s_ip, ipc->key.iface, ipc->data.hops, (unsigned long long)(now-ipc->data.last));
+	}
+}
+
+static void ipcache6Destroy(ip_cache6 **ipcache)
+{
+	ip_cache6 *elem, *tmp;
+	HASH_ITER(hh, *ipcache, elem, tmp)
+	{
+		HASH_DEL(*ipcache, elem);
+		free(elem);
+	}
+}
+static void ipcache6Key(ip6if *key, const struct in6_addr *a, const char *iface)
+{
+	memset(key,0,sizeof(*key)); // make sure everything is zero
+	key->addr = *a;
+	if (iface) snprintf(key->iface,sizeof(key->iface),"%s",iface);
+}
+static ip_cache6 *ipcache6Find(ip_cache6 *ipcache, const struct in6_addr *a, const char *iface)
+{
+	ip_cache6 *entry;
+	ip6if key;
+
+	ipcache6Key(&key,a,iface);
+	HASH_FIND(hh, ipcache, &key, sizeof(key), entry);
+	return entry;
+}
+static ip_cache6 *ipcache6Add(ip_cache6 **ipcache, const struct in6_addr *a, const char *iface)
+{
+	// avoid dups
+	ip_cache6 *entry = ipcache6Find(*ipcache,a,iface);
+	if (entry) return entry; // already included
+
+	entry = malloc(sizeof(ip_cache6));
+	if (!entry) return NULL;
+	ipcache6Key(&entry->key,a,iface);
+
+	oom = false;
+	HASH_ADD(hh, *ipcache, key, sizeof(entry->key), entry);
+	if (oom) { free(entry); return NULL; }
+
+	ipcache_item_init(&entry->data);
+
+	return entry;
+}
+static void ipcache6Print(ip_cache6 *ipcache)
+{
+	char s_ip[40];
+	time_t now;
+	ip_cache6 *ipc, *tmp;
+
+	time(&now);
+	HASH_ITER(hh, ipcache , ipc, tmp)
+	{
+		*s_ip=0;
+		inet_ntop(AF_INET6, &ipc->key.addr, s_ip, sizeof(s_ip));
+		printf("%s iface=%s : hops %u now=last+%llu\n", s_ip, ipc->key.iface, ipc->data.hops, (unsigned long long)(now-ipc->data.last));
+	}
+}
+
+void ipcacheDestroy(ip_cache *ipcache)
+{
+	ipcache4Destroy(&ipcache->ipcache4);
+	ipcache6Destroy(&ipcache->ipcache6);
+}
+void ipcachePrint(ip_cache *ipcache)
+{
+	ipcache4Print(ipcache->ipcache4);
+	ipcache6Print(ipcache->ipcache6);
+}
+
+ip_cache_item *ipcacheTouch(ip_cache *ipcache, const struct in_addr *a4, const struct in6_addr *a6, const char *iface)
+{
+	ip_cache4 *ipcache4;
+	ip_cache6 *ipcache6;
+	if (a4)
+	{
+		if ((ipcache4 = ipcache4Add(&ipcache->ipcache4,a4,iface)))
+		{
+			ipcache_item_touch(&ipcache4->data);
+			return &ipcache4->data;
+		}
+	}
+	else if (a6)
+	{
+		if ((ipcache6 = ipcache6Add(&ipcache->ipcache6,a6,iface)))
+		{
+			ipcache_item_touch(&ipcache6->data);
+			return &ipcache6->data;
+		}
+	}
+	return NULL;
+}
+
+static void ipcache4_purge(ip_cache4 **ipcache, time_t lifetime)
+{
+	ip_cache4 *elem, *tmp;
+	time_t now = time(NULL);
+	HASH_ITER(hh, *ipcache, elem, tmp)
+	{
+		if (now >= (elem->data.last + lifetime))
+		{
+			HASH_DEL(*ipcache, elem);
+			free(elem);
+		}
+	}
+}
+static void ipcache6_purge(ip_cache6 **ipcache, time_t lifetime)
+{
+	ip_cache6 *elem, *tmp;
+	time_t now = time(NULL);
+	HASH_ITER(hh, *ipcache, elem, tmp)
+	{
+		if (now >= (elem->data.last + lifetime))
+		{
+			HASH_DEL(*ipcache, elem);
+			free(elem);
+		}
+	}
+}
+static void ipcache_purge(ip_cache *ipcache, time_t lifetime)
+{
+	if (lifetime) // 0 = no expire
+	{
+		ipcache4_purge(&ipcache->ipcache4, lifetime);
+		ipcache6_purge(&ipcache->ipcache6, lifetime);
+	}
+}
+static time_t ipcache_purge_prev=0;
+void ipcachePurgeRateLimited(ip_cache *ipcache, time_t lifetime)
+{
+	time_t now = time(NULL);
+	// do not purge too often to save resources
+	if (ipcache_purge_prev != now)
+	{
+		ipcache_purge(ipcache, lifetime);
+		ipcache_purge_prev = now;
+	}
+}
+

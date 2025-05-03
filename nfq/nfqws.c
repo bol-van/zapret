@@ -99,7 +99,11 @@ static void onusr2(int sig)
 		printf("\nDESYNC PROFILE %d\n",dpl->dp.n);
 		HostFailPoolDump(dpl->dp.hostlist_auto_fail_counters);
 	}
-	
+	if (params.autottl_present)
+	{
+		printf("\nAUTOTTL IP CACHE\n");
+		ipcachePrint(&params.ipcache);
+	}
 	printf("\n");
 }
 
@@ -111,7 +115,7 @@ static void pre_desync(void)
 }
 
 
-static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
+static uint8_t processPacketData(uint32_t *mark, const char *ifin, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
 #ifdef __linux__
 	if (*mark & params.desync_fwmark)
@@ -120,7 +124,7 @@ static uint8_t processPacketData(uint32_t *mark, const char *ifout, uint8_t *dat
 		return VERDICT_PASS;
 	}
 #endif
-	return dpi_desync_packet(*mark, ifout, data_pkt, len_pkt);
+	return dpi_desync_packet(*mark, ifin, ifout, data_pkt, len_pkt);
 }
 
 
@@ -154,8 +158,8 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	size_t len;
 	struct nfqnl_msg_packet_hdr *ph;
 	uint8_t *data;
-	uint32_t ifidx;
-	char ifout[IFNAMSIZ+1];
+	uint32_t ifidx_out, ifidx_in;
+	char ifout[IFNAMSIZ], ifin[IFNAMSIZ];
 
 	ph = nfq_get_msg_packet_hdr(nfa);
 	id = ph ? ntohl(ph->packet_id) : 0;
@@ -163,27 +167,20 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	uint32_t mark = nfq_get_nfmark(nfa);
 	ilen = nfq_get_payload(nfa, &data);
 
+	ifidx_out = nfq_get_outdev(nfa);
 	*ifout=0;
-	if (params.bind_fix4 || params.bind_fix6)
-	{
-		char ifin[IFNAMSIZ+1];
-		uint32_t ifidx_in;
+	if (ifidx_out) if_indextoname(ifidx_out,ifout);
 
-		ifidx = nfq_get_outdev(nfa);
-		if (ifidx) if_indextoname(ifidx,ifout);
-		*ifin=0;
-		ifidx_in = nfq_get_indev(nfa);
-		if (ifidx_in) if_indextoname(ifidx_in,ifin);
+	ifidx_in = nfq_get_indev(nfa);
+	*ifin=0;
+	if (ifidx_in) if_indextoname(ifidx_in,ifin);
 
-		DLOG("packet: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifin, ifidx_in, ifout, ifidx);
-	}
-	else
-		// save some syscalls
-		DLOG("packet: id=%d len=%d mark=%08X\n", id, ilen, mark);
+	DLOG("packet: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifin, ifidx_in, ifout, ifidx_out);
+
 	if (ilen >= 0)
 	{
 		len = ilen;
-		uint8_t verdict = processPacketData(&mark, ifout, data, &len);
+		uint8_t verdict = processPacketData(&mark, ifin, ifout, data, &len);
 		switch(verdict & VERDICT_MASK)
 		{
 		case VERDICT_MODIFY:
@@ -437,7 +434,7 @@ static int dvt_main(void)
 					ReloadCheck();
 
 					DLOG("packet: id=%u len=%zu\n", id, len);
-					verdict = processPacketData(&mark, NULL, buf, &len);
+					verdict = processPacketData(&mark, NULL, NULL, buf, &len);
 					switch (verdict & VERDICT_MASK)
 					{
 					case VERDICT_PASS:
@@ -484,7 +481,7 @@ static int win_main(const char *windivert_filter)
 	uint8_t packet[16384];
 	uint32_t mark;
 	WINDIVERT_ADDRESS wa;
-	char ifout[22];
+	char ifname[IFNAMSIZ];
 
 	pre_desync();
 
@@ -550,8 +547,8 @@ static int win_main(const char *windivert_filter)
 
 			ReloadCheck();
 
-			*ifout=0;
-			if (wa.Outbound) snprintf(ifout,sizeof(ifout),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
+			*ifname=0;
+			snprintf(ifname,sizeof(ifname),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
 			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx);
 			if (wa.Impostor)
 			{
@@ -567,7 +564,7 @@ static int win_main(const char *windivert_filter)
 			{
 				mark=0;
 				// pseudo interface id IfIdx.SubIfIdx
-				verdict = processPacketData(&mark, ifout, packet, &len);
+				verdict = processPacketData(&mark, ifname, ifname, packet, &len);
 			}
 			switch (verdict & VERDICT_MASK)
 			{
@@ -690,11 +687,14 @@ static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 	}
 }
 
-static bool parse_autottl(const char *s, autottl *t)
+static bool parse_autottl(const char *s, autottl *t, int8_t def_delta, uint8_t def_min, uint8_t def_max)
 {
 	bool neg=true;
 	unsigned int delta,min,max;
-	AUTOTTL_SET_DEFAULT(*t);
+
+	t->delta = def_delta;
+	t->min = def_min;
+	t->max = def_max;
 	if (s)
 	{
 		max = t->max;
@@ -1416,6 +1416,7 @@ static void exithelp(void)
 		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
+		" --autottl-cache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count (default %u)\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"
 		" --wf-iface=<int>[.<int>]\t\t\t; numeric network interface and subinterface indexes\n"
@@ -1456,12 +1457,16 @@ static void exithelp(void)
 		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
 		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
+		" --orig-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
+		" --orig-autottl6=[<delta>[:<min>[-<max>]]]\t; overrides --orig-autottl for ipv6 only\n"
 		" --orig-mod-start=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --orig-mod-cutoff=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --dup=<int>\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
 		" --dup-replace=[0|1]\t\t\t\t; 1 or no argument means do not send original, only dups\n"
 		" --dup-ttl=<int>\t\t\t\t; set TTL for dups\n"
 		" --dup-ttl6=<int>\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
+		" --dup-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
+		" --dup-autottl6=[<delta>[:<min>[-<max>]]]\t; overrides --dup-autottl for ipv6 only\n"
 		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
 		" --dup-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
@@ -1515,12 +1520,15 @@ static void exithelp(void)
 		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
+		AUTOTTL_CACHE_LIFETIME,
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
+		AUTOTTL_DEFAULT_ORIG_DELTA,AUTOTTL_DEFAULT_ORIG_MIN,AUTOTTL_DEFAULT_ORIG_MAX,
+		AUTOTTL_DEFAULT_DUP_DELTA,AUTOTTL_DEFAULT_DUP_MIN,AUTOTTL_DEFAULT_DUP_MAX,
 		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
-		AUTOTTL_DEFAULT_DELTA,AUTOTTL_DEFAULT_MIN,AUTOTTL_DEFAULT_MAX,
+		AUTOTTL_DEFAULT_DESYNC_DELTA,AUTOTTL_DEFAULT_DESYNC_MIN,AUTOTTL_DEFAULT_DESYNC_MAX,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
 		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
@@ -1610,6 +1618,7 @@ enum opt_indices {
 	IDX_WSSIZE,
 	IDX_WSSIZE_CUTOFF,
 	IDX_CTRACK_TIMEOUTS,
+	IDX_AUTOTTL_CACHE_LIFETIME,
 	IDX_HOSTCASE,
 	IDX_HOSTSPELL,
 	IDX_HOSTNOSPACE,
@@ -1624,6 +1633,8 @@ enum opt_indices {
 	IDX_DUP,
 	IDX_DUP_TTL,
 	IDX_DUP_TTL6,
+	IDX_DUP_AUTOTTL,
+	IDX_DUP_AUTOTTL6,
 	IDX_DUP_FOOLING,
 	IDX_DUP_BADSEQ_INCREMENT,
 	IDX_DUP_BADACK_INCREMENT,
@@ -1632,6 +1643,8 @@ enum opt_indices {
 	IDX_DUP_CUTOFF,
 	IDX_ORIG_TTL,
 	IDX_ORIG_TTL6,
+	IDX_ORIG_AUTOTTL,
+	IDX_ORIG_AUTOTTL6,
 	IDX_ORIG_MOD_START,
 	IDX_ORIG_MOD_CUTOFF,
 	IDX_DPI_DESYNC_TTL,
@@ -1723,6 +1736,7 @@ static const struct option long_options[] = {
 	[IDX_WSSIZE] = {"wssize", required_argument, 0, 0},
 	[IDX_WSSIZE_CUTOFF] = {"wssize-cutoff", required_argument, 0, 0},
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
+	[IDX_AUTOTTL_CACHE_LIFETIME] = {"autottl-cache-lifetime", required_argument, 0, 0},
 	[IDX_HOSTCASE] = {"hostcase", no_argument, 0, 0},
 	[IDX_HOSTSPELL] = {"hostspell", required_argument, 0, 0},
 	[IDX_HOSTNOSPACE] = {"hostnospace", no_argument, 0, 0},
@@ -1737,6 +1751,8 @@ static const struct option long_options[] = {
 	[IDX_DUP] = {"dup", required_argument, 0, 0},
 	[IDX_DUP_TTL] = {"dup-ttl", required_argument, 0, 0},
 	[IDX_DUP_TTL6] = {"dup-ttl6", required_argument, 0, 0},
+	[IDX_DUP_AUTOTTL] = {"dup-autottl", optional_argument, 0, 0},
+	[IDX_DUP_AUTOTTL6] = {"dup-autottl6", optional_argument, 0, 0},
 	[IDX_DUP_FOOLING] = {"dup-fooling", required_argument, 0, 0},
 	[IDX_DUP_BADSEQ_INCREMENT] = {"dup-badseq-increment", required_argument, 0, 0},
 	[IDX_DUP_BADACK_INCREMENT] = {"dup-badack-increment", required_argument, 0, 0},
@@ -1745,6 +1761,8 @@ static const struct option long_options[] = {
 	[IDX_DUP_CUTOFF] = {"dup-cutoff", required_argument, 0, 0},
 	[IDX_ORIG_TTL] = {"orig-ttl", required_argument, 0, 0},
 	[IDX_ORIG_TTL6] = {"orig-ttl6", required_argument, 0, 0},
+	[IDX_ORIG_AUTOTTL] = {"orig-autottl", optional_argument, 0, 0},
+	[IDX_ORIG_AUTOTTL6] = {"orig-autottl6", optional_argument, 0, 0},
 	[IDX_ORIG_MOD_START] = {"orig-mod-start", required_argument, 0, 0},
 	[IDX_ORIG_MOD_CUTOFF] = {"orig-mod-cutoff", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TTL] = {"dpi-desync-ttl", required_argument, 0, 0},
@@ -1872,7 +1890,8 @@ int main(int argc, char **argv)
 	params.ctrack_t_est = CTRACK_T_EST;
 	params.ctrack_t_fin = CTRACK_T_FIN;
 	params.ctrack_t_udp = CTRACK_T_UDP;
-	
+	params.autottl_cache_lifetime = AUTOTTL_CACHE_LIFETIME;
+
 	LIST_INIT(&params.hostlists);
 	LIST_INIT(&params.ipsets);
 
@@ -2025,6 +2044,13 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case IDX_AUTOTTL_CACHE_LIFETIME:
+			if (sscanf(optarg, "%u", &params.autottl_cache_lifetime)!=1)
+			{
+				DLOG_ERR("invalid autottl-cache-lifetime value\n");
+				exit_clean(1);
+			}
+			break;
 		case IDX_HOSTCASE:
 			dp->hostcase = true;
 			break;
@@ -2130,6 +2156,22 @@ int main(int argc, char **argv)
 		case IDX_DUP_TTL6:
 			dp->dup_ttl6 = (uint8_t)atoi(optarg);
 			break;
+		case IDX_DUP_AUTOTTL:
+			if (!parse_autottl(optarg, &dp->dup_autottl, AUTOTTL_DEFAULT_DUP_DELTA, AUTOTTL_DEFAULT_DUP_MIN, AUTOTTL_DEFAULT_DUP_MAX))
+			{
+				DLOG_ERR("dup-autottl value error\n");
+				exit_clean(1);
+			}
+			params.autottl_present=true;
+			break;
+		case IDX_DUP_AUTOTTL6:
+			if (!parse_autottl(optarg, &dp->dup_autottl6, AUTOTTL_DEFAULT_DUP_DELTA, AUTOTTL_DEFAULT_DUP_MIN, AUTOTTL_DEFAULT_DUP_MAX))
+			{
+				DLOG_ERR("dup-autottl6 value error\n");
+				exit_clean(1);
+			}
+			params.autottl_present=true;
+			break;
 		case IDX_DUP_REPLACE:
 			dp->dup_replace = optarg ? !!atoi(optarg) : true;
 			break;
@@ -2175,6 +2217,22 @@ int main(int argc, char **argv)
 		case IDX_ORIG_TTL6:
 			dp->orig_mod_ttl6 = (uint8_t)atoi(optarg);
 			break;
+		case IDX_ORIG_AUTOTTL:
+			if (!parse_autottl(optarg, &dp->orig_autottl, AUTOTTL_DEFAULT_ORIG_DELTA, AUTOTTL_DEFAULT_ORIG_MIN, AUTOTTL_DEFAULT_ORIG_MAX))
+			{
+				DLOG_ERR("orig-autottl value error\n");
+				exit_clean(1);
+			}
+			params.autottl_present=true;
+			break;
+		case IDX_ORIG_AUTOTTL6:
+			if (!parse_autottl(optarg, &dp->orig_autottl6, AUTOTTL_DEFAULT_ORIG_DELTA, AUTOTTL_DEFAULT_ORIG_MIN, AUTOTTL_DEFAULT_ORIG_MAX))
+			{
+				DLOG_ERR("orig-autottl6 value error\n");
+				exit_clean(1);
+			}
+			params.autottl_present=true;
+			break;
 		case IDX_ORIG_MOD_CUTOFF:
 			if (!parse_cutoff(optarg, &dp->orig_mod_cutoff, &dp->orig_mod_cutoff_mode))
 			{
@@ -2197,18 +2255,20 @@ int main(int argc, char **argv)
 			dp->desync_ttl6 = (uint8_t)atoi(optarg);
 			break;
 		case IDX_DPI_DESYNC_AUTOTTL:
-			if (!parse_autottl(optarg, &dp->desync_autottl))
+			if (!parse_autottl(optarg, &dp->desync_autottl, AUTOTTL_DEFAULT_DESYNC_DELTA, AUTOTTL_DEFAULT_DESYNC_MIN, AUTOTTL_DEFAULT_DESYNC_MAX))
 			{
 				DLOG_ERR("dpi-desync-autottl value error\n");
 				exit_clean(1);
 			}
+			params.autottl_present=true;
 			break;
 		case IDX_DPI_DESYNC_AUTOTTL6:
-			if (!parse_autottl(optarg, &dp->desync_autottl6))
+			if (!parse_autottl(optarg, &dp->desync_autottl6, AUTOTTL_DEFAULT_DESYNC_DELTA, AUTOTTL_DEFAULT_DESYNC_MIN, AUTOTTL_DEFAULT_DESYNC_MAX))
 			{
 				DLOG_ERR("dpi-desync-autottl6 value error\n");
 				exit_clean(1);
 			}
+			params.autottl_present=true;
 			break;
 		case IDX_DPI_DESYNC_FOOLING:
 			if (!parse_fooling(optarg,&dp->desync_fooling_mode))
@@ -2789,10 +2849,20 @@ int main(int argc, char **argv)
 		if (dp->dup_ttl6 == 0xFF) dp->dup_ttl6=dp->dup_ttl;
 		if (dp->orig_mod_ttl6 == 0xFF) dp->orig_mod_ttl6=dp->orig_mod_ttl;
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
+		if (!AUTOTTL_ENABLED(dp->orig_autottl6)) dp->orig_autottl6 = dp->orig_autottl;
+		if (!AUTOTTL_ENABLED(dp->dup_autottl6)) dp->dup_autottl6 = dp->dup_autottl;
 		if (AUTOTTL_ENABLED(dp->desync_autottl))
-			DLOG("profile %d autottl ipv4 %d:%u-%u\n",dp->n,dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
+			DLOG("profile %d desync autottl ipv4 %s%d:%u-%u\n",dp->n,UNARY_PLUS(dp->desync_autottl.delta),dp->desync_autottl.delta,dp->desync_autottl.min,dp->desync_autottl.max);
 		if (AUTOTTL_ENABLED(dp->desync_autottl6))
-			DLOG("profile %d autottl ipv6 %d:%u-%u\n",dp->n,dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+			DLOG("profile %d desync autottl ipv6 %s%d:%u-%u\n",dp->n,UNARY_PLUS(dp->desync_autottl6.delta),dp->desync_autottl6.delta,dp->desync_autottl6.min,dp->desync_autottl6.max);
+		if (AUTOTTL_ENABLED(dp->orig_autottl))
+			DLOG("profile %d orig autottl ipv4 %s%d:%u-%u\n",dp->n,UNARY_PLUS(dp->orig_autottl.delta),dp->orig_autottl.delta,dp->orig_autottl.min,dp->orig_autottl.max);
+		if (AUTOTTL_ENABLED(dp->orig_autottl6))
+			DLOG("profile %d orig autottl ipv6 %s%d:%u-%u\n",dp->n,UNARY_PLUS(dp->orig_autottl6.delta),dp->orig_autottl6.delta,dp->orig_autottl6.min,dp->orig_autottl6.max);
+		if (AUTOTTL_ENABLED(dp->dup_autottl))
+			DLOG("profile %d dup autottl ipv4 %s%d:%u-%u\n",dp->n,UNARY_PLUS(dp->dup_autottl.delta),dp->dup_autottl.delta,dp->dup_autottl.min,dp->dup_autottl.max);
+		if (AUTOTTL_ENABLED(dp->dup_autottl6))
+			DLOG("profile %d dup autottl ipv6 %s%d:%u-%u\n",dp->n,UNARY_PLUS(dp->dup_autottl6.delta),dp->dup_autottl6.delta,dp->dup_autottl6.min,dp->dup_autottl6.max);
 		split_compat(dp);
 		if (!dp_fake_defaults(dp))
 		{

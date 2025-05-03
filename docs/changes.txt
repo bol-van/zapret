@@ -482,7 +482,11 @@ nfqws: multiple mods for multiple TLS fakes
 init.d: remove 50-discord
 blockcheck: use tpws --fix-seg on linux for multiple splits
 
-v70.7
+v71
 
 nfqws,tpws: debug tls version, alpn, ech
 nfqws: --dpi-desync-fake-tls=! means default tls fake
+nfqws: --dup*
+nfqws: --orig*
+nfqws: autottl cache
+nfqws: autottl disable path length check

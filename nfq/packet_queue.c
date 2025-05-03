@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "packet_queue.h"
 
@@ -25,7 +26,7 @@ void rawpacket_queue_destroy(struct rawpacket_tailhead *q)
 	while((rp = rawpacket_dequeue(q))) rawpacket_free(rp);
 }
 
-struct rawpacket *rawpacket_queue(struct rawpacket_tailhead *q,const struct sockaddr_storage* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len,size_t len_payload)
+struct rawpacket *rawpacket_queue(struct rawpacket_tailhead *q,const struct sockaddr_storage* dst,uint32_t fwmark,const char *ifin,const char *ifout,const void *data,size_t len,size_t len_payload)
 {
 	struct rawpacket *rp = malloc(sizeof(struct rawpacket));
 	if (!rp) return NULL;
@@ -39,13 +40,14 @@ struct rawpacket *rawpacket_queue(struct rawpacket_tailhead *q,const struct sock
 	
 	rp->dst = *dst;
 	rp->fwmark = fwmark;
-	if (ifout)
-	{
-	    strncpy(rp->ifout,ifout,sizeof(rp->ifout));
-	    rp->ifout[sizeof(rp->ifout)-1]=0;
-	}
+	if (ifin)
+		snprintf(rp->ifin,sizeof(rp->ifin),"%s",ifin);
 	else
-	    rp->ifout[0]=0;
+		*rp->ifin = 0;
+	if (ifout)
+		snprintf(rp->ifout,sizeof(rp->ifout),"%s",ifout);
+	else
+		*rp->ifout = 0;
 	memcpy(rp->packet,data,len);
 	rp->len=len;
 	rp->len_payload=len_payload;

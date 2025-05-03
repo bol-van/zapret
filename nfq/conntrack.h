@@ -77,7 +77,8 @@ typedef struct
 	bool req_seq_present,req_seq_finalized,req_seq_abandoned;
 	uint32_t req_seq_start,req_seq_end;	// sequence interval of the request (to track retransmissions)
 
-	uint8_t incoming_ttl, autottl;
+	uint8_t incoming_ttl, desync_autottl, orig_autottl, dup_autottl;
+	bool b_autottl_discovered;
 
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff, b_dup_cutoff, b_orig_mod_cutoff;

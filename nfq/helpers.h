@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <time.h>
 
+#define UNARY_PLUS(v) (v>0 ? "+" : "")
+
 // this saves memory. sockaddr_storage is larger than required. it can be 128 bytes. sockaddr_in6 is 28 bytes.
 typedef union
 {
