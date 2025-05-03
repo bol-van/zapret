@@ -489,4 +489,3 @@ nfqws: --dpi-desync-fake-tls=! means default tls fake
 nfqws: --dup*
 nfqws: --orig*
 nfqws: autottl cache
-nfqws: autottl disable path length check

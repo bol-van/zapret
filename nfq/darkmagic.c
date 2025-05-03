@@ -1863,9 +1863,8 @@ uint8_t autottl_eval(uint8_t hop_count, const autottl *attl)
 	else if (d>attl->max) fake=attl->max;
 	else fake=(uint8_t)d;
 
-	// path length check disabled
-//	if (attl->delta<0 && fake>=hop_count || attl->delta>=0 && fake<hop_count)
-//		return 0;
+	if (attl->delta<0 && fake>=hop_count || attl->delta>=0 && fake<hop_count)
+		return 0;
 
 	return fake;
 }
