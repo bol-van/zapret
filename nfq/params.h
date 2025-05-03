@@ -199,7 +199,7 @@ struct params_s
 	t_conntrack conntrack;
 
 	unsigned int ipcache_lifetime;
-	bool autottl_present,cache_hostnames;
+	bool autottl_present,cache_hostname;
 	ip_cache ipcache;
 };
 

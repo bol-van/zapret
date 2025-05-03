@@ -799,11 +799,11 @@ static void autottl_rediscover(t_ctrack *ctrack, const struct in_addr *a4, const
 	}
 }
 
-static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *iface, const char *hostname)
+static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *hostname)
 {
-	if (!params.cache_hostnames) return true;
+	if (!params.cache_hostname) return true;
 
-	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,iface);
+	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,NULL);
 	if (!ipc)
 	{
 		DLOG_ERR("ipcache_put_hostname: out of memory\n");
@@ -818,14 +818,14 @@ static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr
 	DLOG("hostname cached: %s\n", hostname);
 	return true;
 }
-static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *iface, char *hostname, size_t hostname_buf_len)
+static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr *a6, char *hostname, size_t hostname_buf_len)
 {
-	if (!params.cache_hostnames)
+	if (!params.cache_hostname)
 	{
 		*hostname = 0;
 		return true;
 	}
-	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,iface);
+	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,NULL);
 	if (!ipc)
 	{
 		DLOG_ERR("ipcache_get_hostname: out of memory\n");
@@ -1144,7 +1144,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			if (!ctrack_replay->hostname && !bReverse)
 			{
-				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host, sizeof(host)) && *host)
 					if (!(ctrack_replay->hostname = strdup(host)))
 						DLOG_ERR("strdup(host): out of memory\n");
 			}
@@ -1177,7 +1177,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				hostname = ctrack->hostname;
 				if (!hostname && !bReverse)
 				{
-					if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+					if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host, sizeof(host)) && *host)
 						if (!(hostname = ctrack_replay->hostname = strdup(host)))
 							DLOG_ERR("strdup(host): out of memory\n");
 				}
@@ -1522,7 +1522,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					reasm_orig_cancel(ctrack);
 					goto send_orig;
 				}
-				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host))
+				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host))
 				{
 					reasm_orig_cancel(ctrack);
 					goto send_orig;
@@ -2350,7 +2350,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			if (!ctrack_replay->hostname && !bReverse)
 			{
-				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host, sizeof(host)) && *host)
 					if (!(ctrack_replay->hostname = strdup(host)))
 						DLOG_ERR("strdup(host): out of memory\n");
 			}
@@ -2386,7 +2386,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				hostname = ctrack->hostname;
 				if (!hostname && !bReverse)
 				{
-					if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+					if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host, sizeof(host)) && *host)
 						if (!(hostname = ctrack_replay->hostname = strdup(host)))
 							DLOG_ERR("strdup(host): out of memory\n");
 				}
@@ -2652,7 +2652,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					DLOG_ERR("hostname dup : out of memory");
 					goto send_orig;
 				}
-				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host))
+				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host))
 					goto send_orig;
 			}
 		}

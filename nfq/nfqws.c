@@ -99,7 +99,7 @@ static void onusr2(int sig)
 		printf("\nDESYNC PROFILE %d\n",dpl->dp.n);
 		HostFailPoolDump(dpl->dp.hostlist_auto_fail_counters);
 	}
-	if (params.autottl_present || params.cache_hostnames)
+	if (params.autottl_present || params.cache_hostname)
 	{
 		printf("\nIPCACHE\n");
 		ipcachePrint(&params.ipcache);
@@ -1418,7 +1418,7 @@ static void exithelp(void)
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
 		" --ipcache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count and domain name (default %u)\n"
-		" --ipcache-hostnames=[0|1]\t\t\t; 1 or no argument enables ip->hostname caching\n"
+		" --ipcache-hostname=[0|1]\t\t\t; 1 or no argument enables ip->hostname caching\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"
 		" --wf-iface=<int>[.<int>]\t\t\t; numeric network interface and subinterface indexes\n"
@@ -1621,7 +1621,7 @@ enum opt_indices {
 	IDX_WSSIZE_CUTOFF,
 	IDX_CTRACK_TIMEOUTS,
 	IDX_IPCACHE_LIFETIME,
-	IDX_IPCACHE_HOSTNAMES,
+	IDX_IPCACHE_HOSTNAME,
 	IDX_HOSTCASE,
 	IDX_HOSTSPELL,
 	IDX_HOSTNOSPACE,
@@ -1740,7 +1740,7 @@ static const struct option long_options[] = {
 	[IDX_WSSIZE_CUTOFF] = {"wssize-cutoff", required_argument, 0, 0},
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
 	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
-	[IDX_IPCACHE_HOSTNAMES] = {"ipcache-hostnames", optional_argument, 0, 0},
+	[IDX_IPCACHE_HOSTNAME] = {"ipcache-hostname", optional_argument, 0, 0},
 	[IDX_HOSTCASE] = {"hostcase", no_argument, 0, 0},
 	[IDX_HOSTSPELL] = {"hostspell", required_argument, 0, 0},
 	[IDX_HOSTNOSPACE] = {"hostnospace", no_argument, 0, 0},
@@ -2055,8 +2055,8 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case IDX_IPCACHE_HOSTNAMES:
-			params.cache_hostnames = !optarg || !!atoi(optarg);
+		case IDX_IPCACHE_HOSTNAME:
+			params.cache_hostname = !optarg || !!atoi(optarg);
 			break;
 		case IDX_HOSTCASE:
 			dp->hostcase = true;
@@ -2964,7 +2964,7 @@ int main(int argc, char **argv)
 	}
 
 	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
-	if (params.autottl_present || params.cache_hostnames) DLOG("ipcache lifetime %us\n", params.ipcache_lifetime);
+	if (params.autottl_present || params.cache_hostname) DLOG("ipcache lifetime %us\n", params.ipcache_lifetime);
 	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 
 #ifdef __linux__
