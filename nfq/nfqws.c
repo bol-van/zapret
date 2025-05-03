@@ -2958,6 +2958,7 @@ int main(int argc, char **argv)
 	}
 
 	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
+	if (params.autottl_present) DLOG("autottl cache lifetime %us\n", params.autottl_cache_lifetime);
 	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 
 #ifdef __linux__
