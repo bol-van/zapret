@@ -756,6 +756,7 @@ static void ipcache4_purge(ip_cache4 **ipcache, time_t lifetime)
 		if (now >= (elem->data.last + lifetime))
 		{
 			HASH_DEL(*ipcache, elem);
+			ipcache_item_destroy(&elem->data);
 			free(elem);
 		}
 	}
@@ -769,6 +770,7 @@ static void ipcache6_purge(ip_cache6 **ipcache, time_t lifetime)
 		if (now >= (elem->data.last + lifetime))
 		{
 			HASH_DEL(*ipcache, elem);
+			ipcache_item_destroy(&elem->data);
 			free(elem);
 		}
 	}
