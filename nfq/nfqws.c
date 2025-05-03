@@ -99,9 +99,9 @@ static void onusr2(int sig)
 		printf("\nDESYNC PROFILE %d\n",dpl->dp.n);
 		HostFailPoolDump(dpl->dp.hostlist_auto_fail_counters);
 	}
-	if (params.autottl_present)
+	if (params.autottl_present || params.cache_hostnames)
 	{
-		printf("\nAUTOTTL IP CACHE\n");
+		printf("\nIPCACHE\n");
 		ipcachePrint(&params.ipcache);
 	}
 	printf("\n");
@@ -1417,7 +1417,8 @@ static void exithelp(void)
 		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
-		" --autottl-cache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count (default %u)\n"
+		" --ipcache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count and domain name (default %u)\n"
+		" --ipcache-hostnames=[0|1]\t\t\t; 1 or no argument enables ip->hostname caching\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"
 		" --wf-iface=<int>[.<int>]\t\t\t; numeric network interface and subinterface indexes\n"
@@ -1521,7 +1522,7 @@ static void exithelp(void)
 		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
-		AUTOTTL_CACHE_LIFETIME,
+		IPCACHE_LIFETIME,
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
 		AUTOTTL_DEFAULT_ORIG_DELTA,AUTOTTL_DEFAULT_ORIG_MIN,AUTOTTL_DEFAULT_ORIG_MAX,
 		AUTOTTL_DEFAULT_DUP_DELTA,AUTOTTL_DEFAULT_DUP_MIN,AUTOTTL_DEFAULT_DUP_MAX,
@@ -1619,7 +1620,8 @@ enum opt_indices {
 	IDX_WSSIZE,
 	IDX_WSSIZE_CUTOFF,
 	IDX_CTRACK_TIMEOUTS,
-	IDX_AUTOTTL_CACHE_LIFETIME,
+	IDX_IPCACHE_LIFETIME,
+	IDX_IPCACHE_HOSTNAMES,
 	IDX_HOSTCASE,
 	IDX_HOSTSPELL,
 	IDX_HOSTNOSPACE,
@@ -1737,7 +1739,8 @@ static const struct option long_options[] = {
 	[IDX_WSSIZE] = {"wssize", required_argument, 0, 0},
 	[IDX_WSSIZE_CUTOFF] = {"wssize-cutoff", required_argument, 0, 0},
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
-	[IDX_AUTOTTL_CACHE_LIFETIME] = {"autottl-cache-lifetime", required_argument, 0, 0},
+	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
+	[IDX_IPCACHE_HOSTNAMES] = {"ipcache-hostnames", optional_argument, 0, 0},
 	[IDX_HOSTCASE] = {"hostcase", no_argument, 0, 0},
 	[IDX_HOSTSPELL] = {"hostspell", required_argument, 0, 0},
 	[IDX_HOSTNOSPACE] = {"hostnospace", no_argument, 0, 0},
@@ -1891,7 +1894,7 @@ int main(int argc, char **argv)
 	params.ctrack_t_est = CTRACK_T_EST;
 	params.ctrack_t_fin = CTRACK_T_FIN;
 	params.ctrack_t_udp = CTRACK_T_UDP;
-	params.autottl_cache_lifetime = AUTOTTL_CACHE_LIFETIME;
+	params.ipcache_lifetime = IPCACHE_LIFETIME;
 
 	LIST_INIT(&params.hostlists);
 	LIST_INIT(&params.ipsets);
@@ -2045,12 +2048,15 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
-		case IDX_AUTOTTL_CACHE_LIFETIME:
-			if (sscanf(optarg, "%u", &params.autottl_cache_lifetime)!=1)
+		case IDX_IPCACHE_LIFETIME:
+			if (sscanf(optarg, "%u", &params.ipcache_lifetime)!=1)
 			{
-				DLOG_ERR("invalid autottl-cache-lifetime value\n");
+				DLOG_ERR("invalid ipcache-lifetime value\n");
 				exit_clean(1);
 			}
+			break;
+		case IDX_IPCACHE_HOSTNAMES:
+			params.cache_hostnames = !optarg || !!atoi(optarg);
 			break;
 		case IDX_HOSTCASE:
 			dp->hostcase = true;
@@ -2958,7 +2964,7 @@ int main(int argc, char **argv)
 	}
 
 	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
-	if (params.autottl_present) DLOG("autottl cache lifetime %us\n", params.autottl_cache_lifetime);
+	if (params.autottl_present || params.cache_hostnames) DLOG("ipcache lifetime %us\n", params.ipcache_lifetime);
 	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 
 #ifdef __linux__

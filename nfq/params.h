@@ -36,7 +36,8 @@
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
 
-#define AUTOTTL_CACHE_LIFETIME		86400
+#define IPCACHE_LIFETIME		7200
+
 #define AUTOTTL_DEFAULT_DESYNC_DELTA	-1
 #define AUTOTTL_DEFAULT_DESYNC_MIN	3
 #define AUTOTTL_DEFAULT_DESYNC_MAX	20
@@ -197,8 +198,8 @@ struct params_s
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;
 	t_conntrack conntrack;
 
-	unsigned int autottl_cache_lifetime;
-	bool autottl_present;
+	unsigned int ipcache_lifetime;
+	bool autottl_present,cache_hostnames;
 	ip_cache ipcache;
 };
 

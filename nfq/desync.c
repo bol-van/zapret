@@ -353,7 +353,7 @@ static void wssize_cutoff(t_ctrack *ctrack)
 }
 static void forced_wssize_cutoff(t_ctrack *ctrack)
 {
- 	if (ctrack && ctrack->dp && ctrack->dp->wssize && !ctrack->b_wssize_cutoff)
+	if (ctrack && ctrack->dp && !ctrack->b_wssize_cutoff)
 	{
 		DLOG("forced wssize-cutoff\n");
 		wssize_cutoff(ctrack);
@@ -799,6 +799,49 @@ static void autottl_rediscover(t_ctrack *ctrack, const struct in_addr *a4, const
 	}
 }
 
+static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *iface, const char *hostname)
+{
+	if (!params.cache_hostnames) return true;
+
+	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,iface);
+	if (!ipc)
+	{
+		DLOG_ERR("ipcache_put_hostname: out of memory\n");
+		return false;
+	}
+	free(ipc->hostname);
+	if (!(ipc->hostname = strdup(hostname)))
+	{
+		DLOG_ERR("ipcache_put_hostname: out of memory\n");
+		return false;
+	}
+	DLOG("hostname cached: %s\n", hostname);
+	return true;
+}
+static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *iface, char *hostname, size_t hostname_buf_len)
+{
+	if (!params.cache_hostnames)
+	{
+		*hostname = 0;
+		return true;
+	}
+	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6,iface);
+	if (!ipc)
+	{
+		DLOG_ERR("ipcache_get_hostname: out of memory\n");
+		return false;
+	}
+	if (ipc->hostname)
+	{
+		DLOG("got cached hostname: %s\n", ipc->hostname);
+		snprintf(hostname,hostname_buf_len,"%s",ipc->hostname);
+	}
+	else
+		*hostname = 0;
+	return true;
+}
+
+
 #ifdef BSD
 // BSD pass to divert socket ip_id=0 and does not auto set it if sent via divert socket
 static uint16_t IP4_IP_ID_FIX(const struct ip *ip)
@@ -1081,10 +1124,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	uint32_t *timestamps;
 	bool bSack,DF;
 	uint16_t nmss;
+	char host[256];
 
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
 	extract_endpoints(dis->ip, dis->ip6, dis->tcp, NULL, &src, &dst);
-	
+
 	if (replay)
 	{
 		// in replay mode conntrack_replay is not NULL and ctrack is NULL
@@ -1098,6 +1142,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("using cached desync profile %d\n",dp->n);
 		else if (!ctrack_replay->dp_search_complete)
 		{
+			if (!ctrack_replay->hostname && !bReverse)
+			{
+				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+					if (!(ctrack_replay->hostname = strdup(host)))
+						DLOG_ERR("strdup(host): out of memory\n");
+			}
 			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, NULL, NULL, NULL);
 			ctrack_replay->dp_search_complete = true;
 		}
@@ -1121,7 +1171,18 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("using cached desync profile %d\n",dp->n);
 		else if (!ctrack || !ctrack->dp_search_complete)
 		{
-			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack ? ctrack->hostname : NULL, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
+			const char *hostname = NULL;
+			if (ctrack)
+			{
+				hostname = ctrack->hostname;
+				if (!hostname && !bReverse)
+				{
+					if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+						if (!(hostname = ctrack_replay->hostname = strdup(host)))
+							DLOG_ERR("strdup(host): out of memory\n");
+				}
+			}
+			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, hostname, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
 			if (ctrack)
 			{
 				ctrack->dp = dp;
@@ -1305,8 +1366,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	{
 		struct blob_collection_head *fake;
 
-		char host[256];
-		bool bHaveHost=false;
 		uint8_t *p, *phost=NULL;
 		const uint8_t *rdata_payload = dis->data_payload;
 		size_t rlen_payload = dis->len_payload;
@@ -1315,6 +1374,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		int multisplit_count;
 		int i;
 		uint16_t ip_id;
+		bool bHaveHost=false;
 		t_l7proto l7proto = UNKNOWN;
 
 		if (replay)
@@ -1447,12 +1507,14 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			bDiscoveredL7 = !ctrack_replay && l7proto!=UNKNOWN;
 		if (bDiscoveredL7) DLOG("discovered l7 protocol\n");
 
-		bool bDiscoveredHostname = bHaveHost && !(ctrack_replay && ctrack_replay->hostname);
+		bool bDiscoveredHostname = bHaveHost && !(ctrack_replay && ctrack_replay->hostname_discovered);
 		if (bDiscoveredHostname)
 		{
 			DLOG("discovered hostname\n");
 			if (ctrack_replay)
 			{
+				ctrack_replay->hostname_discovered=true;
+				free(ctrack_replay->hostname);
 				ctrack_replay->hostname=strdup(host);
 				if (!ctrack_replay->hostname)
 				{
@@ -1460,6 +1522,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					reasm_orig_cancel(ctrack);
 					goto send_orig;
 				}
+				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host))
+				{
+					reasm_orig_cancel(ctrack);
+					goto send_orig;
+				}
+
 			}
 		}
 
@@ -2262,6 +2330,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	size_t pkt1_len, pkt2_len;
 	uint8_t ttl_orig,ttl_fake;
 	bool DF;
+	char host[256];
 	t_l7proto l7proto = UNKNOWN;
 
 	extract_endpoints(dis->ip, dis->ip6, NULL, dis->udp, &src, &dst);
@@ -2279,6 +2348,12 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("using cached desync profile %d\n",dp->n);
 		else if (!ctrack_replay->dp_search_complete)
 		{
+			if (!ctrack_replay->hostname && !bReverse)
+			{
+				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+					if (!(ctrack_replay->hostname = strdup(host)))
+						DLOG_ERR("strdup(host): out of memory\n");
+			}
 			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, NULL, NULL, NULL);
 			ctrack_replay->dp_search_complete = true;
 		}
@@ -2305,7 +2380,18 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("using cached desync profile %d\n",dp->n);
 		else if (!ctrack || !ctrack->dp_search_complete)
 		{
-			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack ? ctrack->hostname : NULL, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
+			const char *hostname = NULL;
+			if (ctrack)
+			{
+				hostname = ctrack->hostname;
+				if (!hostname && !bReverse)
+				{
+					if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host, sizeof(host)) && *host)
+						if (!(hostname = ctrack_replay->hostname = strdup(host)))
+							DLOG_ERR("strdup(host): out of memory\n");
+				}
+			}
+			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, hostname, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
 			if (ctrack)
 			{
 				ctrack->dp = dp;
@@ -2353,7 +2439,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	if (dis->len_payload)
 	{
 		struct blob_collection_head *fake;
-		char host[256];
 		bool bHaveHost=false;
 		uint16_t ip_id;
 
@@ -2553,18 +2638,22 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			bDiscoveredL7 = !ctrack_replay && l7proto!=UNKNOWN;
 		if (bDiscoveredL7) DLOG("discovered l7 protocol\n");
 
-		bool bDiscoveredHostname = bHaveHost && !(ctrack_replay && ctrack_replay->hostname);
+		bool bDiscoveredHostname = bHaveHost && !(ctrack_replay && ctrack_replay->hostname_discovered);
 		if (bDiscoveredHostname)
 		{
 			DLOG("discovered hostname\n");
 			if (ctrack_replay)
 			{
+				ctrack_replay->hostname_discovered=true;
+				free(ctrack_replay->hostname);
 				ctrack_replay->hostname=strdup(host);
 				if (!ctrack_replay->hostname)
 				{
 					DLOG_ERR("hostname dup : out of memory");
 					goto send_orig;
 				}
+				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , ifout, host))
+					goto send_orig;
 			}
 		}
 
@@ -2907,7 +2996,7 @@ static uint8_t dpi_desync_packet_play(bool replay, size_t reasm_offset, uint32_t
 }
 uint8_t dpi_desync_packet(uint32_t fwmark, const char *ifin, const char *ifout, uint8_t *data_pkt, size_t *len_pkt)
 {
-	ipcachePurgeRateLimited(&params.ipcache, params.autottl_cache_lifetime);
+	ipcachePurgeRateLimited(&params.ipcache, params.ipcache_lifetime);
 	return dpi_desync_packet_play(false, 0, fwmark, ifin, ifout, data_pkt, len_pkt);
 }
 

@@ -86,6 +86,7 @@ typedef struct
 	t_l7proto l7proto;
 	bool l7proto_discovered;
 	char *hostname;
+	bool hostname_discovered;
 	bool hostname_ah_check;			// should perform autohostlist checks
 	
 	t_reassemble reasm_orig;

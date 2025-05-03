@@ -488,5 +488,5 @@ nfqws,tpws: debug tls version, alpn, ech
 nfqws: --dpi-desync-fake-tls=! means default tls fake
 nfqws: --dup*
 nfqws: --orig*
-nfqws: autottl cache
+nfqws: ipcache of hop count and host names
 init.d: remove --ipset parameter prohibition
