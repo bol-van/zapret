@@ -1417,7 +1417,7 @@ static void exithelp(void)
 		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
-		" --ipcache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count and domain name (default %u)\n"
+		" --ipcache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count and domain name (default %u). 0 = no expiration\n"
 		" --ipcache-hostname=[0|1]\t\t\t; 1 or no argument enables ip->hostname caching\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"

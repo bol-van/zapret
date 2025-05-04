@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 #define DESTROY_STR_POOL(etype, ppool) \
 	etype *elem, *tmp; \

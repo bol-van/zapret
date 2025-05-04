@@ -1513,7 +1513,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("discovered hostname\n");
 			if (ctrack_replay)
 			{
-				ctrack_replay->hostname_discovered=true;
 				free(ctrack_replay->hostname);
 				ctrack_replay->hostname=strdup(host);
 				if (!ctrack_replay->hostname)
@@ -1522,6 +1521,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					reasm_orig_cancel(ctrack);
 					goto send_orig;
 				}
+				ctrack_replay->hostname_discovered=true;
 				if (!ipcache_put_hostname(dis->ip ? &dis->ip->ip_dst : NULL,dis->ip6 ? &dis->ip6->ip6_dst : NULL , host))
 				{
 					reasm_orig_cancel(ctrack);
