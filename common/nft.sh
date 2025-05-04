@@ -106,7 +106,7 @@ cat << EOF | nft -f -
 	flush chain inet $ZAPRET_NFT_TABLE predefrag_nfqws
 	add rule inet $ZAPRET_NFT_TABLE predefrag mark and $DESYNC_MARK !=0 jump predefrag_nfqws comment "nfqws generated : avoid drop by INVALID conntrack state"
 	add rule inet $ZAPRET_NFT_TABLE predefrag_nfqws mark and $DESYNC_MARK_POSTNAT !=0 notrack comment "postnat traffic"
-	add rule inet $ZAPRET_NFT_TABLE predefrag_nfqws ip frag-off != 0 notrack comment "ipfrag"
+	add rule inet $ZAPRET_NFT_TABLE predefrag_nfqws ip frag-off & 0x1fff != 0 notrack comment "ipfrag"
 	add rule inet $ZAPRET_NFT_TABLE predefrag_nfqws exthdr frag exists notrack comment "ipfrag"
 	add rule inet $ZAPRET_NFT_TABLE predefrag_nfqws tcp flags ! syn,rst,ack notrack comment "datanoack"
 	add set inet $ZAPRET_NFT_TABLE lanif { type ifname; }
@@ -118,6 +118,20 @@ EOF
 	[ -n "$POSTNAT_ALL" ] && {
 		nft_flush_chain predefrag_nfqws
 		nft_add_rule predefrag_nfqws notrack comment \"do not track nfqws generated packets to avoid nat tampering and defragmentation\"
+	}
+	[ "$FILTER_TTL_EXPIRED_ICMP" = 1 ] && {
+		if is_postnat; then
+			# can be caused by untracked nfqws-generated packets
+			nft_add_rule prerouting icmp type time-exceeded ct state invalid drop
+		else
+			nft_add_rule postrouting_hook mark and $DESYNC_MARK != 0 ct mark set ct mark or $DESYNC_MARK comment \"nfqws related : prevent ttl expired socket errors\"
+		fi
+		[ "$DISABLE_IPV4" = "1" ] || {
+			nft_add_rule prerouting icmp type time-exceeded ct mark and $DESYNC_MARK != 0 drop comment \"nfqws related : prevent ttl expired socket errors\"
+		}
+		[ "$DISABLE_IPV6" = "1" ] || {
+			nft_add_rule prerouting icmpv6 type time-exceeded ct mark and $DESYNC_MARK != 0 drop comment \"nfqws related : prevent ttl expired socket errors\"
+		}
 	}
 }
 nft_del_chains()
@@ -456,7 +470,7 @@ _nft_fw_nfqws_post4()
 		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 4
 		rule="${3:+oifname @wanif }$filter ip daddr != @nozapret"
 		is_postnat && setmark="meta mark set meta mark or $DESYNC_MARK_POSTNAT"
-		nft_insert_rule $chain $rule $setmark $FW_EXTRA_POST queue num $port bypass
+		nft_insert_rule $chain $rule $setmark $CONNMARKER $FW_EXTRA_POST queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
 	}
 }
@@ -471,7 +485,7 @@ _nft_fw_nfqws_post6()
 		nft_print_op "$filter" "nfqws postrouting (qnum $port)" 6
 		rule="${3:+oifname @wanif6 }$filter ip6 daddr != @nozapret6"
 		is_postnat && setmark="meta mark set meta mark or $DESYNC_MARK_POSTNAT"
-		nft_insert_rule $chain $rule $setmark $FW_EXTRA_POST queue num $port bypass
+		nft_insert_rule $chain $rule $setmark $CONNMARKER $FW_EXTRA_POST queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
 	}
 }
@@ -495,7 +509,7 @@ _nft_fw_nfqws_pre4()
 		local filter="$1" port="$2" rule
 		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 4
 		rule="${3:+iifname @wanif }$filter ip saddr != @nozapret"
-		nft_insert_rule $(get_prechain) $rule $FW_EXTRA_POST queue num $port bypass
+		nft_insert_rule $(get_prechain) $rule $CONNMARKER $FW_EXTRA_POST queue num $port bypass
 	}
 }
 _nft_fw_nfqws_pre6()
@@ -508,7 +522,7 @@ _nft_fw_nfqws_pre6()
 		local filter="$1" port="$2" rule
 		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 6
 		rule="${3:+iifname @wanif6 }$filter ip6 saddr != @nozapret6"
-		nft_insert_rule $(get_prechain) $rule $FW_EXTRA_POST queue num $port bypass
+		nft_insert_rule $(get_prechain) $rule $CONNMARKER $FW_EXTRA_POST queue num $port bypass
 	}
 }
 nft_fw_nfqws_pre()
@@ -686,3 +700,7 @@ zapret_do_firewall_nft()
 
 	return 0
 }
+
+# ctmark is not available in POSTNAT mode
+CONNMARKER=
+[ "$FILTER_TTL_EXPIRED_ICMP" = 1 ] && is_postnat && CONNMARKER="ct mark set ct mark or $DESYNC_MARK"

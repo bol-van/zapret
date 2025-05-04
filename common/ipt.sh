@@ -391,6 +391,27 @@ zapret_do_firewall_rules_ipt()
 
 	zapret_do_firewall_standard_rules_ipt $1
 	custom_runner zapret_custom_firewall $1
+	zapret_do_icmp_filter $1
+}
+
+zapret_do_icmp_filter()
+{
+	# $1 - 1 - add, 0 - del
+
+	local FW_EXTRA_PRE= FW_EXTRA_POST=
+
+	[ "$FILTER_TTL_EXPIRED_ICMP" = 1 ] && {
+		[ "$DISABLE_IPV4" = 1 ] || {
+			ipt_add_del $1 POSTROUTING -t mangle -m mark --mark $DESYNC_MARK/$DESYNC_MARK -j CONNMARK --or-mark $DESYNC_MARK
+			ipt_add_del $1 INPUT -p icmp -m icmp --icmp-type time-exceeded -m connmark --mark $DESYNC_MARK/$DESYNC_MARK -j DROP
+			ipt_add_del $1 FORWARD -p icmp -m icmp --icmp-type time-exceeded -m connmark --mark $DESYNC_MARK/$DESYNC_MARK -j DROP
+		}
+		[ "$DISABLE_IPV6" = 1 ] || {
+			ipt6_add_del $1 POSTROUTING -t mangle -m mark --mark $DESYNC_MARK/$DESYNC_MARK -j CONNMARK --or-mark $DESYNC_MARK
+			ipt6_add_del $1 INPUT -p icmpv6 -m icmp6 --icmpv6-type time-exceeded -m connmark --mark $DESYNC_MARK/$DESYNC_MARK -j DROP
+			ipt6_add_del $1 FORWARD -p icmpv6 -m icmp6 --icmpv6-type time-exceeded -m connmark --mark $DESYNC_MARK/$DESYNC_MARK -j DROP
+		}
+	}
 }
 
 zapret_do_firewall_ipt()
