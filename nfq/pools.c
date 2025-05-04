@@ -550,7 +550,7 @@ struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, co
 	if (data) memcpy(entry->data,data,size);
 	entry->size = size;
 	entry->size_buf = size+size_reserve;
-	
+
 	// insert to the end
 	struct blob_item *itemc,*iteml=LIST_FIRST(head);
 	if (iteml)

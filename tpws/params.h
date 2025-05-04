@@ -20,6 +20,8 @@
 
 #define FIX_SEG_DEFAULT_MAX_WAIT		50
 
+#define IPCACHE_LIFETIME		7200
+
 enum bindll { unwanted=0, no, prefer, force };
 
 #define MAX_BINDS	32
@@ -140,6 +142,10 @@ struct params_s
 	bool tamper; // any tamper option is set
 	bool tamper_lim; // tamper-start or tamper-cutoff set in any profile
 	struct desync_profile_list_head desync_profiles;
+
+	unsigned int ipcache_lifetime;
+	bool cache_hostname;
+	ip_cache ipcache;
 };
 
 extern struct params_s params;

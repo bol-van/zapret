@@ -15,6 +15,7 @@ typedef struct
 	t_l7proto l7proto;
 	bool bTamperInCutoff;
 	bool b_host_checked,b_host_matches,b_ah_check;
+	bool hostname_discovered;
 	char *hostname;
 	struct desync_profile *dp;		// desync profile cache
 } t_ctrack;

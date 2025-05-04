@@ -88,6 +88,12 @@ static void onusr2(int sig)
 		HostFailPoolDump(dpl->dp.hostlist_auto_fail_counters);
 	}
 
+	if (params.cache_hostname)
+	{
+		printf("\nIPCACHE\n");
+		ipcachePrint(&params.ipcache);
+	}
+
 	printf("\n");
 }
 
@@ -215,6 +221,8 @@ static void exithelp(void)
 #if defined(__linux__)
 		" --fix-seg=<int>\t\t\t; fix segmentation failures at the cost of possible slowdown. wait up to N msec (default %u)\n"
 #endif
+		" --ipcache-lifetime=<int>\t\t; time in seconds to keep cached domain name (default %u). 0 = no expiration\n"
+		" --ipcache-hostname=[0|1]\t\t; 1 or no argument enables ip->hostname caching\n"
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		" --dry-run\t\t\t\t; verify parameters and exit with code 0 if successful\n"
@@ -272,6 +280,7 @@ static void exithelp(void)
 #ifdef __linux__
 		FIX_SEG_DEFAULT_MAX_WAIT,
 #endif
+		IPCACHE_LIFETIME,
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT
 	);
 	exit(1);
@@ -292,6 +301,7 @@ static void cleanup_params(void)
 
 	hostlist_files_destroy(&params.hostlists);
 	ipset_files_destroy(&params.ipsets);
+	ipcacheDestroy(&params.ipcache);
 }
 static void exithelp_clean(void)
 {
@@ -628,6 +638,8 @@ enum opt_indices {
 	IDX_MAXCONN,
 	IDX_MAXFILES,
 	IDX_MAX_ORPHAN_TIME,
+	IDX_IPCACHE_LIFETIME,
+	IDX_IPCACHE_HOSTNAME,
 	IDX_HOSTCASE,
 	IDX_HOSTSPELL,
 	IDX_HOSTDOT,
@@ -718,6 +730,8 @@ static const struct option long_options[] = {
 	[IDX_UID] = {"uid", required_argument, 0, 0},
 	[IDX_MAXCONN] = {"maxconn", required_argument, 0, 0},
 	[IDX_MAXFILES] = {"maxfiles", required_argument, 0, 0},
+	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
+	[IDX_IPCACHE_HOSTNAME] = {"ipcache-hostname", optional_argument, 0, 0},
 	[IDX_MAX_ORPHAN_TIME] = {"max-orphan-time", required_argument, 0, 0},
 	[IDX_HOSTCASE] = {"hostcase", no_argument, 0, 0},
 	[IDX_HOSTSPELL] = {"hostspell", required_argument, 0, 0},
@@ -804,6 +818,7 @@ void parse_params(int argc, char *argv[])
 	params.maxconn = DEFAULT_MAX_CONN;
 	params.max_orphan_time = DEFAULT_MAX_ORPHAN_TIME;
 	params.binds_last = -1;
+	params.ipcache_lifetime = IPCACHE_LIFETIME;
 #if defined(__linux__) || defined(__APPLE__)
 	params.tcp_user_timeout_local = DEFAULT_TCP_USER_TIMEOUT_LOCAL;
 	params.tcp_user_timeout_remote = DEFAULT_TCP_USER_TIMEOUT_REMOTE;
@@ -975,6 +990,16 @@ void parse_params(int argc, char *argv[])
 				DLOG_ERR("bad max_orphan_time\n");
 				exit_clean(1);
 			}
+			break;
+		case IDX_IPCACHE_LIFETIME:
+			if (sscanf(optarg, "%u", &params.ipcache_lifetime)!=1)
+			{
+				DLOG_ERR("invalid ipcache-lifetime value\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_IPCACHE_HOSTNAME:
+			params.cache_hostname = !optarg || !!atoi(optarg);
 			break;
 		case IDX_HOSTCASE:
 			dp->hostcase = true;
@@ -1815,14 +1840,6 @@ int main(int argc, char *argv[])
 	parse_params(argc, argv);
 	argv=NULL; argc=0;
 
-	if (params.daemon) daemonize();
-
-	if (*params.pidfile && !writepid(params.pidfile))
-	{
-		DLOG_ERR("could not write pidfile\n");
-		goto exiterr;
-	}
-
 	memset(&list, 0, sizeof(list));
 	for(i=0;i<=params.binds_last;i++) listen_fd[i]=-1;
 
@@ -2054,6 +2071,18 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (params.cache_hostname) VPRINT("ipcache lifetime %us\n", params.ipcache_lifetime);
+	DLOG_CONDUP(params.proxy_type==CONN_TYPE_SOCKS ? "socks mode\n" : "transparent proxy mode\n");
+	if (!params.tamper) DLOG_CONDUP("TCP proxy mode (no tampering)\n");
+
+	if (params.daemon) daemonize();
+
+	if (*params.pidfile && !writepid(params.pidfile))
+	{
+		DLOG_ERR("could not write pidfile\n");
+		goto exiterr;
+	}
+
 	set_ulimit();
 	sec_harden();
 	if (params.droproot && !droproot(params.uid,params.gid))
@@ -2073,9 +2102,6 @@ int main(int argc, char *argv[])
 		DLOG_ERR("Could not block SIGPIPE signal\n");
 		goto exiterr;
 	}
-
-	DLOG_CONDUP(params.proxy_type==CONN_TYPE_SOCKS ? "socks mode\n" : "transparent proxy mode\n");
-	if (!params.tamper) DLOG_CONDUP("TCP proxy mode (no tampering)\n");
 
 	signal(SIGHUP, onhup); 
 	signal(SIGUSR2, onusr2);

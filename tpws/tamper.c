@@ -7,6 +7,7 @@
 #include "ipset.h"
 #include "protocol.h"
 #include "helpers.h"
+#include "pools.h"
 
 #define PKTDATA_MAXDUMP 32
 
@@ -90,6 +91,48 @@ static void TLSDebug(const uint8_t *tls,size_t sz)
 	TLSDebugHandshake(tls+5,sz-5);
 }
 
+static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *hostname)
+{
+	if (!params.cache_hostname) return true;
+
+	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6);
+	if (!ipc)
+	{
+		DLOG_ERR("ipcache_put_hostname: out of memory\n");
+		return false;
+	}
+	free(ipc->hostname);
+	if (!(ipc->hostname = strdup(hostname)))
+	{
+		DLOG_ERR("ipcache_put_hostname: out of memory\n");
+		return false;
+	}
+	VPRINT("hostname cached: %s\n", hostname);
+	return true;
+}
+static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr *a6, char *hostname, size_t hostname_buf_len)
+{
+	if (!params.cache_hostname)
+	{
+		*hostname = 0;
+		return true;
+	}
+	ip_cache_item *ipc = ipcacheTouch(&params.ipcache,a4,a6);
+	if (!ipc)
+	{
+		DLOG_ERR("ipcache_get_hostname: out of memory\n");
+		return false;
+	}
+	if (ipc->hostname)
+	{
+		VPRINT("got cached hostname: %s\n", ipc->hostname);
+		snprintf(hostname,hostname_buf_len,"%s",ipc->hostname);
+	}
+	else
+		*hostname = 0;
+	return true;
+}
+
 static bool dp_match(struct desync_profile *dp, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto)
 {
 	bool bHostlistsEmpty;
@@ -145,8 +188,17 @@ static struct desync_profile *dp_find(struct desync_profile_list_head *head, con
 	VPRINT("desync profile not found\n");
 	return NULL;
 }
+
 void apply_desync_profile(t_ctrack *ctrack, const struct sockaddr *dest)
 {
+	ipcachePurgeRateLimited(&params.ipcache, params.ipcache_lifetime);
+	if (!ctrack->hostname)
+	{
+		char host[256];
+		if (ipcache_get_hostname(dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL , host, sizeof(host)) && *host)
+			if (!(ctrack->hostname=strdup(host)))
+				DLOG_ERR("hostname dup : out of memory");
+	}
 	ctrack->dp = dp_find(&params.desync_profiles, dest, ctrack->hostname, ctrack->l7proto);
 }
 
@@ -215,7 +267,11 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 	}
 
 	if (bHaveHost)
+	{
 		VPRINT("request hostname: %s\n", Host);
+		if (!ipcache_put_hostname(dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL , Host))
+			DLOG_ERR("ipcache_put_hostname: out of memory");
+	}
 
 	bool bDiscoveredL7 = ctrack->l7proto==UNKNOWN && l7proto!=UNKNOWN;
 	if (bDiscoveredL7)
@@ -224,15 +280,17 @@ void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,
 		ctrack->l7proto=l7proto;
 	}
 
-	bool bDiscoveredHostname = bHaveHost && !ctrack->hostname;
+	bool bDiscoveredHostname = bHaveHost && !ctrack->hostname_discovered;
 	if (bDiscoveredHostname)
 	{
 		VPRINT("discovered hostname\n");
+		free(ctrack->hostname);
 		if (!(ctrack->hostname=strdup(Host)))
 		{
 			DLOG_ERR("strdup hostname : out of memory\n");
 			return;
 		}
+		ctrack->hostname_discovered = true;
 	}
 
 	if (bDiscoveredL7 || bDiscoveredHostname)
