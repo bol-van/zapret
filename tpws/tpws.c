@@ -1638,6 +1638,9 @@ void parse_params(int argc, char *argv[])
 	}
 #endif
 
+	if (!test_list_files())
+		exit_clean(1);
+
 	if (!LoadAllHostLists())
 	{
 		DLOG_ERR("hostlists load failed\n");
