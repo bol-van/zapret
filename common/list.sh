@@ -41,6 +41,9 @@ filter_apply_hostlist_target()
 				parm6="${AUTOHOSTLIST_FAIL_TIME:+--hostlist-auto-fail-time=$AUTOHOSTLIST_FAIL_TIME}"
 				parm7="${AUTOHOSTLIST_RETRANS_THRESHOLD:+--hostlist-auto-retrans-threshold=$AUTOHOSTLIST_RETRANS_THRESHOLD}"
 				parm8="--hostlist=$HOSTLIST_AUTO"
+
+				# allow to use it as usual hostlist before autohostlist profile
+				touch "$HOSTLIST_AUTO"
 			}
 			parm="$parm1${parm2:+ $parm2}${parm3:+ $parm3}${parm4:+ $parm4}${parm5:+ $parm5}${parm6:+ $parm6}${parm7:+ $parm7}"
 			parmNA="$parm1${parm2:+ $parm2}${parm3:+ $parm3}${parm8:+ $parm8}"
