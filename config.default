@@ -76,9 +76,9 @@ NFQWS_PORTS_UDP=443
 # PKT_IN means connbytes dir reply
 # this is --dpi-desync-cutoff=nX kernel mode implementation for linux. it saves a lot of CPU.
 NFQWS_TCP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
-NFQWS_TCP_PKT_IN=4
+NFQWS_TCP_PKT_IN=3
 NFQWS_UDP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
-NFQWS_UDP_PKT_IN=1
+NFQWS_UDP_PKT_IN=0
 # redirect outgoing traffic without connbytes limiter and incoming with connbytes limiter
 # normally it's needed only for stateless DPI that matches every packet in a single TCP session
 # typical example are plain HTTP keep alives
@@ -128,6 +128,11 @@ INIT_APPLY_FW=1
 #DISABLE_IPV4=1
 # do not work with ipv6
 DISABLE_IPV6=1
+
+# drop icmp time exceeded messages for nfqws tampered connections
+# in POSTNAT mode this can interfere with default mtr/traceroute in tcp or udp mode. use source port not redirected to nfqws
+# set to 0 if you are not expecting connection breakage due to icmp in response to TCP SYN or UDP
+FILTER_TTL_EXPIRED_ICMP=1
 
 # select which init script will be used to get ip or host list
 # possible values : get_user.sh get_antizapret.sh get_combined.sh get_reestr.sh get_hostlist.sh
