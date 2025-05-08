@@ -12,6 +12,7 @@
 // this saves memory. sockaddr_storage is larger than required. it can be 128 bytes. sockaddr_in6 is 28 bytes.
 typedef union
 {
+	sa_family_t sa_family;
 	struct sockaddr_in sa4;		// size 16
 	struct sockaddr_in6 sa6;	// size 28
 } sockaddr_in46;

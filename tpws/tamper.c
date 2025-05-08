@@ -91,7 +91,7 @@ static void TLSDebug(const uint8_t *tls,size_t sz)
 	TLSDebugHandshake(tls+5,sz-5);
 }
 
-static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *hostname)
+bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *hostname)
 {
 	if (!params.cache_hostname) return true;
 
@@ -101,13 +101,16 @@ static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr
 		DLOG_ERR("ipcache_put_hostname: out of memory\n");
 		return false;
 	}
-	free(ipc->hostname);
-	if (!(ipc->hostname = strdup(hostname)))
+	if (!ipc->hostname || strcmp(ipc->hostname,hostname))
 	{
-		DLOG_ERR("ipcache_put_hostname: out of memory\n");
-		return false;
+		free(ipc->hostname);
+		if (!(ipc->hostname = strdup(hostname)))
+		{
+			DLOG_ERR("ipcache_put_hostname: out of memory\n");
+			return false;
+		}
+		VPRINT("hostname cached: %s\n", hostname);
 	}
-	VPRINT("hostname cached: %s\n", hostname);
 	return true;
 }
 static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr *a6, char *hostname, size_t hostname_buf_len)

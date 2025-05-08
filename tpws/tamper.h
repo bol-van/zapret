@@ -21,6 +21,7 @@ typedef struct
 } t_ctrack;
 
 void apply_desync_profile(t_ctrack *ctrack, const struct sockaddr *dest);
+bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr *a6, const char *hostname);
 
 void tamper_out(t_ctrack *ctrack, const struct sockaddr *dest, uint8_t *segment,size_t segment_buffer_size,size_t *size, size_t *multisplit_pos, int *multisplit_count, uint8_t *split_flags);
 void tamper_in(t_ctrack *ctrack, const struct sockaddr *client, uint8_t *segment,size_t segment_buffer_size,size_t *size);
