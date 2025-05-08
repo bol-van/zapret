@@ -555,53 +555,22 @@ static void reasm_orig_fin(t_ctrack *ctrack)
 }
 
 
-static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, uint8_t proto, struct udphdr *udp, struct tcphdr *tcp, size_t *len_pkt)
+static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, const struct tcphdr *tcp)
 {
 #ifdef __linux__
 	// if used in postnat chain, dropping initial packet will cause conntrack connection teardown
 	// so we need to workaround this.
-	// we can't use low ttl because TCP/IP stack listens to ttl expired ICMPs and notify socket
-	// we also can't use fooling because DPI would accept fooled packets
 	// SYN and SYN,ACK checks are for conntrack-less mode
 	if (ctrack && ctrack->pcounter_orig==1 || tcp && (tcp_syn_segment(tcp) || tcp_synack_segment(tcp)))
 	{
 		DLOG("applying linux postnat conntrack workaround\n");
-		if (proto==IPPROTO_UDP && udp && len_pkt)
-		{
-			// make malformed udp packet with zero length and invalid checksum
-			udp->uh_ulen = 0; // invalid length. must be >=8
-			udp_fix_checksum(udp,sizeof(struct udphdr),ip,ip6);
-			udp->uh_sum ^= htons(0xBEAF);
-			// truncate packet
-			*len_pkt = (uint8_t*)udp - (ip ? (uint8_t*)ip : (uint8_t*)ip6) + sizeof(struct udphdr);
-			if (ip)
-			{
-				ip->ip_len = htons((uint16_t)*len_pkt);
-				ip4_fix_checksum(ip);
-			}
-			else if (ip6)
-				ip6->ip6_ctlun.ip6_un1.ip6_un1_plen = (uint16_t)htons(sizeof(struct udphdr));
-		}
-		else if (proto==IPPROTO_TCP && tcp)
-		{
-			// only SYN here is expected
-			// make flags invalid and also corrupt checksum
-			tcp->th_flags = 0;
-		}
-		if (ip)	ip->ip_sum ^= htons(0xBEAF);
+		// make ip protocol invalid
+		if (ip6) ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = 255;
+		if (ip) ip->ip_p = 255; // this also makes ipv4 header checksum invalid
 		return VERDICT_MODIFY | VERDICT_NOCSUM;
 	}
 #endif
 	return VERDICT_DROP;
-}
-
-static uint8_t ct_new_postnat_fix_tcp(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, struct tcphdr *tcphdr)
-{
-	return ct_new_postnat_fix(ctrack,ip,ip6,IPPROTO_TCP,NULL,tcphdr,NULL);
-}
-static uint8_t ct_new_postnat_fix_udp(const t_ctrack *ctrack, struct ip *ip, struct ip6_hdr *ip6, struct udphdr *udphdr, size_t *len_pkt)
-{
-	return ct_new_postnat_fix(ctrack,ip,ip6,IPPROTO_UDP,udphdr,NULL,len_pkt);
 }
 
 
@@ -2296,10 +2265,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 send_orig:
 
 	if ((verdict & VERDICT_MASK)==VERDICT_DROP)
-		verdict = ct_new_postnat_fix_tcp(ctrack, dis->ip, dis->ip6, dis->tcp);
+		verdict = ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, dis->tcp);
 	else
 		if (tcp_orig_send(verdict,desync_fwmark,ifout,dp,ctrack_replay,dis,bFake))
-			verdict = ct_new_postnat_fix_tcp(ctrack, dis->ip, dis->ip6, dis->tcp);
+			verdict = ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, dis->tcp);
 	return verdict;
 }
 
@@ -2533,7 +2502,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 									replay_queue(&ctrack->delayed);
 									reasm_orig_fin(ctrack);
 								}
-								return ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+								return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 							}
 						}
 
@@ -2577,7 +2546,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 								reasm_orig_cancel(ctrack);
 								goto send_orig;
 							}
-							return ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+							return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 						}
 						if (!quic_reasm_cancel(ctrack,"QUIC initial fragmented CRYPTO")) goto send_orig;
 					}
@@ -2825,7 +2794,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						goto send_orig;
 					// this mode is final, no other options available
-					return ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+					return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 				}
 				break;
 			default:
@@ -2846,7 +2815,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				DLOG("resending original packet with increased by %d length\n", dp->udplen_increment);
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					goto send_orig;
-				return ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+				return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 			case DESYNC_TAMPER:
 				if (IsDhtD1(dis->data_payload,dis->len_payload))
 				{
@@ -2871,7 +2840,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					DLOG("resending tampered DHT\n");
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						goto send_orig;
-					return ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+					return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 				}
 				else
 				{
@@ -2919,7 +2888,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt2, pkt2_len))
 						goto send_orig;
 
-					return ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+					return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 				}
 			default:
 				break;
@@ -2928,10 +2897,10 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 
 send_orig:
 	if ((verdict & VERDICT_MASK)==VERDICT_DROP)
-		verdict = ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+		verdict = ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 	else
 		if (udp_orig_send(verdict,desync_fwmark,ifout,dp,ctrack_replay,dis,bFake))
-			verdict = ct_new_postnat_fix_udp(ctrack, dis->ip, dis->ip6, dis->udp, &dis->len_pkt);
+			verdict = ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 	return verdict;
 }
 
