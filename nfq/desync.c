@@ -810,13 +810,16 @@ static bool ipcache_put_hostname(const struct in_addr *a4, const struct in6_addr
 		DLOG_ERR("ipcache_put_hostname: out of memory\n");
 		return false;
 	}
-	free(ipc->hostname);
-	if (!(ipc->hostname = strdup(hostname)))
+	if (!ipc->hostname || strcmp(ipc->hostname,hostname))
 	{
-		DLOG_ERR("ipcache_put_hostname: out of memory\n");
-		return false;
+		free(ipc->hostname);
+		if (!(ipc->hostname = strdup(hostname)))
+		{
+			DLOG_ERR("ipcache_put_hostname: out of memory\n");
+			return false;
+		}
+		DLOG("hostname cached: %s\n", hostname);
 	}
-	DLOG("hostname cached: %s\n", hostname);
 	return true;
 }
 static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr *a6, char *hostname, size_t hostname_buf_len)
