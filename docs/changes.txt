@@ -489,6 +489,7 @@ nfqws: --dpi-desync-fake-tls=! means default tls fake
 nfqws: --dup*
 nfqws: --orig*
 nfqws: ipcache of hop count and host names
+nfqws: --ctrack-disable
 tpws: ipcache of host names
 nfqws,tpws: set 1024 repeat limit to fakes and dups
 init.d: remove --ipset parameter prohibition

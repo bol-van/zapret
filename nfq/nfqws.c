@@ -1417,6 +1417,7 @@ static void exithelp(void)
 		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
+		" --ctrack-disable=[0|1]\t\t\t\t; 1 or no argument disables conntrack\n"
 		" --ipcache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count and domain name (default %u). 0 = no expiration\n"
 		" --ipcache-hostname=[0|1]\t\t\t; 1 or no argument enables ip->hostname caching\n"
 #ifdef __CYGWIN__
@@ -1620,6 +1621,7 @@ enum opt_indices {
 	IDX_WSSIZE,
 	IDX_WSSIZE_CUTOFF,
 	IDX_CTRACK_TIMEOUTS,
+	IDX_CTRACK_DISABLE,
 	IDX_IPCACHE_LIFETIME,
 	IDX_IPCACHE_HOSTNAME,
 	IDX_HOSTCASE,
@@ -1739,6 +1741,7 @@ static const struct option long_options[] = {
 	[IDX_WSSIZE] = {"wssize", required_argument, 0, 0},
 	[IDX_WSSIZE_CUTOFF] = {"wssize-cutoff", required_argument, 0, 0},
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
+	[IDX_CTRACK_DISABLE] = {"ctrack-disable", optional_argument, 0, 0},
 	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
 	[IDX_IPCACHE_HOSTNAME] = {"ipcache-hostname", optional_argument, 0, 0},
 	[IDX_HOSTCASE] = {"hostcase", no_argument, 0, 0},
@@ -2048,6 +2051,9 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case IDX_CTRACK_DISABLE:
+			params.ctrack_disable = !optarg || atoi(optarg);
+			break;
 		case IDX_IPCACHE_LIFETIME:
 			if (sscanf(optarg, "%u", &params.ipcache_lifetime)!=1)
 			{
@@ -2056,7 +2062,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_IPCACHE_HOSTNAME:
-			params.cache_hostname = !optarg || !!atoi(optarg);
+			params.cache_hostname = !optarg || atoi(optarg);
 			break;
 		case IDX_HOSTCASE:
 			dp->hostcase = true;
@@ -2180,7 +2186,7 @@ int main(int argc, char **argv)
 			params.autottl_present=true;
 			break;
 		case IDX_DUP_REPLACE:
-			dp->dup_replace = optarg ? !!atoi(optarg) : true;
+			dp->dup_replace = !optarg || atoi(optarg);
 			break;
 		case IDX_DUP_FOOLING:
 			if (!parse_fooling(optarg,&dp->dup_fooling_mode))
@@ -2841,6 +2847,7 @@ int main(int argc, char **argv)
 	}
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
+	if (params.ctrack_disable) DLOG_CONDUP("conntrack disabled ! some functions will not work. make sure it's what you want.\n");
 	
 #ifndef __CYGWIN__
 	if (params.debug_target == LOG_TARGET_FILE && params.droproot && chown(params.debug_logfile, params.uid, -1))

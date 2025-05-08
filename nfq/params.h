@@ -197,9 +197,10 @@ struct params_s
 
 	unsigned int ctrack_t_syn, ctrack_t_est, ctrack_t_fin, ctrack_t_udp;
 	t_conntrack conntrack;
+	bool ctrack_disable;
 
-	unsigned int ipcache_lifetime;
 	bool autottl_present,cache_hostname;
+	unsigned int ipcache_lifetime;
 	ip_cache ipcache;
 };
 

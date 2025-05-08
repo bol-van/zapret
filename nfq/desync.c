@@ -562,7 +562,8 @@ static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct 
 	// so we need to workaround this.
 	// we can't use low ttl because TCP/IP stack listens to ttl expired ICMPs and notify socket
 	// we also can't use fooling because DPI would accept fooled packets
-	if (ctrack && ctrack->pcounter_orig==1)
+	// SYN and SYN,ACK checks are for conntrack-less mode
+	if (ctrack && ctrack->pcounter_orig==1 || tcp && (tcp_syn_segment(tcp) || tcp_synack_segment(tcp)))
 	{
 		DLOG("applying linux postnat conntrack workaround\n");
 		if (proto==IPPROTO_UDP && udp && len_pkt)
@@ -1161,11 +1162,14 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	{
 		// in real mode ctrack may be NULL or not NULL, conntrack_replay is equal to ctrack
 
-		ConntrackPoolPurge(&params.conntrack);
-		if (ConntrackPoolFeed(&params.conntrack, dis->ip, dis->ip6, dis->tcp, NULL, dis->len_payload, &ctrack, &bReverse))
+		if (!params.ctrack_disable)
 		{
-			dp = ctrack->dp;
-			ctrack_replay = ctrack;
+			ConntrackPoolPurge(&params.conntrack);
+			if (ConntrackPoolFeed(&params.conntrack, dis->ip, dis->ip6, dis->tcp, NULL, dis->len_payload, &ctrack, &bReverse))
+			{
+				dp = ctrack->dp;
+				ctrack_replay = ctrack;
+			}
 		}
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
@@ -2370,11 +2374,14 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	{
 		// in real mode ctrack may be NULL or not NULL, conntrack_replay is equal to ctrack
 
-		ConntrackPoolPurge(&params.conntrack);
-		if (ConntrackPoolFeed(&params.conntrack, dis->ip, dis->ip6, NULL, dis->udp, dis->len_payload, &ctrack, &bReverse))
+		if (!params.ctrack_disable)
 		{
-			dp = ctrack->dp;
-			ctrack_replay = ctrack;
+			ConntrackPoolPurge(&params.conntrack);
+			if (ConntrackPoolFeed(&params.conntrack, dis->ip, dis->ip6, NULL, dis->udp, dis->len_payload, &ctrack, &bReverse))
+			{
+				dp = ctrack->dp;
+				ctrack_replay = ctrack;
+			}
 		}
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
