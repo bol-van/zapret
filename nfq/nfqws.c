@@ -2847,7 +2847,6 @@ int main(int argc, char **argv)
 	}
 
 	DLOG_CONDUP("we have %d user defined desync profile(s) and default low priority profile 0\n",desync_profile_count);
-	if (params.ctrack_disable) DLOG_CONDUP("conntrack disabled ! some functions will not work. make sure it's what you want.\n");
 	
 #ifndef __CYGWIN__
 	if (params.debug_target == LOG_TARGET_FILE && params.droproot && chown(params.debug_logfile, params.uid, -1))
@@ -2973,9 +2972,14 @@ int main(int argc, char **argv)
 		goto exiterr;
 	}
 
-	DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
+	if (params.ctrack_disable)
+		DLOG_CONDUP("conntrack disabled ! some functions will not work. make sure it's what you want.\n");
+	else
+	{
+		DLOG("initializing conntrack with timeouts tcp=%u:%u:%u udp=%u\n", params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
+		ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
+	}
 	if (params.autottl_present || params.cache_hostname) DLOG("ipcache lifetime %us\n", params.ipcache_lifetime);
-	ConntrackPoolInit(&params.conntrack, 10, params.ctrack_t_syn, params.ctrack_t_est, params.ctrack_t_fin, params.ctrack_t_udp);
 
 #ifdef __linux__
 	result = nfq_main();
