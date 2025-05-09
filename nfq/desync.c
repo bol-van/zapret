@@ -564,9 +564,18 @@ static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, struct ip *ip, struct 
 	if (ctrack && ctrack->pcounter_orig==1 || tcp && (tcp_syn_segment(tcp) || tcp_synack_segment(tcp)))
 	{
 		DLOG("applying linux postnat conntrack workaround\n");
-		// make ip protocol invalid
-		if (ip6) ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = 255;
-		if (ip) ip->ip_p = 255; // this also makes ipv4 header checksum invalid
+		// make ip protocol invalid and low TTL
+		if (ip6)
+		{
+			ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt = 255;
+			ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim = 1;
+		}
+		if (ip)
+		{
+			// this likely also makes ipv4 header checksum invalid
+			ip->ip_p = 255;
+			ip->ip_ttl = 1;
+		}
 		return VERDICT_MODIFY | VERDICT_NOCSUM;
 	}
 #endif

@@ -296,6 +296,7 @@ static int nfq_main(void)
 		return 1;
 	}
 
+	sec_harden();
 	if (params.droproot && !droproot(params.uid, params.gid) || !dropcaps())
 		goto err;
 	print_id();
@@ -306,9 +307,6 @@ static int nfq_main(void)
 		goto err;
 
 	if (params.daemon) daemonize();
-
-	// do it only after daemonize because daemonize needs fork
-	sec_harden();
 
 	if (Fpid)
 	{
