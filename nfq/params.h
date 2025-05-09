@@ -75,7 +75,7 @@ struct fake_tls_mod
 	uint32_t mod;
 };
 
-typedef enum {SS_NONE=0,SS_ACK,SS_SYN} t_synack_split;
+typedef enum {SS_NONE=0,SS_SYN,SS_SYNACK,SS_ACKSYN} t_synack_split;
 
 struct desync_profile
 {

@@ -1516,7 +1516,7 @@ static void exithelp(void)
 		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --synack-split=[syn|ack]\t\t\t; syn (default) sends SYN,ACK tcp segment as separate SYN and ACK segments. ack sends ACK then SYN.\n"
+		" --synack-split=[syn|synack|acksyn]\t\t; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN\n"
 		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
 		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
 		" --orig-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
@@ -2106,8 +2106,10 @@ int main(int argc, char **argv)
 			dp->synack_split = SS_SYN;
 			if (optarg)
 			{
-				if (!strcmp(optarg,"ack"))
-					dp->synack_split = SS_ACK;
+				if (!strcmp(optarg,"synack"))
+					dp->synack_split = SS_SYNACK;
+				else if (!strcmp(optarg,"acksyn"))
+					dp->synack_split = SS_ACKSYN;
 				else if (strcmp(optarg,"syn"))
 				{
 					DLOG_ERR("invalid synack-split value\n");

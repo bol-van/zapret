@@ -1280,32 +1280,49 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			}
 		}
 
-		if (dp->synack_split && tcp_synack_segment(dis->tcp))
+		if (dp->synack_split!=SS_NONE && tcp_synack_segment(dis->tcp))
 		{
 			dis->tcp->th_flags &= ~TH_ACK;
 			tcp_fix_checksum(dis->tcp,dis->transport_len, dis->ip, dis->ip6);
 
-			pkt1_len = sizeof(pkt1);
-			if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_ACK, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, SCALE_NONE, timestamps,
-				DF,ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6),
-				FOOL_NONE,0,0,NULL, 0, pkt1, &pkt1_len))
+			char ss[2],i,ct;
+			if (dp->synack_split==SS_SYN)
 			{
-				DLOG_ERR("cannot prepare split SYNACK ACK part\n");
-				goto send_orig;
+				ct=1;
+				ss[0] = 'S';
 			}
-
-			t_synack_split ss[2] = {dp->synack_split, dp->synack_split==SS_ACK ? SS_SYN : SS_ACK};
-			int i;
-			for (int i=0;i<2;i++)
+			else
+			{
+				ct=2;
+				if (dp->synack_split==SS_SYNACK)
+				{
+					ss[0] = 'S';
+					ss[1] = 'A';
+				}
+				else
+				{
+					ss[0] = 'A';
+					ss[1] = 'S';
+				}
+				pkt1_len = sizeof(pkt1);
+				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_ACK, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, SCALE_NONE, timestamps,
+					DF,ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6),
+					FOOL_NONE,0,0,NULL, 0, pkt1, &pkt1_len))
+				{
+					DLOG_ERR("cannot prepare split SYNACK ACK part\n");
+					goto send_orig;
+				}
+			}
+			for (int i=0;i<ct;i++)
 			{
 				switch(ss[i])
 				{
-					case SS_SYN:
+					case 'S':
 						DLOG("sending split SYNACK : SYN\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , dis->data_pkt, dis->len_pkt))
 							goto send_orig;
 						break;
-					case SS_ACK:
+					case 'A':
 						DLOG("sending split SYNACK : ACK\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 							goto send_orig;
