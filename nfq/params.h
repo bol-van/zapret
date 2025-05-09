@@ -84,6 +84,8 @@ struct desync_profile
 	char wssize_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int wssize_cutoff;
 
+	bool synack_split;
+
 	bool hostcase, hostnospace, domcase, methodeol;
 	char hostspell[4];
 	enum dpi_desync_mode desync_mode0,desync_mode,desync_mode2;

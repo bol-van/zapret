@@ -1516,6 +1516,7 @@ static void exithelp(void)
 		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --synack-split=[0|1]\t\t\t\t; 1 or no arguments sends SYN,ACK tcp segment as separate SYN and ACK segments\n"
 		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
 		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
 		" --orig-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
@@ -1678,6 +1679,7 @@ enum opt_indices {
 	IDX_WSIZE,
 	IDX_WSSIZE,
 	IDX_WSSIZE_CUTOFF,
+	IDX_SYNACK_SPLIT,
 	IDX_CTRACK_TIMEOUTS,
 	IDX_CTRACK_DISABLE,
 	IDX_IPCACHE_LIFETIME,
@@ -1798,6 +1800,7 @@ static const struct option long_options[] = {
 	[IDX_WSIZE] = {"wsize", required_argument, 0, 0},
 	[IDX_WSSIZE] = {"wssize", required_argument, 0, 0},
 	[IDX_WSSIZE_CUTOFF] = {"wssize-cutoff", required_argument, 0, 0},
+	[IDX_SYNACK_SPLIT] = {"synack-split", optional_argument, 0, 0},
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
 	[IDX_CTRACK_DISABLE] = {"ctrack-disable", optional_argument, 0, 0},
 	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
@@ -2098,6 +2101,9 @@ int main(int argc, char **argv)
 				DLOG_ERR("invalid wssize-cutoff value\n");
 				exit_clean(1);
 			}
+			break;
+		case IDX_SYNACK_SPLIT:
+			dp->synack_split = !optarg || atoi(optarg);
 			break;
 		case IDX_CTRACK_TIMEOUTS:
 			if (sscanf(optarg, "%u:%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin, &params.ctrack_t_udp)<3)

@@ -1110,6 +1110,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
 	extract_endpoints(dis->ip, dis->ip6, dis->tcp, NULL, &src, &dst);
+	timestamps = tcp_find_timestamps(dis->tcp);
+	DF = ip_has_df(dis->ip);
+	ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 
 	if (replay)
 	{
@@ -1193,15 +1196,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 		if (bReverse)
 		{
-			if (ctrack)
+			if (ctrack && !ctrack->incoming_ttl)
 			{
-				ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-				if (!ctrack->incoming_ttl)
-				{
-					ctrack->incoming_ttl = ttl_orig;
-					DLOG("incoming TTL %u\n",ttl_orig);
-					autottl_rediscover(ctrack,dis->ip ? &dis->ip->ip_src : NULL,dis->ip6 ? &dis->ip6->ip6_src : NULL , ifin);
-				}
+				ctrack->incoming_ttl = ttl_orig;
+				DLOG("incoming TTL %u\n",ttl_orig);
+				autottl_rediscover(ctrack,dis->ip ? &dis->ip->ip_src : NULL,dis->ip6 ? &dis->ip6->ip6_src : NULL , ifin);
 			}
 
 			// process reply packets for auto hostlist mode
@@ -1281,6 +1280,29 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			}
 		}
 
+		if (dp->synack_split && tcp_synack_segment(dis->tcp))
+		{
+			dis->tcp->th_flags &= ~TH_ACK;
+			tcp_fix_checksum(dis->tcp,dis->transport_len, dis->ip, dis->ip6);
+
+			DLOG("sending split SYNACK : SYN\n");
+			if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , dis->data_pkt, dis->len_pkt))
+				goto send_orig;
+
+			pkt1_len = sizeof(pkt1);
+			if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_ACK, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, SCALE_NONE, timestamps,
+				DF,ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6),
+				FOOL_NONE,0,0,NULL, 0, pkt1, &pkt1_len))
+			{
+				DLOG_ERR("cannot prepare split SYNACK ACK part\n");
+				goto send_orig;
+			}
+			DLOG("sending split SYNACK : ACK\n");
+			if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+				goto send_orig;
+			return VERDICT_DROP;
+		}
+
 		// start and cutoff limiters
 		if (!process_desync_interval(dp, ctrack)) goto send_orig;
 	} // !replay
@@ -1289,10 +1311,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	ttl_fake = (ctrack_replay && ctrack_replay->desync_autottl) ? ctrack_replay->desync_autottl : (dis->ip6 ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 	flags_orig = *((uint8_t*)dis->tcp+13);
 	scale_factor = tcp_find_scale_factor(dis->tcp);
-	timestamps = tcp_find_timestamps(dis->tcp);
 	bSack = tcp_has_sack(dis->tcp);
 	nmss = tcp_find_mss(dis->tcp);
-	DF = ip_has_df(dis->ip);
 
 	if (!replay)
 	{
