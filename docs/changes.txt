@@ -492,5 +492,6 @@ nfqws: ipcache of hop count and host names
 nfqws: --ctrack-disable
 tpws: ipcache of host names
 nfqws,tpws: set 1024 repeat limit to fakes and dups
+nfqws,tpws: do more before daemonize
 init.d: remove --ipset parameter prohibition
 init.d, blockcheck: drop time exceeded icmp for nfqws-related connections

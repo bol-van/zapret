@@ -288,19 +288,40 @@ static int nfq_main(void)
 	struct nfq_q_handle *qh = NULL;
 	int fd,e;
 	ssize_t rd;
+	FILE *Fpid = NULL;
 
-	sec_harden();
-	if (params.droproot && !droproot(params.uid, params.gid) || !dropcaps())
+	if (*params.pidfile && !(Fpid=fopen(params.pidfile,"w")))
+	{
+		DLOG_PERROR("create pidfile");
 		return 1;
+	}
+
+	if (params.droproot && !droproot(params.uid, params.gid) || !dropcaps())
+		goto err;
 	print_id();
 	if (params.droproot && !test_list_files())
-		return 1;
-
-	pre_desync();
+		goto err;
 
 	if (!nfq_init(&h,&qh))
-		return 1;
+		goto err;
 
+	if (params.daemon) daemonize();
+
+	// do it only after daemonize because daemonize needs fork
+	sec_harden();
+
+	if (Fpid)
+	{
+		if (fprintf(Fpid, "%d", getpid())<=0)
+		{
+			DLOG_PERROR("write pidfile");
+			goto err;
+		}
+		fclose(Fpid);
+		Fpid=NULL;
+	}
+
+	pre_desync();
 	notify_ready();
 
 	fd = nfq_fd(h);
@@ -326,6 +347,9 @@ static int nfq_main(void)
 
 	nfq_deinit(&h,&qh);
 	return 0;
+err:
+	if (Fpid) fclose(Fpid);
+	return 1;
 }
 
 #elif defined(BSD)
@@ -340,6 +364,13 @@ static int dvt_main(void)
 	socklen_t socklen;
 	ssize_t rd,wr;
 	fd_set fdset;
+	FILE *Fpid = NULL;
+
+	if (*params.pidfile && !(Fpid=fopen(params.pidfile,"w")))
+	{
+		DLOG_PERROR("create pidfile");
+		return 1;
+	}
 
 	{
 		struct sockaddr_in bp4;
@@ -391,11 +422,25 @@ static int dvt_main(void)
 	if (!rawsend_preinit(false,false))
 		goto exiterr;
 
+
 	if (params.droproot && !droproot(params.uid, params.gid))
 		goto exiterr;
 	print_id();
 	if (params.droproot && !test_list_files())
 		goto exiterr;
+
+	if (params.daemon) daemonize();
+
+	if (Fpid)
+	{
+		if (fprintf(Fpid, "%d", getpid())<=0)
+		{
+			DLOG_PERROR("write pidfile");
+			goto exiterr;
+		}
+		fclose(Fpid);
+		Fpid=NULL;
+	}
 
 	pre_desync();
 
@@ -464,6 +509,7 @@ static int dvt_main(void)
 
 	res=0;
 exiterr:
+	if (Fpid) fclose(Fpid);
 	if (fd[0]!=-1) close(fd[0]);
 	if (fd[1]!=-1) close(fd[1]);
 	return res;
@@ -483,13 +529,27 @@ static int win_main(const char *windivert_filter)
 	WINDIVERT_ADDRESS wa;
 	char ifname[IFNAMSIZ];
 
-	pre_desync();
+	if (params.daemon)
+	{
+		// cygwin loses current dir
+		char *cwd = get_current_dir_name();
+		daemonize();
+		chdir(cwd);
+	}
+
+	if (*params.pidfile && !writepid(params.pidfile))
+	{
+		DLOG_ERR("could not write pidfile");
+		return ERROR_TOO_MANY_OPEN_FILES; // code 4 = The system cannot open the file
+	}
 
 	if (!win_dark_init(&params.ssid_filter, &params.nlm_filter))
 	{
 		DLOG_ERR("win_dark_init failed. win32 error %u (0x%08X)\n", w_win32_error, w_win32_error);
 		return w_win32_error;
 	}
+
+	pre_desync();
 
 	for(;;)
 	{
@@ -1855,8 +1915,7 @@ int main(int argc, char **argv)
 #endif
 	int result, v;
 	int option_index = 0;
-	bool daemon = false, bSkip = false, bDry = false;
-	char pidfile[256];
+	bool bSkip = false, bDry = false;
 	struct hostlist_file *anon_hl = NULL, *anon_hl_exclude = NULL;
 	struct ipset_file *anon_ips = NULL, *anon_ips_exclude = NULL;
 #ifdef __CYGWIN__
@@ -1873,7 +1932,6 @@ int main(int argc, char **argv)
 	PRINT_VER;
 
 	memset(&params, 0, sizeof(params));
-	*pidfile = 0;
 
 	struct desync_profile_list *dpl;
 	struct desync_profile *dp;
@@ -1999,11 +2057,10 @@ int main(int argc, char **argv)
 			break;
 #endif
 		case IDX_DAEMON:
-			daemon = true;
+			params.daemon = true;
 			break;
 		case IDX_PIDFILE:
-			strncpy(pidfile, optarg, sizeof(pidfile));
-			pidfile[sizeof(pidfile) - 1] = '\0';
+			snprintf(params.pidfile,sizeof(params.pidfile),"%s",optarg);
 			break;
 #ifndef __CYGWIN__
 		case IDX_USER:
@@ -2962,14 +3019,6 @@ int main(int argc, char **argv)
 	{
 		DLOG_CONDUP("command line parameters verified\n");
 		exit_clean(0);
-	}
-
-	if (daemon) daemonize();
-
-	if (*pidfile && !writepid(pidfile))
-	{
-		DLOG_ERR("could not write pidfile\n");
-		goto exiterr;
 	}
 
 	if (params.ctrack_disable)

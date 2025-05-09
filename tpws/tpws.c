@@ -1832,6 +1832,7 @@ int main(int argc, char *argv[])
 	int i, listen_fd[MAX_BINDS], yes = 1, retval = 0, if_index, exit_v=EXIT_FAILURE;
 	struct salisten_s list[MAX_BINDS];
 	char ip_port[48];
+	FILE *Fpid = NULL;
 
 	set_console_io_buffering();
 	set_env_exedir(argv[0]);
@@ -2078,11 +2079,9 @@ int main(int argc, char *argv[])
 	DLOG_CONDUP(params.proxy_type==CONN_TYPE_SOCKS ? "socks mode\n" : "transparent proxy mode\n");
 	if (!params.tamper) DLOG_CONDUP("TCP proxy mode (no tampering)\n");
 
-	if (params.daemon) daemonize();
-
-	if (*params.pidfile && !writepid(params.pidfile))
+	if (*params.pidfile && !(Fpid=fopen(params.pidfile,"w")))
 	{
-		DLOG_ERR("could not write pidfile\n");
+		DLOG_PERROR("create pidfile");
 		goto exiterr;
 	}
 
@@ -2097,6 +2096,19 @@ int main(int argc, char *argv[])
 	print_id();
 	if (params.droproot && !test_list_files())
 		goto exiterr;
+
+	if (params.daemon) daemonize();
+
+	if (Fpid)
+	{
+		if (fprintf(Fpid, "%d", getpid())<=0)
+		{
+			DLOG_PERROR("write pidfile");
+			goto exiterr;
+		}
+		fclose(Fpid);
+		Fpid=NULL;
+	}
 
 	//splice() causes the process to receive the SIGPIPE-signal if one part (for
 	//example a socket) is closed during splice(). I would rather have splice()
@@ -2114,6 +2126,7 @@ int main(int argc, char *argv[])
 	DLOG_CONDUP("Exiting\n");
 	
 exiterr:
+	if (Fpid) fclose(Fpid);
 	redir_close();
 	for(i=0;i<=params.binds_last;i++) if (listen_fd[i]!=-1) close(listen_fd[i]);
 	cleanup_params();

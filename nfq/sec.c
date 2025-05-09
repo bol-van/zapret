@@ -192,20 +192,21 @@ static bool set_seccomp(void)
 
 bool sec_harden(void)
 {
+	bool bRes = true;
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
 	{
 		DLOG_PERROR("PR_SET_NO_NEW_PRIVS(prctl)");
-		return false;
+		bRes = false;
 	}
 #if ARCH_NR!=0
 	if (!set_seccomp())
 	{
 		DLOG_PERROR("seccomp");
 		if (errno==EINVAL) DLOG_ERR("seccomp: this can be safely ignored if kernel does not support seccomp\n");
-		return false;
+		bRes = false;
 	}
 #endif
-	return true;
+	return bRes;
 }
 
 

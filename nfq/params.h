@@ -170,6 +170,8 @@ struct params_s
 	char debug_logfile[PATH_MAX];
 	bool debug;
 
+	bool daemon;
+
 #ifdef __linux__
 	int qnum;
 #elif defined(BSD)
@@ -187,6 +189,7 @@ struct params_s
 	uid_t uid;
 	gid_t gid;
 #endif
+	char pidfile[PATH_MAX];
 
 	char hostlist_auto_debuglog[PATH_MAX];
 
