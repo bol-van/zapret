@@ -1516,7 +1516,7 @@ static void exithelp(void)
 		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --synack-split=[0|1]\t\t\t\t; 1 or no arguments sends SYN,ACK tcp segment as separate SYN and ACK segments\n"
+		" --synack-split=[syn|ack]\t\t\t; syn (default) sends SYN,ACK tcp segment as separate SYN and ACK segments. ack sends ACK then SYN.\n"
 		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
 		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
 		" --orig-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
@@ -2103,7 +2103,17 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_SYNACK_SPLIT:
-			dp->synack_split = !optarg || atoi(optarg);
+			dp->synack_split = SS_SYN;
+			if (optarg)
+			{
+				if (!strcmp(optarg,"ack"))
+					dp->synack_split = SS_ACK;
+				else if (strcmp(optarg,"syn"))
+				{
+					DLOG_ERR("invalid synack-split value\n");
+					exit_clean(1);
+				}
+			}
 			break;
 		case IDX_CTRACK_TIMEOUTS:
 			if (sscanf(optarg, "%u:%u:%u:%u", &params.ctrack_t_syn, &params.ctrack_t_est, &params.ctrack_t_fin, &params.ctrack_t_udp)<3)

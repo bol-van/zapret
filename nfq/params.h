@@ -75,6 +75,8 @@ struct fake_tls_mod
 	uint32_t mod;
 };
 
+typedef enum {SS_NONE=0,SS_ACK,SS_SYN} t_synack_split;
+
 struct desync_profile
 {
 	int n;	// number of the profile
@@ -84,7 +86,7 @@ struct desync_profile
 	char wssize_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int wssize_cutoff;
 
-	bool synack_split;
+	t_synack_split synack_split;
 
 	bool hostcase, hostnospace, domcase, methodeol;
 	char hostspell[4];

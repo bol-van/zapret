@@ -180,7 +180,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --wsize=<winsize>[:<scale_factor>]                 ; менять tcp window size на указанный размер в SYN,ACK. если не задан scale_factor, то он не меняется (устарело !)
 --wssize=<winsize>[:<scale_factor>]                ; менять tcp window size на указанный размер в исходящих пакетах. scale_factor по умолчанию 0. (см. conntrack !)
 --wssize-cutoff=[n|d|s]N                           ; изменять server window size в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
---synack-split=[0|1]                               ; 1 или отсутствие аргумента отсылает SYN,ACK tcp сегмент как раздельные SYN и ACK сегменты (техника для сервера !)
+--synack-split=[syn|ack]                           ; syn (по умолчанию) отсылает SYN,ACK tcp сегмент как раздельные SYN и ACK сегменты, ack шлет сначала ACK, потом SYN.\n"
 --orig-ttl=<int>                                   ; модифицировать TTL оригинального пакета
 --orig-ttl6=<int>                                  ; модифицировать ipv6 hop limit оригинальных пакетов.  если не указано, используется значение --orig-ttl
 --orig-autottl=[<delta>[:<min>[-<max>]]]           ; режим auto ttl для ipv4 и ipv6. по умолчанию: +5:3-64. delta=0 отключает функцию
