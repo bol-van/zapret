@@ -1620,8 +1620,10 @@ SKIP_DNSCHECK=1 - отказ от проверки DNS
 SKIP_IPBLOCK=1 - отказ от тестов блокировки по порту или IP
 SKIP_TPWS=1 - отказ от тестов tpws
 SKIP_PKTWS=1 - отказ от тестов nfqws/dvtws/winws
-PKTWS_EXTRA, TPWS_EXTRA - дополнительные параметры nfqws/dvtws/winws и tpws
+PKTWS_EXTRA, TPWS_EXTRA - дополнительные параметры nfqws/dvtws/winws и tpws, указываемые после основной стратегии
 PKTWS_EXTRA_1 .. PKTWS_EXTRA_9, TPWS_EXTRA_1 .. TPWS_EXTRA_9 - отдельно дополнительные параметры, содержащие пробелы
+PKTWS_EXTRA_PRE - дополнительные параметры для nfqws/dvtws/winws, указываемые перед основной стратегией
+PKTWS_EXTRA_PRE_1 .. PKTWS_EXTRA_PRE_9 - отдельно дополнительные параметры, содержащие пробелы
 SECURE_DNS=0|1 - принудительно выключить или включить DoH
 DOH_SERVERS - список URL DoH через пробел для автоматического выбора работающего сервера
 DOH_SERVER - конкретный DoH URL, отказ от поиска

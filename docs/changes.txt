@@ -497,3 +497,5 @@ nfqws,tpws: do more before daemonize
 nfqws,tpws: accept multiple gids in --gid
 init.d: remove --ipset parameter prohibition
 init.d, blockcheck: drop time exceeded icmp for nfqws-related connections
+blockcheck: some dup and orig-ttl mods
+blockcheck: PKTWS_EXTRA_PRE
