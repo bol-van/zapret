@@ -2135,7 +2135,6 @@ int main(int argc, char *argv[])
 	}
 
 	set_ulimit();
-	sec_harden();
 	if (params.droproot && !droproot(params.uid,params.gid,params.gid_count))
 		goto exiterr;
 #ifdef __linux__
@@ -2147,6 +2146,8 @@ int main(int argc, char *argv[])
 		goto exiterr;
 
 	if (params.daemon) daemonize();
+
+	sec_harden();
 
 	if (Fpid)
 	{

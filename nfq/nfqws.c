@@ -297,7 +297,6 @@ static int nfq_main(void)
 		return 1;
 	}
 
-	sec_harden();
 	if (params.droproot && !droproot(params.uid, params.gid, params.gid_count) || !dropcaps())
 		goto err;
 	print_id();
@@ -308,6 +307,8 @@ static int nfq_main(void)
 		goto err;
 
 	if (params.daemon) daemonize();
+
+	sec_harden();
 
 	if (Fpid)
 	{
