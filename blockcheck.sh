@@ -1193,15 +1193,19 @@ pktws_curl_test_update_vary()
 	# $4 - desync mode
 	# $5,$6,... - strategy
 
-	local testf=$1 sec=$2 domain=$3 desync=$4 proto zerofake= tlsmod= splits= pos fake ret=1
+	local testf=$1 sec=$2 domain=$3 desync=$4 proto splits= pos fake ret=1
+	local fake1=- fake2=- fake3=-
 	
 	shift; shift; shift; shift
 	
 	proto=http
 	[ "$sec" = 0 ] || proto=tls
 	test_has_fake $desync && {
-		zerofake="--dpi-desync-fake-$proto=0x00000000"
-		[ "$sec" = 0 ] || tlsmod="--dpi-desync-fake-tls-mod=rnd,dupsid,rndsni,padencap"
+		fake1="--dpi-desync-fake-$proto=0x00000000"
+		[ "$sec" = 0 ] || {
+			fake2="--dpi-desync-fake-tls=0x00000000 --dpi-desync-fake-tls=! --dpi-desync-fake-tls-mod=rnd,rndsni,dupsid"
+			fake3="--dpi-desync-fake-tls-mod=rnd,dupsid,rndsni,padencap"
+		}
 	}
 	if test_has_fakedsplit $desync ; then
 		splits="method+2 midsld"
@@ -1210,7 +1214,8 @@ pktws_curl_test_update_vary()
 		splits="method+2 midsld"
 		[ "$sec" = 0 ] || splits="1 midsld 1,midsld"
 	fi
-	for fake in '' $zerofake $tlsmod ; do
+	for fake in '' "$fake1" "$fake2" "$fake3" ; do
+		[ "$fake" = "-" ] && continue
 		if [ -n "$splits" ]; then
 			for pos in $splits ; do
 				pktws_curl_test_update $testf $domain --dpi-desync=$desync "$@" --dpi-desync-split-pos=$pos $fake && {
