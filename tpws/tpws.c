@@ -23,6 +23,7 @@
 #include <sys/resource.h>
 #include <time.h>
 #include <syslog.h>
+#include <grp.h>
 
 #ifdef __ANDROID__
 #include "andr/ifaddrs.h"
@@ -214,7 +215,7 @@ static void exithelp(void)
 		" --daemon\t\t\t\t; daemonize\n"
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
 		" --user=<username>\t\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t\t; drop root privs\n"
+		" --uid=uid[:gid1,gid2,...]\t\t; drop root privs\n"
 #if defined(__FreeBSD__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
@@ -583,6 +584,35 @@ static bool parse_ip_list(char *opt, ipset *pp)
 	return true;
 }
 
+static bool parse_uid(const char *opt, uid_t *uid, gid_t *gid, int *gid_count, int max_gids)
+{
+	unsigned int u;
+	char c, *p, *e;
+
+	*gid_count=0;
+	if ((e = strchr(optarg,':'))) *e++=0;
+	if (sscanf(opt,"%u",&u)!=1) return false;
+	*uid = (uid_t)u;
+	for (p=e ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+		if (p)
+		{
+			if (sscanf(p,"%u",&u)!=1) return false;
+			if (*gid_count>=max_gids) return false;
+			gid[(*gid_count)++] = (gid_t)u;
+		}
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
+
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
 // no static to not allow optimizer to inline this func (save stack)
 void config_from_file(const char *filename)
@@ -837,8 +867,9 @@ void parse_params(int argc, char *argv[])
 
 	if (can_drop_root())
 	{
-	    params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
-	    params.droproot = true;
+		params.uid = params.gid[0] = 0x7FFFFFFF; // default uid:gid
+		params.gid_count = 1;
+		params.droproot = true;
 	}
 
 	struct desync_profile_list *dpl;
@@ -954,17 +985,36 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			params.uid = pwd->pw_uid;
-			params.gid = pwd->pw_gid;
+			params.gid_count=MAX_GIDS;
+#ifdef __APPLE__
+			// silence warning
+			if (getgrouplist(optarg,pwd->pw_gid,(int*)params.gid,&params.gid_count)<0)
+#else
+			if (getgrouplist(optarg,pwd->pw_gid,params.gid,&params.gid_count)<0)
+#endif
+			{
+				DLOG_ERR("getgrouplist failed. too much groups ?\n");
+				exit_clean(1);
+			}
+			if (!params.gid_count)
+			{
+				params.gid[0] = pwd->pw_gid;
+				params.gid_count = 1;
+			}
 			params.droproot = true;
 			break;
 		}
 		case IDX_UID:
-			params.gid=0x7FFFFFFF; // default git. drop gid=0
 			params.droproot = true;
-			if (sscanf(optarg,"%u:%u",&params.uid,&params.gid)<1)
+			if (!parse_uid(optarg,&params.uid,params.gid,&params.gid_count,MAX_GIDS))
 			{
-				DLOG_ERR("--uid should be : uid[:gid]\n");
+				DLOG_ERR("--uid should be : uid[:gid,gid,...]\n");
 				exit_clean(1);
+			}
+			if (!params.gid_count)
+			{
+				params.gid[0] = 0x7FFFFFFF;
+				params.gid_count = 1;
 			}
 			break;
 		case IDX_MAXCONN:
@@ -1273,8 +1323,7 @@ void parse_params(int argc, char *argv[])
 			}
 			break;
 		case IDX_PIDFILE:
-			strncpy(params.pidfile,optarg,sizeof(params.pidfile));
-			params.pidfile[sizeof(params.pidfile)-1]='\0';
+			snprintf(params.pidfile,sizeof(params.pidfile),"%s",optarg);
 			break;
 		case IDX_DEBUG:
 			if (optarg)
@@ -2087,7 +2136,7 @@ int main(int argc, char *argv[])
 
 	set_ulimit();
 	sec_harden();
-	if (params.droproot && !droproot(params.uid,params.gid))
+	if (params.droproot && !droproot(params.uid,params.gid,params.gid_count))
 		goto exiterr;
 #ifdef __linux__
 	if (!dropcaps())

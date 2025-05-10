@@ -169,23 +169,22 @@ static bool set_seccomp(void)
 
 bool sec_harden(void)
 {
+	bool bRes = true;
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
 	{
 		DLOG_PERROR("PR_SET_NO_NEW_PRIVS(prctl)");
-		return false;
+		bRes = false;
 	}
 #if ARCH_NR!=0
 	if (!set_seccomp())
 	{
 		DLOG_PERROR("seccomp");
 		if (errno==EINVAL) DLOG_ERR("seccomp: this can be safely ignored if kernel does not support seccomp\n");
-		return false;
+		bRes = false;
 	}
 #endif
-	return true;
+	return bRes;
 }
-
-
 
 
 bool checkpcap(uint64_t caps)
@@ -270,8 +269,13 @@ bool can_drop_root(void)
 #endif
 }
 
-bool droproot(uid_t uid, gid_t gid)
+bool droproot(uid_t uid, gid_t *gid, int gid_count)
 {
+	if (gid_count<1)
+	{
+		DLOG_ERR("droproot: no groups specified");
+		return false;
+	}
 #ifdef __linux__
 	if (prctl(PR_SET_KEEPCAPS, 1L))
 	{
@@ -280,12 +284,12 @@ bool droproot(uid_t uid, gid_t gid)
 	}
 #endif
 	// drop all SGIDs
-	if (setgroups(0,NULL))
+	if (setgroups(gid_count,gid))
 	{
 		DLOG_PERROR("setgroups");
 		return false;
 	}
-	if (setgid(gid))
+	if (setgid(gid[0]))
 	{
 		DLOG_PERROR("setgid");
 		return false;

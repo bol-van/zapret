@@ -63,6 +63,8 @@
 #define FAKE_MAX_TCP	1460
 #define FAKE_MAX_UDP	1472
 
+#define MAX_GIDS 64
+
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
 struct fake_tls_mod_cache
@@ -191,7 +193,8 @@ struct params_s
 #else
 	bool droproot;
 	uid_t uid;
-	gid_t gid;
+	gid_t gid[MAX_GIDS];
+	int gid_count;
 #endif
 	char pidfile[PATH_MAX];
 

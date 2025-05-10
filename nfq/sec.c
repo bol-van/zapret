@@ -295,8 +295,13 @@ bool can_drop_root(void)
 #endif
 }
 
-bool droproot(uid_t uid, gid_t gid)
+bool droproot(uid_t uid, gid_t *gid, int gid_count)
 {
+	if (gid_count<1)
+	{
+		DLOG_ERR("droproot: no groups specified");
+		return false;
+	}
 #ifdef __linux__
 	if (prctl(PR_SET_KEEPCAPS, 1L))
 	{
@@ -305,12 +310,12 @@ bool droproot(uid_t uid, gid_t gid)
 	}
 #endif
 	// drop all SGIDs
-	if (setgroups(0,NULL))
+	if (setgroups(gid_count,gid))
 	{
 		DLOG_PERROR("setgroups");
 		return false;
 	}
-	if (setgid(gid))
+	if (setgid(gid[0]))
 	{
 		DLOG_PERROR("setgid");
 		return false;

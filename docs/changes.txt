@@ -494,5 +494,6 @@ nfqws: --synack-split
 tpws: ipcache of host names
 nfqws,tpws: set 1024 repeat limit to fakes and dups
 nfqws,tpws: do more before daemonize
+nfqws,tpws: accept multiple gids in --gid
 init.d: remove --ipset parameter prohibition
 init.d, blockcheck: drop time exceeded icmp for nfqws-related connections

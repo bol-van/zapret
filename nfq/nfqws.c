@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <syslog.h>
+#include <grp.h>
 
 #ifdef __CYGWIN__
 #include "win.h"
@@ -297,7 +298,7 @@ static int nfq_main(void)
 	}
 
 	sec_harden();
-	if (params.droproot && !droproot(params.uid, params.gid) || !dropcaps())
+	if (params.droproot && !droproot(params.uid, params.gid, params.gid_count) || !dropcaps())
 		goto err;
 	print_id();
 	if (params.droproot && !test_list_files())
@@ -421,7 +422,7 @@ static int dvt_main(void)
 		goto exiterr;
 
 
-	if (params.droproot && !droproot(params.uid, params.gid))
+	if (params.droproot && !droproot(params.uid, params.gid, params.gid_count))
 		goto exiterr;
 	print_id();
 	if (params.droproot && !test_list_files())
@@ -642,33 +643,6 @@ static int win_main(const char *windivert_filter)
 
 
 
-static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
-{
-	int v;
-	char *p;
-
-	if ((p = strchr(s,':'))) *p++=0;
-	v = atoi(s);
-	if (v < 0 || v>65535)
-	{
-		DLOG_ERR("bad wsize\n");
-		return false;
-	}
-	*wsize=(uint16_t)v;
-	if (p && *p)
-	{
-		v = atoi(p);
-		if (v < 0 || v>255)
-		{
-			DLOG_ERR("bad wscale\n");
-			return false;
-		}
-		*wscale = (uint8_t)v;
-	}
-	return true;
-}
-
-
 
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
 static void cleanup_args()
@@ -699,6 +673,61 @@ static void exit_clean(int code)
 {
 	cleanup_params();
 	exit(code);
+}
+
+
+static bool parse_uid(const char *opt, uid_t *uid, gid_t *gid, int *gid_count, int max_gids)
+{
+	unsigned int u;
+	char c, *p, *e;
+
+	*gid_count=0;
+	if ((e = strchr(optarg,':'))) *e++=0;
+	if (sscanf(opt,"%u",&u)!=1) return false;
+	*uid = (uid_t)u;
+	for (p=e ; p ; )
+	{
+		if ((e = strchr(p,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+		if (p)
+		{
+			if (sscanf(p,"%u",&u)!=1) return false;
+			if (*gid_count>=max_gids) return false;
+			gid[(*gid_count)++] = (gid_t)u;
+		}
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+}
+
+static bool parse_ws_scale_factor(char *s, uint16_t *wsize, uint8_t *wscale)
+{
+	int v;
+	char *p;
+
+	if ((p = strchr(s,':'))) *p++=0;
+	v = atoi(s);
+	if (v < 0 || v>65535)
+	{
+		DLOG_ERR("bad wsize\n");
+		return false;
+	}
+	*wsize=(uint16_t)v;
+	if (p && *p)
+	{
+		v = atoi(p);
+		if (v < 0 || v>255)
+		{
+			DLOG_ERR("bad wscale\n");
+			return false;
+		}
+		*wscale = (uint8_t)v;
+	}
+	return true;
 }
 
 static bool parse_cutoff(const char *opt, unsigned int *value, char *mode)
@@ -1462,7 +1491,7 @@ static void exithelp(void)
 		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
 #ifndef __CYGWIN__
 		" --user=<username>\t\t\t\t; drop root privs\n"
-		" --uid=uid[:gid]\t\t\t\t; drop root privs\n"
+		" --uid=uid[:gid1,gid2,...]\t\t\t; drop root privs\n"
 #endif
 #ifdef __linux__
 		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
@@ -1959,9 +1988,10 @@ int main(int argc, char **argv)
 	LIST_INIT(&params.ssid_filter);
 	LIST_INIT(&params.nlm_filter);
 #else
-	if (can_drop_root()) // are we root ?
+	if (can_drop_root())
 	{
-		params.uid = params.gid = 0x7FFFFFFF; // default uid:gid
+		params.uid = params.gid[0] = 0x7FFFFFFF; // default uid:gid
+		params.gid_count = 1;
 		params.droproot = true;
 	}
 #endif
@@ -2059,25 +2089,44 @@ int main(int argc, char **argv)
 			break;
 #ifndef __CYGWIN__
 		case IDX_USER:
+		{
+			struct passwd *pwd = getpwnam(optarg);
+			if (!pwd)
 			{
-				struct passwd *pwd = getpwnam(optarg);
-				if (!pwd)
-				{
-					DLOG_ERR("non-existent username supplied\n");
-					exit_clean(1);
-				}
-				params.uid = pwd->pw_uid;
-				params.gid = pwd->pw_gid;
-				params.droproot = true;
-			}
-			break;
-		case IDX_UID:
-			params.gid = 0x7FFFFFFF; // default gid. drop gid=0
-			params.droproot = true;
-			if (sscanf(optarg, "%u:%u", &params.uid, &params.gid)<1)
-			{
-				DLOG_ERR("--uid should be : uid[:gid]\n");
+				DLOG_ERR("non-existent username supplied\n");
 				exit_clean(1);
+			}
+			params.uid = pwd->pw_uid;
+			params.gid_count=MAX_GIDS;
+#ifdef __APPLE__
+			// silence warning
+			if (getgrouplist(optarg,pwd->pw_gid,(int*)params.gid,&params.gid_count)<0)
+#else
+			if (getgrouplist(optarg,pwd->pw_gid,params.gid,&params.gid_count)<0)
+#endif
+			{
+				DLOG_ERR("getgrouplist failed. too much groups ?\n");
+				exit_clean(1);
+			}
+			if (!params.gid_count)
+			{
+				params.gid[0] = pwd->pw_gid;
+				params.gid_count = 1;
+			}
+			params.droproot = true;
+			break;
+		}
+		case IDX_UID:
+			params.droproot = true;
+			if (!parse_uid(optarg,&params.uid,params.gid,&params.gid_count,MAX_GIDS))
+			{
+				DLOG_ERR("--uid should be : uid[:gid,gid,...]\n");
+				exit_clean(1);
+			}
+			if (!params.gid_count)
+			{
+				params.gid[0] = 0x7FFFFFFF;
+				params.gid_count = 1;
 			}
 			break;
 #endif

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/param.h>
+#include <sys/types.h>
 #include <sys/queue.h>
 #include <time.h>
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
@@ -18,13 +19,15 @@
 #define HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT	3
 #define	HOSTLIST_AUTO_FAIL_TIME_DEFAULT 	60
 
-#define FIX_SEG_DEFAULT_MAX_WAIT		50
+#define FIX_SEG_DEFAULT_MAX_WAIT 50
 
-#define IPCACHE_LIFETIME		7200
+#define IPCACHE_LIFETIME 7200
+
+#define MAX_GIDS 64
 
 enum bindll { unwanted=0, no, prefer, force };
 
-#define MAX_BINDS	32
+#define MAX_BINDS 32
 struct bind_s
 {
 	char bindaddr[64],bindiface[IF_NAMESIZE];
@@ -33,7 +36,7 @@ struct bind_s
 	int bind_wait_ifup,bind_wait_ip,bind_wait_ip_ll;
 };
 
-#define MAX_SPLITS	16
+#define MAX_SPLITS 16
 
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
 
@@ -116,8 +119,9 @@ struct params_s
 	bool droproot;
 	bool daemon;
 	uid_t uid;
-	gid_t gid;
-	char pidfile[256];
+	gid_t gid[MAX_GIDS];
+	int gid_count;
+	char pidfile[PATH_MAX];
 	int maxconn,resolver_threads,maxfiles,max_orphan_time;
 	int local_rcvbuf,local_sndbuf,remote_rcvbuf,remote_sndbuf;
 #if defined(__linux__) || defined(__APPLE__)
