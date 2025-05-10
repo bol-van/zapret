@@ -1188,10 +1188,19 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 		//ConntrackPoolDump(&params.conntrack);
 
-		if (dp->wsize && tcp_synack_segment(dis->tcp))
+		if (tcp_synack_segment(dis->tcp))
 		{
-			tcp_rewrite_winsize(dis->tcp, dp->wsize, dp->wscale);
-			verdict=VERDICT_MODIFY;
+			if (dp->wsize)
+			{
+				tcp_rewrite_winsize(dis->tcp, dp->wsize, dp->wscale);
+				verdict=VERDICT_MODIFY;
+			}
+			if (dp->synack_split==SS_SYN)
+			{
+				DLOG("split SYNACK : clearing ACK bit\n");
+				dis->tcp->th_flags &= ~TH_ACK;
+				verdict=VERDICT_MODIFY;
+			}
 		}
 
 		if (bReverse)
@@ -1280,50 +1289,43 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			}
 		}
 
-		if (dp->synack_split!=SS_NONE && tcp_synack_segment(dis->tcp))
+		if ((dp->synack_split==SS_SYNACK || dp->synack_split==SS_ACKSYN) && tcp_synack_segment(dis->tcp))
 		{
+			// reconstruct required
+
 			dis->tcp->th_flags &= ~TH_ACK;
 			tcp_fix_checksum(dis->tcp,dis->transport_len, dis->ip, dis->ip6);
 
-			char ss[2],i,ct;
-			if (dp->synack_split==SS_SYN)
+			char ss[2],i;
+			if (dp->synack_split==SS_SYNACK)
 			{
-				ct=1;
 				ss[0] = 'S';
+				ss[1] = 'A';
 			}
 			else
 			{
-				ct=2;
-				if (dp->synack_split==SS_SYNACK)
-				{
-					ss[0] = 'S';
-					ss[1] = 'A';
-				}
-				else
-				{
-					ss[0] = 'A';
-					ss[1] = 'S';
-				}
-				pkt1_len = sizeof(pkt1);
-				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_ACK, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, SCALE_NONE, timestamps,
-					DF,ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6),
-					FOOL_NONE,0,0,NULL, 0, pkt1, &pkt1_len))
-				{
-					DLOG_ERR("cannot prepare split SYNACK ACK part\n");
-					goto send_orig;
-				}
+				ss[0] = 'A';
+				ss[1] = 'S';
 			}
-			for (int i=0;i<ct;i++)
+			pkt1_len = sizeof(pkt1);
+			if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_ACK, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, SCALE_NONE, timestamps,
+				DF,ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6),
+				FOOL_NONE,0,0,NULL, 0, pkt1, &pkt1_len))
+			{
+				DLOG_ERR("cannot prepare split SYNACK ACK part\n");
+				goto send_orig;
+			}
+			for (int i=0;i<2;i++)
 			{
 				switch(ss[i])
 				{
 					case 'S':
-						DLOG("sending split SYNACK : SYN\n");
+						DLOG("split SYNACK : SYN\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , dis->data_pkt, dis->len_pkt))
 							goto send_orig;
 						break;
 					case 'A':
-						DLOG("sending split SYNACK : ACK\n");
+						DLOG("split SYNACK : ACK\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 							goto send_orig;
 						break;

@@ -527,13 +527,7 @@ static int win_main(const char *windivert_filter)
 	WINDIVERT_ADDRESS wa;
 	char ifname[IFNAMSIZ];
 
-	if (params.daemon)
-	{
-		// cygwin loses current dir
-		char *cwd = get_current_dir_name();
-		daemonize();
-		chdir(cwd);
-	}
+	if (params.daemon) daemonize();
 
 	if (*params.pidfile && !writepid(params.pidfile))
 	{

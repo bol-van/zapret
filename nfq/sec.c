@@ -343,9 +343,13 @@ void print_id(void)
 #endif
 
 
+
 void daemonize(void)
 {
 	int pid;
+#ifdef __CYGWIN__
+	char *cwd = get_current_dir_name();
+#endif
 
 	pid = fork();
 	if (pid == -1)
@@ -355,6 +359,10 @@ void daemonize(void)
 	}
 	else if (pid != 0)
 		exit(0);
+
+#ifdef __CYGWIN__
+	chdir(get_current_dir_name());
+#endif
 
 	if (setsid() == -1)
 		exit(2);
