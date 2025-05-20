@@ -1438,13 +1438,15 @@ pktws_check_domain_http3_bypass_()
 	# $1 - test function
 	# $2 - domain
 
-	local f desync frag tests rep
+	local f desync frag tests rep fake
 
-	for rep in '' 2 5 10 20; do
-		pktws_curl_test_update $1 $2 --dpi-desync=fake ${rep:+--dpi-desync-repeats=$rep} && [ "$SCANLEVEL" != force ] && {
-			[ "$SCANLEVEL" = quick ] && return
-			break
-		}
+	for fake in '' "--dpi-desync-fake-quic=$ZAPRET_BASE/files/fake/quic_initial_www_google_com.bin"; do
+		for rep in '' 2 5 10 20; do
+			pktws_curl_test_update $1 $2 --dpi-desync=fake ${fake:+$fake }${rep:+--dpi-desync-repeats=$rep} && [ "$SCANLEVEL" != force ] && {
+				[ "$SCANLEVEL" = quick ] && return
+				break
+			}
+		done
 	done
 
 	[ "$IPV" = 6 ] && {
