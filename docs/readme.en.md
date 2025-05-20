@@ -768,7 +768,7 @@ Most of the protocols will not be recognized because protocol recognition system
 To make things working use `--dpi-desync-any-protocol` with connbytes or packet payload limiter.
 start/cutoff are unavailable because they are conntrack based.
 
-`synack-split` removes standard SYN,ACK packet and replaces it with one SYN packet, SYN then ACK separate packets or ACK then SYN separate packets.
+`--synack-split` removes standard SYN,ACK packet and replaces it with one SYN packet, SYN then ACK separate packets or ACK then SYN separate packets.
 Client sends SYN,ACK in reply which usually only server does.
 This makes some DPI's to treat connection establishement roles wrong. They stop to block.
 See [split handshake](https://nmap.org/misc/split-handshake.pdf).
