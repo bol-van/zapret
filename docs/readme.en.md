@@ -451,7 +451,6 @@ Modes must be specified in phase ascending order.
 
 ### IP cache
 
-ipcache is internal structure in processe's RAM that allows to
 `ipcache` is the structure in the process memory that stores some information by IP address and interface name key.
 This information can be used as missing data. Currently it's used in the following cases :
 
