@@ -261,7 +261,7 @@ typedef struct
 	int8_t delta;
 	uint8_t min, max;
 } autottl;
-#define AUTOTTL_ENABLED(a) (!!(a).delta)
+#define AUTOTTL_ENABLED(a) ((a).delta || (a).min || (a).max)
 
 uint8_t hop_count_guess(uint8_t ttl);
 uint8_t autottl_eval(uint8_t hop_count, const autottl *attl);
