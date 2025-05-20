@@ -1658,12 +1658,14 @@ void config_from_file(const char *filename)
 void check_dp(const struct desync_profile *dp)
 {
 	// only linux has connbytes limiter
-	if (dp->desync_any_proto && !dp->desync_cutoff &&
+	if ((dp->desync_any_proto && !dp->desync_cutoff &&
 		(dp->desync_mode==DESYNC_FAKE || dp->desync_mode==DESYNC_RST || dp->desync_mode==DESYNC_RSTACK ||
 		 dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER))
+		||
+		dp->dup_repeats && !dp->dup_cutoff)
 	{
 #ifdef __linux__
-		DLOG_CONDUP("WARNING !!! in profile %d you are using --dpi-desync-any-protocol without --dpi-desync-cutoff\n", dp->n);
+		DLOG_CONDUP("WARNING !!! in profile %d you are using --dpi-desync-any-protocol without --dpi-desync-cutoff or --dup without --dup-cutoff\n", dp->n);
 		DLOG_CONDUP("WARNING !!! it's completely ok if connbytes or payload based ip/nf tables limiter is applied. Make sure it exists.\n");
 #else
 		DLOG_CONDUP("WARNING !!! possible TRASH FLOOD configuration detected in profile %d\n", dp->n);
