@@ -443,7 +443,7 @@ Without extra parameter payload is 16 zero bytes.
 
 `--dpi-desync` takes up to 3 comma separated modes.
 
-* 0 phase modes work during the connection establishement : `synack`, `syndata` `--wsize`, `--wssize`. [hostlist](((#multiple-strategies))) filters are applicable only if [`--ipcache-hostname`](#ip-cache) is enabled.
+* 0 phase modes work during the connection establishement : `synack`, `syndata` `--wsize`, `--wssize`. [hostlist](#multiple-strategies) filters are applicable only if [`--ipcache-hostname`](#ip-cache) is enabled.
 * In the 1st phase fakes are sent before original data  : `fake`, `rst`, `rstack`.
 * In the 2nd phase original data is sent in a modified way (for example `fakedsplit` or `ipfrag2`).
 
