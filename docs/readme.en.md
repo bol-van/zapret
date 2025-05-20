@@ -459,7 +459,7 @@ This information can be used as missing data. Currently it's used in the followi
 2. IP => hostname . Hostname is cached to be used in 0 phase strategies. Mode is disabled by default and can be enabled by `ipcache-hostname` parameter.
 This tech is experimental. There's no one-to-one correspondence between IP and domain name. Multiple domains can resolve to the same IP.
 If collision happens hostname is replaced. On CDNs a domain can resolve to different IPs over time. `--ipcache-lifetime` limits how long cached record is valid. It's 2 hours by default.
-Be prepared for unexpected results that can be explained only by reading debut logs.
+Be prepared for unexpected results that can be explained only by reading debug logs.
 
 SIGUSR2 forces process to output it's ipcache to stdout.
 
