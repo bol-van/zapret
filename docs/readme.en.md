@@ -4,7 +4,7 @@
 
 This software is free and open source under [MIT license](./LICENSE.txt).
 If anyone demands you to download this software only from their webpage, telegram channel, forces you to delete links, videos, makes copyright claims, you are dealing with scammers.
-However, [donations](#поддержать-разработчика) are welcome.
+However, [donations](#donations) are welcome.
 
 # Multilanguage/Мультиязычный README
 ___
