@@ -1871,9 +1871,17 @@ static const char *bindll_s[] = { "unwanted","no","prefer","force" };
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #if defined(ZAPRET_GH_VER) || defined (ZAPRET_GH_HASH)
+#ifdef __ANDROID__
+#define PRINT_VER printf("github android version %s (%s)\n\n", TOSTRING(ZAPRET_GH_VER), TOSTRING(ZAPRET_GH_HASH))
+#else
 #define PRINT_VER printf("github version %s (%s)\n\n", TOSTRING(ZAPRET_GH_VER), TOSTRING(ZAPRET_GH_HASH))
+#endif
+#else
+#ifdef __ANDROID__
+#define PRINT_VER printf("self-built android version %s %s\n\n", __DATE__, __TIME__)
 #else
 #define PRINT_VER printf("self-built version %s %s\n\n", __DATE__, __TIME__)
+#endif
 #endif
 
 int main(int argc, char *argv[])
