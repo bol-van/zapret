@@ -184,16 +184,16 @@ dvtws, собираемый из тех же исходников (см. [док
 --synack-split=[syn|synack|acksyn]                 ; выполнить tcp split handshake. вместо SYN,ACK отсылать только SYN, SYN+ACK или ACK+SYN
 --orig-ttl=<int>                                   ; модифицировать TTL оригинального пакета
 --orig-ttl6=<int>                                  ; модифицировать ipv6 hop limit оригинальных пакетов.  если не указано, используется значение --orig-ttl
---orig-autottl=[<delta>[:<min>[-<max>]]]           ; режим auto ttl для ipv4 и ipv6. по умолчанию: +5:3-64. delta=0 отключает функцию
---orig-autottl6=[<delta>[:<min>[-<max>]]]          ; переопределение предыдущего параметра для ipv6
+--orig-autottl=[<delta>[:<min>[-<max>]]|-]         ; режим auto ttl для ipv4 и ipv6. по умолчанию: +5:3-64. "0:0-0" или "-" отключает функцию
+--orig-autottl6=[<delta>[:<min>[-<max>]]|-]        ; переопределение предыдущего параметра для ipv6
 --orig-mod-start=[n|d|s]N                          ; применять orig-mod только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру больше или равно N
 --orig-mod-cutoff=[n|d|s]N                         ; применять orig-mod только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру меньше N
 --dup=<int>                                        ; высылать N дубликатов до оригинала
 --dup-replace=[0|1]                                ; 1 или отсутствие аргумента блокирует отправку оригинала. отправляются только дубликаты.
 --dup-ttl=<int>                                    ; модифицировать TTL дубликатов
 --dup-ttl6=<int>                                   ; модифицировать ipv6 hop limit дубликатов. если не указано, используется значение --dup-ttl
---dup-autottl=[<delta>[:<min>[-<max>]]]            ; режим auto ttl для ipv4 и ipv6. по умолчанию: +1:3-64. delta=0 отключает функцию
---dup-autottl6=[<delta>[:<min>[-<max>]]]           ; переопределение предыдущего параметра для ipv6
+--dup-autottl=[<delta>[:<min>[-<max>]]|-]          ; режим auto ttl для ipv4 и ipv6. по умолчанию: +1:3-64. "0:0-0" или "-" отключает функцию
+--dup-autottl6=[<delta>[:<min>[-<max>]]|-]         ; переопределение предыдущего параметра для ipv6
 --dup-fooling=<fooling>                            ; дополнительные методики как сделать, чтобы дубликат не дошел до сервера. none md5sig badseq badsum datanoack hopbyhop hopbyhop2
 --dup-badseq-increment=<int|0xHEX>                 ; инкремент sequence number для badseq. по умолчанию -10000
 --dup-badack-increment=<int|0xHEX>                 ; инкремент ack sequence number для badseq. по умолчанию -66000
@@ -208,8 +208,8 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-fwmark=<int|0xHEX>                    ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
 --dpi-desync-ttl=<int>                             ; установить ttl для десинхронизирующих пакетов
 --dpi-desync-ttl6=<int>                            ; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение --dpi-desync-ttl
---dpi-desync-autottl=[<delta>[:<min>[-<max>]]]     ; режим auto ttl для ipv4 и ipv6. по умолчанию: 1:3-20. delta=0 отключает функцию.
---dpi-desync-autottl6=[<delta>[:<min>[-<max>]]]    ; переопределение предыдущего параметра для ipv6
+--dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]   ; режим auto ttl для ipv4 и ipv6. по умолчанию: 1:3-20. "0:0-0" или "-" отключает функцию
+--dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-]  ; переопределение предыдущего параметра для ipv6
 --dpi-desync-fooling=<fooling>                     ; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера. none md5sig badseq badsum datanoack hopbyhop hopbyhop2
 --dpi-desync-repeats=<N>                           ; посылать каждый генерируемый в nfqws пакет N раз (не влияет на остальные пакеты)
 --dpi-desync-skip-nosni=0|1                        ; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI

@@ -780,27 +780,33 @@ static bool parse_autottl(const char *s, autottl *t, int8_t def_delta, uint8_t d
 	t->max = def_max;
 	if (s)
 	{
-		max = t->max;
-		if (*s=='+')
+		// "-" means disable
+		if (s[0]=='-' && s[1]==0)
+			memset(t,0,sizeof(*t));
+		else
 		{
-			neg=false;
-			s++;
-		} else if (*s=='-')
-			s++;
-		switch (sscanf(s,"%u:%u-%u",&delta,&min,&max))
-		{
-			case 3:
-				if ((delta && !max) || max>255) return false;
-				t->max=(uint8_t)max;
-			case 2:
-				if ((delta && !min) || min>255 || min>max) return false;
-				t->min=(uint8_t)min;
-			case 1:
-				if (delta>127) return false;
-				t->delta=(int8_t)(neg ? -delta : delta);
-				break;
-			default:
-				return false;
+			max = t->max;
+			if (*s=='+')
+			{
+				neg=false;
+				s++;
+			} else if (*s=='-')
+				s++;
+			switch (sscanf(s,"%u:%u-%u",&delta,&min,&max))
+			{
+				case 3:
+					if ((delta && !max) || max>255) return false;
+					t->max=(uint8_t)max;
+				case 2:
+					if ((delta && !min) || min>255 || min>max) return false;
+					t->min=(uint8_t)min;
+				case 1:
+					if (delta>127) return false;
+					t->delta=(int8_t)(neg ? -delta : delta);
+					break;
+				default:
+					return false;
+			}
 		}
 	}
 	return true;
@@ -1543,16 +1549,16 @@ static void exithelp(void)
 		" --synack-split=[syn|synack|acksyn]\t\t; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN\n"
 		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
 		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
-		" --orig-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
-		" --orig-autottl6=[<delta>[:<min>[-<max>]]]\t; overrides --orig-autottl for ipv6 only\n"
+		" --orig-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
+		" --orig-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --orig-autottl for ipv6 only\n"
 		" --orig-mod-start=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --orig-mod-cutoff=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --dup=<int>\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
 		" --dup-replace=[0|1]\t\t\t\t; 1 or no argument means do not send original, only dups\n"
 		" --dup-ttl=<int>\t\t\t\t; set TTL for dups\n"
 		" --dup-ttl6=<int>\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
-		" --dup-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
-		" --dup-autottl6=[<delta>[:<min>[-<max>]]]\t; overrides --dup-autottl for ipv6 only\n"
+		" --dup-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
+		" --dup-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --dup-autottl for ipv6 only\n"
 		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
 		" --dup-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
@@ -1573,8 +1579,8 @@ static void exithelp(void)
 #endif
 		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for fakes packets\n"
 		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
-		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
-		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only\n"
+		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]  ; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
+		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-] ; overrides --dpi-desync-autottl for ipv6 only\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI\n"

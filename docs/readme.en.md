@@ -163,16 +163,16 @@ nfqws takes the following parameters:
  --synack-split=[syn|synack|acksyn]             ; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN
  --orig-ttl=<int>                               ; set TTL for original packets
  --orig-ttl6=<int>                              ; set ipv6 hop limit for original packets. by default ttl value is used
- --orig-autottl=[<delta>[:<min>[-<max>]]]       ; auto ttl mode for both ipv4 and ipv6. default: +5:3-64
- --orig-autottl6=[<delta>[:<min>[-<max>]]]      ; overrides --orig-autottl for ipv6 only
+ --orig-autottl=[<delta>[:<min>[-<max>]]|-]     ; auto ttl mode for both ipv4 and ipv6. default: +5:3-64. "0:0-0" or "-" disables autottl.
+ --orig-autottl6=[<delta>[:<min>[-<max>]]|-]    ; overrides --orig-autottl for ipv6 only
  --orig-mod-start=[n|d|s]N                      ; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N
  --orig-mod-cutoff=[n|d|s]N                     ; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
  --dup=<int>                                    ; duplicate original packets. send N dups before original.
  --dup-replace=[0|1]                            ; 1 or no argument means do not send original, only dups
  --dup-ttl=<int>                                ; set TTL for dups
  --dup-ttl6=<int>                               ; set ipv6 hop limit for dups. by default ttl value is used
- --dup-autottl=[<delta>[:<min>[-<max>]]]        ; auto ttl mode for both ipv4 and ipv6. default: -1:3-64
- --dup-autottl6=[<delta>[:<min>[-<max>]]]       ; overrides --dup-autottl for ipv6 only
+ --dup-autottl=[<delta>[:<min>[-<max>]]|-]      ; auto ttl mode for both ipv4 and ipv6. default: -1:3-64. "0:0-0" or "-" disables autottl.
+ --dup-autottl6=[<delta>[:<min>[-<max>]]|-]     ; overrides --dup-autottl for ipv6 only
  --dup-fooling=<mode>[,<mode>]                  ; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2
  --dup-badseq-increment=<int|0xHEX>             ; badseq fooling seq signed increment for dup. default -10000
  --dup-badack-increment=<int|0xHEX>             ; badseq fooling ackseq signed increment for dup. default -66000
@@ -182,8 +182,8 @@ nfqws takes the following parameters:
  --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                         ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                        ; set ipv6 hop limit for desync packet. by default ttl value is used.
- --dpi-desync-autottl=[<delta>[:<min>[-<max>]]] ; auto ttl mode for both ipv4 and ipv6. default: -1:3-20
- --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]] ; overrides --dpi-desync-autottl for ipv6 only
+ --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]  ; auto ttl mode for both ipv4 and ipv6. default: -1:3-20. "0:0-0" or "-" disables autottl.
+ --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-] ; overrides --dpi-desync-autottl for ipv6 only
  --dpi-desync-fooling=<mode>[,<mode>]           ; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2
  --dpi-desync-repeats=<N>                       ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1                    ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
