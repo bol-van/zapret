@@ -1379,6 +1379,10 @@ With other values or if the parameter is commented out, the rules will not be ap
 This is useful if you have a firewall management system, in the settings of which you should tie the rules.
 Not applicable to `OpenWRT` if used with `firewall3+iptables`.
 
+`FILTER_TTL_EXPIRED_ICMP=1` blocks icmp time exceeded messages in response to connections handled by nfqws.
+Linux closes socket if it receives this icmp in response to SYN packet. Similar mechanism exists for datagram sockets.
+It's better to disable this if you do not expect problems caused by icmp.
+
 The following settings are not relevant for openwrt :
 
 If your system works as a router, then you need to enter the names of the internal and external interfaces:
