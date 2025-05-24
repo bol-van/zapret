@@ -1675,7 +1675,8 @@ void check_dp(const struct desync_profile *dp)
 		DLOG_CONDUP("WARNING !!! it's completely ok if connbytes or payload based ip/nf tables limiter is applied. Make sure it exists.\n");
 #else
 		DLOG_CONDUP("WARNING !!! possible TRASH FLOOD configuration detected in profile %d\n", dp->n);
-		DLOG_CONDUP("WARNING !!! it's highly recommended to use --dpi-desync-cutoff limiter or fakes will be sent on every processed packet\n");
+		DLOG_CONDUP("WARNING !!! in profile %d you are using --dpi-desync-any-protocol without --dpi-desync-cutoff or --dup without --dup-cutoff\n", dp->n);
+		DLOG_CONDUP("WARNING !!! fakes or dups will be sent on every processed packet\n");
 		DLOG_CONDUP("WARNING !!! make sure it's really what you want\n");
 #ifdef __CYGWIN__
 		DLOG_CONDUP("WARNING !!! in most cases this is acceptable only with custom payload based windivert filter (--wf-raw)\n");
