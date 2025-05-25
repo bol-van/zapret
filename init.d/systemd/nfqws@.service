@@ -56,9 +56,6 @@ RemoveIPC=true
 RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
-SystemCallArchitectures=native
-SystemCallFilter=@system-service
-SystemCallFilter=~@resources
 UMask=0077
 
 [Install]
