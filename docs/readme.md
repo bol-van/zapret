@@ -226,6 +226,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-fake-unknown=<filename>|0xHEX         ; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
 --dpi-desync-fake-syndata=<filename>|0xHEX         ; файл, содержащий фейковый пейлоад пакета SYN для режима десинхронизации syndata
 --dpi-desync-fake-quic=<filename>|0xHEX            ; файл, содержащий фейковый QUIC Initial
+--dpi-desync-fake-wireguard=<filename>|0xHEX       ; файл, содержащий фейковый wireguard handshake initiation
 --dpi-desync-fake-dht=<filename>|0xHEX             ; файл, содержащий фейковый пейлоад DHT протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
 --dpi-desync-fake-discord=<filename>|0xHEX         ; файл, содержащий фейковый пейлоад Discord протокола нахождения IP адреса для голосовых чатов для dpi-desync=fake, на замену стандартным нулям 64 байт
 --dpi-desync-fake-stun=<filename>|0xHEX            ; файл, содержащий фейковый пейлоад STUN протокола для dpi-desync=fake, на замену стандартным нулям 64 байт
