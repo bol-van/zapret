@@ -24,7 +24,7 @@ Tor поддерживает "из коробки" режим transparent proxy.
 Устанавливать их нужно с опцией opkg --force-overwrite, поскольку они перепишут ssh клиент от dropbear.
 После установки пакетов расслабим неоправданно жестокие права : chmod 755 /etc/ssh.
 Следует создать пользователя, под которым будем крутить ssh client. Допустим, это будет 'proxy'.
-Сначала установить пакет shadow-useradd.
+Сначала установить пакеты shadow-useradd и shadow-su.
 ------------------
 useradd -d /home/proxy proxy
 mkdir -p /home/proxy
