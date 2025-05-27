@@ -32,7 +32,7 @@ chown proxy:proxy /home/proxy
 ------------------
 Сгенерируем ключ RSA для доступа к ssh серверу.
 ------------------
-su proxy
+su -s /bin/ash proxy
 cd
 mkdir -m 700 .ssh
 cd .ssh
