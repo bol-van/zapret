@@ -26,7 +26,7 @@ Tor поддерживает "из коробки" режим transparent proxy.
 Следует создать пользователя, под которым будем крутить ssh client. Допустим, это будет 'proxy'.
 Сначала установить пакеты shadow-useradd и shadow-su.
 ------------------
-useradd -d /home/proxy proxy
+useradd -s /bin/false -d /home/proxy proxy
 mkdir -p /home/proxy
 chown proxy:proxy /home/proxy
 ------------------
