@@ -113,6 +113,16 @@ bool append_to_list_file(const char *filename, const char *s)
 	return bOK;
 }
 
+void expand_bits(void *target, const void *source, unsigned int source_bitlen, unsigned int target_bytelen)
+{
+	unsigned int target_bitlen = target_bytelen<<3;
+	unsigned int bitlen = target_bitlen<source_bitlen ? target_bitlen : source_bitlen;
+	unsigned int bytelen = bitlen>>3;
+
+	if ((target_bytelen-bytelen)>=1) memset(target+bytelen,0,target_bytelen-bytelen);
+	memcpy(target,source,bytelen);
+	if ((bitlen &= 7)) ((uint8_t*)target)[bytelen] = ((uint8_t*)source)[bytelen] & (~((1 << (8-bitlen)) - 1));
+}
 
 void ntop46(const struct sockaddr *sa, char *str, size_t len)
 {

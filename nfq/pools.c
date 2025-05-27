@@ -260,121 +260,146 @@ bool hostlist_collection_is_empty(const struct hostlist_collection_head *head)
 }
 
 
-void ipset4Destroy(ipset4 **ipset)
+static int kavl_bit_cmp(const struct kavl_bit_elem *p, const struct kavl_bit_elem *q)
 {
-	ipset4 *elem, *tmp;
-	HASH_ITER(hh, *ipset, elem, tmp)
+	unsigned int bitlen = q->bitlen < p->bitlen ? q->bitlen : p->bitlen;
+	unsigned int df = bitlen & 7, bytes = bitlen >> 3;
+	int cmp = memcmp(p->data, q->data, bytes);
+
+	if (cmp || !df) return cmp;
+
+	uint8_t c1 = p->data[bytes] >> (8 - df);
+	uint8_t c2 = q->data[bytes] >> (8 - df);
+	return c1<c2 ? -1 : c1==c2 ? 0 : 1;
+}
+KAVL_INIT(kavl_bit, struct kavl_bit_elem, head, kavl_bit_cmp)
+static void kavl_bit_destroy_elem(struct kavl_bit_elem *e)
+{
+	if (e)
 	{
-		HASH_DEL(*ipset, elem);
-		free(elem);
+		free(e->data);
+		free(e);
 	}
 }
-bool ipset4Check(ipset4 *ipset, const struct in_addr *a, uint8_t preflen)
+void kavl_bit_delete(struct kavl_bit_elem **hdr, const void *data, unsigned int bitlen)
 {
-	uint32_t ip = ntohl(a->s_addr);
-	struct cidr4 cidr;
-	ipset4 *ips_found;
-
-	// zero alignment bytes
-	memset(&cidr,0,sizeof(cidr));
-	cidr.preflen = preflen+1;
-	do
-	{
-		cidr.preflen--;
-		cidr.addr.s_addr = htonl(ip & mask_from_preflen(cidr.preflen));
-		HASH_FIND(hh, ipset, &cidr, sizeof(cidr), ips_found);
-		if (ips_found) return true;
-	} while(cidr.preflen);
-
-	return false;
+	struct kavl_bit_elem temp = {
+		.bitlen = bitlen, .data = (uint8_t*)data
+	};
+	kavl_bit_destroy_elem(kavl_erase(kavl_bit, hdr, &temp, 0));
 }
-bool ipset4Add(ipset4 **ipset, const struct in_addr *a, uint8_t preflen)
+void kavl_bit_destroy(struct kavl_bit_elem **hdr)
+{
+	while (*hdr)
+	{
+		struct kavl_bit_elem *e = kavl_erase_first(kavl_bit, hdr);
+		if (!e)	break;
+		kavl_bit_destroy_elem(e);
+	}
+	free(*hdr);
+}
+struct kavl_bit_elem *kavl_bit_add(struct kavl_bit_elem **hdr, void *data, unsigned int bitlen, size_t struct_size)
+{
+	if (!struct_size) struct_size=sizeof(struct kavl_bit_elem);
+
+	struct kavl_bit_elem *v, *e = calloc(1, struct_size);
+	if (!e) return 0;
+
+	e->bitlen = bitlen;
+	e->data = data;
+
+	v = kavl_insert(kavl_bit, hdr, e, 0);
+	while (e != v && e->bitlen < v->bitlen)
+	{
+		kavl_bit_delete(hdr, v->data, v->bitlen);
+		v = kavl_insert(kavl_bit, hdr, e, 0);
+	}
+	if (e != v) kavl_bit_destroy_elem(e);
+	return v;
+}
+struct kavl_bit_elem *kavl_bit_get(const struct kavl_bit_elem *hdr, const void *data, unsigned int bitlen)
+{
+	struct kavl_bit_elem temp = {
+		.bitlen = bitlen, .data = (uint8_t*)data
+	};
+	return kavl_find(kavl_bit, hdr, &temp, 0);
+}
+
+static bool ipset_kavl_add(struct kavl_bit_elem **ipset, const void *a, uint8_t preflen)
+{
+	uint8_t bytelen = (preflen+7)>>3;
+	uint8_t *abuf = malloc(bytelen);
+	if (!abuf) return false;
+	memcpy(abuf,a,bytelen);
+	if (!kavl_bit_add(ipset,abuf,preflen,0))
+	{
+		free(abuf);
+		return false;
+	}
+	return true;
+}
+
+
+bool ipset4Check(const struct kavl_bit_elem *ipset, const struct in_addr *a, uint8_t preflen)
+{
+	return !!kavl_bit_get(ipset,a,preflen);
+}
+bool ipset4Add(struct kavl_bit_elem **ipset, const struct in_addr *a, uint8_t preflen)
 {
 	if (preflen>32) return false;
-
-	// avoid dups
-	if (ipset4Check(*ipset, a, preflen)) return true; // already included
-
-	struct ipset4 *entry = calloc(1,sizeof(ipset4));
-	if (!entry) return false;
-
-	entry->cidr.addr.s_addr = htonl(ntohl(a->s_addr) & mask_from_preflen(preflen));
-	entry->cidr.preflen = preflen;
-	oom = false;
-	HASH_ADD(hh, *ipset, cidr, sizeof(entry->cidr), entry);
-	if (oom) { free(entry); return false; }
-
-	return true;
+	return ipset_kavl_add(ipset,a,preflen);
 }
-void ipset4Print(ipset4 *ipset)
+void ipset4Print(struct kavl_bit_elem *ipset)
 {
-	ipset4 *ips, *tmp;
-	HASH_ITER(hh, ipset , ips, tmp)
-	{
-		print_cidr4(&ips->cidr);
-		printf("\n");
-	}
-}
+	if (!ipset) return;
 
-void ipset6Destroy(ipset6 **ipset)
-{
-	ipset6 *elem, *tmp;
-	HASH_ITER(hh, *ipset, elem, tmp)
-	{
-		HASH_DEL(*ipset, elem);
-		free(elem);
-	}
-}
-bool ipset6Check(ipset6 *ipset, const struct in6_addr *a, uint8_t preflen)
-{
-	struct cidr6 cidr;
-	ipset6 *ips_found;
-
-	// zero alignment bytes
-	memset(&cidr,0,sizeof(cidr));
-	cidr.preflen = preflen+1;
+	struct cidr4 c;
+	const struct kavl_bit_elem *elem;
+	kavl_itr_t(kavl_bit) itr;
+	kavl_itr_first(kavl_bit, ipset, &itr);
 	do
 	{
-		cidr.preflen--;
-		ip6_and(a, mask_from_preflen6(cidr.preflen), &cidr.addr);
-		HASH_FIND(hh, ipset, &cidr, sizeof(cidr), ips_found);
-		if (ips_found) return true;
-	} while(cidr.preflen);
-
-	return false;
-}
-bool ipset6Add(ipset6 **ipset, const struct in6_addr *a, uint8_t preflen)
-{
-	if (preflen>128) return false;
-
-	// avoid dups
-	if (ipset6Check(*ipset, a, preflen)) return true; // already included
-
-	struct ipset6 *entry = calloc(1,sizeof(ipset6));
-	if (!entry) return false;
-
-	ip6_and(a, mask_from_preflen6(preflen), &entry->cidr.addr);
-	entry->cidr.preflen = preflen;
-	oom = false;
-	HASH_ADD(hh, *ipset, cidr, sizeof(entry->cidr), entry);
-	if (oom) { free(entry); return false; }
-
-	return true;
-}
-void ipset6Print(ipset6 *ipset)
-{
-	ipset6 *ips, *tmp;
-	HASH_ITER(hh, ipset , ips, tmp)
-	{
-		print_cidr6(&ips->cidr);
+		elem = kavl_at(&itr);
+		c.preflen = elem->bitlen;
+		expand_bits(&c.addr, elem->data, elem->bitlen, sizeof(c.addr));
+		print_cidr4(&c);
 		printf("\n");
 	}
+	while (kavl_itr_next(kavl_bit, &itr));
+}
+
+bool ipset6Check(const struct kavl_bit_elem *ipset, const struct in6_addr *a, uint8_t preflen)
+{
+	return !!kavl_bit_get(ipset,a,preflen);
+}
+bool ipset6Add(struct kavl_bit_elem **ipset, const struct in6_addr *a, uint8_t preflen)
+{
+	if (preflen>128) return false;
+	return ipset_kavl_add(ipset,a,preflen);
+}
+void ipset6Print(struct kavl_bit_elem *ipset)
+{
+	if (!ipset) return;
+
+	struct cidr6 c;
+	const struct kavl_bit_elem *elem;
+	kavl_itr_t(kavl_bit) itr;
+	kavl_itr_first(kavl_bit, ipset, &itr);
+	do
+	{
+		elem = kavl_at(&itr);
+		c.preflen = elem->bitlen;
+		expand_bits(&c.addr, elem->data, elem->bitlen, sizeof(c.addr));
+		print_cidr6(&c);
+		printf("\n");
+	}
+	while (kavl_itr_next(kavl_bit, &itr));
 }
 
 void ipsetDestroy(ipset *ipset)
 {
-	ipset4Destroy(&ipset->ips4);
-	ipset6Destroy(&ipset->ips6);
+	kavl_bit_destroy(&ipset->ips4);
+	kavl_bit_destroy(&ipset->ips6);
 }
 void ipsetPrint(ipset *ipset)
 {

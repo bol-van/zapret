@@ -502,3 +502,7 @@ init.d, blockcheck: drop time exceeded icmp for nfqws-related connections
 blockcheck: some dup and orig-ttl mods
 blockcheck: PKTWS_EXTRA_PRE
 blockcheck: report test function and domain every test
+
+v71.1
+
+nfqws,tpws: much faster ipset implementation. move from hash to avl tree

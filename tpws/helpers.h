@@ -29,6 +29,8 @@ bool str_ends_with(const char *s, const char *suffix);
 bool load_file(const char *filename,void *buffer,size_t *buffer_size);
 bool append_to_list_file(const char *filename, const char *s);
 
+void expand_bits(void *target, const void *source, unsigned int source_bitlen, unsigned int target_bytelen);
+
 void ntop46(const struct sockaddr *sa, char *str, size_t len);
 void ntop46_port(const struct sockaddr *sa, char *str, size_t len);
 void print_sockaddr(const struct sockaddr *sa);

@@ -13,6 +13,8 @@
 #define HASH_FUNCTION HASH_BER
 #include "uthash.h"
 
+#include "kavl.h"
+
 #define HOSTLIST_POOL_FLAG_STRICT_MATCH		1
 
 typedef struct hostlist_pool {
@@ -76,39 +78,40 @@ struct hostlist_item *hostlist_collection_search(struct hostlist_collection_head
 bool hostlist_collection_is_empty(const struct hostlist_collection_head *head);
 
 
-typedef struct ipset4 {
-	struct cidr4 cidr;	/* key */
-	UT_hash_handle hh;	/* makes this structure hashable */
-} ipset4;
-typedef struct ipset6 {
-	struct cidr6 cidr;	/* key */
-	UT_hash_handle hh;	/* makes this structure hashable */
-} ipset6;
+struct kavl_bit_elem
+{
+	unsigned int bitlen;
+	uint8_t *data;
+	KAVL_HEAD(struct kavl_bit_elem) head;
+};
+
+struct kavl_bit_elem *kavl_bit_get(const struct kavl_bit_elem *hdr, const void *data, unsigned int bitlen);
+struct kavl_bit_elem *kavl_bit_add(struct kavl_bit_elem **hdr, void *data, unsigned int bitlen, size_t struct_size);
+void kavl_bit_delete(struct kavl_bit_elem **hdr, const void *data, unsigned int bitlen);
+void kavl_bit_destroy(struct kavl_bit_elem **hdr);
+
 // combined ipset ipv4 and ipv6
 typedef struct ipset {
-	ipset4 *ips4;
-	ipset6 *ips6;
+	struct kavl_bit_elem *ips4,*ips6;
 } ipset;
 
 #define IPSET_EMPTY(ips) (!(ips)->ips4 && !(ips)->ips6)
 
-void ipset4Destroy(ipset4 **ipset);
-bool ipset4Add(ipset4 **ipset, const struct in_addr *a, uint8_t preflen);
-static inline bool ipset4AddCidr(ipset4 **ipset, const struct cidr4 *cidr)
+bool ipset4Add(struct kavl_bit_elem **ipset, const struct in_addr *a, uint8_t preflen);
+static inline bool ipset4AddCidr(struct kavl_bit_elem **ipset, const struct cidr4 *cidr)
 {
 	return ipset4Add(ipset,&cidr->addr,cidr->preflen);
 }
-bool ipset4Check(ipset4 *ipset, const struct in_addr *a, uint8_t preflen);
-void ipset4Print(ipset4 *ipset);
+bool ipset4Check(const struct kavl_bit_elem *ipset, const struct in_addr *a, uint8_t preflen);
+void ipset4Print(struct kavl_bit_elem *ipset);
 
-void ipset6Destroy(ipset6 **ipset);
-bool ipset6Add(ipset6 **ipset, const struct in6_addr *a, uint8_t preflen);
-static inline bool ipset6AddCidr(ipset6 **ipset, const struct cidr6 *cidr)
+bool ipset6Add(struct kavl_bit_elem **ipset, const struct in6_addr *a, uint8_t preflen);
+static inline bool ipset6AddCidr(struct kavl_bit_elem **ipset, const struct cidr6 *cidr)
 {
 	return ipset6Add(ipset,&cidr->addr,cidr->preflen);
 }
-bool ipset6Check(ipset6 *ipset, const struct in6_addr *a, uint8_t preflen);
-void ipset6Print(ipset6 *ipset);
+bool ipset6Check(const struct kavl_bit_elem *ipset, const struct in6_addr *a, uint8_t preflen);
+void ipset6Print(struct kavl_bit_elem *ipset);
 
 void ipsetDestroy(ipset *ipset);
 void ipsetPrint(ipset *ipset);
