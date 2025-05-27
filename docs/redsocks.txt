@@ -30,9 +30,7 @@ useradd -d /home/proxy proxy
 mkdir -p /home/proxy
 chown proxy:proxy /home/proxy
 ------------------
-Openssh ловит разные глюки, если у него нет доступа к /dev/tty.
-Добавим в /etc/rc.local строчку : "chmod 666 /dev/tty"
-Сгенерируем для него ключ RSA для доступа к ssh серверу.
+Сгенерируем ключ RSA для доступа к ssh серверу.
 ------------------
 su proxy
 cd
