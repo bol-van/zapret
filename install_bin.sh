@@ -88,6 +88,13 @@ check_dir()
 					out=$(echo 0.0.0.0 | $FIND "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
 					[ -n "$out" ]
 					;;
+				run)
+					out=$(echo 0.0.0.0 | "$exe" 2>/dev/null)
+					[ -n "$out" ]
+					;;
+				*)
+					false
+					;;
 			esac
 		else
 			echo >&2 "$exe is not executable. set proper chmod."
