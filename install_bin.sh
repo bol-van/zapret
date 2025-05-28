@@ -8,6 +8,61 @@ BINDIR="$EXEDIR/$BINS"
 ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
 . "$ZAPRET_BASE/common/base.sh"
 
+
+read_elf_arch()
+{
+	# $1 - elf file
+
+	local arch=$(dd if="$1" count=2 bs=1 skip=18 2>/dev/null | hexdump -e '2/1 "%02x"')
+	local bit=$(dd if="$1" count=1 bs=1 skip=4 2>/dev/null | hexdump -e '1/1 "%02x"')
+	echo $bit$arch
+}
+
+select_test_method()
+{
+	local f ELF
+
+	TEST=run
+
+	# ash and dash try to execute invalid executables as a script. they interpret binary garbage with possible negative consequences
+	# bash and zsh do not do this
+	if exists bash; then
+		TEST=bash
+	elif exists zsh; then
+		TEST=zsh
+	elif [ "$UNAME" != Darwin ]; then
+		if exists hexdump and exists dd; then
+			# macos does not use ELF
+			TEST=elf
+			ELF=
+			for f in /bin/sh /system/bin/sh; do
+				[ -x "$f" ] && {
+					ELF=$f
+					break
+				}
+			done
+			[ -n "$ELF" ] && ELF_ARCH=$(read_elf_arch "$ELF")
+			[ -n "$ELF_ARCH" ] && return
+		fi
+
+		# find does not use its own shell exec
+		# it uses execvp(). in musl libc it does not call shell, in glibc it DOES call /bin/sh
+		# that's why prefer bash or zsh if present. otherwise it's our last chance
+		if exists find; then
+			TEST=find
+			FIND=find
+		elif exists busybox; then
+			busybox find /jGHUa3fh1A 2>/dev/null
+			# 127 - command not found
+			[ "$?" = 127 ] || {
+				TEST=find
+				FIND="busybox find"
+			}
+		fi
+	fi
+
+}
+
 check_dir()
 {
 	local dir="$BINDIR/$1"
@@ -15,23 +70,24 @@ check_dir()
 	local out
 	if [ -f "$exe" ]; then
 		if [ -x "$exe" ]; then
-			# ash and dash try to execute invalid executables as a script. they interpret binary garbage with possible negative consequences
-			# bash and zsh do not do this
-			if exists bash; then
-				out=$(echo 0.0.0.0 | bash -c "\"$exe"\" 2>/dev/null)
-			elif exists zsh; then
-				out=$(echo 0.0.0.0 | zsh -c "\"$exe\"" 2>/dev/null)
-			else
-				# find does not use its own shell exec
-				# it uses execvp(). in musl libc it does not call shell, in glibc it DOES call /bin/sh
-				# that's why prefer bash or zsh if present. otherwise it's our last chance
-				local FIND=find
-				if ! exists find && exists busybox; then
-					FIND="busybox find"
-				fi
-				out=$(echo 0.0.0.0 | $FIND "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
-			fi
-			[ -n "$out" ]
+			case $TEST in
+				bash)
+					out=$(echo 0.0.0.0 | bash -c "\"$exe"\" 2>/dev/null)
+					[ -n "$out" ]
+					;;
+				zsh)
+					out=$(echo 0.0.0.0 | zsh -c "\"$exe\"" 2>/dev/null)
+					[ -n "$out" ]
+					;;
+				elf)
+					out=$(read_elf_arch "$exe")
+					[ "$ELF_ARCH" = "$out" ]
+					;;
+				find)
+					out=$(echo 0.0.0.0 | $FIND "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
+					[ -n "$out" ]
+					;;
+			esac
 		else
 			echo >&2 "$exe is not executable. set proper chmod."
 			return 1
@@ -53,6 +109,8 @@ ccp()
 }
 
 UNAME=$(uname)
+select_test_method
+
 unset PKTWS
 case $UNAME in
 	Linux)
@@ -85,6 +143,8 @@ if [ "$1" = "getarch" ]; then
 	 	fi
 	done
 else
+	echo "using arch detect method : $TEST${ELF_ARCH:+ $ELF_ARCH}"
+
 	for arch in $ARCHLIST
 	do
 		[ -d "$BINDIR/$arch" ] || continue
