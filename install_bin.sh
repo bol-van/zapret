@@ -82,7 +82,11 @@ check_dir()
 					;;
 				elf)
 					out=$(read_elf_arch "$exe")
-					[ "$ELF_ARCH" = "$out" ]
+					[ "$ELF_ARCH" = "$out" ] && {
+						# exec test to verify it actually works. no illegal instruction or crash.
+						out=$(echo 0.0.0.0 | "$exe" 2>/dev/null)
+						[ -n "$out" ]
+					}
 					;;
 				find)
 					out=$(echo 0.0.0.0 | $FIND "$dir" -maxdepth 1 -name ip2net -exec {} \; 2>/dev/null)
