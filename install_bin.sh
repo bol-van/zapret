@@ -28,9 +28,9 @@ select_test_method()
 	# bash and zsh do not do this
 	if exists bash; then
 		TEST=bash
-	elif exists zsh; then
+	elif exists zsh && [ "$UNAME" != CYGWIN ] ; then
 		TEST=zsh
-	elif [ "$UNAME" != Darwin ]; then
+	elif [ "$UNAME" != Darwin -a "$UNAME" != CYGWIN ]; then
 		if exists hexdump and exists dd; then
 			# macos does not use ELF
 			TEST=elf
@@ -110,7 +110,6 @@ ccp()
 }
 
 UNAME=$(uname)
-select_test_method
 
 unset PKTWS
 case $UNAME in
@@ -133,6 +132,8 @@ case $UNAME in
 	*)
 		ARCHLIST="my"
 esac
+
+select_test_method
 
 if [ "$1" = "getarch" ]; then
 	for arch in $ARCHLIST
