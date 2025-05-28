@@ -35,6 +35,7 @@ select_test_method()
 			# macos does not use ELF
 			TEST=elf
 			ELF=
+			ELF_ARCH=
 			for f in /bin/sh /system/bin/sh; do
 				[ -x "$f" ] && {
 					ELF=$f
