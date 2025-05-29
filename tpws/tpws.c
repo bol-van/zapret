@@ -1715,6 +1715,18 @@ void parse_params(int argc, char *argv[])
 #endif
 	if (bDry)
 	{
+		if (params.droproot)
+		{
+			if (!droproot(params.uid,params.gid,params.gid_count))
+				exit_clean(1);
+#ifdef __linux__
+			if (!dropcaps())
+				exit_clean(1);
+#endif
+			print_id();
+			if (!test_list_files())
+				exit_clean(1);
+		}
 		DLOG_CONDUP("command line parameters verified\n");
 		exit_clean(0);
 	}

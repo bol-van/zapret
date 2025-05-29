@@ -506,5 +506,6 @@ blockcheck: report test function and domain every test
 v71.1
 
 nfqws,tpws: much faster ipset implementation. move from hash to avl tree
+nfqws,tpws: check list files accessibility with dropped privs in --dry-run mode
 install_easy: stop if running embedded release on traditional linux system (some files missing)
 install_bin: add "read elf" arch detection method
