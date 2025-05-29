@@ -253,9 +253,9 @@ select_mode_filter()
 
 select_mode()
 {
+	select_mode_filter
 	select_mode_mode
 	select_mode_iface
-	select_mode_filter
 }
 
 select_getlist()
