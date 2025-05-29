@@ -53,21 +53,24 @@ check_readonly_system()
 check_source()
 {
 	local bad=0
+
 	echo \* checking source files
-        case $SYSTEM in
+	case $SYSTEM in
 		systemd)
 			[ -f "$EXEDIR/init.d/systemd/zapret.service" ] || bad=1
 			;;
 		openrc)
 			[ -f "$EXEDIR/init.d/openrc/zapret" ] || bad=1
 			;;
-		*)
-	esac
-	[ "$bad" = 1 ] && {
-		echo 'some critical files are missing'
-		echo 'are you sure you are not using embedded release ? you need full version for traditional linux'
-		exitp 5
-	}
+		macos)
+			[ -f "$EXEDIR/init.d/macos/zapret" ] || bad=1
+			;;
+       esac
+       [ "$bad" = 1 ] && {
+               echo 'some critical files are missing'
+               echo 'are you sure you are not using embedded release ? you need full version for traditional linux'
+               exitp 5
+       }
 }
 
 check_bins()
@@ -904,8 +907,6 @@ fix_sbin_path
 fsleep_setup
 check_system
 check_source
-
-[ "$SYSTEM" = "macos" ] && . "$EXEDIR/init.d/macos/functions"
 
 case $SYSTEM in
 	systemd)

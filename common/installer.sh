@@ -187,7 +187,7 @@ check_system()
 
 	SYSTEM=
 	SUBSYS=
-	SYSTEMCTL=$(whichq systemctl)
+	SYSTEMCTL="$(whichq systemctl)"
 
 	get_fwtype
 	OPENWRT_FW3=
@@ -203,6 +203,7 @@ check_system()
 		# some distros include systemctl without systemd
 		if [ -d "$SYSTEMD_DIR" ] && [ -x "$SYSTEMCTL" ] && [ "$INIT" = "systemd" ]; then
 			SYSTEM=systemd
+			[ -f "$EXEDIR/init.d/sysv/functions" ] && . "$EXEDIR/init.d/sysv/functions"
 		elif [ -f "/etc/openwrt_release" ] && exists opkg || exists apk && exists uci && [ "$INIT" = "procd" ] ; then
 			SYSTEM=openwrt
 			OPENWRT_PACKAGER=opkg
@@ -226,8 +227,10 @@ check_system()
 				OPENWRT_FW4=1
 				info="${info}firewall fw4. flow offloading requires nftables."
 			fi
+			[ -f "$EXEDIR/init.d/openwrt/functions" ] && . "$EXEDIR/init.d/openwrt/functions"
 		elif openrc_test; then
 			SYSTEM=openrc
+			[ -f "$EXEDIR/init.d/sysv/functions" ] && . "$EXEDIR/init.d/sysv/functions"
 		else
 			echo system is not either systemd, openrc or openwrt based
 			echo easy installer can set up config settings but can\'t configure auto start
@@ -237,10 +240,12 @@ check_system()
 			else
 			    exitp 5
 			fi
+			[ -f "$EXEDIR/init.d/sysv/functions" ] && . "$EXEDIR/init.d/sysv/functions"
 		fi
 		linux_get_subsys
 	elif [ "$UNAME" = "Darwin" ]; then
 		SYSTEM=macos
+		[ -f "$EXEDIR/init.d/macos/functions" ] && . "$EXEDIR/init.d/macos/functions"
 	else
 		echo easy installer only supports Linux and MacOS. check readme.md for supported systems and manual setup info.
 		exitp 5
@@ -834,13 +839,13 @@ dry_run_tpws_()
 {
 	local TPWS="$ZAPRET_BASE/tpws/tpws"
 	echo verifying tpws options
-	"$TPWS" --dry-run "$@"
+	"$TPWS" --dry-run --user=$WS_USER "$@"
 }
 dry_run_nfqws_()
 {
 	local NFQWS="$ZAPRET_BASE/nfq/nfqws"
 	echo verifying nfqws options
-	"$NFQWS" --dry-run "$@"
+	"$NFQWS" --dry-run --user=$WS_USER "$@"
 }
 dry_run_tpws()
 {
