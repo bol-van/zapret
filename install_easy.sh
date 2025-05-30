@@ -68,7 +68,7 @@ check_source()
        esac
        [ "$bad" = 1 ] && {
                echo 'some critical files are missing'
-               echo 'are you sure you are not using embedded release ? you need full version for traditional linux'
+               echo 'are you sure you are not using embedded release ? you need full version for traditional systems'
                exitp 5
        }
 }
