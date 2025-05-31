@@ -39,7 +39,7 @@ static void syslog_log_function(int priority, const char *line)
 	syslog(priority,"%s",log_buf);
 }
 #ifdef __ANDROID__
-enum android_LogPriority syslog_priority_to_android(int priority)
+static enum android_LogPriority syslog_priority_to_android(int priority)
 {
 	enum android_LogPriority ap;
 	switch(priority)
