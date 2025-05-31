@@ -101,9 +101,22 @@ check_bins()
 				;;
 		esac
 		CFLAGS="-march=native ${CFLAGS}" make -C "$EXEDIR" $make_target || {
-			echo could not compile
-			make -C "$EXEDIR" clean
-			exitp 8
+			if [ "$SYSTEM" = macos ]; then
+					echo "retrying compile"
+					echo "removing quarantine attributes"
+					xattr -d com.apple.quarantine ./binaries/mac64/ip2net 2>/dev/null
+					xattr -d com.apple.quarantine ./binaries/mac64/mdig 2>/dev/null
+					xattr -d com.apple.quarantine ./binaries/mac64/tpws 2>/dev/null
+					make -C "$EXEDIR" $make_target || {
+						echo could not compile
+						make -C "$EXEDIR" clean 2>/dev/null
+						exitp 8
+					}
+			else
+				echo could not compile
+				make -C "$EXEDIR" clean 2>/dev/null
+				exitp 8
+			fi
 		}
 		echo compiled
 	else
