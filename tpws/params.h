@@ -11,6 +11,7 @@
 #include <wordexp.h>
 #endif
 
+
 #include "tpws.h"
 #include "pools.h"
 #include "helpers.h"
@@ -38,7 +39,7 @@ struct bind_s
 
 #define MAX_SPLITS 16
 
-enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
+enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG, LOG_TARGET_ANDROID };
 
 struct desync_profile
 {
@@ -153,6 +154,7 @@ struct params_s
 };
 
 extern struct params_s params;
+extern const char *progname;
 
 int DLOG(const char *format, int level, ...);
 int DLOG_CONDUP(const char *format, ...);

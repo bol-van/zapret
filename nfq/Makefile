@@ -3,6 +3,7 @@ CFLAGS += -std=gnu99 -Os -flto=auto
 CFLAGS_SYSTEMD = -DUSE_SYSTEMD
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
+LDFLAGS_ANDROID = -llog
 LIBS_LINUX = -lnetfilter_queue -lnfnetlink -lz
 LIBS_SYSTEMD = -lsystemd
 LIBS_BSD = -lz
@@ -21,7 +22,8 @@ nfqws: $(SRC_FILES)
 systemd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_SYSTEMD) -o nfqws $(SRC_FILES) $(LIBS_LINUX) $(LIBS_SYSTEMD) $(LDFLAGS)
 
-android: nfqws
+android: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) -o nfqws $(SRC_FILES) $(LIBS_LINUX) $(LDFLAGS) $(LDFLAGS_ANDROID)
 
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o dvtws $(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)

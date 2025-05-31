@@ -1485,7 +1485,11 @@ static void exithelp(void)
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
 		" @<config_file>|$<config_file>\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 #endif
+#ifdef __ANDROID__
+		" --debug=0|1|syslog|android|@<filename>\n"
+#else
 		" --debug=0|1|syslog|@<filename>\n"
+#endif
 		" --version\t\t\t\t\t; print version and exit\n"
 		" --dry-run\t\t\t\t\t; verify parameters and exit with code 0 if successful\n"
 		" --comment=any_text\n"
@@ -2057,10 +2061,22 @@ int main(int argc, char **argv)
 					params.debug_target = LOG_TARGET_SYSLOG;
 					openlog(progname,LOG_PID,LOG_USER);
 				}
+#ifdef __ANDROID__
+				else if (!strcmp(optarg,"android"))
+				{
+					if (!params.debug) params.debug = 1;
+					params.debug_target = LOG_TARGET_ANDROID;
+				}
+#endif
+				else if (optarg[0]>='0' && optarg[0]<='1')
+				{
+					params.debug = atoi(optarg);
+					params.debug_target = LOG_TARGET_CONSOLE;
+				}
 				else
 				{
-					params.debug = !!atoi(optarg);
-					params.debug_target = LOG_TARGET_CONSOLE;
+					fprintf(stderr, "invalid debug mode : %s\n", optarg);
+					exit_clean(1);
 				}
 			}
 			else

@@ -224,7 +224,11 @@ static void exithelp(void)
 #endif
 		" --ipcache-lifetime=<int>\t\t; time in seconds to keep cached domain name (default %u). 0 = no expiration\n"
 		" --ipcache-hostname=[0|1]\t\t; 1 or no argument enables ip->hostname caching\n"
+#ifdef __ANDROID__
+		" --debug=0|1|2|syslog|android|@<filename> ; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
+#else
 		" --debug=0|1|2|syslog|@<filename>\t; 1 and 2 means log to console and set debug level. for other targets use --debug-level.\n"
+#endif
 		" --debug-level=0|1|2\t\t\t; specify debug level\n"
 		" --dry-run\t\t\t\t; verify parameters and exit with code 0 if successful\n"
 		" --version\t\t\t\t; print version and exit\n"
@@ -1345,12 +1349,24 @@ void parse_params(int argc, char *argv[])
 				{
 					if (!params.debug) params.debug = 1;
 					params.debug_target = LOG_TARGET_SYSLOG;
-					openlog("tpws",LOG_PID,LOG_USER);
+					openlog(progname,LOG_PID,LOG_USER);
 				}
-				else
+#ifdef __ANDROID__
+				else if (!strcmp(optarg,"android"))
+				{
+					if (!params.debug) params.debug = 1;
+					params.debug_target = LOG_TARGET_ANDROID;
+				}
+#endif
+				else if (optarg[0]>='0' && optarg[0]<='2')
 				{
 					params.debug = atoi(optarg);
 					params.debug_target = LOG_TARGET_CONSOLE;
+				}
+				else
+				{
+					fprintf(stderr, "invalid debug mode : %s\n", optarg);
+					exit_clean(1);
 				}
 			}
 			else

@@ -65,7 +65,7 @@
 
 #define MAX_GIDS 64
 
-enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG };
+enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG, LOG_TARGET_ANDROID };
 
 struct fake_tls_mod_cache
 {
