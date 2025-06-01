@@ -77,6 +77,9 @@ check_bins()
 {
 	echo \* checking executables
 
+	if [ "$SYSTEM" = macos ]; then 
+		find ./binaries/mac64 -type f -exec xattr -d com.apple.quarantine {} \;
+	fi
 	fix_perms_bin_test "$EXEDIR"
 	local arch="$(get_bin_arch)"
 	local make_target
@@ -102,23 +105,10 @@ check_bins()
 				make_target=systemd
 				;;
 		esac
-    CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
-			if [ "$SYSTEM" = macos ]; then
-				echo "retrying compile"
-				echo "trying to remove quarantine attributes if exist"
-				xattr -d com.apple.quarantine ./binaries/mac64/ip2net 2>/dev/null
-				xattr -d com.apple.quarantine ./binaries/mac64/mdig 2>/dev/null
-				xattr -d com.apple.quarantine ./binaries/mac64/tpws 2>/dev/null
-				CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
-					echo could not compile
-					make -C "$EXEDIR" clean
-					exitp 8
-				}
-			else
-				echo could not compile
-				make -C "$EXEDIR" clean
-				exitp 8
-			fi
+    		CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
+			echo could not compile
+			make -C "$EXEDIR" clean
+			exitp 8
 		}
 		echo compiled
 	else
