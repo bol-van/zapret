@@ -67,7 +67,7 @@ select_test_method()
 disable_antivirus()
 {
 	# $1 - dir
-	[ "$UNAME" = Darwin ] && find "$dir" -maxdepth 1 -type f -perm +111 -exec xattr -d com.apple.quarantine {} \; 2>/dev/null
+	[ "$UNAME" = Darwin ] && find "$1" -maxdepth 1 -type f -perm +111 -exec xattr -d com.apple.quarantine {} \; 2>/dev/null
 }
 
 check_dir()
