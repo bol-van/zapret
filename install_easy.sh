@@ -80,6 +80,7 @@ check_bins()
 	fix_perms_bin_test "$EXEDIR"
 	local arch="$(get_bin_arch)"
 	local make_target
+	local cf="-march=native"
 	[ "$FORCE_BUILD" = "1" ] && {
 		echo forced build mode
 		if [ "$arch" = "my" ]; then
@@ -95,12 +96,13 @@ check_bins()
 		case $SYSTEM in
 			macos)
 				make_target=mac
+				cf=
 				;;
 			systemd)
 				make_target=systemd
 				;;
 		esac
-		CFLAGS="-march=native ${CFLAGS}" make -C "$EXEDIR" $make_target || {
+		CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
 			echo could not compile
 			make -C "$EXEDIR" clean
 			exitp 8
