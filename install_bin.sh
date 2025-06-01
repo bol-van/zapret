@@ -64,6 +64,12 @@ select_test_method()
 
 }
 
+disable_antivirus()
+{
+	# $1 - dir
+	[ "$UNAME" = Darwin ] && find "$dir" -maxdepth 1 -type f -perm +111 -exec xattr -d com.apple.quarantine {} \; 2>/dev/null
+}
+
 check_dir()
 {
 	local dir="$BINDIR/$1"
@@ -71,6 +77,7 @@ check_dir()
 	local out
 	if [ -f "$exe" ]; then
 		if [ -x "$exe" ]; then
+			disable_antivirus "$dir"
 			case $TEST in
 				bash)
 					out=$(echo 0.0.0.0 | bash -c "\"$exe"\" 2>/dev/null)
