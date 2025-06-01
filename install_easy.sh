@@ -80,6 +80,7 @@ check_bins()
 	fix_perms_bin_test "$EXEDIR"
 	local arch="$(get_bin_arch)"
 	local make_target
+	local cf="-march=native"
 	[ "$FORCE_BUILD" = "1" ] && {
 		echo forced build mode
 		if [ "$arch" = "my" ]; then
@@ -95,26 +96,27 @@ check_bins()
 		case $SYSTEM in
 			macos)
 				make_target=mac
+				cf=
 				;;
 			systemd)
 				make_target=systemd
 				;;
 		esac
-		CFLAGS="-march=native ${CFLAGS}" make -C "$EXEDIR" $make_target || {
+    CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
 			if [ "$SYSTEM" = macos ]; then
-					echo "retrying compile"
-					echo "removing quarantine attributes"
-					xattr -d com.apple.quarantine ./binaries/mac64/ip2net 2>/dev/null
-					xattr -d com.apple.quarantine ./binaries/mac64/mdig 2>/dev/null
-					xattr -d com.apple.quarantine ./binaries/mac64/tpws 2>/dev/null
-					make -C "$EXEDIR" $make_target || {
-						echo could not compile
-						make -C "$EXEDIR" clean 2>/dev/null
-						exitp 8
-					}
+				echo "retrying compile"
+				echo "trying to remove quarantine attributes if exist"
+				xattr -d com.apple.quarantine ./binaries/mac64/ip2net 2>/dev/null
+				xattr -d com.apple.quarantine ./binaries/mac64/mdig 2>/dev/null
+				xattr -d com.apple.quarantine ./binaries/mac64/tpws 2>/dev/null
+				CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
+					echo could not compile
+					make -C "$EXEDIR" clean
+					exitp 8
+				}
 			else
 				echo could not compile
-				make -C "$EXEDIR" clean 2>/dev/null
+				make -C "$EXEDIR" clean
 				exitp 8
 			fi
 		}
