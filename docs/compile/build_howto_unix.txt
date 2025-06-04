@@ -1,6 +1,6 @@
 debian,ubuntu :
 
-apt install make gcc zlib1g-dev libcap-dev libnetfilter-queue-dev libsystemd-dev
+apt install make gcc zlib1g-dev libcap-dev libnetfilter-queue-dev libmnl-dev libsystemd-dev
 make -C /opt/zapret systemd
 
 FreeBSD :

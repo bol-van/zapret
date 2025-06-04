@@ -29,6 +29,13 @@
 
 #endif
 
+#ifdef __linux__
+#include <linux/nl80211.h>
+#include <linux/genetlink.h>
+#include <libmnl/libmnl.h>
+#include <net/if.h>
+#endif
+
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
 	return htonl(ntohl(netorder_value)+cpuorder_increment);
@@ -1830,6 +1837,239 @@ bool rawsend_queue(struct rawpacket_tailhead *q)
 		b &= rawsend_rp(rp);
 	return b;
 }
+
+
+
+#if defined(HAS_FILTER_SSID) && defined(__linux__)
+
+// linux-specific wlan retrieval implementation
+
+typedef void netlink_prepare_nlh_cb_t(struct nlmsghdr *nlh);
+
+static bool netlink_genl_simple_transact(struct mnl_socket* nl, uint16_t type, uint16_t flags, uint8_t cmd, uint8_t version, netlink_prepare_nlh_cb_t cb_prepare_nlh, mnl_cb_t cb_data, void *data)
+{
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *nlh;
+	struct genlmsghdr *genl;
+	ssize_t rd;
+
+	nlh = mnl_nlmsg_put_header(buf);
+	nlh->nlmsg_type	= type;
+	nlh->nlmsg_flags = flags;
+
+	genl = mnl_nlmsg_put_extra_header(nlh, sizeof(struct genlmsghdr));
+	genl->cmd = cmd;
+	genl->version = version;
+
+	if (cb_prepare_nlh) cb_prepare_nlh(nlh);
+
+	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
+	{
+		DLOG_PERROR("mnl_socket_sendto");
+		return false;
+	}
+
+	while ((rd=mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0)
+	{
+		switch(mnl_cb_run(buf, rd, 0, 0, cb_data, data))
+		{
+			case MNL_CB_STOP:
+				return true;
+			case MNL_CB_OK:
+				break;
+			default:
+				return false;
+		}
+	}
+
+	return false;
+}
+
+static void wlan_id_prepare(struct nlmsghdr *nlh)
+{
+	mnl_attr_put_strz(nlh, CTRL_ATTR_FAMILY_NAME, "nl80211");
+}
+static int wlan_id_attr_cb(const struct nlattr *attr, void *data)
+{
+	if (mnl_attr_type_valid(attr, CTRL_ATTR_MAX) < 0)
+	{
+		DLOG_PERROR("mnl_attr_type_valid");
+		return MNL_CB_ERROR;
+	}
+
+	switch(mnl_attr_get_type(attr))
+	{
+		case CTRL_ATTR_FAMILY_ID:
+			if (mnl_attr_validate(attr, MNL_TYPE_U16) < 0)
+			{
+				DLOG_PERROR("mnl_attr_validate(family_id)");
+				return MNL_CB_ERROR;
+			}
+			*((uint16_t*)data) = mnl_attr_get_u16(attr);
+		break;
+	}
+	return MNL_CB_OK;
+}
+static int wlan_id_cb(const struct nlmsghdr *nlh, void *data)
+{
+	return mnl_attr_parse(nlh, sizeof(struct genlmsghdr), wlan_id_attr_cb, data);
+}
+static uint16_t wlan_get_family_id(struct mnl_socket* nl)
+{
+	uint16_t id;
+	return netlink_genl_simple_transact(nl, GENL_ID_CTRL, NLM_F_REQUEST | NLM_F_ACK, CTRL_CMD_GETFAMILY, 1, wlan_id_prepare, wlan_id_cb, &id) ? id : 0;
+}
+
+static int wlan_info_attr_cb(const struct nlattr *attr, void *data)
+{
+	struct wlan_interface *wlan = (struct wlan_interface *)data;
+	switch(mnl_attr_get_type(attr))
+	{
+		case NL80211_ATTR_IFINDEX:
+			if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0)
+			{
+				DLOG_PERROR("mnl_attr_validate(ifindex)");
+				return MNL_CB_ERROR;
+			}
+			wlan->ifindex = mnl_attr_get_u32(attr);
+			break;
+		case NL80211_ATTR_SSID:
+			if (mnl_attr_validate(attr, MNL_TYPE_STRING) < 0)
+			{
+				DLOG_PERROR("mnl_attr_validate(ssid)");
+				return MNL_CB_ERROR;
+			}
+			snprintf(wlan->ssid,sizeof(wlan->ssid),"%s",mnl_attr_get_str(attr));
+			break;
+		case NL80211_ATTR_IFNAME:
+			if (mnl_attr_validate(attr, MNL_TYPE_STRING) < 0)
+			{
+				DLOG_PERROR("mnl_attr_validate(ifname)");
+				return MNL_CB_ERROR;
+			}
+			snprintf(wlan->ifname,sizeof(wlan->ifname),"%s",mnl_attr_get_str(attr));
+			break;
+	}
+	return MNL_CB_OK;
+}
+static int wlan_info_cb(const struct nlmsghdr *nlh, void *data)
+{
+	int ret;
+	struct wlan_interface_collection *wc = (struct wlan_interface_collection*)data;
+	if (wc->count>=WLAN_INTERFACE_MAX) return MNL_CB_OK;
+	memset(wc->wlan+wc->count,0,sizeof(wc->wlan[0]));
+	ret = mnl_attr_parse(nlh, sizeof(struct genlmsghdr), wlan_info_attr_cb, wc->wlan+wc->count);
+	if (ret>=0 && *wc->wlan[wc->count].ssid && *wc->wlan[wc->count].ifname && wc->wlan[wc->count].ifindex)
+		wc->count++;
+	return ret;
+}
+static bool wlan_info(struct mnl_socket* nl, uint16_t wlan_family_id, struct wlan_interface_collection* w)
+{
+	return netlink_genl_simple_transact(nl, wlan_family_id, NLM_F_REQUEST | NLM_F_ACK | NLM_F_DUMP, NL80211_CMD_GET_INTERFACE, 0, NULL, wlan_info_cb, w);
+}
+
+static bool wlan_init80211(struct mnl_socket** nl)
+{
+	if (!(*nl = mnl_socket_open(NETLINK_GENERIC)))
+	{
+		DLOG_PERROR("mnl_socket_open");
+		return false;
+	}
+	if (mnl_socket_bind(*nl, 0, MNL_SOCKET_AUTOPID))
+	{
+		DLOG_PERROR("mnl_socket_bind");
+		return false;
+	}
+	return true;
+}
+
+static void wlan_deinit80211(struct mnl_socket** nl)
+{
+	if (*nl)
+	{
+		mnl_socket_close(*nl);
+		*nl = NULL;
+	}
+}
+
+static time_t wlan_info_last = 0;
+static bool wlan_info_rate_limited(struct mnl_socket* nl, uint16_t wlan_family_id, struct wlan_interface_collection* w)
+{
+	bool bres = true;
+	time_t now = time(NULL);
+
+	// do not purge too often to save resources
+	if (wlan_info_last != now)
+	{
+		bres = wlan_info(nl,wlan_family_id,w);
+		wlan_info_last = now;
+	}
+	return bres;
+}
+
+static struct mnl_socket* nl_wifi = NULL;
+static uint16_t id_nl80211;
+struct wlan_interface_collection wlans = { .count = 0 };
+
+void wlan_info_deinit(void)
+{
+	wlan_deinit80211(&nl_wifi);
+}
+bool wlan_info_init(void)
+{
+	wlan_info_deinit();
+
+	if (!wlan_init80211(&nl_wifi)) return false;
+	if (!(id_nl80211 = wlan_get_family_id(nl_wifi)))
+	{
+		wlan_info_deinit();
+		return false;
+	}
+	return true;
+}
+bool wlan_info_get(void)
+{
+	return wlan_info(nl_wifi, id_nl80211, &wlans);
+}
+bool wlan_info_get_rate_limited(void)
+{
+	return wlan_info_rate_limited(nl_wifi, id_nl80211, &wlans);
+}
+
+#endif
+
+
+#ifdef HAS_FILTER_SSID
+const char *wlan_ifname2ssid(const struct wlan_interface_collection *w, const char *ifname)
+{
+	int i;
+	if (ifname)
+	{
+		for (i=0;i<w->count;i++)
+			if (!strcmp(w->wlan[i].ifname,ifname))
+				return w->wlan[i].ssid;
+	}
+	return NULL;
+}
+const char *wlan_ifidx2ssid(const struct wlan_interface_collection *w,int ifidx)
+{
+	int i;
+	for (i=0;i<w->count;i++)
+		if (w->wlan[i].ifindex == ifidx)
+			return w->wlan[i].ssid;
+	return NULL;
+}
+const char *wlan_ssid_search_ifname(const char *ifname)
+{
+	return wlan_ifname2ssid(&wlans,ifname);
+}
+const char *wlan_ssid_search_ifidx(int ifidx)
+{
+	return wlan_ifidx2ssid(&wlans,ifidx);
+}
+
+#endif
+
 
 
 uint8_t hop_count_guess(uint8_t ttl)

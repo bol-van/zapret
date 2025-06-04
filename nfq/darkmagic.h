@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nfqws.h"
 #include "checksum.h"
 #include "packet_queue.h"
 #include "pools.h"
@@ -272,3 +273,29 @@ void verdict_udp_csum_fix(uint8_t verdict, struct udphdr *udphdr, size_t transpo
 
 void dbgprint_socket_buffers(int fd);
 bool set_socket_buffers(int fd, int rcvbuf, int sndbuf);
+
+
+#ifdef HAS_FILTER_SSID
+
+struct wlan_interface
+{
+	int ifindex;
+	char ifname[IFNAMSIZ], ssid[33];
+};
+#define WLAN_INTERFACE_MAX 16
+struct wlan_interface_collection
+{
+	int count;
+	struct wlan_interface wlan[WLAN_INTERFACE_MAX];
+};
+
+extern struct wlan_interface_collection wlans;
+
+void wlan_info_deinit(void);
+bool wlan_info_init(void);
+bool wlan_info_get(void);
+bool wlan_info_get_rate_limited(void);
+const char *wlan_ssid_search_ifname(const char *ifname);
+const char *wlan_ssid_search_ifidx(int ifidx);
+
+#endif

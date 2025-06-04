@@ -34,6 +34,11 @@ struct str_list {
 };
 LIST_HEAD(str_list_head, str_list);
 
+bool strlist_add(struct str_list_head *head, const char *filename);
+void strlist_destroy(struct str_list_head *head);
+bool strlist_search(const struct str_list_head *head, const char *str);
+
+
 typedef struct hostfail_pool {
 	char *str;		/* key */
 	int counter;	/* value */
@@ -48,10 +53,6 @@ void HostFailPoolDel(hostfail_pool **pp, hostfail_pool *elem);
 void HostFailPoolPurge(hostfail_pool **pp);
 void HostFailPoolPurgeRateLimited(hostfail_pool **pp);
 void HostFailPoolDump(hostfail_pool *p);
-
-bool strlist_add(struct str_list_head *head, const char *filename);
-void strlist_destroy(struct str_list_head *head);
-
 
 
 struct hostlist_file {

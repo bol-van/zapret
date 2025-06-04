@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nfqws.h"
 #include "pools.h"
 #include "conntrack.h"
 #include "desync.h"
@@ -135,6 +136,13 @@ struct desync_profile
 	struct port_filters_head pf_tcp,pf_udp;
 	uint32_t filter_l7;	// L7_PROTO_* bits
 
+#ifdef HAS_FILTER_SSID
+	// per profile ssid filter
+	// annot use global filter because it's not possible to bind multiple instances to a single queue
+	// it's possible to run multiple winws instances on the same windivert filter, but it's not the case for linux
+	struct str_list_head filter_ssid;
+#endif
+
 	// list of pointers to ipsets
 	struct ipset_collection_head ips_collection, ips_collection_exclude;
 
@@ -209,7 +217,12 @@ struct params_s
 	t_conntrack conntrack;
 	bool ctrack_disable;
 
-	bool autottl_present,cache_hostname;
+	bool autottl_present;
+#ifdef HAS_FILTER_SSID
+	bool filter_ssid_present;
+#endif
+
+	bool cache_hostname;
 	unsigned int ipcache_lifetime;
 	ip_cache ipcache;
 };

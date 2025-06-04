@@ -42,6 +42,7 @@ int DLOG_FILENAME(const char *filename, const char *format, va_list args)
 		r=-1;
 	return r;
 }
+
 typedef void (*f_log_function)(int priority, const char *line);
 
 static char log_buf[1024];
@@ -301,6 +302,9 @@ static void dp_clear_dynamic(struct desync_profile *dp)
 	ipset_collection_destroy(&dp->ips_collection_exclude);
 	port_filters_destroy(&dp->pf_tcp);
 	port_filters_destroy(&dp->pf_udp);
+#ifdef HAS_FILTER_SSID
+	strlist_destroy(&dp->filter_ssid);
+#endif
 	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
 	struct blob_collection_head **fake,*fakes[] = {&dp->fake_http, &dp->fake_tls, &dp->fake_unknown, &dp->fake_unknown_udp, &dp->fake_quic, &dp->fake_wg, &dp->fake_dht, &dp->fake_discord, &dp->fake_stun, NULL};
 	for(fake=fakes;*fake;fake++) blob_collection_destroy(*fake);

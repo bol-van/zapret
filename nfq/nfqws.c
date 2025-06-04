@@ -306,6 +306,12 @@ static int nfq_main(void)
 	if (!nfq_init(&h,&qh))
 		goto err;
 
+	if (params.filter_ssid_present && !wlan_info_init())
+	{
+		DLOG_ERR("cannot initialize wlan info capture\n");
+		goto err;
+	}
+
 	if (params.daemon) daemonize();
 
 	sec_harden();
@@ -330,6 +336,9 @@ static int nfq_main(void)
 		while ((rd = recv(fd, buf, sizeof(buf), 0)) >= 0)
 		{
 			ReloadCheck();
+			if (params.filter_ssid_present)
+				if (!wlan_info_get_rate_limited())
+					DLOG_ERR("cannot get wlan info\n");
 			if (rd)
 			{
 				int r = nfq_handle_packet(h, (char *)buf, (int)rd);
@@ -346,9 +355,12 @@ static int nfq_main(void)
 	} while(e==ENOBUFS);
 
 	nfq_deinit(&h,&qh);
+	wlan_info_deinit();
 	return 0;
 err:
 	if (Fpid) fclose(Fpid);
+	nfq_deinit(&h,&qh);
+	wlan_info_deinit();
 	return 1;
 }
 
@@ -1127,6 +1139,20 @@ static bool parse_fooling(char *opt, unsigned int *fooling_mode)
 	return true;
 }
 
+static bool parse_strlist(char *opt, struct str_list_head *list)
+{
+	char *e,*p = optarg;
+	while (p)
+	{
+		e = strchr(p,',');
+		if (e) *e++=0;
+		if (*p && !strlist_add(list, p))
+			return false;
+		p = e;
+	}
+	return true;
+}
+
 static void split_compat(struct desync_profile *dp)
 {
 	if (!dp->split_count)
@@ -1532,6 +1558,9 @@ static void exithelp(void)
 		" --filter-tcp=[~]port1[-port2]|*\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list allowed.\n"
 		" --filter-udp=[~]port1[-port2]|*\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
 		" --filter-l7=[http|tls|quic|wireguard|dht|discord|stun|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
+#ifdef HAS_FILTER_SSID
+		" --filter-ssid=ssid1[,ssid2,ssid3,...]\t\t; per profile wifi SSID filter\n"
+#endif
 		" --ipset=<filename>\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
 		" --ipset-ip=<ip_list>\t\t\t\t; comma separated fixed subnet list\n"
 		" --ipset-exclude=<filename>\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
@@ -1805,6 +1834,9 @@ enum opt_indices {
 	IDX_FILTER_TCP,
 	IDX_FILTER_UDP,
 	IDX_FILTER_L7,
+#ifdef HAS_FILTER_SSID
+	IDX_FILTER_SSID,
+#endif
 	IDX_IPSET,
 	IDX_IPSET_IP,
 	IDX_IPSET_EXCLUDE,
@@ -1926,6 +1958,9 @@ static const struct option long_options[] = {
 	[IDX_FILTER_TCP] = {"filter-tcp", required_argument, 0, 0},
 	[IDX_FILTER_UDP] = {"filter-udp", required_argument, 0, 0},
 	[IDX_FILTER_L7] = {"filter-l7", required_argument, 0, 0},
+#ifdef HAS_FILTER_SSID
+	[IDX_FILTER_SSID] = {"filter-ssid", required_argument, 0, 0},
+#endif
 	[IDX_IPSET] = {"ipset", required_argument, 0, 0},
 	[IDX_IPSET_IP] = {"ipset-ip", required_argument, 0, 0},
 	[IDX_IPSET_EXCLUDE] = {"ipset-exclude", required_argument, 0, 0},
@@ -2810,6 +2845,16 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+#ifdef HAS_FILTER_SSID
+		case IDX_FILTER_SSID:
+			if (!parse_strlist(optarg,&dp->filter_ssid))
+			{
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
+			}
+			params.filter_ssid_present = true;
+			break;
+#endif
 		case IDX_IPSET:
 			if (bSkip) break;
 			if (!RegisterIpset(dp, false, optarg))
@@ -2914,38 +2959,18 @@ int main(int argc, char **argv)
 			break;
 		case IDX_SSID_FILTER:
 			hash_ssid_filter=hash_jen(optarg,strlen(optarg));
+			if (!parse_strlist(optarg,&params.ssid_filter))
 			{
-				char *e,*p = optarg;
-				while (p)
-				{
-					e = strchr(p,',');
-					if (e) *e++=0;
-					if (*p && !strlist_add(&params.ssid_filter, p))
-					{
-						DLOG_ERR("strlist_add failed\n");
-						exit_clean(1);
-					}
-					p = e;
-
-				}
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
 			}
 			break;
 		case IDX_NLM_FILTER:
 			hash_nlm_filter=hash_jen(optarg,strlen(optarg));
+			if (!parse_strlist(optarg,&params.nlm_filter))
 			{
-				char *e,*p = optarg;
-				while (p)
-				{
-					e = strchr(p,',');
-					if (e) *e++=0;
-					if (*p && !strlist_add(&params.nlm_filter, p))
-					{
-						DLOG_ERR("strlist_add failed\n");
-						exit_clean(1);
-					}
-					p = e;
-
-				}
+				DLOG_ERR("strlist_add failed\n");
+				exit_clean(1);
 			}
 			break;
 		case IDX_NLM_LIST:

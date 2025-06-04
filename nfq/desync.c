@@ -223,7 +223,7 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 
 static bool dp_match(
 	struct desync_profile *dp,
-	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto,
+	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto, const char *ssid,
 	bool *bCheckDone, bool *bCheckResult, bool *bExcluded)
 {
 	bool bHostlistsEmpty;
@@ -241,6 +241,11 @@ static bool dp_match(
 	if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
 		// L7 filter does not match
 		return false;
+#ifdef HAS_FILTER_SSID
+	if (!LIST_EMPTY(&dp->filter_ssid) && !strlist_search(&dp->filter_ssid,ssid))
+		return false;
+#endif
+
 	bHostlistsEmpty = PROFILE_HOSTLISTS_EMPTY(dp);
 	if (!dp->hostlist_auto && !hostname && !bHostlistsEmpty)
 		// avoid cpu consuming ipset check. profile cannot win if regular hostlists are present without auto hostlist and hostname is unknown.
@@ -271,7 +276,7 @@ static bool dp_match(
 }
 static struct desync_profile *dp_find(
 	struct desync_profile_list_head *head,
-	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto,
+	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto, const char *ssid,
 	bool *bCheckDone, bool *bCheckResult, bool *bExcluded)
 {
 	struct desync_profile_list *dpl;
@@ -279,12 +284,12 @@ static struct desync_profile *dp_find(
 	{
 		char ip_port[48];
 		ntop46_port(dest, ip_port,sizeof(ip_port));
-		DLOG("desync profile search for %s target=%s l7proto=%s hostname='%s'\n", proto_name(l3proto), ip_port, l7proto_str(l7proto), hostname ? hostname : "");
+		DLOG("desync profile search for %s target=%s l7proto=%s ssid='%s' hostname='%s'\n", proto_name(l3proto), ip_port, l7proto_str(l7proto), ssid ? ssid : "", hostname ? hostname : "");
 	}
 	if (bCheckDone) *bCheckDone = false;
 	LIST_FOREACH(dpl, head, next)
 	{
-		if (dp_match(&dpl->dp,l3proto,dest,hostname,l7proto,bCheckDone,bCheckResult,bExcluded))
+		if (dp_match(&dpl->dp,l3proto,dest,hostname,l7proto,ssid,bCheckDone,bCheckResult,bExcluded))
 		{
 			DLOG("desync profile %d matches\n",dpl->dp.n);
 			return &dpl->dp;
@@ -1107,6 +1112,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	bool bSack,DF;
 	uint16_t nmss;
 	char host[256];
+	const char *ifname = NULL, *ssid = NULL;
 
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
 	extract_endpoints(dis->ip, dis->ip6, dis->tcp, NULL, &src, &dst);
@@ -1122,6 +1128,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		if (!ConntrackPoolDoubleSearch(&params.conntrack, dis->ip, dis->ip6, dis->tcp, NULL, &ctrack_replay, &bReverse) || bReverse)
 			return verdict;
 
+		ifname = bReverse ? ifin : ifout;
+#ifdef HAS_FILTER_SSID
+		ssid = wlan_ssid_search_ifname(ifname);
+		if (ssid) DLOG("found ssid for %s : %s\n",ifname,ssid);
+#endif
 		dp = ctrack_replay->dp;
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
@@ -1133,7 +1144,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!(ctrack_replay->hostname = strdup(host)))
 						DLOG_ERR("strdup(host): out of memory\n");
 			}
-			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, NULL, NULL, NULL);
+			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, ssid, NULL, NULL, NULL);
 			ctrack_replay->dp_search_complete = true;
 		}
 		if (!dp)
@@ -1155,6 +1166,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				ctrack_replay = ctrack;
 			}
 		}
+		ifname = bReverse ? ifin : ifout;
+#ifdef HAS_FILTER_SSID
+		ssid = wlan_ssid_search_ifname(ifname);
+		if (ssid) DLOG("found ssid for %s : %s\n",ifname,ssid);
+#endif
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
 		else if (!ctrack || !ctrack->dp_search_complete)
@@ -1170,7 +1186,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							DLOG_ERR("strdup(host): out of memory\n");
 				}
 			}
-			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, hostname, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
+			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, hostname, ctrack ? ctrack->l7proto : UNKNOWN, ssid, NULL, NULL, NULL);
 			if (ctrack)
 			{
 				ctrack->dp = dp;
@@ -1574,7 +1590,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst,
 				ctrack_replay ? ctrack_replay->hostname : bHaveHost ? host : NULL,
-				ctrack_replay ? ctrack_replay->l7proto : l7proto,
+				ctrack_replay ? ctrack_replay->l7proto : l7proto, ssid,
 				&bCheckDone, &bCheckResult, &bCheckExcluded);
 			if (ctrack_replay)
 			{
@@ -2368,6 +2384,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	bool DF;
 	char host[256];
 	t_l7proto l7proto = UNKNOWN;
+	const char *ifname = NULL, *ssid = NULL;
 
 	extract_endpoints(dis->ip, dis->ip6, NULL, dis->udp, &src, &dst);
 
@@ -2378,6 +2395,12 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		//ConntrackPoolDump(&params.conntrack);
 		if (!ConntrackPoolDoubleSearch(&params.conntrack, dis->ip, dis->ip6, NULL, dis->udp, &ctrack_replay, &bReverse) || bReverse)
 			return verdict;
+
+		ifname = bReverse ? ifin : ifout;
+#ifdef HAS_FILTER_SSID
+		ssid = wlan_ssid_search_ifname(ifname);
+		if (ssid) DLOG("found ssid for %s : %s\n",ifname,ssid);
+#endif
 
 		dp = ctrack_replay->dp;
 		if (dp)
@@ -2390,7 +2413,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					if (!(ctrack_replay->hostname = strdup(host)))
 						DLOG_ERR("strdup(host): out of memory\n");
 			}
-			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, NULL, NULL, NULL);
+			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, ssid, NULL, NULL, NULL);
 			ctrack_replay->dp_search_complete = true;
 		}
 		if (!dp)
@@ -2415,6 +2438,11 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				ctrack_replay = ctrack;
 			}
 		}
+		ifname = bReverse ? ifin : ifout;
+#ifdef HAS_FILTER_SSID
+		ssid = wlan_ssid_search_ifname(ifname);
+		if (ssid) DLOG("found ssid for %s : %s\n",ifname,ssid);
+#endif
 		if (dp)
 			DLOG("using cached desync profile %d\n",dp->n);
 		else if (!ctrack || !ctrack->dp_search_complete)
@@ -2430,7 +2458,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 							DLOG_ERR("strdup(host): out of memory\n");
 				}
 			}
-			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, hostname, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
+			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, hostname, ctrack ? ctrack->l7proto : UNKNOWN, ssid, NULL, NULL, NULL);
 			if (ctrack)
 			{
 				ctrack->dp = dp;
@@ -2703,7 +2731,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 
 			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst,
 				ctrack_replay ? ctrack_replay->hostname : bHaveHost ? host : NULL,
-				ctrack_replay ? ctrack_replay->l7proto : l7proto,
+				ctrack_replay ? ctrack_replay->l7proto : l7proto, ssid,
 				&bCheckDone, &bCheckResult, &bCheckExcluded);
 			if (ctrack_replay)
 			{

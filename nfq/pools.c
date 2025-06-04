@@ -159,6 +159,19 @@ void strlist_destroy(struct str_list_head *head)
 		strlist_entry_destroy(entry);
 	}
 }
+bool strlist_search(const struct str_list_head *head, const char *str)
+{
+	struct str_list *entry;
+	if (str)
+	{
+		LIST_FOREACH(entry, head, next)
+		{
+			if (!strcmp(entry->str, str))
+				return true;
+		}
+	}
+	return false;
+}
 
 
 
