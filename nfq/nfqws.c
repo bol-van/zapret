@@ -306,10 +306,14 @@ static int nfq_main(void)
 	if (!nfq_init(&h,&qh))
 		goto err;
 
-	if (params.filter_ssid_present && !wlan_info_init())
+	if (params.filter_ssid_present)
 	{
-		DLOG_ERR("cannot initialize wlan info capture\n");
-		goto err;
+		if (!wlan_info_init())
+		{
+			DLOG_ERR("cannot initialize wlan info capture\n");
+			goto err;
+		}
+		DLOG("wlan info capture initialized\n");
 	}
 
 	if (params.daemon) daemonize();
