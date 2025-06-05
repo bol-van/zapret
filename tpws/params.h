@@ -24,7 +24,11 @@
 
 #define IPCACHE_LIFETIME 7200
 
-#define MAX_GIDS 64
+#if defined(__APPLE__)
+# define	MAX_GIDS 16
+#else 
+# define	MAX_GIDS 64
+#endif
 
 enum bindll { unwanted=0, no, prefer, force };
 

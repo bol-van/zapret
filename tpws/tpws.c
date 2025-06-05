@@ -997,8 +997,7 @@ void parse_params(int argc, char *argv[])
 			if (getgrouplist(optarg,pwd->pw_gid,params.gid,&params.gid_count)<0)
 #endif
 			{
-				DLOG_ERR("getgrouplist failed. too much groups ?\n");
-				exit_clean(1);
+				DLOG_CONDUP("WARNING ! May shrink needed groups.\n");
 			}
 			if (!params.gid_count)
 			{
