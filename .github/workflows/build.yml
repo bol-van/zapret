@@ -437,7 +437,7 @@ jobs:
             if [ -d $dir ]; then
               echo "Processing $dir"
               case $dir in
-                *-android-arm64-v8a )   run_dir android-aarch64 ;;
+                *-android-arm64-v8a )   run_dir android-arm64 ;;
                 *-android-armeabi-v7a ) run_dir android-arm ;;
                 *-android-x86 )         run_dir android-x86 ;;
                 *-android-x86_64 )      run_dir android-x86_64 ;;
