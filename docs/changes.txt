@@ -512,3 +512,4 @@ nfqws,tpws: use initgroups instead of setgroups if --user specified
 nfqws: --filter-ssid (linux-only)
 install_easy: stop if running embedded release on traditional linux system (some files missing)
 install_bin: add "read elf" arch detection method
+binaries: renamed arch dirs in binaries
