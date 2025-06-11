@@ -441,7 +441,7 @@ jobs:
                 *-android-armeabi-v7a ) run_dir android-arm ;;
                 *-android-x86 )         run_dir android-x86 ;;
                 *-android-x86_64 )      run_dir android-x86_64 ;;
-                *-freebsd-x86_64 )      run_dir freebsd-x64 ;;
+                *-freebsd-x86_64 )      run_dir freebsd-x86_64 ;;
                 *-linux-arm )           run_dir linux-arm ;;
                 *-linux-arm64 )         run_dir linux-arm64 ;;
                 *-linux-mips64 )        run_dir linux-mips64 ;;

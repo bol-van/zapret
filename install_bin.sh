@@ -139,7 +139,7 @@ case $UNAME in
 		ARCHLIST="my mac64"
 		;;
 	FreeBSD)
-		ARCHLIST="my freebsd-x64"
+		ARCHLIST="my freebsd-x86_64"
 		PKTWS=dvtws
 		;;
 	CYGWIN*)
