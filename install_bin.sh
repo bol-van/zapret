@@ -144,7 +144,7 @@ case $UNAME in
 		;;
 	CYGWIN*)
 		UNAME=CYGWIN
-		ARCHLIST="win64 win32"
+		ARCHLIST="windows-x86_64 windows-x86"
 		PKTWS=winws
 		;;
 	*)

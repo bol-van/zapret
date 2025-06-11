@@ -452,8 +452,8 @@ jobs:
                 *-linux-x86_64 )        run_dir linux-x86_64 ;;
                 *-linux-lexra )         run_dir linux-lexra ;;
                 *-mac-x64 )             run_dir mac64 ;;
-                *-win-x86 )             run_dir win32 ;;
-                *-win-x86_64 )          run_dir win64 ;;
+                *-win-x86 )             run_dir windows-x86 ;;
+                *-win-x86_64 )          run_dir windows-x86_64 ;;
               esac
             fi
           done
