@@ -12,7 +12,7 @@ define Package/nfqws
 	CATEGORY:=Network
 	TITLE:=nfqws
 	SUBMENU:=Zapret
- 	DEPENDS:=+libnetfilter-queue +libcap +zlib
+	DEPENDS:=+libnetfilter-queue +lmnl +libcap +zlib
 endef
 
 define Build/Prepare
