@@ -132,7 +132,7 @@ UNAME=$(uname)
 unset PKTWS
 case $UNAME in
 	Linux)
-		ARCHLIST="my x86_64 x86 aarch64 arm mips64r2-msb mips32r1-lsb mips32r1-msb lexra ppc"
+		ARCHLIST="my linux-x86_64 linux-x86 linux-arm64 linux-arm linux-mips64 linux-mipsel linux-mips linux-lexra linux-ppc"
 		PKTWS=nfqws
 		;;
 	Darwin)
