@@ -345,3 +345,32 @@ bool dp_list_need_all_out(struct desync_profile_list_head *head)
 			return true;
 	return false;
 }
+
+
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
+void cleanup_args(struct params_s *params)
+{
+	wordfree(&params->wexp);
+}
+#endif
+
+void cleanup_params(struct params_s *params)
+{
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
+	cleanup_args(params);
+#endif
+
+	ConntrackPoolDestroy(&params->conntrack);
+
+	dp_list_destroy(&params->desync_profiles);
+
+	hostlist_files_destroy(&params->hostlists);
+	ipset_files_destroy(&params->ipsets);
+	ipcacheDestroy(&params->ipcache);
+#ifdef __CYGWIN__
+	strlist_destroy(&params->ssid_filter);
+	strlist_destroy(&params->nlm_filter);
+#else
+	free(params->user); params->user=NULL;
+#endif
+}

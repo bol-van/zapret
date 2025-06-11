@@ -200,6 +200,7 @@ struct params_s
 	struct str_list_head ssid_filter,nlm_filter;
 #else
 	bool droproot;
+	char *user;
 	uid_t uid;
 	gid_t gid[MAX_GIDS];
 	int gid_count;
@@ -229,6 +230,10 @@ struct params_s
 
 extern struct params_s params;
 extern const char *progname;
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
+void cleanup_args(struct params_s *params);
+#endif
+void cleanup_params(struct params_s *params);
 
 int DLOG(const char *format, ...);
 int DLOG_ERR(const char *format, ...);

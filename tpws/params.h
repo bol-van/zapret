@@ -117,8 +117,9 @@ struct params_s
 	bool fix_seg_avail;
 	bool no_resolve;
 	bool skip_nodelay;
-	bool droproot;
 	bool daemon;
+	bool droproot;
+	char *user;
 	uid_t uid;
 	gid_t gid[MAX_GIDS];
 	int gid_count;
@@ -155,6 +156,10 @@ struct params_s
 
 extern struct params_s params;
 extern const char *progname;
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
+void cleanup_args(struct params_s *params);
+#endif
+void cleanup_params(struct params_s *params);
 
 int DLOG(const char *format, int level, ...);
 int DLOG_CONDUP(const char *format, ...);

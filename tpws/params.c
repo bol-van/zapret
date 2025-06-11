@@ -258,3 +258,24 @@ void dp_list_destroy(struct desync_profile_list_head *head)
 		dp_entry_destroy(entry);
 	}
 }
+
+
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
+void cleanup_args(struct params_s *params)
+{
+	wordfree(&params->wexp);
+}
+#endif
+void cleanup_params(struct params_s *params)
+{
+#if !defined( __OpenBSD__) && !defined(__ANDROID__)
+	cleanup_args(params);
+#endif
+
+	dp_list_destroy(&params->desync_profiles);
+
+	hostlist_files_destroy(&params->hostlists);
+	ipset_files_destroy(&params->ipsets);
+	ipcacheDestroy(&params->ipcache);
+	free(params->user); params->user=NULL;
+}

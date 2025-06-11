@@ -84,7 +84,7 @@ bool dropcaps(void);
 
 bool sec_harden(void);
 bool can_drop_root();
-bool droproot(uid_t uid, gid_t *gid, int gid_count);
+bool droproot(uid_t uid, const char *user, const gid_t *gid, int gid_count);
 void print_id(void);
 void daemonize(void);
 bool writepid(const char *filename);

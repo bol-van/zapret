@@ -295,7 +295,7 @@ bool can_drop_root(void)
 #endif
 }
 
-bool droproot(uid_t uid, gid_t *gid, int gid_count)
+bool droproot(uid_t uid, const char *user, const gid_t *gid, int gid_count)
 {
 	if (gid_count<1)
 	{
@@ -309,11 +309,23 @@ bool droproot(uid_t uid, gid_t *gid, int gid_count)
 		return false;
 	}
 #endif
-	// drop all SGIDs
-	if (setgroups(gid_count,gid))
+	if (user)
 	{
-		DLOG_PERROR("setgroups");
-		return false;
+		// macos has strange supp gid handling. they cache only 16 groups and fail setgroups if more than 16 gids specified.
+		// better to leave it to the os
+		if (initgroups(user,gid[0]))
+		{
+			DLOG_PERROR("initgroups");
+			return false;
+		}
+	}
+	else
+	{
+		if (setgroups(gid_count,gid))
+		{
+			DLOG_PERROR("setgroups");
+			return false;
+		}
 	}
 	if (setgid(gid[0]))
 	{

@@ -290,32 +290,14 @@ static void exithelp(void)
 	);
 	exit(1);
 }
-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
-static void cleanup_args()
-{
-	wordfree(&params.wexp);
-}
-#endif
-static void cleanup_params(void)
-{
-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
-	cleanup_args();
-#endif
-
-	dp_list_destroy(&params.desync_profiles);
-
-	hostlist_files_destroy(&params.hostlists);
-	ipset_files_destroy(&params.ipsets);
-	ipcacheDestroy(&params.ipcache);
-}
 static void exithelp_clean(void)
 {
-	cleanup_params();
+	cleanup_params(&params);
 	exithelp();
 }
 static void exit_clean(int code)
 {
-	cleanup_params();
+	cleanup_params(&params);
 	exit(code);
 }
 static void nextbind_clean(void)
@@ -982,6 +964,7 @@ void parse_params(int argc, char *argv[])
 			break;
 		case IDX_USER:
 		{
+			free(params.user); params.user=NULL;
 			struct passwd *pwd = getpwnam(optarg);
 			if (!pwd)
 			{
@@ -989,27 +972,18 @@ void parse_params(int argc, char *argv[])
 				exit_clean(1);
 			}
 			params.uid = pwd->pw_uid;
-			params.gid_count=MAX_GIDS;
-#ifdef __APPLE__
-			// silence warning
-			if (getgrouplist(optarg,pwd->pw_gid,(int*)params.gid,&params.gid_count)<0)
-#else
-			if (getgrouplist(optarg,pwd->pw_gid,params.gid,&params.gid_count)<0)
-#endif
+			params.gid[0]=pwd->pw_gid;
+			params.gid_count=1;
+			if (!(params.user=strdup(optarg)))
 			{
-				DLOG_ERR("getgrouplist failed. too much groups ?\n");
+				DLOG_ERR("strdup: out of memory\n");
 				exit_clean(1);
-			}
-			if (!params.gid_count)
-			{
-				params.gid[0] = pwd->pw_gid;
-				params.gid_count = 1;
 			}
 			params.droproot = true;
 			break;
 		}
 		case IDX_UID:
-			params.droproot = true;
+			free(params.user); params.user=NULL;
 			if (!parse_uid(optarg,&params.uid,params.gid,&params.gid_count,MAX_GIDS))
 			{
 				DLOG_ERR("--uid should be : uid[:gid,gid,...]\n");
@@ -1020,6 +994,7 @@ void parse_params(int argc, char *argv[])
 				params.gid[0] = 0x7FFFFFFF;
 				params.gid_count = 1;
 			}
+			params.droproot = true;
 			break;
 		case IDX_MAXCONN:
 			params.maxconn = atoi(optarg);
@@ -1727,13 +1702,13 @@ void parse_params(int argc, char *argv[])
 
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
 	// do not need args from file anymore
-	cleanup_args();
+	cleanup_args(&params);
 #endif
 	if (bDry)
 	{
 		if (params.droproot)
 		{
-			if (!droproot(params.uid,params.gid,params.gid_count))
+			if (!droproot(params.uid,params.user,params.gid,params.gid_count))
 				exit_clean(1);
 #ifdef __linux__
 			if (!dropcaps())
@@ -2171,7 +2146,7 @@ int main(int argc, char *argv[])
 	}
 
 	set_ulimit();
-	if (params.droproot && !droproot(params.uid,params.gid,params.gid_count))
+	if (params.droproot && !droproot(params.uid,params.user,params.gid,params.gid_count))
 		goto exiterr;
 #ifdef __linux__
 	if (!dropcaps())
@@ -2215,6 +2190,6 @@ exiterr:
 	if (Fpid) fclose(Fpid);
 	redir_close();
 	for(i=0;i<=params.binds_last;i++) if (listen_fd[i]!=-1) close(listen_fd[i]);
-	cleanup_params();
+	cleanup_params(&params);
 	return exit_v;
 }

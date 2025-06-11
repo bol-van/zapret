@@ -508,6 +508,7 @@ v71.1
 nfqws,tpws: much faster ipset implementation. move from hash to avl tree
 nfqws,tpws: check list files accessibility with dropped privs in --dry-run mode
 nfqws,tpws: --debug=android for NDK builds
+nfqws,tpws: use initgroups instead of setgroups if --user specified
 nfqws: --filter-ssid (linux-only)
 install_easy: stop if running embedded release on traditional linux system (some files missing)
 install_bin: add "read elf" arch detection method
