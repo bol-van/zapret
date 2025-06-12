@@ -1,5 +1,6 @@
 DISABLE_IPV6=0
 TP_PORT=900
+TP_PORT_SSL=901
 TP_USER=daemon
 
 EXCLUDE4="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 127.0.0.0/8"
@@ -25,7 +26,7 @@ redirect_port()
 redirect()
 {
 	redirect_port 80 $TP_PORT
-	redirect_port 443 $TP_PORT
+	redirect_port 443 $TP_PORT_SSL
 }
 
 for IPTABLES in $IPTS; do

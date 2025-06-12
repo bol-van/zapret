@@ -8,11 +8,15 @@ set tpws_exclude6 {
 }
 chain tpws_pre {
 	type nat hook prerouting priority dstnat; policy accept;
-	tcp dport {80,443} ip daddr != @tpws_exclude4 redirect to :900
-	tcp dport {80,443} ip6 daddr != @tpws_exclude6 redirect to :900
+	tcp dport 80 ip daddr != @tpws_exclude4 redirect to :900
+	tcp dport 443 ip daddr != @tpws_exclude4 redirect to :901
+	tcp dport 80 ip6 daddr != @tpws_exclude4 redirect to :900
+	tcp dport 443 ip6 daddr != @tpws_exclude6 redirect to :901
 }
 chain tpws_out {
 	type nat hook output priority -100; policy accept;
-	tcp dport {80,443} skuid != daemon ip daddr != @tpws_exclude4 redirect to :900
-	tcp dport {80,443} skuid != daemon ip6 daddr != @tpws_exclude6 redirect to :900
+	tcp dport 80 skuid != daemon ip daddr != @tpws_exclude4 redirect to :900
+	tcp dport 443 skuid != daemon ip daddr != @tpws_exclude4 redirect to :901
+	tcp dport 80 skuid != daemon ip6 daddr != @tpws_exclude6 redirect to :900
+	tcp dport 443 skuid != daemon ip6 daddr != @tpws_exclude6 redirect to :901
 }
