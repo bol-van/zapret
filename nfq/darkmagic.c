@@ -1972,10 +1972,10 @@ static int wlan_info_cb(const struct nlmsghdr *nlh, void *data)
 			if (wext_fd!=-1)
 			{
 				struct iwreq req;
-				memset(&req.u,0,sizeof(req.u));
 				snprintf(req.ifr_ifrn.ifrn_name,sizeof(req.ifr_ifrn.ifrn_name),"%s",wc->wlan[wc->count].ifname);
 				req.u.essid.pointer = wc->wlan[wc->count].ssid;
 				req.u.essid.length = sizeof(wc->wlan[wc->count].ssid);
+				req.u.essid.flags = 0;
 				if (ioctl(wext_fd, SIOCGIWESSID, &req) != -1)
 					wc->count++;
 				close(wext_fd);
