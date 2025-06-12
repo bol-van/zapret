@@ -1976,8 +1976,9 @@ static int wlan_info_cb(const struct nlmsghdr *nlh, void *data)
 				req.u.essid.pointer = wc->wlan[wc->count].ssid;
 				req.u.essid.length = sizeof(wc->wlan[wc->count].ssid);
 				req.u.essid.flags = 0;
-				if (ioctl(wext_fd, SIOCGIWESSID, &req) != -1)
-					wc->count++;
+				if (ioctl(wext_fd, SIOCGIWESSID, &req)!=-1)
+					if (*wc->wlan[wc->count].ssid)
+						wc->count++;
 				close(wext_fd);
 			}
 		}
