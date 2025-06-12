@@ -34,6 +34,8 @@
 #include <linux/genetlink.h>
 #include <libmnl/libmnl.h>
 #include <net/if.h>
+#include <linux/wireless.h>
+#include <sys/ioctl.h>
 #endif
 
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
@@ -1959,8 +1961,27 @@ static int wlan_info_cb(const struct nlmsghdr *nlh, void *data)
 	if (wc->count>=WLAN_INTERFACE_MAX) return MNL_CB_OK;
 	memset(wc->wlan+wc->count,0,sizeof(wc->wlan[0]));
 	ret = mnl_attr_parse(nlh, sizeof(struct genlmsghdr), wlan_info_attr_cb, wc->wlan+wc->count);
-	if (ret>=0 && *wc->wlan[wc->count].ssid && *wc->wlan[wc->count].ifname && wc->wlan[wc->count].ifindex)
-		wc->count++;
+	if (ret>=0 && *wc->wlan[wc->count].ifname && wc->wlan[wc->count].ifindex)
+	{
+		if (*wc->wlan[wc->count].ssid)
+			wc->count++;
+		else
+		{
+			// sometimes nl80211 does not return SSID but wireless ext does
+			int wext_fd = socket(AF_INET, SOCK_DGRAM, 0);
+			if (wext_fd!=-1)
+			{
+				struct iwreq req;
+				memset(&req.u,0,sizeof(req.u));
+				snprintf(req.ifr_ifrn.ifrn_name,sizeof(req.ifr_ifrn.ifrn_name),"%s",wc->wlan[wc->count].ifname);
+				req.u.essid.pointer = wc->wlan[wc->count].ssid;
+				req.u.essid.length = sizeof(wc->wlan[wc->count].ssid);
+				if (ioctl(wext_fd, SIOCGIWESSID, &req) != -1)
+					wc->count++;
+				close(wext_fd);
+			}
+		}
+	}
 	return ret;
 }
 static bool wlan_info(struct mnl_socket* nl, uint16_t wlan_family_id, struct wlan_interface_collection* w)
