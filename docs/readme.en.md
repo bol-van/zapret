@@ -1,4 +1,4 @@
-# zapret v71
+# zapret v71.1
 
 # SCAMMER WARNING
 
@@ -35,6 +35,7 @@ ___
   - [UDP support](#udp-support)
   - [IP fragmentation](#ip-fragmentation)
   - [Multiple strategies](#multiple-strategies)
+  - [WIFI filtering](#wifi-filtering)
   - [Virtual machines](#virtual-machines)
   - [IPTABLES for nfqws](#iptables-for-nfqws)
   - [NFTABLES for nfqws](#nftables-for-nfqws)
@@ -229,6 +230,7 @@ nfqws takes the following parameters:
  --filter-tcp=[~]port1[-port2]|*                ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list supported.
  --filter-udp=[~]port1[-port2]|*                ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list supported.
  --filter-l7=<proto>                            ; L6-L7 protocol filter. multiple comma separated values allowed. proto: http tls quic wireguard dht discord stun unknown
+ --filter-ssid=ssid1[,ssid2,ssid3,...]          ; per profile wifi SSID filter
  --ipset=<filename>                             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
  --ipset-ip=<ip_list>                           ; comma separated fixed subnet list
  --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
@@ -658,6 +660,28 @@ This way you may never unblock all resources and only confuse yourself.
 
 IMPORTANT : user-mode ipset implementation was not designed as a kernel version replacement. Kernel version is much more effective.
 It's for the systems that lack ipset support : Windows and Linux without nftables and ipset kernel modules (Android, for example).
+
+### WIFI filtering
+
+Wifi interface name is not related to connected SSID.
+It's possible to connect interface to different SSIDs.
+They may require different strategies. How to solve this problem ?
+
+You can run and stop nfqws instances manually. But you can also automate this.
+Windows version `winws` has global filter `--ssid-filter`.
+It connects or disconnects `winws` depending on connected SSIDs.
+Routing is not take into account. This approach is possible because windivert can have multiple handlers with intersecting filter.
+If SSID changes one `winws` connects and others disconnect.
+
+`winws` solution is hard to implement in Linux because one nfqueue can have only one handler and it's impossible to pass same traffic to multiple queues.
+One must connect when others have already disconnected.
+Instead, `nfqws` has per-profile `--filter-ssid` parameter. Like `--ssid-filter` it takes comma separated SSID list.
+`nfqws` maintains ifname->SSID list which is updated not faster than once a second.
+When a packet comes incoming or outgoing interface name is matched to the SSID and then used in profile selection algorithm.
+
+SSID info is taken the same way as `iw dev <ifname> info` does.
+In practice this command not always returns SSID name for reasons not known yet. If it does not display SSID then `--filter-ssid` will also not work.
+Before using it check iw command output.
 
 ### Virtual machines
 

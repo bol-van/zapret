@@ -83,7 +83,7 @@ You must choose to install `curl`. To compile from sources install `gcc-core`,`m
 Make from directory `nfq` using `make cygwin64` or `make cygwin32` for 64 and 32 bit versions.
 
 `winws` requires `cygwin1.dll`, `windivert.dll`, `windivert64.sys` or `windivert32.sys`.
-You can take them from `binaries/win64` or `binaries/win32`.
+You can take them from `binaries/windows-x86_64` or `binaries/windows-x86`.
 
 There's no `arm64` signed `windivert` driver and no `cygwin`.
 But it's possible to use unsigned driver version in test mode and user mode components with x64 emulation.
@@ -128,19 +128,6 @@ If you want to run `winws` from `cygwin` delete, rename or move `cygwin1.dll`.
 
 To simplify things it's advised to use `zapret-win-bundle`.
 
-### auto start
-
-To start `winws` with windows use windows task scheduler. There are `task_*.cmd` batch files in `binaries/win64/zapret-winws`.
-They create, remove, start and stop scheduled task `winws1`. They must be run as administrator.
-
-Edit `task_create.cmd` and write your `winws` parameters to `%WINWS1%` variable. If you need multiple `winws` instances
-clone the code in all cmd files to support multiple tasks `winws1,winws2,winws3,...`.
-
-Tasks can also be controlled from GUI `taskschd.msc`.
-
-Also you can use windows services the same way with `service_*.cmd`.
-
-
 ### zapret-win-bundle
 
 To make your life easier there's ready to use [bundle](https://github.com/bol-van/zapret-win-bundle) with `cygwin`,`blockcheck` and `winws`.
@@ -166,3 +153,15 @@ unix2dos winws.log
 `winws.log` will be in `cygwin/home/<username>`. `unix2dos` helps with `windows 7` notepad. It's not necessary in `Windows 10` and later.
 
 Because 32-bit systems are rare nowadays `zapret-win-bundle` exists only for `Windows x64/arm64`.
+
+### auto start
+
+To start `winws` with windows use windows task scheduler. There are `task_*.cmd` batch files in `binaries/windows-x86-64/zapret-winws`.
+They create, remove, start and stop scheduled task `winws1`. They must be run as administrator.
+
+Edit `task_create.cmd` and write your `winws` parameters to `%WINWS1%` variable. If you need multiple `winws` instances
+clone the code in all cmd files to support multiple tasks `winws1,winws2,winws3,...`.
+
+Tasks can also be controlled from GUI `taskschd.msc`.
+
+Also you can use windows services the same way with `service_*.cmd`.
