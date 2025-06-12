@@ -513,3 +513,7 @@ nfqws: --filter-ssid (linux-only)
 install_easy: stop if running embedded release on traditional linux system (some files missing)
 install_bin: add "read elf" arch detection method
 binaries: renamed arch dirs in binaries
+
+v71.2
+
+nfqws: use wireless ext in case nl80211 does not return SSID
