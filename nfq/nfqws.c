@@ -306,6 +306,7 @@ static int nfq_main(void)
 	if (!nfq_init(&h,&qh))
 		goto err;
 
+#ifdef HAS_FILTER_SSID
 	if (params.filter_ssid_present)
 	{
 		if (!wlan_info_init())
@@ -315,6 +316,7 @@ static int nfq_main(void)
 		}
 		DLOG("wlan info capture initialized\n");
 	}
+#endif
 
 	if (params.daemon) daemonize();
 
@@ -340,9 +342,11 @@ static int nfq_main(void)
 		while ((rd = recv(fd, buf, sizeof(buf), 0)) >= 0)
 		{
 			ReloadCheck();
+#ifdef HAS_FILTER_SSID
 			if (params.filter_ssid_present)
 				if (!wlan_info_get_rate_limited())
 					DLOG_ERR("cannot get wlan info\n");
+#endif
 			if (rd)
 			{
 				int r = nfq_handle_packet(h, (char *)buf, (int)rd);
@@ -359,12 +363,16 @@ static int nfq_main(void)
 	} while(e==ENOBUFS);
 
 	nfq_deinit(&h,&qh);
+#ifdef HAS_FILTER_SSID
 	wlan_info_deinit();
+#endif
 	return 0;
 err:
 	if (Fpid) fclose(Fpid);
 	nfq_deinit(&h,&qh);
+#ifdef HAS_FILTER_SSID
 	wlan_info_deinit();
+#endif
 	return 1;
 }
 
