@@ -34,6 +34,7 @@
 #include <linux/genetlink.h>
 #include <libmnl/libmnl.h>
 #include <net/if.h>
+#define _LINUX_IF_H // prevent conflict between linux/if.h and net/if.h in old gcc 4.x
 #include <linux/wireless.h>
 #include <sys/ioctl.h>
 #endif
