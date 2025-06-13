@@ -1,4 +1,4 @@
-# zapret v71.1
+# zapret v71.1.1
 
 # SCAMMER WARNING
 
@@ -679,9 +679,11 @@ Instead, `nfqws` has per-profile `--filter-ssid` parameter. Like `--ssid-filter`
 `nfqws` maintains ifname->SSID list which is updated not faster than once a second.
 When a packet comes incoming or outgoing interface name is matched to the SSID and then used in profile selection algorithm.
 
-SSID info is taken the same way as `iw dev <ifname> info` does.
-In practice this command not always returns SSID name for reasons not known yet. If it does not display SSID then `--filter-ssid` will also not work.
-Before using it check iw command output.
+SSID info is taken the same way as `iw dev <ifname> info` does (nl80211).
+Unfortunately it's broken since kernel 5.19 and still unfixed in 6.14.
+In the latter case `iwgetid` way is used (wireless extensions).
+Wireless extensions are deprecated. Some kernels can be built without wext support.
+Before using `--filter-ssid` check that any of the mentioned commands can return SSID.
 
 ### Virtual machines
 
