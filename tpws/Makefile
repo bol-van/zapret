@@ -1,5 +1,6 @@
 CC ?= gcc
-CFLAGS += -std=gnu99 -Os -flto=auto
+OPTIMIZE ?= -Os
+CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto
 CFLAGS_SYSTEMD = -DUSE_SYSTEMD
 CFLAGS_BSD = -Wno-address-of-packed-member
 LDFLAGS_ANDROID = -llog

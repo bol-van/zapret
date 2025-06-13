@@ -1,5 +1,6 @@
 CC ?= cc
-CFLAGS += -std=gnu99 -s -Os -Wno-address-of-packed-member -flto=auto
+OPTIMIZE ?= -Os
+CFLAGS += -std=gnu99 -s $(OPTIMIZE) -flto=auto -Wno-address-of-packed-member
 LIBS = -lz
 SRC_FILES = *.c crypto/*.c
 

@@ -1,5 +1,6 @@
 CC ?= cc
-CFLAGS += -std=gnu99 -s -Os -flto=auto
+OPTIMIZE ?= -Os
+CFLAGS += -std=gnu99 -s $(OPTIMIZE) -flto=auto
 LIBS = -lz -lpthread
 SRC_FILES = *.c
 

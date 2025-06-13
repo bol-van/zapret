@@ -102,7 +102,7 @@ check_bins()
 				make_target=systemd
 				;;
 		esac
-		CFLAGS="${cf:+$cf }${CFLAGS}" make -C "$EXEDIR" $make_target || {
+		CFLAGS="${cf:+$cf }${CFLAGS}" OPTIMIZE=-O2 make -C "$EXEDIR" $make_target || {
 			echo could not compile
 			make -C "$EXEDIR" clean
 			exitp 8
