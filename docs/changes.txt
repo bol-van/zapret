@@ -514,6 +514,10 @@ install_easy: stop if running embedded release on traditional linux system (some
 install_bin: add "read elf" arch detection method
 binaries: renamed arch dirs in binaries
 
-v71.2
+v71.1.1
 
 nfqws: use wireless ext in case nl80211 does not return SSID
+
+v71.2
+
+nfqws: apply udp desync to replayed packets with non-zero reasm offset (except fake)

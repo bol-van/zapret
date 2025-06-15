@@ -2421,9 +2421,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("matching desync profile not found\n");
 			return verdict;
 		}
-
-		// no need to desync middle packets in reasm session
-		if (reasm_offset) goto send_orig;
 	}
 	else
 	{
@@ -2839,6 +2836,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					break;
 				}
 			case DESYNC_FAKE:
+				if (!reasm_offset)
 				{
 					struct blob_item *fake_item;
 					int n=0;
@@ -2862,8 +2860,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 							goto send_orig;
 						ip_id=IP4_IP_ID_NEXT(ip_id);
 					}
+					bFake = true;
 				}
-				bFake = true;
 				break;
 			case DESYNC_HOPBYHOP:
 			case DESYNC_DESTOPT:
