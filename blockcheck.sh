@@ -403,8 +403,8 @@ check_system()
 	esac
 	echo $UNAME${SUBSYS:+/$SUBSYS} detected
 	echo firewall type is $FWTYPE
-	echo CURL=${CURL:-curl}
-	${CURL:-curl} --version
+	echo CURL=$CURL
+	$CURL --version
 }
 
 zp_already_running()
