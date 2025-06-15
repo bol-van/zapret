@@ -402,6 +402,12 @@ check_system()
 			exitp 5
 	esac
 	echo $UNAME${SUBSYS:+/$SUBSYS} detected
+	echo -n 'kernel: '
+	if [ -f "/proc/version" ]; then
+		cat /proc/version
+	else
+		uname -a
+	fi
 	echo firewall type is $FWTYPE
 	echo CURL=$CURL
 	$CURL --version
