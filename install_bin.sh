@@ -136,6 +136,7 @@ if [ ! -d "$BINDIR" ] || ! dir_is_not_empty "$BINDIR" ]; then
 		Linux)
 			echo "you need to download release from github or build binaries from source"
 			echo "building from source requires debian/ubuntu packages : make gcc zlib1g-dev libcap-dev libnetfilter-queue-dev libmnl-dev libsystemd-dev"
+			echo "libsystemd-dev required only on systemd based systems"
 			echo "on distributions with other package manager find dev package analogs"
 			echo "to compile on systems with systemd : make systemd"
 			echo "to compile on other systems : make"
@@ -155,9 +156,6 @@ if [ ! -d "$BINDIR" ] || ! dir_is_not_empty "$BINDIR" ]; then
 			echo "you need to download release from github or build binaries from source"
 			echo "to compile : read docs"
 			echo "to make things easier use zapret-win-bundle"
-			;;
-		*)
-			echo "to compile : make"
 			;;
 	esac
 	exit 1
