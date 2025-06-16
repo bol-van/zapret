@@ -127,7 +127,41 @@ ccp()
 	#cp -f "../$BINS/$1" "$ZAPRET_BASE/$2" && echo copying : "../$BINS/$1" =\> "$ZAPRET_BASE/$2"
 }
 
+
 UNAME=$(uname)
+
+if [ ! -d "$BINDIR" ] || ! dir_is_not_empty "$BINDIR" ]; then
+	echo "no binaries found"
+	case $UNAME in
+		Linux)
+			echo "you need to download release from github or build binaries from source"
+			echo "building from source requires debian/ubuntu packages : make gcc zlib1g-dev libcap-dev libnetfilter-queue-dev libmnl-dev libsystemd-dev"
+			echo "on distributions with other package manager find dev package analogs"
+			echo "to compile on systems with systemd : make systemd"
+			echo "to compile on other systems : make"
+			;;
+		Darwin)
+			echo "you need to download release from github or build binaries from source"
+			echo "to compile : make mac"
+			;;
+		FreeBSD)
+			echo "you need to download release from github or build binaries from source"
+			echo "to compile : make"
+			;;
+		OpenBSD)
+			echo "to compile : make bsd"
+			;;
+		CYGWIN*)
+			echo "you need to download release from github or build binaries from source"
+			echo "to compile : read docs"
+			echo "to make things easier use zapret-win-bundle"
+			;;
+		*)
+			echo "to compile : make"
+			;;
+	esac
+	exit 1
+fi
 
 unset PKTWS
 case $UNAME in
