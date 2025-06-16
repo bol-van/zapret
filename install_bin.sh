@@ -130,6 +130,7 @@ ccp()
 
 UNAME=$(uname)
 
+[ "$1" = getarch ] ||
 if [ ! -d "$BINDIR" ] || ! dir_is_not_empty "$BINDIR" ]; then
 	echo "no binaries found"
 	case $UNAME in
