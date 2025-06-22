@@ -1,4 +1,4 @@
-CC ?= gcc
+CC ?= cc
 OPTIMIZE ?= -Os
 CFLAGS += -std=gnu99 $(OPTIMIZE)
 CFLAGS_BSD = -Wno-address-of-packed-member
