@@ -556,9 +556,9 @@ There is special support for all tcp split options for multi segment TLS. Split 
 ### UDP support
 
 UDP attacks are limited. Its not possible to fragment UDP on transport level, only on network (ip) level.
-Only desync modes `fake`,`hopbyhop`,`destopt`,`ipfrag1` and `ipfrag2` are applicable.
-`fake`,`hopbyhop`,`destopt` can be used in combo with `ipfrag2`.
-`fake` can be used in combo with `udplen` and `tamper`.
+Only desync modes `fake`,`fakeknown`,`hopbyhop`,`destopt`,`ipfrag1`,`ipfrag2`,`udplen` and `tamper` are applicable.
+`fake`,`fakeknown`,`hopbyhop`,`destopt`,`ipfrag1` are 1st phase modes, others - 2nd phase.
+As always it's possible to combine one mode from 1st phase with one mode from 2nd phase but not possible to mix same phase modes.
 
 `udplen` increases udp payload size by `--dpi-desync-udplen-increment` bytes. Padding is filled with zeroes by default but can be overriden with a pattern.
 This option can resist DPIs that track outgoing UDP packet sizes.
