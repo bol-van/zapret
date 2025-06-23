@@ -1449,7 +1449,7 @@ static bool wf_make_filter(
 	const char *pf_tcp_src, const char *pf_tcp_dst,
 	const char *pf_udp_src, const char *pf_udp_dst)
 {
-	char pf_dst_buf[512],iface[64];
+	char pf_dst_buf[8192],iface[64];
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? dp_list_have_autohostlist(&params.desync_profiles) ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
 	const char *f_tcp_not_empty = (*pf_tcp_src && !dp_list_need_all_out(&params.desync_profiles)) ? DIVERT_TCP_NOT_EMPTY " and " : "";
@@ -1987,7 +1987,7 @@ int main(int argc, char **argv)
 	struct hostlist_file *anon_hl = NULL, *anon_hl_exclude = NULL;
 	struct ipset_file *anon_ips = NULL, *anon_ips_exclude = NULL;
 #ifdef __CYGWIN__
-	char windivert_filter[8192], wf_pf_tcp_src[256], wf_pf_tcp_dst[256], wf_pf_udp_src[256], wf_pf_udp_dst[256], wf_save_file[256];
+	char windivert_filter[16384], wf_pf_tcp_src[4096], wf_pf_tcp_dst[4096], wf_pf_udp_src[4096], wf_pf_udp_dst[4096], wf_save_file[4096];
 	bool wf_ipv4=true, wf_ipv6=true;
 	unsigned int IfIdx=0, SubIfIdx=0;
 	unsigned int hash_wf_tcp=0,hash_wf_udp=0,hash_wf_raw=0,hash_ssid_filter=0,hash_nlm_filter=0;
