@@ -635,7 +635,11 @@ curl_with_subst_ip()
 	# $2 - port
 	# $3 - ip
 	# $4+ - curl params
-	local connect_to="--connect-to $1::[$3]${2:+:$2}" arg
+	local ip="$3"
+	case "$ip" in
+		*:*) ip="[$ip]" ;;
+	esac
+	local connect_to="--connect-to $1::$ip${2:+:$2}" arg
 	shift ; shift ; shift
 	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
 	[ "$CURL_CMD" = 1 ] && echo $CURL ${arg:+$arg }$connect_to "$@"
