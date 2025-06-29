@@ -1494,7 +1494,7 @@ LISTS_RELOAD=-  отключает перезагрузку листов.
 `ipset/zapret-hosts-users.txt.gz` или `ipset/zapret-hosts-users.txt`,
 `ipset/zapret-hosts.txt.gz` или `ipset/zapret-hosts.txt`
 и 1 exclude список
-`ipset/zapret-hosts-users-exclude.txt.gz` или `ipset/zapret-hosts-users-exclude.txt`
+`ipset/zapret-hosts-users-exclude.txt.gz` или `ipset/zapret-hosts-user-exclude.txt`
 
 При режимах фильтрации `MODE_FILTER=hostlist` или `MODE_FILTER=autohostlist` система запуска передает **nfqws** или **tpws** все листы, файлы которых присутствуют.
 Передача происходит через замену маркеров `<HOSTLIST>` и `<HOSTLIST_NOAUTO>` на реальные параметры `--hostlist`, `--hostlist-exclude`, `--hostlist-auto`.
