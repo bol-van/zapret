@@ -56,13 +56,26 @@ sysctl net.inet6.ip6.forwarding=1
 
 OpenBSD PF :
 
+(OLD OpenBSD versions)
+
 ; dont know how to rdr-to from local system. doesn't seem to work. only works for routed traffic.
 
 /etc/pf.conf
 pass in quick on em1 inet  proto tcp to port {80,443} rdr-to 127.0.0.1 port 988 
 pass in quick on em1 inet6 proto tcp to port {80,443} rdr-to ::1 port 988 
 pfctl -f /etc/pf.conf
+/opt/zapret/tpws/tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1 --enable-pf
+
+(NEW OpenBSD versions)
+
+; dont know how to divert-to from local system
+
+/etc/pf.conf
+pass on em1 inet proto tcp to port {80,443} divert-to 127.0.0.1 port 989
+pass on em1 inet6 proto tcp to port {80,443} divert-to ::1 port 989
+pfctl -f /etc/pf.conf
 /opt/zapret/tpws/tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
+
 
 ; dvtws works both for routed and local
 

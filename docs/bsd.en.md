@@ -312,7 +312,7 @@ In OpenBSD default `tpws` bind is ipv6 only. To bind to ipv4 specify
 Use `--bind-addr=0.0.0.0 --bind-addr=::` to achieve the same default bind as in
 others OSes.
 
-`tpws` for forwarded traffic only :
+`tpws` for forwarded traffic only (OLDER OS versions):
 
 `/etc/pf.conf`:
 ```
@@ -323,12 +323,30 @@ pass in quick on em1 inet6 proto tcp to port {80,443} rdr-to ::1 port 988
 Then:
 ```
 pfctl -f /etc/pf.conf
-tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
+tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1 --enable-pf
 ```
 
 Its not clear how to do rdr-to outgoing traffic. I could not make route-to
 scheme work. rdr-to support is done using /dev/pf, that's why transparent mode
 requires root.
+
+`tpws` for forwarded traffic only (NEWER OS versions):
+
+```
+pass on em1 inet proto tcp to port {80,443} divert-to 127.0.0.1 port 989
+pass on em1 inet6 proto tcp to port {80,443} divert-to ::1 port 989
+```
+
+Then:
+```
+pfctl -f /etc/pf.conf
+tpws --port=988 --user=daemon --bind-addr=::1 --bind-addr=127.0.0.1
+```
+
+tpws must be bound exactly to diverted IPs, not `0.0.0.0` or `::`.
+
+It's also not clear how to divert connections from local system.
+
 
 `dvtws` for all traffic:
 
