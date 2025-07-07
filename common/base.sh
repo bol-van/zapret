@@ -406,12 +406,15 @@ has_bad_ws_options()
 {
 	# $1 - nfqws/tpws opts
 
-	# kernel or user mode ipset usage should be wise
-	# if all traffic is already intercepted it would be OK to use ip-based specialized profiles
-	# but if all traffic is intercepted only to filter a group of ip its BAD. kernel ipset should be used.
-	# I cannot insert brain to copy-pasters, I know they will misuse. But it's their problem.
-	# zapret is not made for newbies
-	#contains "$1" "--ipset"
+	contains "$1" "--ipset" && {
+		echo
+		echo "WARNING !!! --ipset paramter is present"
+		echo "It's OK if you only specialize already redirected traffic and also process the rest."
+		echo "If you redirect port X to process several IPs from the list and do nothing with the rest - IT'S VERY INEFFECTIVE !"
+		echo "Kernel ipsets should be used instead. Write custom scripts and filter IPs in kernel."
+		echo
+	}
+	
 	return 1
 }
 check_bad_ws_options()
@@ -428,8 +431,5 @@ check_bad_ws_options()
 }
 help_bad_ws_options()
 {
-	echo "WARNING ! you have specified --ipset option"
-	echo "WARNING ! it would work but on ${UNAME:-$(uname)} it's not the best option"
-	echo "WARNING ! you should use kernel mode sets. they are much more efficient."
-	echo "WARNING ! to use ipsets you have to write your own custom script"
+	echo "WARNING ! BAD options detected"
 }
