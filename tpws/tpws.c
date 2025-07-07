@@ -216,7 +216,7 @@ static void exithelp(void)
 		" --pidfile=<filename>\t\t\t; write pid to file\n"
 		" --user=<username>\t\t\t; drop root privs\n"
 		" --uid=uid[:gid1,gid2,...]\t\t; drop root privs\n"
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 		" --enable-pf\t\t\t\t; enable PF redirector support. required in FreeBSD when used with PF firewall.\n"
 #endif
 #if defined(__linux__)
@@ -711,7 +711,7 @@ enum opt_indices {
 	IDX_IPSET_EXCLUDE,
 	IDX_IPSET_EXCLUDE_IP,
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 	IDX_ENABLE_PF,
 #elif defined(__APPLE__)
 	IDX_LOCAL_TCP_USER_TIMEOUT,
@@ -804,7 +804,7 @@ static const struct option long_options[] = {
 	[IDX_IPSET_EXCLUDE] = {"ipset-exclude", required_argument, 0, 0},
 	[IDX_IPSET_EXCLUDE_IP] = {"ipset-exclude-ip", required_argument, 0, 0},
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 	[IDX_ENABLE_PF] = {"enable-pf", no_argument, 0, 0},
 #elif defined(__APPLE__)
 	[IDX_LOCAL_TCP_USER_TIMEOUT] = {"local-tcp-user-timeout", required_argument, 0, 0},
@@ -840,7 +840,7 @@ void parse_params(int argc, char *argv[])
 	params.tcp_user_timeout_remote = DEFAULT_TCP_USER_TIMEOUT_REMOTE;
 #endif
 
-#if defined(__OpenBSD__) || defined(__APPLE__)
+#if defined(__APPLE__)
 	params.pf_enable = true; // OpenBSD and MacOS have no other choice
 #endif
 
@@ -1554,7 +1554,7 @@ void parse_params(int argc, char *argv[])
 			params.tamper = true;
 			break;
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 		case IDX_ENABLE_PF:
 			params.pf_enable = true;
 			break;

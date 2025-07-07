@@ -524,3 +524,4 @@ nfqws: apply udp desync to replayed packets with non-zero reasm offset (except f
 blockcheck: display curl version and kernel version
 install_bin: stop if no binaries found. display help text.
 winws: increase buffers for port filter
+tpws: tpws no more opens /dev/pf in OpenBSD by default. requires --enable-pf like in FreeBSD. this is migration from rdr-to to divert-to redirection scheme.
