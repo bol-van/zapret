@@ -408,7 +408,7 @@ has_bad_ws_options()
 
 	contains "$1" "--ipset" && {
 		echo
-		echo "WARNING !!! --ipset paramter is present"
+		echo "WARNING !!! --ipset parameter is present"
 		echo "It's OK if you only specialize already redirected traffic and also process the rest."
 		echo "If you redirect port X to process several IPs from the list and do nothing with the rest - IT'S VERY INEFFECTIVE !"
 		echo "Kernel ipsets should be used instead. Write custom scripts and filter IPs in kernel."
