@@ -1225,16 +1225,19 @@ Don't use `<HOSTLIST>` in highly specialized profiles. Use your own filter or ho
 `<HOSTLIST_NOAUTO>` marker uses standard autohostlist as usual hostlist thus disabling auto additions in this profile.
 If any other profile adds something this profile accepts the change automatically.
 
-***Change loop prevention mark bit***\
+Change loop prevention mark bit
+
 `DESYNC_MARK=0x40000000`
 
-***Change postnat scheme mark bit***\
+Change postnat scheme mark bit
+
 `DESYNC_MARK_POSTNAT=0x20000000`
 
-***If uncommented pass to zapret only packets marked with this bit***\
+If uncommented pass to zapret only packets marked with this bit
+
 `#FILTER_MARK_POSTNAT=0x10000000`
 
-Bit must be set in your own rules..
+Bit must be set in your own rules.
 * iptables - in mangle PREROUTING and mangle OUTPUT before zapret rules (iptables -I _after_ zapret rules application).
 * nftables - in output and prerouting hooks with priority -102 or lower.
 
