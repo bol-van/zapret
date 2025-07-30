@@ -112,6 +112,10 @@ unprepare_tpws_fw()
 	unprepare_tpws_fw4
 }
 
+ipt_mark_filter()
+{
+	[ -n "$FILTER_MARK" ] && echo "-m mark --mark $FILTER_MARK/$FILTER_MARK"
+}
 
 ipt_print_op()
 {
@@ -136,7 +140,7 @@ _fw_tpws4()
 
 		ipt_print_op $1 "$2" "tpws (port $3)"
 
-		rule="$2 $IPSET_EXCLUDE dst $IPBAN_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
+		rule="$(ipt_mark_filter) $2 $IPSET_EXCLUDE dst $IPBAN_EXCLUDE dst -j DNAT --to $TPWS_LOCALHOST4:$3"
 		for i in $4 ; do
 			ipt_add_del $1 PREROUTING -t nat -i $i $rule
 	 	done
@@ -164,7 +168,7 @@ _fw_tpws6()
 
 		ipt_print_op $1 "$2" "tpws (port $3)" 6
 
-		rule="$2 $IPSET_EXCLUDE6 dst $IPBAN_EXCLUDE6 dst"
+		rule="$(ipt_mark_filter) $2 $IPSET_EXCLUDE6 dst $IPBAN_EXCLUDE6 dst"
 		for i in $4 ; do
 			_dnat6_target $i DNAT6
 			[ -n "$DNAT6" -a "$DNAT6" != "-" ] && ipt6_add_del $1 PREROUTING -t nat -i $i $rule -j DNAT --to [$DNAT6]:$3
@@ -202,7 +206,7 @@ _fw_nfqws_post4()
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)"
 
-		rule="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		rule="$(ipt_mark_filter) -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK $2 $IPSET_EXCLUDE dst -j NFQUEUE --queue-num $3 --queue-bypass"
 		if [ -n "$4" ] ; then
 			for i in $4; do
 				ipt_add_del $1 POSTROUTING -t mangle -o $i $rule
@@ -223,7 +227,7 @@ _fw_nfqws_post6()
 
 		ipt_print_op $1 "$2" "nfqws postrouting (qnum $3)" 6
 
-		rule="-m mark ! --mark $DESYNC_MARK/$DESYNC_MARK $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
+		rule="$(ipt_mark_filter) -m mark ! --mark $DESYNC_MARK/$DESYNC_MARK $2 $IPSET_EXCLUDE6 dst -j NFQUEUE --queue-num $3 --queue-bypass"
 		if [ -n "$4" ] ; then
 			for i in $4; do
 				ipt6_add_del $1 POSTROUTING -t mangle -o $i $rule

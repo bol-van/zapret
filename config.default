@@ -47,6 +47,12 @@ GZIP_LISTS=1
 DESYNC_MARK=0x40000000
 DESYNC_MARK_POSTNAT=0x20000000
 
+# do not pass outgoing traffic to tpws/nfqws not marked with this bit
+# this setting allows to write your own rules to limit traffic that should be fooled
+# for example based on source IP or incoming interface name
+# no filter if not defined
+#FILTER_MARK=0x10000000
+
 TPWS_SOCKS_ENABLE=0
 # tpws socks listens on this port on localhost and LAN interfaces
 TPPORT_SOCKS=987
