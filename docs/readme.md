@@ -195,7 +195,8 @@ dvtws, собираемый из тех же исходников (см. [док
 --dup-ttl6=<int>                                   ; модифицировать ipv6 hop limit дубликатов. если не указано, используется значение --dup-ttl
 --dup-autottl=[<delta>[:<min>[-<max>]]|-]          ; режим auto ttl для ipv4 и ipv6. по умолчанию: +1:3-64. "0:0-0" или "-" отключает функцию
 --dup-autottl6=[<delta>[:<min>[-<max>]]|-]         ; переопределение предыдущего параметра для ipv6
---dup-fooling=<fooling>                            ; дополнительные методики как сделать, чтобы дубликат не дошел до сервера. none md5sig badseq badsum datanoack hopbyhop hopbyhop2
+--dup-fooling=<fooling>                            ; дополнительные методики как сделать, чтобы дубликат не дошел до сервера. none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2
+--dup-ts-increment=<int|0xHEX>                     ; инкремент TSval для ts. по умолчанию -600000
 --dup-badseq-increment=<int|0xHEX>                 ; инкремент sequence number для badseq. по умолчанию -10000
 --dup-badack-increment=<int|0xHEX>                 ; инкремент ack sequence number для badseq. по умолчанию -66000
 --dup-start=[n|d|s]N                               ; применять dup только в исходящих пакетах (n), пакетах данных (d), относительных sequence (s) по номеру больше или равно N
@@ -211,13 +212,14 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-ttl6=<int>                            ; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение --dpi-desync-ttl
 --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]   ; режим auto ttl для ipv4 и ipv6. по умолчанию: 1:3-20. "0:0-0" или "-" отключает функцию
 --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-]  ; переопределение предыдущего параметра для ipv6
---dpi-desync-fooling=<fooling>                     ; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера. none md5sig badseq badsum datanoack hopbyhop hopbyhop2
+--dpi-desync-fooling=<fooling>                     ; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера. none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2
 --dpi-desync-repeats=<N>                           ; посылать каждый генерируемый в nfqws пакет N раз (не влияет на остальные пакеты)
 --dpi-desync-skip-nosni=0|1                        ; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI
 --dpi-desync-split-pos=N|-N|marker+N|marker-N      ; список через запятую маркеров для tcp сегментации в режимах split и disorder
 --dpi-desync-split-seqovl=N|-N|marker+N|marker-N   ; единичный маркер, определяющий величину перекрытия sequence в режимах split и disorder. для split поддерживается только положительное число.
 --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; чем заполнять фейковую часть overlap
 --dpi-desync-fakedsplit-pattern=<filename>|0xHEX   ; чем заполнять фейки в fakedsplit/fakeddisorder
+--dpi-desync-ts-increment=<int|0xHEX>              ; инкремент TSval для ts. по умолчанию -600000
 --dpi-desync-badseq-increment=<int|0xHEX>          ; инкремент sequence number для badseq. по умолчанию -10000
 --dpi-desync-badack-increment=<int|0xHEX>          ; инкремент ack sequence number для badseq. по умолчанию -66000
 --dpi-desync-any-protocol=0|1                      ; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
@@ -339,6 +341,12 @@ dvtws, собираемый из тех же исходников (см. [док
   выяснено, что многие провайдерские NAT не отбрасывают эти пакеты, потому работает даже с внутренним провайдерским IP.
   Но linux NAT оно не пройдет, так что за домашним роутером эта техника скорее всего не сработает, но может сработать с него.
   Может сработать и через роутер, если подключение по проводу, и на роутере включено аппаратное ускорение.
+* `ts` прибавляет к значению TSval таймштампа tcp значение ts increment (по умолчанию -600000). Сервера отбрасывают пакеты
+  с TSval в определенных пределах. По практическим тестам инкремент должен быть где-то от -100 до -0x80000000.
+  timestamps генерирует клиентская ОС. В linux таймштампы включены по умолчанию, в windows выключены по умолчанию.
+  Можно включить через команду `netsh interface tcp set global timestamps=enabled`.
+  ts fooling требует, чтобы таймштампы были включены, иначе работать не будет. Включать надо на каждом клиентском устройстве.
+  TSecr оставляется без изменений.
 * `autottl`. Суть режима в автоматическом определении TTL, чтобы пакет почти наверняка прошел DPI и немного не дошел до
   сервера (`--dpi-desync-autottl`). Или наоборот - TTL едва хватило, чтобы он все-таки дошел до сервера (см `--dup-autottl`, `--orig-autottl`).
   Берутся базовые значения TTL 64,128,255, смотрится входящий пакет (да, требуется направить первый входящий пакет на nfqws !).
