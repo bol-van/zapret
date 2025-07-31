@@ -397,6 +397,7 @@ check_system()
 			PKTWSD=winws
 			FWTYPE=windivert
 			# ts fooling requires timestamps. they are disabled by default in windows.
+			echo enabling tcp timestamps
 			netsh interface tcp set global timestamps=enabled >/dev/null
 			;;
 		*)
