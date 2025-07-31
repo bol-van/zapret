@@ -735,7 +735,7 @@ static bool parse_cutoff(const char *opt, unsigned int *value, char *mode)
 	*mode = (*opt=='n' || *opt=='d' || *opt=='s') ? *opt++ : 'n';
 	return sscanf(opt, "%u", value)>0;
 }
-static bool parse_badseq_increment(const char *opt, uint32_t *value)
+static bool parse_net32_signed(const char *opt, uint32_t *value)
 {
 	if (((opt[0]=='0' && opt[1]=='x') || (opt[0]=='-' && opt[1]=='0' && opt[2]=='x')) && sscanf(opt+2+(opt[0]=='-'), "%X", (int32_t*)value)>0)
 	{
@@ -1579,7 +1579,8 @@ static void exithelp(void)
 		" --dup-ttl6=<int>\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
 		" --dup-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
 		" --dup-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --dup-autottl for ipv6 only\n"
-		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
+		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
+		" --dup-ts-increment=<int|0xHEX>\t\t\t; ts fooling TSval signed increment for dup. default %d\n"
 		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
 		" --dup-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
 		" --dup-start=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
@@ -1601,7 +1602,7 @@ static void exithelp(void)
 		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
 		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]  ; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-] ; overrides --dpi-desync-autottl for ipv6 only\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack hopbyhop hopbyhop2\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
 		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
@@ -1613,6 +1614,7 @@ static void exithelp(void)
 		" --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-ts-increment=<int|0xHEX>\t\t; ts fooling TSval signed increment. default %d\n"
 		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
 		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
@@ -1636,14 +1638,14 @@ static void exithelp(void)
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
 		AUTOTTL_DEFAULT_ORIG_DELTA,AUTOTTL_DEFAULT_ORIG_MIN,AUTOTTL_DEFAULT_ORIG_MAX,
 		AUTOTTL_DEFAULT_DUP_DELTA,AUTOTTL_DEFAULT_DUP_MIN,AUTOTTL_DEFAULT_DUP_MAX,
-		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
+		TS_INCREMENT_DEFAULT, BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
 #if defined(__linux__) || defined(SO_USER_COOKIE)
 		DPI_DESYNC_FWMARK_DEFAULT,DPI_DESYNC_FWMARK_DEFAULT,
 #endif
 		AUTOTTL_DEFAULT_DESYNC_DELTA,AUTOTTL_DEFAULT_DESYNC_MIN,AUTOTTL_DEFAULT_DESYNC_MAX,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_UDP_DEFAULT,
 		DPI_DESYNC_MAX_FAKE_LEN, IPFRAG_TCP_DEFAULT,
-		BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
+		TS_INCREMENT_DEFAULT, BADSEQ_INCREMENT_DEFAULT, BADSEQ_ACK_INCREMENT_DEFAULT,
 		UDPLEN_INCREMENT_DEFAULT
 	);
 	exit(1);
@@ -1762,6 +1764,7 @@ enum opt_indices {
 	IDX_DUP_AUTOTTL,
 	IDX_DUP_AUTOTTL6,
 	IDX_DUP_FOOLING,
+	IDX_DUP_TS_INCREMENT,
 	IDX_DUP_BADSEQ_INCREMENT,
 	IDX_DUP_BADACK_INCREMENT,
 	IDX_DUP_REPLACE,
@@ -1788,6 +1791,7 @@ enum opt_indices {
 	IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN,
 	IDX_DPI_DESYNC_IPFRAG_POS_TCP,
 	IDX_DPI_DESYNC_IPFRAG_POS_UDP,
+	IDX_DPI_DESYNC_TS_INCREMENT,
 	IDX_DPI_DESYNC_BADSEQ_INCREMENT,
 	IDX_DPI_DESYNC_BADACK_INCREMENT,
 	IDX_DPI_DESYNC_ANY_PROTOCOL,
@@ -1886,6 +1890,7 @@ static const struct option long_options[] = {
 	[IDX_DUP_AUTOTTL] = {"dup-autottl", optional_argument, 0, 0},
 	[IDX_DUP_AUTOTTL6] = {"dup-autottl6", optional_argument, 0, 0},
 	[IDX_DUP_FOOLING] = {"dup-fooling", required_argument, 0, 0},
+	[IDX_DUP_TS_INCREMENT] = {"dup-ts-increment", required_argument, 0, 0},
 	[IDX_DUP_BADSEQ_INCREMENT] = {"dup-badseq-increment", required_argument, 0, 0},
 	[IDX_DUP_BADACK_INCREMENT] = {"dup-badack-increment", required_argument, 0, 0},
 	[IDX_DUP_REPLACE] = {"dup-replace", optional_argument, 0, 0},
@@ -1912,6 +1917,7 @@ static const struct option long_options[] = {
 	[IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN] = {"dpi-desync-fakedsplit-pattern", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_IPFRAG_POS_TCP] = {"dpi-desync-ipfrag-pos-tcp", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_IPFRAG_POS_UDP] = {"dpi-desync-ipfrag-pos-udp", required_argument, 0, 0},
+	[IDX_DPI_DESYNC_TS_INCREMENT] = {"dpi-desync-ts-increment", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_BADSEQ_INCREMENT] = {"dpi-desync-badseq-increment", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_BADACK_INCREMENT] = {"dpi-desync-badack-increment", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_ANY_PROTOCOL] = {"dpi-desync-any-protocol", optional_argument, 0, 0},
@@ -2360,15 +2366,22 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case IDX_DUP_TS_INCREMENT:
+			if (!parse_net32_signed(optarg,&dp->dup_ts_increment))
+			{
+				DLOG_ERR("dup-ts-increment should be signed decimal or signed 0xHEX\n");
+				exit_clean(1);
+			}
+			break;
 		case IDX_DUP_BADSEQ_INCREMENT:
-			if (!parse_badseq_increment(optarg,&dp->dup_badseq_increment))
+			if (!parse_net32_signed(optarg,&dp->dup_badseq_increment))
 			{
 				DLOG_ERR("dup-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
 		case IDX_DUP_BADACK_INCREMENT:
-			if (!parse_badseq_increment(optarg,&dp->dup_badseq_ack_increment))
+			if (!parse_net32_signed(optarg,&dp->dup_badseq_ack_increment))
 			{
 				DLOG_ERR("dup-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
@@ -2559,15 +2572,22 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case IDX_DPI_DESYNC_TS_INCREMENT:
+			if (!parse_net32_signed(optarg,&dp->desync_ts_increment))
+			{
+				DLOG_ERR("dpi-desync-ts-increment should be signed decimal or signed 0xHEX\n");
+				exit_clean(1);
+			}
+			break;
 		case IDX_DPI_DESYNC_BADSEQ_INCREMENT:
-			if (!parse_badseq_increment(optarg,&dp->desync_badseq_increment))
+			if (!parse_net32_signed(optarg,&dp->desync_badseq_increment))
 			{
 				DLOG_ERR("dpi-desync-badseq-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);
 			}
 			break;
 		case IDX_DPI_DESYNC_BADACK_INCREMENT:
-			if (!parse_badseq_increment(optarg,&dp->desync_badseq_ack_increment))
+			if (!parse_net32_signed(optarg,&dp->desync_badseq_ack_increment))
 			{
 				DLOG_ERR("dpi-desync-badack-increment should be signed decimal or signed 0xHEX\n");
 				exit_clean(1);

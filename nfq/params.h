@@ -28,6 +28,8 @@
 #define BADSEQ_INCREMENT_DEFAULT 	-10000
 #define BADSEQ_ACK_INCREMENT_DEFAULT 	-66000
 
+#define TS_INCREMENT_DEFAULT 		-600000
+
 #define IPFRAG_UDP_DEFAULT 8
 #define IPFRAG_TCP_DEFAULT 32
 
@@ -108,7 +110,7 @@ struct desync_profile
 	unsigned int dup_repeats;
 	uint8_t dup_ttl, dup_ttl6;
 	uint32_t dup_fooling_mode;
-	uint32_t dup_badseq_increment, dup_badseq_ack_increment;
+	uint32_t dup_ts_increment, dup_badseq_increment, dup_badseq_ack_increment;
 	autottl dup_autottl, dup_autottl6;
 
 	char orig_mod_start_mode, orig_mod_cutoff_mode; // n - packets, d - data packets, s - relative sequence
@@ -121,7 +123,7 @@ struct desync_profile
 	uint8_t desync_ttl, desync_ttl6;
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
-	uint32_t desync_badseq_increment, desync_badseq_ack_increment;
+	uint32_t desync_ts_increment, desync_badseq_increment, desync_badseq_ack_increment;
 
 	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht,fake_discord,fake_stun;
 	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],fsplit_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];

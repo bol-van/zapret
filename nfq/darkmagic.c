@@ -118,6 +118,7 @@ static void fill_tcphdr(
 	uint16_t nsport, uint16_t ndport,
 	uint16_t nwsize, uint8_t scale_factor,
 	uint32_t *timestamps,
+	uint32_t ts_increment,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	uint16_t data_len)
@@ -165,13 +166,13 @@ static void fill_tcphdr(
 		*(uint32_t*)(tcpopt+t+14)=random();
 		t+=18;
 	}
-	if (timestamps || (fooling & FOOL_TS))
+	if (timestamps)
 	{
 		tcpopt[t] = 8; // kind
 		tcpopt[t+1] = 10; // len
-		// forge only TSecr if orig timestamp is present
-		*(uint32_t*)(tcpopt+t+2) = timestamps ? timestamps[0] : -1;
-		*(uint32_t*)(tcpopt+t+6) = (timestamps && !(fooling & FOOL_TS)) ? timestamps[1] : -1;
+		memcpy(tcpopt+t+2,timestamps,8);
+		// forge TSval, keep TSecr
+		if (fooling & FOOL_TS) *(uint32_t*)(tcpopt+t+2) = net32_add(*(uint32_t*)(tcpopt+t+2),ts_increment);
 		t+=10;
 	}
 	if (scale_factor!=SCALE_NONE)
@@ -242,6 +243,7 @@ bool prepare_tcp_segment4(
 	uint8_t tos,
 	uint16_t ip_id,
 	uint32_t fooling,
+	uint32_t ts_increment,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -257,7 +259,7 @@ bool prepare_tcp_segment4(
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
 	fill_iphdr(ip, &src->sin_addr, &dst->sin_addr, pktlen, IPPROTO_TCP, DF, ttl, tos, ip_id);
-	fill_tcphdr(tcp,fooling,tcp_flags,sack,nmss,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
+	fill_tcphdr(tcp,fooling,tcp_flags,sack,nmss,nseq,nack_seq,src->sin_port,dst->sin_port,nwsize,scale_factor,timestamps,ts_increment,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
 	tcp4_fix_checksum(tcp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
@@ -279,6 +281,7 @@ bool prepare_tcp_segment6(
 	uint8_t ttl,
 	uint32_t flow_label,
 	uint32_t fooling,
+	uint32_t ts_increment,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
@@ -343,7 +346,7 @@ bool prepare_tcp_segment6(
 	uint8_t *payload = (uint8_t*)(tcp+1)+tcpoptlen;
 
 	fill_ip6hdr(ip6, &src->sin6_addr, &dst->sin6_addr, ip_payload_len, proto, ttl, flow_label);
-	fill_tcphdr(tcp,fooling,tcp_flags,sack,nmss,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,badseq_increment,badseq_ack_increment,len);
+	fill_tcphdr(tcp,fooling,tcp_flags,sack,nmss,nseq,nack_seq,src->sin6_port,dst->sin6_port,nwsize,scale_factor,timestamps,ts_increment,badseq_increment,badseq_ack_increment,len);
 
 	memcpy(payload,data,len);
 	tcp6_fix_checksum(tcp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);
@@ -368,15 +371,16 @@ bool prepare_tcp_segment(
 	uint16_t ip_id,
 	uint32_t flow_label,
 	uint32_t fooling,
+	uint32_t ts_increment,
 	uint32_t badseq_increment,
 	uint32_t badseq_ack_increment,
 	const void *data, uint16_t len,
 	uint8_t *buf, size_t *buflen)
 {
 	return (src->sa_family==AF_INET && dst->sa_family==AF_INET) ?
-		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,sack,nmss,nseq,nack_seq,nwsize,scale_factor,timestamps,DF,ttl,tos,ip_id,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		prepare_tcp_segment4((struct sockaddr_in *)src,(struct sockaddr_in *)dst,tcp_flags,sack,nmss,nseq,nack_seq,nwsize,scale_factor,timestamps,DF,ttl,tos,ip_id,fooling,ts_increment,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
 		(src->sa_family==AF_INET6 && dst->sa_family==AF_INET6) ?
-		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,sack,nmss,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,flow_label,fooling,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
+		prepare_tcp_segment6((struct sockaddr_in6 *)src,(struct sockaddr_in6 *)dst,tcp_flags,sack,nmss,nseq,nack_seq,nwsize,scale_factor,timestamps,ttl,flow_label,fooling,ts_increment,badseq_increment,badseq_ack_increment,data,len,buf,buflen) :
 		false;
 }
 
