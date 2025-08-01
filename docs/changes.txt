@@ -532,5 +532,5 @@ v71.3
 init.d: FILTER_MARK
 nfqws: ts fooling
 blockcheck: test ts fooling
-blockcheck: silently enable tcp timestamps in windows
+blockcheck: auto enable tcp timestamps in windows
 tpws,nfqws: special handling of IP-like hostnames. strip :port from hostname:port
