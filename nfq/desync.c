@@ -1462,7 +1462,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				DLOG("not applying tampering to HTTP without Host:\n");
 				goto send_orig;
 			}
-			bHostIsIp=strip_host_to_ip(host);
 			if (ctrack)
 			{
 				// we do not reassemble http
@@ -1484,7 +1483,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (bReqFull) TLSDebug(rdata_payload,rlen_payload);
 
 			bHaveHost=TLSHelloExtractHost(rdata_payload,rlen_payload,host,sizeof(host),TLS_PARTIALS_ENABLE);
-			if (bHaveHost) bHostIsIp=strip_host_to_ip(host);
 
 			if (ctrack)
 			{
@@ -1553,7 +1551,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (dseq>=0x1000000 && !(dseq & 0x80000000)) ctrack->req_seq_abandoned=true;
 		}
 
-		if (bHaveHost) DLOG("hostname: %s\n",host);
+		if (bHaveHost)
+		{
+			bHostIsIp=strip_host_to_ip(host);
+			DLOG("hostname: %s\n",host);
+		}
 
 		bool bDiscoveredL7;
 		if (ctrack_replay)
@@ -2604,9 +2606,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 						if (bIsHello)
 						{
 							bHaveHost = TLSHelloExtractHostFromHandshake(defrag + hello_offset, hello_len, host, sizeof(host), TLS_PARTIALS_ENABLE);
-							if (bHaveHost)
-								bHostIsIp=strip_host_to_ip(host);
-							else if (dp->desync_skip_nosni)
+							if (!bHaveHost && dp->desync_skip_nosni)
 							{
 								reasm_orig_cancel(ctrack);
 								DLOG("not applying tampering to QUIC ClientHello without hostname in the SNI\n");
@@ -2702,7 +2702,11 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			}
 		}
 
-		if (bHaveHost) DLOG("hostname: %s\n",host);
+		if (bHaveHost)
+		{
+			bHostIsIp=strip_host_to_ip(host);
+			DLOG("hostname: %s\n",host);
+		}
 
 		bool bDiscoveredL7;
 		if (ctrack_replay)
