@@ -124,10 +124,12 @@ void expand_bits(void *target, const void *source, unsigned int source_bitlen, u
 	if ((bitlen &= 7)) ((uint8_t*)target)[bytelen] = ((uint8_t*)source)[bytelen] & (~((1 << (8-bitlen)) - 1));
 }
 
-// "       [fd00::1]"
-// "[fd00::1]:8000"
-// "127.0.0.1"
-// " 127.0.0.1:8000"
+// "       [fd00::1]" => "fd00::1"
+// "[fd00::1]:8000" => "fd00::1"
+// "127.0.0.1" => "127.0.0.1"
+// " 127.0.0.1:8000" => "127.0.0.1"
+// " vk.com:8000" => "vk.com"
+// return value:  true - host is ip addr
 bool strip_host_to_ip(char *host)
 {
 	size_t l;
