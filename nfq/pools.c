@@ -629,6 +629,7 @@ static void ipcache_item_init(ip_cache_item *item)
 {
 	ipcache_item_touch(item);
 	item->hostname = NULL;
+	item->hostname_is_ip = false;
 	item->hops = 0;
 }
 static void ipcache_item_destroy(ip_cache_item *item)
@@ -690,7 +691,7 @@ static void ipcache4Print(ip_cache4 *ipcache)
 	{
 		*s_ip=0;
 		inet_ntop(AF_INET, &ipc->key.addr, s_ip, sizeof(s_ip));
-		printf("%s iface=%s : hops %u hostname=%s now=last+%llu\n", s_ip, ipc->key.iface, ipc->data.hops, ipc->data.hostname ? ipc->data.hostname : "", (unsigned long long)(now-ipc->data.last));
+		printf("%s iface=%s : hops %u hostname=%s hostname_is_ip=%u now=last+%llu\n", s_ip, ipc->key.iface, ipc->data.hops, ipc->data.hostname ? ipc->data.hostname : "", ipc->data.hostname_is_ip, (unsigned long long)(now-ipc->data.last));
 	}
 }
 

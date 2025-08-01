@@ -29,6 +29,7 @@ void ConntrackClearHostname(t_ctrack *track)
 {
 	free(track->hostname);
 	track->hostname = NULL;
+	track->hostname_is_ip = false;
 }
 static void ConntrackClearTrack(t_ctrack *track)
 {

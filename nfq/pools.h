@@ -182,6 +182,7 @@ typedef struct ip_cache_item
 {
 	time_t last;
 	char *hostname;
+	bool hostname_is_ip;
 	uint8_t hops;
 } ip_cache_item;
 typedef struct ip_cache4

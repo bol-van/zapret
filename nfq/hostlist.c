@@ -170,7 +170,7 @@ bool LoadAllHostLists()
 
 
 
-static bool SearchHostList(hostlist_pool *hostlist, const char *host)
+static bool SearchHostList(hostlist_pool *hostlist, const char *host, bool no_match_subdomains)
 {
 	if (hostlist)
 	{
@@ -195,6 +195,7 @@ static bool SearchHostList(hostlist_pool *hostlist, const char *host)
 			}
 			else
 				DLOG("negative\n");
+			if (no_match_subdomains) break;
 			p = strchr(p, '.');
 			if (p) p++;
 			bHostFull = false;
@@ -220,7 +221,7 @@ bool HostlistsReloadCheckForProfile(const struct desync_profile *dp)
 	return HostlistsReloadCheck(&dp->hl_collection) && HostlistsReloadCheck(&dp->hl_collection_exclude);
 }
 // return : true = apply fooling, false = do not apply
-static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, const struct hostlist_collection_head *hostlists_exclude, const char *host, bool *excluded, bool bSkipReloadCheck)
+static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, const struct hostlist_collection_head *hostlists_exclude, const char *host, bool no_match_subdomains, bool *excluded, bool bSkipReloadCheck)
 {
 	struct hostlist_item *item;
 
@@ -233,7 +234,7 @@ static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, con
 	LIST_FOREACH(item, hostlists_exclude, next)
 	{
 		DLOG("[%s] exclude ", item->hfile->filename ? item->hfile->filename : "fixed");
-		if (SearchHostList(item->hfile->hostlist, host))
+		if (SearchHostList(item->hfile->hostlist, host, no_match_subdomains))
 		{
 			if (excluded) *excluded = true;
 			return false;
@@ -245,7 +246,7 @@ static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, con
 		LIST_FOREACH(item, hostlists, next)
 		{
 			DLOG("[%s] include ", item->hfile->filename ? item->hfile->filename : "fixed");
-			if (SearchHostList(item->hfile->hostlist, host))
+			if (SearchHostList(item->hfile->hostlist, host, no_match_subdomains))
 				return true;
 		}
 		return false;
@@ -255,10 +256,10 @@ static bool HostlistCheck_(const struct hostlist_collection_head *hostlists, con
 
 
 // return : true = apply fooling, false = do not apply
-bool HostlistCheck(const struct desync_profile *dp, const char *host, bool *excluded, bool bSkipReloadCheck)
+bool HostlistCheck(const struct desync_profile *dp, const char *host, bool no_match_subdomains, bool *excluded, bool bSkipReloadCheck)
 {
 	DLOG("* hostlist check for profile %d\n",dp->n);
-	return HostlistCheck_(&dp->hl_collection, &dp->hl_collection_exclude, host, excluded, bSkipReloadCheck);
+	return HostlistCheck_(&dp->hl_collection, &dp->hl_collection_exclude, host, no_match_subdomains, excluded, bSkipReloadCheck);
 }
 
 
