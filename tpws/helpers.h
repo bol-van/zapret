@@ -31,6 +31,8 @@ bool append_to_list_file(const char *filename, const char *s);
 
 void expand_bits(void *target, const void *source, unsigned int source_bitlen, unsigned int target_bytelen);
 
+bool strip_host_to_ip(char *host);
+
 void ntop46(const struct sockaddr *sa, char *str, size_t len);
 void ntop46_port(const struct sockaddr *sa, char *str, size_t len);
 void print_sockaddr(const struct sockaddr *sa);

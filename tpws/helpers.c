@@ -123,6 +123,61 @@ void expand_bits(void *target, const void *source, unsigned int source_bitlen, u
 	if ((bitlen &= 7)) ((uint8_t*)target)[bytelen] = ((uint8_t*)source)[bytelen] & (~((1 << (8-bitlen)) - 1));
 }
 
+// "       [fd00::1]" => "fd00::1"
+// "[fd00::1]:8000" => "fd00::1"
+// "127.0.0.1" => "127.0.0.1"
+// " 127.0.0.1:8000" => "127.0.0.1"
+// " vk.com:8000" => "vk.com"
+// return value:  true - host is ip addr
+bool strip_host_to_ip(char *host)
+{
+	size_t l;
+	char *h,*p;
+	uint8_t addr[16];
+
+	for (h = host ; *h==' ' || *h=='\t' ; h++);
+	l = strlen(h);
+	if (l>=2)
+	{
+		if (*h=='[')
+		{
+			// ipv6 ?
+			for (p=++h ; *p && *p!=']' ;  p++);
+			if (*p==']')
+			{
+				l = p-h;
+				memmove(host,h,l);
+				host[l]=0;
+				return inet_pton(AF_INET6, host, addr)>0;
+			}
+		}
+		else
+		{
+			if (inet_pton(AF_INET6, h, addr)>0)
+			{
+				// ipv6 ?
+				if (host!=h)
+				{
+					l = strlen(h);
+					memmove(host,h,l);
+					host[l]=0;
+				}
+				return true;
+			}
+			else
+			{
+				// ipv4 ?
+				for (p=h ; *p && *p!=':' ;  p++);
+				l = p-h;
+				if (host!=h) memmove(host,h,l);
+				host[l]=0;
+				return inet_pton(AF_INET, host, addr)>0;
+			}
+		}
+	}
+	return false;
+}
+
 void ntop46(const struct sockaddr *sa, char *str, size_t len)
 {
 	if (!len) return;

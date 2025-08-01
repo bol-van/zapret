@@ -495,7 +495,7 @@ static bool connect_remote_conn(tproxy_conn_t *conn)
 	int mss=0;
 
 	if (conn->track.hostname)
-		if (!ipcache_put_hostname(conn->dest.sa_family==AF_INET ? &((struct sockaddr_in*)&conn->dest)->sin_addr : NULL, conn->dest.sa_family==AF_INET6 ? &((struct sockaddr_in6*)&conn->dest)->sin6_addr : NULL , conn->track.hostname))
+		if (!ipcache_put_hostname(conn->dest.sa_family==AF_INET ? &((struct sockaddr_in*)&conn->dest)->sin_addr : NULL, conn->dest.sa_family==AF_INET6 ? &((struct sockaddr_in6*)&conn->dest)->sin6_addr : NULL , conn->track.hostname, false))
 			DLOG_ERR("ipcache_put_hostname: out of memory");
 	apply_desync_profile(&conn->track, (struct sockaddr *)&conn->dest);
 
@@ -507,7 +507,7 @@ static bool connect_remote_conn(tproxy_conn_t *conn)
 			if (conn->track.hostname)
 			{
 				bool bHostExcluded;
-				conn->track.b_host_matches = HostlistCheck(conn->track.dp, conn->track.hostname, &bHostExcluded, false);
+				conn->track.b_host_matches = HostlistCheck(conn->track.dp, conn->track.hostname, conn->track.hostname_is_ip, &bHostExcluded, false);
 				conn->track.b_host_checked = true;
 				if (!conn->track.b_host_matches)
 				{
