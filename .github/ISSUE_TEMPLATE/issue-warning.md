@@ -20,3 +20,6 @@ Discussions - место для обсуждения вопросов между
 
 Вирусов здесь нет. У вас либо чья-то сборка, либо ваш антивирус давно пора отправить на покой. Антивирусы в основном жалуются на upx и windivert, которые убраны НЕ будут. upx - это паковщик для сокращения требуемого места на openwrt, windivert - замена iptables для windows, потенциальный инструмент хакера или компонент зловредной программы, но сам по себе вирусом не является. Не согласны - удаляйте софт. За агрессивные наезды "почему автор распространяет вирусы" молча схватите бан.
 
+
+Here is the place for bugs only. All questions, especially user-like questions (non-technical) go to Discussions.
+There're also no viruses here. All virus claims and everyting non-technical and non-bugs will be instantly deleted, closed or moved to Discussions.
