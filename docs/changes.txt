@@ -534,3 +534,7 @@ nfqws: ts fooling
 blockcheck: test ts fooling
 blockcheck: auto enable tcp timestamps in windows
 tpws,nfqws: special handling of IP-like hostnames. strip :port from hostname:port
+
+v71.4
+
+nfqws,tpws: fix possible crashes or high memory usage if hostlist has duplicate hostnames

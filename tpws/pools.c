@@ -25,7 +25,7 @@
 	memcpy(elem->str, keystr, keystr_len); \
 	elem->str[keystr_len] = 0; \
 	oom = false; \
-	HASH_ADD_KEYPTR(hh, *ppool, elem->str, strlen(elem->str), elem); \
+	HASH_ADD_KEYPTR(hh, *ppool, elem->str, keystr_len, elem); \
 	if (oom) \
 	{ \
 		free(elem->str); \
@@ -33,9 +33,12 @@
 		return false; \
 	}
 #define ADD_HOSTLIST_POOL(etype, ppool, keystr, keystr_len, flg) \
-	ADD_STR_POOL(etype,ppool,keystr,keystr_len); \
-	elem->flags = flg;
-
+	etype *elem_find; \
+	HASH_FIND(hh, *ppool, keystr, keystr_len, elem_find); \
+	if (!elem_find) { \
+		ADD_STR_POOL(etype,ppool,keystr,keystr_len); \
+		elem->flags = flg; \
+	}
 
 #undef uthash_nonfatal_oom
 #define uthash_nonfatal_oom(elt) ut_oom_recover(elt)
