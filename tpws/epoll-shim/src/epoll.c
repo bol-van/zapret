@@ -18,8 +18,8 @@
 #define ppoll pollts
 #endif
 
-// TODO(jan): Remove this once the definition is exposed in <sys/time.h> in
-// all supported FreeBSD versions.
+// timespecsub compatibility for FreeBSD versions that don't expose it in <sys/time.h>
+// This definition is compatible with the standard timespecsub macro
 #ifndef timespecsub
 #define timespecsub(tsp, usp, vsp)                                            \
 	do {                                                                  \

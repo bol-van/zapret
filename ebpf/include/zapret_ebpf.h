@@ -152,7 +152,10 @@ struct sni_encrypt_ctx {
     uint8_t ech_supported;
     uint8_t esni_supported;
     uint8_t key[32];  /* Encryption key */
-    uint8_t iv[16];   /* Initialization vector */
+    uint8_t key_len;
+    uint8_t iv[12];
+    uint8_t encrypted;
+    uint8_t padding[2];
 };
 
 /* Connection tracking entry */
@@ -171,6 +174,7 @@ struct conn_track {
     struct quic_conn_info quic_info;
     struct fragment_ctx frag_ctx;
     struct sni_encrypt_ctx sni_ctx;
+    struct conn_track *next;  /* For hash table chaining */
 };
 
 /* Filter rule structure */
@@ -197,6 +201,9 @@ struct zapret_config {
     uint8_t enable_packet_fragmentation;
     uint8_t enable_sni_encryption;
     uint8_t enable_performance_monitoring;
+    uint8_t use_netfilter;
+    uint8_t use_tc;
+    uint8_t use_raw_socket;
     uint32_t max_connections;
     uint32_t connection_timeout;
     uint32_t fragment_threshold;

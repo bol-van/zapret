@@ -70,14 +70,14 @@ LOADER_OBJS = $(LOADER_SRCS:.c=.o)
 # Target executables
 TARGETS = zapret_ebpf_loader
 
-.PHONY: all clean install libbpf ebpf_programs user_space demo
+.PHONY: all clean install libbpf ebpf_programs user_space
 
 ifeq ($(EBPF_SUPPORTED),yes)
 all: libbpf $(TARGETS)
 	@echo "Build complete for $(PLATFORM) platform with eBPF support"
 else
-all: demo
-	@echo "Build complete for $(PLATFORM) platform (demo mode - no eBPF support)"
+all: user_space
+	@echo "Build complete for $(PLATFORM) platform"
 endif
 
 # Build libbpf (Linux only)
@@ -119,18 +119,10 @@ zapret_ebpf_loader: $(EBPF_OBJS) $(LOADER_OBJS) $(LIBBPF_OBJ)
 	$(CC) $(CFLAGS) $(LOADER_OBJS) $(LIBBPF_OBJ) -lelf -lz -o $@
 else
 zapret_ebpf_loader: $(LOADER_OBJS)
-	$(CC) $(CFLAGS) $(LOADER_OBJS) $(LDFLAGS) -DDEMO_MODE -o $@
+	$(CC) $(CFLAGS) $(LOADER_OBJS) $(LDFLAGS) -o $@
 endif
 
-# Demo target for non-Linux platforms
-demo: zapret_demo
 
-zapret_demo:
-	@echo "CC      zapret_demo (demo mode)"
-	@echo '#include <stdio.h>' > demo.c
-	@echo 'int main() { printf("Zapret demo for $(PLATFORM)\\n"); return 0; }' >> demo.c
-	@$(CC) $(CFLAGS) demo.c -o zapret_demo
-	@rm -f demo.c
 
 install: all
 	cp $(TARGETS) /usr/local/bin/
@@ -147,29 +139,68 @@ distclean: clean
 
 # Development targets
 format:
-	clang-format -i $(LOADER_SRCS) include/*.h
+	@echo "Formatting source code..."
+	@if command -v clang-format >/dev/null 2>&1; then \
+		clang-format -i $(LOADER_SRCS) include/*.h src/*.c; \
+		echo "Code formatting completed"; \
+	else \
+		echo "clang-format not found, skipping formatting"; \
+	fi
 
 check:
-	@echo "Checking eBPF programs..."
-	@for prog in $(EBPF_OBJS); do \
-		echo "Verifying $$prog"; \
-		bpftool prog load $$prog /sys/fs/bpf/test_$$prog 2>/dev/null && \
-		bpftool prog del pinned /sys/fs/bpf/test_$$prog || true; \
+	@echo "Checking eBPF programs and source code..."
+	@echo "Checking syntax with clang..."
+	@for src in $(LOADER_SRCS); do \
+		echo "Checking $$src"; \
+		$(CC) $(CFLAGS) $(INCLUDES) -fsyntax-only $$src || exit 1; \
 	done
+ifeq ($(EBPF_SUPPORTED),yes)
+	@echo "Verifying eBPF programs..."
+	@for prog in $(EBPF_OBJS); do \
+		if [ -f "$$prog" ]; then \
+			echo "Verifying $$prog"; \
+			if command -v bpftool >/dev/null 2>&1; then \
+				bpftool prog load $$prog /sys/fs/bpf/test_$$prog 2>/dev/null && \
+				bpftool prog del pinned /sys/fs/bpf/test_$$prog || true; \
+			else \
+				echo "bpftool not found, skipping eBPF verification"; \
+			fi; \
+		fi; \
+	done
+else
+	@echo "eBPF verification skipped (not supported on $(PLATFORM))"
+endif
+	@echo "All checks completed"
 
 # macOS target
-mac: demo
-	@echo "macOS build completed (demo mode)"
+mac: user_space
+	@echo "macOS build completed"
 
 # Help target
 help:
+	@echo "Zapret eBPF Build System"
+	@echo "========================"
+	@echo "Platform: $(PLATFORM)"
+	@echo "eBPF Support: $(EBPF_SUPPORTED)"
+	@echo ""
 	@echo "Available targets:"
 	@echo "  all       - Build all eBPF programs and loader"
-	@echo "  mac       - Build for macOS (demo mode)"
-	@echo "  libbpf    - Build libbpf dependency"
-	@echo "  install   - Install binaries to system"
+	@echo "  mac       - Build for macOS"
+	@echo "  libbpf    - Build libbpf dependency (Linux only)"
+	@echo "  install   - Install binaries to system directories"
 	@echo "  clean     - Clean build artifacts"
 	@echo "  distclean - Clean everything including dependencies"
-	@echo "  format    - Format source code"
-	@echo "  check     - Verify eBPF programs"
-	@echo "  help      - Show this help"
+	@echo "  format    - Format source code with clang-format"
+	@echo "  check     - Verify eBPF programs and check syntax"
+	@echo "  help      - Show this help message"
+	@echo ""
+	@echo "Build Configuration:"
+	@echo "  CC        = $(CC)"
+	@echo "  CFLAGS    = $(CFLAGS)"
+	@echo "  INCLUDES  = $(INCLUDES)"
+	@echo "  LDFLAGS   = $(LDFLAGS)"
+	@echo ""
+	@echo "Source Files:"
+	@echo "  eBPF Programs: $(EBPF_SRCS)"
+	@echo "  Loader Sources: $(LOADER_SRCS)"
+	@echo "  Target: $(TARGETS)"

@@ -651,15 +651,13 @@ uint8_t QUICDraftVersion(uint32_t version)
 	if ((version & 0x0F0F0F0F) == 0x0a0a0a0a) {
 		return 29;
 	}
-	/* QUIC (final?) constants for v1 are defined in draft-33, but draft-34 is the
-	   final draft version */
+	/* QUIC v1 (RFC 9000) */
 	if (version == 0x00000001) {
-		return 34;
+		return 1;
 	}
-	/* QUIC Version 2 */
-	/* TODO: for the time being use 100 as a number for V2 and let see how v2 drafts evolve */
+	/* QUIC Version 2 (RFC 9369) */
 	if (version == 0x709A50C4) {
-		return 100;
+		return 2;
 	}
 	return 0;
 }

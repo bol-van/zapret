@@ -62,7 +62,7 @@ struct conn_track* find_connection(uint32_t src_ip, uint32_t dst_ip, uint16_t sr
             pthread_mutex_unlock(&conn_mutex);
             return conn;
         }
-        conn = (struct conn_track*)conn->bytes_count;  /* Using bytes_count as next pointer */
+        conn = conn->next;  /* Proper linked list traversal */
     }
     
     pthread_mutex_unlock(&conn_mutex);
@@ -93,7 +93,7 @@ struct conn_track* create_connection(uint32_t src_ip, uint32_t dst_ip, uint16_t 
     
     pthread_mutex_lock(&conn_mutex);
     /* Insert at head of hash bucket */
-    conn->bytes_count = (uint32_t)(uintptr_t)connection_table[hash];
+    conn->next = connection_table[hash];
     connection_table[hash] = conn;
     pthread_mutex_unlock(&conn_mutex);
     

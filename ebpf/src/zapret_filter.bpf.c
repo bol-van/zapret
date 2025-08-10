@@ -98,44 +98,72 @@ static __always_inline int parse_tls_client_hello(void *data, void *data_end, st
     if (tls_data[0] != 0x16)
         return -1;
     
-    /* Extract TLS version */
+    /* TLS version */
     fp->version = (tls_data[1] << 8) | tls_data[2];
     
-    /* Parse Client Hello message */
-    if (data + 9 > data_end)
+    /* Record length */
+    uint16_t record_len = (tls_data[3] << 8) | tls_data[4];
+    
+    if (data + 5 + record_len > data_end)
         return -1;
     
-    /* Skip to cipher suites */
-    uint8_t *pos = tls_data + 43;  /* Skip fixed part of Client Hello */
+    /* Check for Client Hello (0x01) */
+    if (data + 6 > data_end || tls_data[5] != 0x01)
+        return -1;
     
-    if (pos + 1 > data_end)
+    /* Skip handshake header and random */
+    uint8_t *ptr = tls_data + 43;
+    if (ptr > data_end)
         return -1;
     
     /* Skip session ID */
-    uint8_t session_id_len = *pos++;
-    pos += session_id_len;
-    
-    if (pos + 2 > data_end)
+    if (ptr + 1 > data_end)
         return -1;
+    uint8_t session_id_len = *ptr++;
+    ptr += session_id_len;
     
     /* Parse cipher suites */
-    uint16_t cipher_suites_len = (pos[0] << 8) | pos[1];
-    pos += 2;
+    if (ptr + 2 > data_end)
+        return -1;
+    uint16_t cipher_len = (ptr[0] << 8) | ptr[1];
+    ptr += 2;
     
-    if (pos + cipher_suites_len > data_end)
+    if (ptr + cipher_len > data_end)
         return -1;
     
-    /* Store first few cipher suites for fingerprinting */
-    int cipher_count = cipher_suites_len / 2;
-    if (cipher_count > MAX_CIPHER_SUITES)
-        cipher_count = MAX_CIPHER_SUITES;
+    /* Copy cipher suites */
+    fp->cipher_suites_len = cipher_len / 2;
+    if (fp->cipher_suites_len > 32)
+        fp->cipher_suites_len = 32;
     
-    fp->cipher_count = cipher_count;
-    for (int i = 0; i < cipher_count && i < MAX_CIPHER_SUITES; i++) {
-        if (pos + 2 <= data_end) {
-            fp->cipher_suites[i] = (pos[0] << 8) | pos[1];
-            pos += 2;
+    for (int i = 0; i < fp->cipher_suites_len && i < 32; i++) {
+        if (ptr + (i * 2) + 1 < data_end) {
+            fp->cipher_suites[i] = (ptr[i * 2] << 8) | ptr[i * 2 + 1];
         }
+    }
+    
+    /* Skip compression methods */
+    ptr += cipher_len;
+    if (ptr + 1 > data_end)
+        return -1;
+    uint8_t comp_len = *ptr++;
+    ptr += comp_len;
+    
+    /* Parse extensions */
+    if (ptr + 2 > data_end)
+        return -1;
+    uint16_t ext_len = (ptr[0] << 8) | ptr[1];
+    ptr += 2;
+    
+    fp->extensions_len = 0;
+    uint8_t *ext_end = ptr + ext_len;
+    
+    while (ptr + 4 <= ext_end && ptr + 4 <= data_end && fp->extensions_len < 16) {
+        uint16_t ext_type = (ptr[0] << 8) | ptr[1];
+        uint16_t ext_data_len = (ptr[2] << 8) | ptr[3];
+        
+        fp->extensions[fp->extensions_len++] = ext_type;
+        ptr += 4 + ext_data_len;
     }
     
     return 0;
@@ -164,6 +192,65 @@ static __always_inline int parse_quic_initial(void *data, void *data_end, struct
     
     quic->version = (quic_data[1] << 24) | (quic_data[2] << 16) | 
                    (quic_data[3] << 8) | quic_data[4];
+    
+    /* Extract connection IDs */
+    uint8_t *pos = quic_data + 5;
+    if (pos + 1 > data_end)
+        return -1;
+    
+    /* Destination Connection ID */
+    uint8_t dcid_len = *pos++;
+    if (dcid_len > 20) dcid_len = 20;
+    
+    if (pos + dcid_len > data_end)
+        return -1;
+    
+    quic->dcid_len = dcid_len;
+    for (int i = 0; i < dcid_len; i++) {
+        quic->dcid[i] = pos[i];
+    }
+    pos += dcid_len;
+    
+    /* Source Connection ID */
+    if (pos + 1 > data_end)
+        return -1;
+    
+    uint8_t scid_len = *pos++;
+    if (scid_len > 20) scid_len = 20;
+    
+    if (pos + scid_len > data_end)
+        return -1;
+    
+    quic->scid_len = scid_len;
+    for (int i = 0; i < scid_len; i++) {
+        quic->scid[i] = pos[i];
+    }
+    pos += scid_len;
+    
+    /* Token length (variable length integer) */
+    if (pos + 1 > data_end)
+        return -1;
+    
+    uint64_t token_len = 0;
+    uint8_t first_byte = *pos++;
+    
+    if ((first_byte & 0xC0) == 0x00) {
+        token_len = first_byte & 0x3F;
+    } else if ((first_byte & 0xC0) == 0x40) {
+        if (pos + 1 > data_end) return -1;
+        token_len = ((first_byte & 0x3F) << 8) | *pos++;
+    }
+    
+    /* Skip token */
+    if (pos + token_len > data_end)
+        return -1;
+    pos += token_len;
+    
+    /* Length field */
+    if (pos + 2 > data_end)
+        return -1;
+    
+    quic->initial_packet_len = (pos[0] << 8) | pos[1];
     
     /* Mark as initial packet */
     quic->is_initial = 1;
