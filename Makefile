@@ -1,5 +1,5 @@
-DIRS := nfq tpws ip2net mdig
-DIRS_MAC := tpws ip2net mdig
+DIRS := nfq tpws ip2net mdig ebpf
+DIRS_MAC := tpws ip2net mdig ebpf
 TGT := binaries/my
 
 all:	clean
