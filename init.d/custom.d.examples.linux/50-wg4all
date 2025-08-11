@@ -25,6 +25,6 @@ zapret_custom_firewall_nft()
 {
         # stop logic is not required
 
-        local f="udp length 156 @th,64,32 0x01000000"
+        local f="udp length 156 @ih,0,32 0x01000000"
         nft_fw_nfqws_post "$f" "$f" $QNUM_WG4ALL
 }
