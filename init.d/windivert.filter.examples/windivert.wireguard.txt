@@ -1,0 +1,8 @@
+!impostor and !loopback and
+ (outbound and
+  udp.PayloadLength=148 and
+  udp.Payload[0]=0x01 and
+  ( ((ip.DstAddr < 127.0.0.1 or ip.DstAddr > 127.255.255.255) and (ip.DstAddr < 10.0.0.0 or ip.DstAddr > 10.255.255.255) and (ip.DstAddr < 192.168.0.0 or ip.DstAddr > 192.168.255.255) and (ip.DstAddr < 172.16.0.0 or ip.DstAddr > 172.31.255.255) and (ip.DstAddr < 169.254.0.0 or ip.DstAddr > 169.254.255.255)) or
+     ((ipv6.DstAddr > ::1) and (ipv6.DstAddr < 2001::0 or ipv6.DstAddr >= 2001:1::0) and (ipv6.DstAddr < fc00::0 or ipv6.DstAddr >= fe00::0) and (ipv6.DstAddr < fe80::0 or ipv6.DstAddr >= fec0::0) and (ipv6.DstAddr < ff00::0 or ipv6.DstAddr >= ffff::0))
+    )
+ )
