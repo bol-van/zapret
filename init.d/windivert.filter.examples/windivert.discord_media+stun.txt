@@ -1,6 +1,7 @@
 !impostor and !loopback and
  (outbound and
-  ((udp.DstPort>=50000 and udp.DstPort<=50099 and
+  ((ip and
+    udp.DstPort>=50000 and udp.DstPort<=50099 and
     udp.PayloadLength=74 and
     udp.Payload32[0]=0x00010046 and
     udp.Payload32[2]=0 and
