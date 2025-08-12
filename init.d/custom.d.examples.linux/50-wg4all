@@ -1,4 +1,5 @@
 # this custom script runs desync to all wireguard handshake initiation packets
+# NOTE : this works for original wireguard and may not work for 3rd party implementations such as xray
 
 # can override in config :
 NFQWS_OPT_DESYNC_WG="${NFQWS_OPT_DESYNC_WG:---dpi-desync=fake}"
