@@ -1243,7 +1243,7 @@ Change postnat scheme mark bit
 
 If uncommented pass to zapret only packets marked with this bit
 
-`#FILTER_MARK_POSTNAT=0x10000000`
+`#FILTER_MARK=0x10000000`
 
 Bit must be set in your own rules.
 * iptables - in mangle PREROUTING and mangle OUTPUT before zapret rules (iptables -I _after_ zapret rules application).
