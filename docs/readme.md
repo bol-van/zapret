@@ -43,6 +43,7 @@ zapret является свободным и open source.
     - [IPTABLES ДЛЯ NFQWS](#iptables-для-nfqws)
     - [NFTABLES ДЛЯ NFQWS](#nftables-для-nfqws)
     - [FLOW OFFLOADING](#flow-offloading)
+    - [ОСОБЕННОСТИ ЖЕЛЕЗОК](#особенности-железок)
     - [ДУРЕНИЕ СО СТОРОНЫ СЕРВЕРА](#дурение-со-стороны-сервера)
   - [tpws](#tpws)
     - [TCP СЕГМЕНТАЦИЯ В TPWS](#tcp-сегментация-в-tpws)
@@ -933,6 +934,70 @@ OpenWrt не предусматривает выборочного управл�
 iptables target `FLOWOFFLOAD` - это проприетарное изобретение OpenWrt.
 Управление offload в nftables реализовано в базовом ядре linux без патчей.
 nftables - единственный способ включения offload на классическом Linux.
+
+### ОСОБЕННОСТИ ЖЕЛЕЗОК
+
+На устройствах mediatek замечены 2 проблемы.
+
+Драйвер mediatek ethernet отбрасывает tcp и udp пакеты с неверной чексуммой на аппаратном уровне, это не отключается.
+Как следствие не будет работать fooling badsum через роутер, но будет с него.
+
+Другая проблема mediatek, затрагивающая как ethernet, так и wireless, проявляется на udp, когда включен offload rx-gro-list.
+Пока отсутствует nfqueue, все хорошо. Как только nfqueue появляется, часть пакетов выпадает.
+Особенно заметно это проявляется на дурении QUIC с kyber.
+
+<details>
+  <summary>shell код лечения</summary>
+
+```
+append_separator_list()
+{
+    # $1 - var name to receive result
+    # $2 - separator
+    # $3 - quoter
+    # $4,$5,... - elements
+    local _var="$1" sep="$2" quo="$3" i
+
+    eval i="\$$_var"
+    shift; shift; shift
+    while [ -n "$1" ]; do
+        if [ -n "$i" ] ; then
+            i="$i$sep$quo$1$quo"
+        else
+            i="$quo$1$quo"
+        fi
+        shift
+    done
+    eval $_var="\$i"
+}
+resolve_lower_devices()
+{
+    # $1 - bridge interface name
+    [ -d "/sys/class/net/$1" ] && {
+        find "/sys/class/net/$1" -follow -maxdepth 1 -name "lower_*" |
+        {
+            local l lower lowers
+            while read lower; do
+                lower="$(basename "$lower")"
+                l="${lower#lower_*}"
+                [  "$l" != "$lower" ] && append_separator_list lowers ' ' '' "$l"
+            done
+            printf "$lowers"
+        }
+    }
+}
+
+# it breaks nfqueue
+lans=$(resolve_lower_devices br-lan)
+for int in $lans; do
+    ethtool -K $int rx-gro-list off
+done
+```
+</details>
+
+Этот код нужно вызывать после вставания интерфейса LAN, когда все bridge members уже занесены в bridge.
+Можно использовать хук в `/etc/hotplug.d/iface`.
+
 
 ### ДУРЕНИЕ СО СТОРОНЫ СЕРВЕРА
 
