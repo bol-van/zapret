@@ -166,7 +166,7 @@ Tasks can also be controlled from GUI `taskschd.msc`.
 
 Also you can use windows services the same way with `service_*.cmd`.
 
-## Windows Server
+### Windows Server
 
 winws is linked against wlanapi.dll which is absent by default.
 To solve this problem run power shell as administrator and execute command `Install-WindowsFeature -Name Wireless-Networking`.
