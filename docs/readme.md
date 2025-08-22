@@ -947,7 +947,7 @@ nftables - единственный способ включения offload на
 Особенно заметно это проявляется на дурении QUIC с kyber.
 
 <details>
-  <summary>shell код лечения</summary>
+  <summary><b>shell код лечения</b></summary>
 
 ```
 append_separator_list()
