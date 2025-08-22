@@ -817,6 +817,9 @@ wireless extensions считаются deprecated и на новых ядрах 
 
 ### IPTABLES ДЛЯ NFQWS
 
+> [!CAUTION]
+> Начиная с ядер Linux 6.17 присутствует параметр конфигурации ядра CONFIG_NETFILTER_XTABLES_LEGACY, который по умолчанию в дистрибутиве может быть "not set". Отсутствие этой настройки выключает iptables-legacy. Это часть процесса депрекации iptables. Тем не менее iptables-nft будут работать, поскольку используют backend nftables.
+
 iptables для задействования атаки на первые пакеты данных в tcp соединении :
 
 ```
