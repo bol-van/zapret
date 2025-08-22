@@ -702,7 +702,7 @@ Set up bridge networking.
 ### IPTABLES for nfqws
 
 > [!CAUTION]
-> Starting from Linux kernel 6.17 there's CONFIG_NETFILTER_XTABLES_LEGACY parameter which is not set by default. Many distributions will likely will not turn it on making iptables-legacy non working. This is part of iptables deprecation. However iptables-nft still works because their backend is based on nftables.
+> Starting from Linux kernel 6.17 there's CONFIG_NETFILTER_XTABLES_LEGACY parameter which is not set by default. Many distributions will likely not turn it on making iptables-legacy non working. This is part of iptables deprecation. However iptables-nft still works because their backend is based on nftables.
 
 This is the common way to redirect some traffic to nfqws :
 
