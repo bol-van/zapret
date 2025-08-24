@@ -8,6 +8,23 @@ BINDIR="$EXEDIR/$BINS"
 ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
 . "$ZAPRET_BASE/common/base.sh"
 
+# Function to detect MacOS architecture
+detect_macos_arch()
+{
+	local arch
+	case "$(uname -m)" in
+		x86_64)
+			arch="mac64"
+			;;
+		arm64)
+			arch="mac64-arm64"
+			;;
+		*)
+			arch="mac64"
+			;;
+	esac
+	echo "$arch"
+}
 
 read_elf_arch()
 {
@@ -144,7 +161,8 @@ if [ ! -d "$BINDIR" ] || ! dir_is_not_empty "$BINDIR" ]; then
 			;;
 		Darwin)
 			echo "you need to download release from github or build binaries from source"
-			echo "to compile : make mac"
+			echo "to compile for current architecture : make mac"
+			echo "to compile universal binary (x86_64 + arm64) : make mac-universal"
 			;;
 		FreeBSD)
 			echo "you need to download release from github or build binaries from source"
@@ -169,7 +187,7 @@ case $UNAME in
 		PKTWS=nfqws
 		;;
 	Darwin)
-		ARCHLIST="my mac64"
+		ARCHLIST="my mac64 mac64-arm64"
 		;;
 	FreeBSD)
 		ARCHLIST="my freebsd-x86_64"
@@ -187,14 +205,42 @@ esac
 select_test_method
 
 if [ "$1" = "getarch" ]; then
-	for arch in $ARCHLIST
-	do
-		[ -d "$BINDIR/$arch" ] || continue
-		if check_dir $arch; then
-	 		echo $arch
-	 		exit 0
-	 	fi
-	done
+	# For MacOS, try to detect architecture and prioritize matching binaries
+	if [ "$UNAME" = "Darwin" ]; then
+		local detected_arch=$(detect_macos_arch)
+		echo "detected MacOS architecture: $detected_arch"
+		
+		# First try the detected architecture
+		if [ -d "$BINDIR/$detected_arch" ] && check_dir "$detected_arch"; then
+			echo "$detected_arch"
+			exit 0
+		fi
+		
+		# Then try universal binary
+		if [ -d "$BINDIR/mac64" ] && check_dir "mac64"; then
+			echo "mac64"
+			exit 0
+		fi
+		
+		# Finally try the other architecture
+		if [ "$detected_arch" = "mac64" ] && [ -d "$BINDIR/mac64-arm64" ] && check_dir "mac64-arm64"; then
+			echo "mac64-arm64"
+			exit 0
+		elif [ "$detected_arch" = "mac64-arm64" ] && [ -d "$BINDIR/mac64" ] && check_dir "mac64"; then
+			echo "mac64"
+			exit 0
+		fi
+	else
+		# For other systems, use the original logic
+		for arch in $ARCHLIST
+		do
+			[ -d "$BINDIR/$arch" ] || continue
+			if check_dir $arch; then
+				echo $arch
+				exit 0
+			fi
+		done
+	fi
 else
 	echo "using arch detect method : $TEST${ELF_ARCH:+ $ELF_ARCH}"
 
@@ -208,7 +254,7 @@ else
 			ccp $arch/mdig mdig
 			[ -n "$PKTWS" ] && ccp $arch/$PKTWS nfq
 			[ "$UNAME" = CYGWIN ] || ccp $arch/tpws tpws
-	 		exit 0
+			exit 0
 		else
 			echo $arch is NOT OK
 		fi

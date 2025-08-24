@@ -7,6 +7,10 @@ LDFLAGS_ANDROID = -llog
 LIBS = -lz -lpthread
 LIBS_SYSTEMD = -lsystemd
 LIBS_ANDROID = -lz
+
+# MacOS target detection
+MACOS_TARGET ?= $(shell uname -m | sed 's/x86_64/x86_64-apple-macos10.8/;s/arm64/arm64-apple-macos10.8/')
+
 SRC_FILES = *.c
 SRC_FILES_ANDROID = $(SRC_FILES) andr/*.c
 
@@ -24,7 +28,15 @@ android: $(SRC_FILES)
 bsd: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -o tpws $(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 
+# Single architecture build for MacOS
 mac: $(SRC_FILES)
+	@echo "Building tpws for MacOS target: $(MACOS_TARGET)"
+	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpws -target $(MACOS_TARGET) $(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
+	strip tpws
+
+# Universal binary build for MacOS (both architectures)
+mac-universal: $(SRC_FILES)
+	@echo "Building universal tpws for MacOS (x86_64 + arm64)"
 	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpwsa -target arm64-apple-macos10.8 $(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpwsx -target x86_64-apple-macos10.8 $(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 	strip tpwsa tpwsx
@@ -32,4 +44,4 @@ mac: $(SRC_FILES)
 	rm -f tpwsx tpwsa
 
 clean:
-	rm -f tpws *.o
+	rm -f tpws *.o tpwsa tpwsx
