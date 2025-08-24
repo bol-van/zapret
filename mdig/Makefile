@@ -1,10 +1,10 @@
 CC ?= cc
 OPTIMIZE ?= -Os
 CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto
-CFLAGS_BSD = -Wno-address-of-packed-member
+CFLAGS_MACOS = -Wno-address-of-packed-member -DMACOS_DARWIN
 CFLAGS_WIN = -static
 LIBS = 
-LIBS_BSD = 
+LIBS_MACOS = 
 LIBS_WIN = -lws2_32
 
 # MacOS target detection with improved compatibility
@@ -28,41 +28,48 @@ systemd: mdig
 android: mdig
 
 bsd: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o mdig $(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_MACOS) -o mdig $(SRC_FILES) $(LIBS_MACOS) $(LDFLAGS)
 
-# Single architecture build for MacOS with improved compatibility
+# Single architecture build for MacOS (Darwin) with improved compatibility
 mac: $(SRC_FILES)
-	@echo "Building mdig for MacOS target: $(MACOS_TARGET)"
+	@echo "Building mdig for MacOS (Darwin) target: $(MACOS_TARGET)"
 	@echo "MacOS version: $(MACOS_VERSION), minimum: $(MACOS_MIN_VERSION)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o mdig \
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o mdig \
 		-target $(MACOS_TARGET) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
-		$(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)
+		-DMACOS_DARWIN \
+		$(SRC_FILES) $(LIBS_MACOS) $(LDFLAGS)
 	strip mdig
 
-# Universal binary build for MacOS (both architectures)
+# Universal binary build for MacOS (Darwin) (both architectures)
 mac-universal: $(SRC_FILES)
-	@echo "Building universal mdig for MacOS (x86_64 + arm64)"
+	@echo "Building universal mdig for MacOS (Darwin) (x86_64 + arm64)"
 	@echo "MacOS version: $(MACOS_VERSION), minimum: $(MACOS_MIN_VERSION)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o mdiga \
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o mdiga \
 		-target arm64-apple-macos$(MACOS_MIN_VERSION) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
-		$(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o mdigx \
+		-DMACOS_DARWIN \
+		$(SRC_FILES) $(LIBS_MACOS) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o mdigx \
 		-target x86_64-apple-macos$(MACOS_MIN_VERSION) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
-		$(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)
+		-DMACOS_DARWIN \
+		$(SRC_FILES) $(LIBS_MACOS) $(LDFLAGS)
 	strip mdiga mdigx
 	lipo -create -output mdig mdigx mdiga
 	rm -f mdigx mdiga
 
 # MacOS build with specific version targeting
 mac-$(MACOS_VERSION): $(SRC_FILES)
-	@echo "Building mdig for MacOS $(MACOS_VERSION) with target: $(MACOS_TARGET)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o mdig \
+	@echo "Building mdig for MacOS (Darwin) $(MACOS_VERSION) with target: $(MACOS_TARGET)"
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o mdig \
 		-target $(MACOS_TARGET) \
 		-mmacosx-version-min=$(MACOS_VERSION) \
-		$(SRC_FILES) $(LIBS_BSD) $(LDFLAGS)
+		-DMACOS_DARWIN \
+		$(SRC_FILES) $(LIBS_MACOS) $(LDFLAGS)
 	strip mdig
 
 win: $(SRC_FILES)
@@ -74,17 +81,24 @@ clean:
 # MacOS specific clean
 mac-clean:
 	rm -f mdig *.o mdiga mdigx
-	@echo "Cleaned MacOS build artifacts"
+	@echo "Cleaned MacOS (Darwin) build artifacts"
 
 # Show MacOS build information
 mac-info:
-	@echo "mdig MacOS Build Information:"
-	@echo "============================="
+	@echo "mdig MacOS (Darwin) Build Information:"
+	@echo "======================================"
 	@echo "Target: $(MACOS_TARGET)"
 	@echo "Version: $(MACOS_VERSION)"
 	@echo "Minimum: $(MACOS_MIN_VERSION)"
 	@echo "Compiler: $(CC)"
 	@echo "CFLAGS: $(CFLAGS)"
+	@echo ""
+	@echo "IMPORTANT: MacOS is NOT BSD - it's a hybrid system with:"
+	@echo "  - XNU kernel (Mach + BSD-like layer + Apple components)"
+	@echo "  - Unique networking stack and system calls"
+	@echo "  - Apple-specific security features (SIP, code signing)"
+	@echo "  - Different firewall (PF) and service management (launchd)"
+	@echo ""
 	@echo "Available targets:"
 	@echo "  make mac           - Build for current architecture"
 	@echo "  make mac-universal - Build universal binary"

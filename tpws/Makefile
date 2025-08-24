@@ -2,7 +2,7 @@ CC ?= cc
 OPTIMIZE ?= -Os
 CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto
 CFLAGS_SYSTEMD = -DUSE_SYSTEMD
-CFLAGS_BSD = -Wno-address-of-packed-member
+CFLAGS_MACOS = -Wno-address-of-packed-member -DMACOS_DARWIN
 LDFLAGS_ANDROID = -llog
 LIBS = -lz -lpthread
 LIBS_SYSTEMD = -lsystemd
@@ -32,29 +32,34 @@ android: $(SRC_FILES)
 	$(CC) -s $(CFLAGS) -o tpws $(SRC_FILES) $(LIBS_ANDROID) $(LDFLAGS) $(LDFLAGS_ANDROID)
 
 bsd: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -o tpws $(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_MACOS) -Iepoll-shim/include -o tpws $(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 
-# Single architecture build for MacOS with improved compatibility
+# Single architecture build for MacOS (Darwin) with improved compatibility
 mac: $(SRC_FILES)
-	@echo "Building tpws for MacOS target: $(MACOS_TARGET)"
+	@echo "Building tpws for MacOS (Darwin) target: $(MACOS_TARGET)"
 	@echo "MacOS version: $(MACOS_VERSION), minimum: $(MACOS_MIN_VERSION)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpws \
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -Iepoll-shim/include -Imacos -o tpws \
 		-target $(MACOS_TARGET) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 	strip tpws
 
-# Universal binary build for MacOS (both architectures)
+# Universal binary build for MacOS (Darwin) (both architectures)
 mac-universal: $(SRC_FILES)
-	@echo "Building universal tpws for MacOS (x86_64 + arm64)"
+	@echo "Building universal tpws for MacOS (Darwin) (x86_64 + arm64)"
 	@echo "MacOS version: $(MACOS_VERSION), minimum: $(MACOS_MIN_VERSION)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpwsa \
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -Iepoll-shim/include -Imacos -o tpwsa \
 		-target arm64-apple-macos$(MACOS_MIN_VERSION) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpwsx \
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -Iepoll-shim/include -Imacos -o tpwsx \
 		-target x86_64-apple-macos$(MACOS_MIN_VERSION) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 	strip tpwsa tpwsx
 	lipo -create -output tpws tpwsx tpwsa
@@ -62,10 +67,12 @@ mac-universal: $(SRC_FILES)
 
 # MacOS build with specific version targeting
 mac-$(MACOS_VERSION): $(SRC_FILES)
-	@echo "Building tpws for MacOS $(MACOS_VERSION) with target: $(MACOS_TARGET)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -Iepoll-shim/include -Imacos -o tpws \
+	@echo "Building tpws for MacOS (Darwin) $(MACOS_VERSION) with target: $(MACOS_TARGET)"
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -Iepoll-shim/include -Imacos -o tpws \
 		-target $(MACOS_TARGET) \
 		-mmacosx-version-min=$(MACOS_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) epoll-shim/src/*.c $(LIBS) $(LDFLAGS)
 	strip tpws
 
@@ -75,17 +82,24 @@ clean:
 # MacOS specific clean
 mac-clean:
 	rm -f tpws *.o tpwsa tpwsx
-	@echo "Cleaned MacOS build artifacts"
+	@echo "Cleaned MacOS (Darwin) build artifacts"
 
 # Show MacOS build information
 mac-info:
-	@echo "tpws MacOS Build Information:"
-	@echo "============================="
+	@echo "tpws MacOS (Darwin) Build Information:"
+	@echo "======================================"
 	@echo "Target: $(MACOS_TARGET)"
 	@echo "Version: $(MACOS_VERSION)"
 	@echo "Minimum: $(MACOS_MIN_VERSION)"
 	@echo "Compiler: $(CC)"
 	@echo "CFLAGS: $(CFLAGS)"
+	@echo ""
+	@echo "IMPORTANT: MacOS is NOT BSD - it's a hybrid system with:"
+	@echo "  - XNU kernel (Mach + BSD-like layer + Apple components)"
+	@echo "  - Unique networking stack and system calls"
+	@echo "  - Apple-specific security features (SIP, code signing)"
+	@echo "  - Different firewall (PF) and service management (launchd)"
+	@echo ""
 	@echo "Available targets:"
 	@echo "  make mac           - Build for current architecture"
 	@echo "  make mac-universal - Build universal binary"

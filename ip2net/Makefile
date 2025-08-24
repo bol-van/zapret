@@ -1,7 +1,7 @@
 CC ?= cc
 OPTIMIZE ?= -Os
 CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto
-CFLAGS_BSD = -Wno-address-of-packed-member
+CFLAGS_MACOS = -Wno-address-of-packed-member -DMACOS_DARWIN
 CFLAGS_WIN = -static
 LIBS = 
 LIBS_WIN = -lws2_32
@@ -27,29 +27,34 @@ systemd: ip2net
 android: ip2net
 
 bsd: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o ip2net $(SRC_FILES) $(LIBS) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_MACOS) -o ip2net $(SRC_FILES) $(LIBS) $(LDFLAGS)
 
-# Single architecture build for MacOS with improved compatibility
+# Single architecture build for MacOS (Darwin) with improved compatibility
 mac: $(SRC_FILES)
-	@echo "Building ip2net for MacOS target: $(MACOS_TARGET)"
+	@echo "Building ip2net for MacOS (Darwin) target: $(MACOS_TARGET)"
 	@echo "MacOS version: $(MACOS_VERSION), minimum: $(MACOS_MIN_VERSION)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o ip2net \
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o ip2net \
 		-target $(MACOS_TARGET) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) $(LIBS) $(LDFLAGS)
 	strip ip2net
 
-# Universal binary build for MacOS (both architectures)
+# Universal binary build for MacOS (Darwin) (both architectures)
 mac-universal: $(SRC_FILES)
-	@echo "Building universal ip2net for MacOS (x86_64 + arm64)"
+	@echo "Building universal ip2net for MacOS (Darwin) (x86_64 + arm64)"
 	@echo "MacOS version: $(MACOS_VERSION), minimum: $(MACOS_MIN_VERSION)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o ip2neta \
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o ip2neta \
 		-target arm64-apple-macos$(MACOS_MIN_VERSION) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) $(LIBS) $(LDFLAGS)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o ip2netx \
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o ip2netx \
 		-target x86_64-apple-macos$(MACOS_MIN_VERSION) \
 		-mmacosx-version-min=$(MACOS_MIN_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) $(LIBS) $(LDFLAGS)
 	strip ip2neta ip2netx
 	lipo -create -output ip2net ip2netx ip2neta
@@ -57,10 +62,12 @@ mac-universal: $(SRC_FILES)
 
 # MacOS build with specific version targeting
 mac-$(MACOS_VERSION): $(SRC_FILES)
-	@echo "Building ip2net for MacOS $(MACOS_VERSION) with target: $(MACOS_TARGET)"
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o ip2net \
+	@echo "Building ip2net for MacOS (Darwin) $(MACOS_VERSION) with target: $(MACOS_TARGET)"
+	@echo "Note: MacOS is NOT BSD - it's a hybrid system with unique characteristics"
+	$(CC) $(CFLAGS) $(CFLAGS_MACOS) -o ip2net \
 		-target $(MACOS_TARGET) \
 		-mmacosx-version-min=$(MACOS_VERSION) \
+		-DMACOS_DARWIN \
 		$(SRC_FILES) $(LIBS) $(LDFLAGS)
 	strip ip2net
 
@@ -73,17 +80,24 @@ clean:
 # MacOS specific clean
 mac-clean:
 	rm -f ip2net *.o ip2neta ip2netx
-	@echo "Cleaned MacOS build artifacts"
+	@echo "Cleaned MacOS (Darwin) build artifacts"
 
 # Show MacOS build information
 mac-info:
-	@echo "ip2net MacOS Build Information:"
-	@echo "================================="
+	@echo "ip2net MacOS (Darwin) Build Information:"
+	@echo "========================================"
 	@echo "Target: $(MACOS_TARGET)"
 	@echo "Version: $(MACOS_VERSION)"
 	@echo "Minimum: $(MACOS_MIN_VERSION)"
 	@echo "Compiler: $(CC)"
 	@echo "CFLAGS: $(CFLAGS)"
+	@echo ""
+	@echo "IMPORTANT: MacOS is NOT BSD - it's a hybrid system with:"
+	@echo "  - XNU kernel (Mach + BSD-like layer + Apple components)"
+	@echo "  - Unique networking stack and system calls"
+	@echo "  - Apple-specific security features (SIP, code signing)"
+	@echo "  - Different firewall (PF) and service management (launchd)"
+	@echo ""
 	@echo "Available targets:"
 	@echo "  make mac           - Build for current architecture"
 	@echo "  make mac-universal - Build universal binary"
