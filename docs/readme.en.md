@@ -113,7 +113,7 @@ There is also more advanced magic for bypassing DPI at the packet level.
 In short, the options can be classified according to the following scheme:
 
 1. Passive DPI not sending RST to the server. ISP tuned iptables commands can help.
-This option is out of the scope of the project. If you do not allow ban trigger to fire, then you won’t have to
+This option is out of the scope of the project. If you do not allow ban trigger to fire, then you won't have to
 deal with its consequences.
 2. Modification of the TCP connection at the stream level. Implemented through a proxy or transparent proxy.
 3. Modification of TCP connection at the packet level. Implemented through the NFQUEUE handler and raw sockets.
@@ -1558,6 +1558,12 @@ Now its possible to run `/data/local/tmp/zapret/tpws` from any app such as taske
 ### FreeBSD, OpenBSD, MacOS
 
 see [BSD documentation](./bsd.en.md)
+
+**MacOS users**: The project now includes improved support for both Intel (x86_64) and Apple Silicon (ARM64) architectures. See [MacOS Refactoring Guide](./MACOS_REFACTORING.md) for details on:
+- Automatic architecture detection
+- Universal binary compilation
+- Cross-architecture compatibility
+- Enhanced build system
 
 ### Windows (WSL)
 

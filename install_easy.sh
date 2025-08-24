@@ -95,7 +95,23 @@ check_bins()
 		echo trying to compile
 		case $SYSTEM in
 			macos)
-				make_target=mac
+				# Detect MacOS architecture and set appropriate target
+				local macos_arch=$(uname -m)
+				local make_target
+				
+				if [ "$macos_arch" = "arm64" ]; then
+					make_target=mac
+					export MACOS_TARGET="arm64-apple-macos10.8"
+					echo "detected Apple Silicon (ARM64), using target: $MACOS_TARGET"
+				elif [ "$macos_arch" = "x86_64" ]; then
+					make_target=mac
+					export MACOS_TARGET="x86_64-apple-macos10.8"
+					echo "detected Intel (x86_64), using target: $MACOS_TARGET"
+				else
+					make_target=mac
+					export MACOS_TARGET="x86_64-apple-macos10.8"
+					echo "unknown architecture, using default target: $MACOS_TARGET"
+				fi
 				cf=
 				;;
 			systemd)

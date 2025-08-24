@@ -147,22 +147,36 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    name: macOS
-    runs-on: macos-latest
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-12
+            arch: x86_64
+            target: x86_64-apple-macos10.8
+          - os: macos-13
+            arch: arm64
+            target: arm64-apple-macos10.8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build zapret
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
         run: |
           export CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }}"
+          export MACOS_TARGET="$TARGET"
           make mac -j$(sysctl -n hw.logicalcpu)
-          tar -C binaries/my -cJf zapret-mac-x64.tar.xz .
+          tar -C binaries/my -cJf zapret-mac-$ARCH.tar.xz .
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: zapret-mac-x64
+          name: zapret-mac-${{ matrix.arch }}
           path: zapret-*.tar.xz
           if-no-files-found: error
 
