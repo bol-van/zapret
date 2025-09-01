@@ -703,7 +703,7 @@ removable_pkgs_openwrt()
 	for pkg in $PKGS2; do
 		check_package_exists_openwrt $pkg && PKGS="${PKGS:+$PKGS }$pkg"
 	done
-	PKGS="ipset iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra ip6tables-mod-nat ip6tables-extra kmod-nft-queue gzip coreutils-sort coreutils-sleep curl $PKGS"
+	PKGS="ipset iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra iptables-mod-u32 ip6tables-mod-nat ip6tables-extra kmod-nft-queue gzip coreutils-sort coreutils-sleep curl $PKGS"
 }
 
 openwrt_fix_broken_apk_uninstall_scripts()
@@ -744,7 +744,7 @@ check_prerequisites_openwrt()
 		iptables)
 			pkg_iptables=iptables
 			check_package_exists_openwrt iptables-zz-legacy && pkg_iptables=iptables-zz-legacy
-			PKGS="$PKGS ipset $pkg_iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra"
+			PKGS="$PKGS ipset $pkg_iptables iptables-mod-extra iptables-mod-nfqueue iptables-mod-filter iptables-mod-ipopt iptables-mod-conntrack-extra iptables-mod-u32"
 			check_package_exists_openwrt ip6tables-zz-legacy && pkg_iptables=ip6tables-zz-legacy
 			[ "$DISABLE_IPV6" = 1 ] || PKGS="$PKGS $pkg_iptables ip6tables-mod-nat ip6tables-extra"
 			;;
