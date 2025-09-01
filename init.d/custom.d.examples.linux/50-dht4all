@@ -32,6 +32,6 @@ zapret_custom_firewall_nft()
         local f
         local first_packet_only="$nft_connbytes 1"
 
-        f="meta length 109-407 meta l4proto udp @th,64,16 0x6431"
+        f="meta length 109-407 meta l4proto udp @ih,0,16 0x6431"
         nft_fw_nfqws_post "$f $first_packet_only" "$f $first_packet_only" $QNUM_DHT4ALL
 }
