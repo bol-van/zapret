@@ -1,5 +1,6 @@
 # this custom script runs desync to all wireguard handshake initiation packets
-# NOTE : this works for original wireguard and may not work for 3rd party implementations such as xray
+# NOTE: this works for original wireguard and may not work for 3rd party implementations such as xray
+# NOTE: @ih requires nft 1.0.1+ and updated kernel version. it's confirmed to work on 5.15 (openwrt 23) and not work on 5.10 (openwrt 22)
 
 # can override in config :
 NFQWS_OPT_DESYNC_WG="${NFQWS_OPT_DESYNC_WG:---dpi-desync=fake}"
