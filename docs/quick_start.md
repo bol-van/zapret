@@ -52,6 +52,11 @@
 1. Скачайте последний [tar.gz релиз](https://github.com/bol-van/zapret/releases) в /tmp, распакуйте его, затем удалите архив.
    Для openwrt и прошивок используйте вариант `openwrt-embedded`.
    Для экономия места в /tmp можно качать через curl в stdout и сразу распаковывать.
+   Пример для версии 71.4 (для других URL отличается) :
+    `cd /tmp; curl -Lo - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx`
+    `cd /tmp; wget -O - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx`
+   curl должен быть предварительно установлен. Но он в любом случае поднабоится далее.
+   Вариант с wget будет работать только если установленный wget поддерживает https.
 
 2. Убедитесь, что у вас отключены все средства обхода блокировок, в том числе и
    сам zapret. Гарантированно уберет zapret скрипт `uninstall_easy.sh`.
