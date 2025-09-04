@@ -57,7 +57,7 @@
    $ curl -Lo - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx
    $ wget -O - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx
    ```
-   curl должен быть предварительно установлен. Но он в любом случае поднабоится далее.
+   curl должен быть предварительно установлен. Но он в любом случае понадобится далее.
    Вариант с wget будет работать только если установленный wget поддерживает https.
 
 2. Убедитесь, что у вас отключены все средства обхода блокировок, в том числе и
