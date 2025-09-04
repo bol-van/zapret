@@ -53,8 +53,10 @@
    Для openwrt и прошивок используйте вариант `openwrt-embedded`.
    Для экономия места в /tmp можно качать через curl в stdout и сразу распаковывать.
    Пример для версии 71.4 (для других URL отличается) :
-    `cd /tmp; curl -Lo - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx`
-    `cd /tmp; wget -O - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx`
+   ```
+   $ curl -Lo - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx
+   $ wget -O - https://github.com/bol-van/zapret/releases/download/v71.4/zapret-v71.4-openwrt-embedded.tar.gz | tar -zx
+   ```
    curl должен быть предварительно установлен. Но он в любом случае поднабоится далее.
    Вариант с wget будет работать только если установленный wget поддерживает https.
 
