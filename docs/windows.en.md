@@ -47,7 +47,9 @@ Task of `iptables` is done inside `winws` through `windivert` filters. `Windiver
  --wf-l3=ipv4|ipv6                              ; L3 protocol filter. multiple comma separated values allowed.
  --wf-tcp=[~]port1[-port2]                      ; TCP port filter. ~ means negation. multiple comma separated values allowed.
  --wf-udp=[~]port1[-port2]                      ; UDP port filter. ~ means negation. multiple comma separated values allowed.
- --wf-raw=<filter>|@<filename>                  ; raw windivert filter string or filename
+ --wf-raw-part=<filter>|@<filename>             ; partial raw windivert filter string or filename
+ --wf-filter-lan=0|1                            ; add excluding filter for non-global IP (default : 1)
+ --wf-raw=<filter>|@<filename>                  ; full raw windivert filter string or filename. replaces --wf-tcp,--wf-udp,--wf-raw-part
  --wf-save=<filename>                           ; save windivert filter string to a file and exit
  --ssid-filter=ssid1[,ssid2,ssid3,...]          ; enable winws only if any of specified wifi SSIDs connected
  --nlm-filter=net1[,net2,net3,...]              ; enable winws only if any of specified NLM network is connected. names and GUIDs are accepted.
@@ -59,6 +61,12 @@ Task of `iptables` is done inside `winws` through `windivert` filters. `Windiver
 Interface indexes can be discovered using this command : `netsh int ip show int`
 
 If you can't find index this way use `winws --debug` to see index there. Subinterface index is almost always 0 and you can omit it.
+
+`--wf-raw-part` specifies partial windivert filter. Multiple filter parts are supported. They can also be combined with `--wf-tcp`,`--wf-udp`.
+
+`--wf-raw` specifies full windivert filter that replaces `--wf-tcp`,`--wf-udp`,`--wf-raw-part`.
+
+Kernel filtering with windivert language is much more effective than passing massive amount of traffic to winws. Use it if possible to save CPU resources.
 
 Multiple `winws` processes are allowed. However, it's discouraged to intersect their filters.
 
