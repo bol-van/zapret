@@ -371,6 +371,7 @@ void cleanup_params(struct params_s *params)
 #ifdef __CYGWIN__
 	strlist_destroy(&params->ssid_filter);
 	strlist_destroy(&params->nlm_filter);
+	strlist_destroy(&params->wf_raw_part);
 #else
 	free(params->user); params->user=NULL;
 #endif

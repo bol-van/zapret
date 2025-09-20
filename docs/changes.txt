@@ -541,3 +541,7 @@ nfqws,tpws: fix possible crashes or high memory usage if hostlist has duplicate 
 init.d: custom scripts 50-discord-media, 50-stun4all
 init.d: windivert filters for discord media, stun, wireguard
 readme: hardware problems description
+
+v71.5
+
+winws: --wf-raw-part

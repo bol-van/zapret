@@ -1,5 +1,4 @@
-!impostor and !loopback and
- (outbound and
+  outbound and ip and
   udp.DstPort>=50000 and udp.DstPort<=50099 and
   udp.PayloadLength=74 and
   udp.Payload32[0]=0x00010046 and
@@ -18,6 +17,4 @@
   udp.Payload32[14]=0 and
   udp.Payload32[15]=0 and
   udp.Payload32[16]=0 and
-  udp.Payload32[17]=0 and
-  (ip.DstAddr < 127.0.0.1 or ip.DstAddr > 127.255.255.255) and (ip.DstAddr < 10.0.0.0 or ip.DstAddr > 10.255.255.255) and (ip.DstAddr < 192.168.0.0 or ip.DstAddr > 192.168.255.255) and (ip.DstAddr < 172.16.0.0 or ip.DstAddr > 172.31.255.255) and (ip.DstAddr < 169.254.0.0 or ip.DstAddr > 169.254.255.255)
- )
+  udp.Payload32[17]=0

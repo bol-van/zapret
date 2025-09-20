@@ -200,6 +200,7 @@ struct params_s
 	
 #ifdef __CYGWIN__
 	struct str_list_head ssid_filter,nlm_filter;
+	struct str_list_head wf_raw_part;
 #else
 	bool droproot;
 	char *user;

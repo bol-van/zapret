@@ -1447,37 +1447,63 @@ static bool wf_make_filter(
 	unsigned int IfIdx,unsigned int SubIfIdx,
 	bool ipv4, bool ipv6,
 	const char *pf_tcp_src, const char *pf_tcp_dst,
-	const char *pf_udp_src, const char *pf_udp_dst)
+	const char *pf_udp_src, const char *pf_udp_dst,
+	const struct str_list_head *wf_raw_part,
+	bool bFilterOutLAN)
 {
 	char pf_dst_buf[8192],iface[64];
+	struct str_list *wfpart;
+	int n;
 	const char *pf_dst;
 	const char *f_tcpin = *pf_tcp_src ? dp_list_have_autohostlist(&params.desync_profiles) ? "(" DIVERT_TCP_INBOUNDS " or (" DIVERT_HTTP_REDIRECT "))" : DIVERT_TCP_INBOUNDS : "";
 	const char *f_tcp_not_empty = (*pf_tcp_src && !dp_list_need_all_out(&params.desync_profiles)) ? DIVERT_TCP_NOT_EMPTY " and " : "";
 	snprintf(iface,sizeof(iface)," ifIdx=%u and subIfIdx=%u and",IfIdx,SubIfIdx);
 
-	if (!*pf_tcp_src && !*pf_udp_src) return false;
-	if (*pf_tcp_src && *pf_udp_src)
-	{
-		snprintf(pf_dst_buf,sizeof(pf_dst_buf),"(%s or %s)",pf_tcp_dst,pf_udp_dst);
-		pf_dst = pf_dst_buf;
-	}
-	else
-		pf_dst = *pf_tcp_dst ? pf_tcp_dst : pf_udp_dst;
-	snprintf(wf,len,
-	       DIVERT_PROLOG " and%s%s\n ((outbound and %s%s%s)\n  or\n  (inbound and tcp%s%s%s%s%s%s%s))",
+	snprintf(wf,len,"%s and%s%s\n(",
+		DIVERT_PROLOG,
 		IfIdx ? iface : "",
-		ipv4 ? ipv6 ? "" : " ip and" : " ipv6 and",
-		f_tcp_not_empty,
-		pf_dst,
-		ipv4 ? ipv6 ? " and " DIVERT_NO_LOCALNETS_DST : " and " DIVERT_NO_LOCALNETSv4_DST : " and " DIVERT_NO_LOCALNETSv6_DST,
-		*pf_tcp_src ? "" : " and false",
-		*f_tcpin ? " and " : "",
-		*f_tcpin ? f_tcpin : "",
-		*pf_tcp_src ? " and " : "",
-		*pf_tcp_src ? pf_tcp_src : "",
-		*pf_tcp_src ? " and " : "",
-		*pf_tcp_src ? ipv4 ? ipv6 ? DIVERT_NO_LOCALNETS_SRC : DIVERT_NO_LOCALNETSv4_SRC : DIVERT_NO_LOCALNETSv6_SRC : ""
-		);
+		ipv4 ? ipv6 ? "" : " ip and" : " ipv6 and"
+	);
+
+	n=0;
+	if (!LIST_EMPTY(wf_raw_part))
+	{
+		LIST_FOREACH(wfpart, wf_raw_part, next)
+		{
+			snprintf(wf+strlen(wf),len-strlen(wf),"%s(\n%s\n )", n ? "\n or\n " : "\n " ,wfpart->str);
+			n++;
+		}
+	}
+
+	if (*pf_tcp_src || *pf_udp_src)
+	{
+		if (*pf_tcp_src && *pf_udp_src)
+		{
+			snprintf(pf_dst_buf,sizeof(pf_dst_buf),"(%s or %s)",pf_tcp_dst,pf_udp_dst);
+			pf_dst = pf_dst_buf;
+		}
+		else
+			pf_dst = *pf_tcp_dst ? pf_tcp_dst : pf_udp_dst;
+
+		snprintf(wf+strlen(wf),len-strlen(wf), n++ ? "\n or\n " : "\n ");
+
+		snprintf(wf+strlen(wf),len-strlen(wf),
+			"(\n  (outbound and %s%s)\n  or\n  (inbound and tcp%s%s%s%s%s)\n )",
+			f_tcp_not_empty,
+			pf_dst,
+			*pf_tcp_src ? "" : " and false",
+			*f_tcpin ? " and " : "",
+			*f_tcpin ? f_tcpin : "",
+			*pf_tcp_src ? " and " : "",
+			*pf_tcp_src ? pf_tcp_src : "");
+
+	}
+	strncat(wf,"\n)",len-strlen(wf)-1);
+
+	if (bFilterOutLAN)
+		snprintf(wf+strlen(wf),len-strlen(wf),"\nand\n(\n outbound and %s\n or\n inbound and %s\n)\n",
+			ipv4 ? ipv6 ? DIVERT_NO_LOCALNETS_DST : DIVERT_NO_LOCALNETSv4_DST : DIVERT_NO_LOCALNETSv6_DST,
+			ipv4 ? ipv6 ? DIVERT_NO_LOCALNETS_SRC : DIVERT_NO_LOCALNETSv4_SRC : DIVERT_NO_LOCALNETSv6_SRC);
 
 	return true;
 }
@@ -1531,7 +1557,9 @@ static void exithelp(void)
 		" --wf-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
 		" --wf-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
 		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
-		" --wf-raw=<filter>|@<filename>\t\t\t; raw windivert filter string or filename\n"
+		" --wf-raw-part=<filter>|@<filename>\t\t; partial raw windivert filter string or filename\n"
+		" --wf-filter-lan=0|1\t\t\t\t; add excluding filter for non-global IP (default : 1)\n"
+		" --wf-raw=<filter>|@<filename>\t\t\t; full raw windivert filter string or filename. replaces --wf-tcp,--wf-udp,--wf-raw-part\n"
 		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
 		"\nLOGICAL NETWORK FILTER:\n"
 		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t; enable winws only if any of specified wifi SSIDs connected\n"
@@ -1701,7 +1729,7 @@ void check_dp(const struct desync_profile *dp)
 		DLOG_CONDUP("WARNING !!! fakes or dups will be sent on every processed packet\n");
 		DLOG_CONDUP("WARNING !!! make sure it's really what you want\n");
 #ifdef __CYGWIN__
-		DLOG_CONDUP("WARNING !!! in most cases this is acceptable only with custom payload based windivert filter (--wf-raw)\n");
+		DLOG_CONDUP("WARNING !!! in most cases this is acceptable only with custom payload based windivert filter (--wf-raw, --wf-raw-part)\n");
 #endif
 #endif
 	}
@@ -1841,6 +1869,8 @@ enum opt_indices {
 	IDX_WF_TCP,
 	IDX_WF_UDP,
 	IDX_WF_RAW,
+	IDX_WF_RAW_PART,
+	IDX_WF_FILTER_LAN,
 	IDX_WF_SAVE,
 	IDX_SSID_FILTER,
 	IDX_NLM_FILTER,
@@ -1967,6 +1997,8 @@ static const struct option long_options[] = {
 	[IDX_WF_TCP] = {"wf-tcp", required_argument, 0, 0},
 	[IDX_WF_UDP] = {"wf-udp", required_argument, 0, 0},
 	[IDX_WF_RAW] = {"wf-raw", required_argument, 0, 0},
+	[IDX_WF_RAW_PART] = {"wf-raw-part", required_argument, 0, 0},
+	[IDX_WF_FILTER_LAN] = {"wf-filter-lan", required_argument, 0, 0},
 	[IDX_WF_SAVE] = {"wf-save", required_argument, 0, 0},
 	[IDX_SSID_FILTER] = {"ssid-filter", required_argument, 0, 0},
 	[IDX_NLM_FILTER] = {"nlm-filter", required_argument, 0, 0},
@@ -1994,9 +2026,9 @@ int main(int argc, char **argv)
 	struct ipset_file *anon_ips = NULL, *anon_ips_exclude = NULL;
 #ifdef __CYGWIN__
 	char windivert_filter[16384], wf_pf_tcp_src[4096], wf_pf_tcp_dst[4096], wf_pf_udp_src[4096], wf_pf_udp_dst[4096], wf_save_file[256];
-	bool wf_ipv4=true, wf_ipv6=true;
+	bool wf_ipv4=true, wf_ipv6=true, wf_filter_lan=true;
 	unsigned int IfIdx=0, SubIfIdx=0;
-	unsigned int hash_wf_tcp=0,hash_wf_udp=0,hash_wf_raw=0,hash_ssid_filter=0,hash_nlm_filter=0;
+	unsigned int hash_wf_tcp=0,hash_wf_udp=0,hash_wf_raw=0,hash_wf_raw_part=0,hash_ssid_filter=0,hash_nlm_filter=0;
 	*windivert_filter = *wf_pf_tcp_src = *wf_pf_tcp_dst = *wf_pf_udp_src = *wf_pf_udp_dst = *wf_save_file = 0;
 #endif
 
@@ -2037,6 +2069,7 @@ int main(int argc, char **argv)
 #ifdef __CYGWIN__
 	LIST_INIT(&params.ssid_filter);
 	LIST_INIT(&params.nlm_filter);
+	LIST_INIT(&params.wf_raw_part);
 #else
 	if (can_drop_root())
 	{
@@ -2953,6 +2986,31 @@ int main(int argc, char **argv)
 				windivert_filter[sizeof(windivert_filter) - 1] = '\0';
 			}
 			break;
+		case IDX_WF_RAW_PART:
+			hash_wf_raw_part^=hash_jen(optarg,strlen(optarg));
+			{
+				char wfpart[sizeof(windivert_filter)];
+				if (optarg[0]=='@')
+				{
+					size_t sz = sizeof(wfpart)-1;
+					load_file_or_exit(optarg+1,wfpart,&sz);
+					wfpart[sz] = 0;
+				}
+				else
+				{
+					strncpy(wfpart, optarg, sizeof(wfpart));
+					wfpart[sizeof(wfpart) - 1] = '\0';
+				}
+				if (!strlist_add(&params.wf_raw_part,wfpart))
+				{
+					DLOG_ERR("out of memory\n");
+					exit_clean(1);
+				}
+			}
+			break;
+		case IDX_WF_FILTER_LAN:
+			wf_filter_lan=!!atoi(optarg);
+			break;
 		case IDX_WF_SAVE:
 			strncpy(wf_save_file, optarg, sizeof(wf_save_file));
 			wf_save_file[sizeof(wf_save_file) - 1] = '\0';
@@ -3093,12 +3151,12 @@ int main(int argc, char **argv)
 #ifdef __CYGWIN__
 	if (!*windivert_filter)
 	{
-		if (!*wf_pf_tcp_src && !*wf_pf_udp_src)
+		if (!*wf_pf_tcp_src && !*wf_pf_udp_src && LIST_EMPTY(&params.wf_raw_part))
 		{
-			DLOG_ERR("windivert filter : must specify port filter\n");
+			DLOG_ERR("windivert filter : must specify port or/and partial raw filter\n");
 			exit_clean(1);
 		}
-		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), IfIdx, SubIfIdx, wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst))
+		if (!wf_make_filter(windivert_filter, sizeof(windivert_filter), IfIdx, SubIfIdx, wf_ipv4, wf_ipv6, wf_pf_tcp_src, wf_pf_tcp_dst, wf_pf_udp_src, wf_pf_udp_dst, &params.wf_raw_part, wf_filter_lan))
 		{
 			DLOG_ERR("windivert filter : could not make filter\n");
 			exit_clean(1);
@@ -3121,7 +3179,7 @@ int main(int argc, char **argv)
 	HANDLE hMutexArg;
 	{
 		char mutex_name[128];
-		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_ssid_filter,hash_nlm_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
+		snprintf(mutex_name,sizeof(mutex_name),"Global\\winws_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u_%u",hash_wf_tcp,hash_wf_udp,hash_wf_raw,hash_wf_raw_part,hash_ssid_filter,hash_nlm_filter,IfIdx,SubIfIdx,wf_ipv4,wf_ipv6);
 
 		hMutexArg = CreateMutexA(NULL,TRUE,mutex_name);
 		if (hMutexArg && GetLastError()==ERROR_ALREADY_EXISTS)
