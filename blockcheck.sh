@@ -47,6 +47,7 @@ HTTPS_PORT=${HTTPS_PORT:-443}
 QUIC_PORT=${QUIC_PORT:-443}
 UNBLOCKED_DOM=${UNBLOCKED_DOM:-iana.org}
 PARALLEL_OUT=/tmp/zapret_parallel
+SIM_SUCCESS_RATE=${SIM_SUCCESS_RATE:-10}
 
 HDRTEMP=/tmp/zapret-hdr
 
@@ -1063,6 +1064,17 @@ ws_curl_test()
 	# $3 - domain
 	# $4,$5,$6, ... - ws params
 	local code ws_start=$1 testf=$2 dom=$3
+
+	[ "$SIMULATE" = 1 ] && {
+		n=$(random 0 99)
+		if [ "$n" -lt "$SIM_SUCCESS_RATE" ]; then
+			echo "SUCCESS"
+			return 0
+		else
+			echo "FAILED"
+			return 7
+		fi
+	}
 	shift
 	shift
 	shift
@@ -1178,13 +1190,17 @@ report_strategy()
 		return 1
 	fi
 }
-test_has_split()
-{
-	contains "$1" split || contains "$1" disorder
-}
 test_has_fakedsplit()
 {
 	contains "$1" fakedsplit || contains "$1" fakeddisorder
+}
+test_has_split()
+{
+	contains "$1" multisplit || contains "$1" multidisorder || test_has_fakedsplit "$1"
+}
+test_has_hostfakesplit()
+{
+	contains "$1" hostfakesplit
 }
 test_has_fake()
 {
@@ -1230,6 +1246,7 @@ pktws_curl_test_update_vary()
 		splits="method+2 midsld"
 		[ "$sec" = 0 ] || splits="1 midsld 1,midsld"
 	fi
+	test_has_hostfakesplit $desync && fake1="--dpi-desync-hostfakesplit-midhost=midsld"
 	for fake in '' "$fake1" "$fake2" "$fake3" ; do
 		[ "$fake" = "-" ] && continue
 		if [ -n "$splits" ]; then
@@ -1257,7 +1274,7 @@ pktws_check_domain_http_bypass_()
 	# $3 - domain
 
 	local ok ttls s f f2 e desync pos fooling frag sec="$2" delta orig splits
-	local need_split need_disorder need_fakedsplit need_fakeddisorder need_fake need_wssize
+	local need_split need_disorder need_fakedsplit need_hostfakesplit need_fakeddisorder need_fake need_wssize
 	local splits_http='method+2 midsld method+2,midsld'
 	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1'
 
@@ -1302,25 +1319,33 @@ pktws_check_domain_http_bypass_()
 		done
 
 		need_fakedsplit=1
+		need_hostfakesplit=1
 		need_fakeddisorder=1
 		need_fake=1
-		for desync in fake ${need_split:+fakedsplit fake,multisplit fake,fakedsplit} ${need_disorder:+fakeddisorder fake,multidisorder fake,fakeddisorder}; do
+		for desync in fake ${need_split:+fakedsplit fake,multisplit fake,fakedsplit hostfakesplit fake,hostfakesplit} ${need_disorder:+fakeddisorder fake,multidisorder fake,fakeddisorder}; do
 			[ "$need_fake" = 0 ] && test_has_fake "$desync" && continue
 			[ "$need_fakedsplit" = 0 ] && contains "$desync" fakedsplit && continue
+			[ "$need_hostfakesplit" = 0 ] && contains "$desync" hostfakesplit && continue
 			[ "$need_fakeddisorder" = 0 ] && contains "$desync" fakeddisorder && continue
 			ok=0
 			for ttl in $ttls; do
-				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=$ttl $e && {
-					[ "$SCANLEVEL" = quick ] && return
-					ok=1
-					need_wssize=0
-					break
-				}
+				# orig-ttl=1 with start/cutoff limiter drops empty ACK packet in response to SYN,ACK. it does not reach DPI or server.
+				# missing ACK is transmitted in the first data packet of TLS/HTTP proto
+				for f in '' '--orig-ttl=1 --orig-mod-start=s1 --orig-mod-cutoff=d1'; do
+					pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=$ttl $f $e && {
+						[ "$SCANLEVEL" = quick ] && return
+						ok=1
+						need_wssize=0
+						[ "$SCANLEVEL" = force ] || break
+					}
+				done
+				[ "$ok" = 1 ] && break
 			done
 			# only skip tests if TTL succeeded. do not skip if TTL failed but fooling succeeded
 			[ $ok = 1 -a "$SCANLEVEL" != force ] && {
 				[ "$desync" = fake ] && need_fake=0
 				[ "$desync" = fakedsplit ] && need_fakedsplit=0
+				[ "$desync" = hostfakesplit ] && need_hostfakesplit=0
 				[ "$desync" = fakeddisorder ] && need_fakeddisorder=0
 			}
 			f=
@@ -1329,11 +1354,20 @@ pktws_check_domain_http_bypass_()
 			[ "$IPV" = 6 ] && f="$f hopbyhop hopbyhop2"
 			for fooling in $f; do
 				ok=0
+				f2=
 				pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling $e && {
 					warn_fool $fooling $desync
 					[ "$SCANLEVEL" = quick ] && return
 					need_wssize=0
 					ok=1
+				}
+				[ "$fooling" = badseq ] && {
+					[ "$ok" = 1 -a "$SCANLEVEL" != force ] && continue
+					# --dpi-desync-badseq-increment=0 leaves modified by default ack increment
+					pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-fooling=$fooling --dpi-desync-badseq-increment=0 $e && {
+						[ "$SCANLEVEL" = quick ] && return
+						need_wssize=0
+					}
 				}
 				[ "$fooling" = md5sig ] && {
 					[ "$ok" = 1 -a "$SCANLEVEL" != force ] && continue
@@ -1399,18 +1433,30 @@ pktws_check_domain_http_bypass_()
 
 		need_fakedsplit=1
 		need_fakeddisorder=1
+		need_hostfakesplit=1
 		need_fake=1
-		for desync in fake ${need_split:+fakedsplit fake,multisplit fake,fakedsplit} ${need_disorder:+fakeddisorder fake,multidisorder fake,fakeddisorder}; do
+		for desync in fake ${need_split:+fakedsplit fake,multisplit fake,fakedsplit hostfakesplit fake,hostfakesplit} ${need_disorder:+fakeddisorder fake,multidisorder fake,fakeddisorder}; do
 			[ "$need_fake" = 0 ] && test_has_fake "$desync" && continue
 			[ "$need_fakedsplit" = 0 ] && contains "$desync" fakedsplit && continue
+			[ "$need_hostfakesplit" = 0 ] && contains "$desync" hostfakesplit && continue
 			[ "$need_fakeddisorder" = 0 ] && contains "$desync" fakeddisorder && continue
 			ok=0
-			for orig in '' 1 2 3; do
-				for delta in 1 2 3 4 5; do
-					pktws_curl_test_update_vary $1 $2 $3 $desync ${orig:+--orig-autottl=+$orig} --dpi-desync-ttl=1 --dpi-desync-autottl=-$delta $e && ok=1
+			# orig-ttl=1 with start/cutoff limiter drops empty ACK packet in response to SYN,ACK. it does not reach DPI or server.
+			# missing ACK is transmitted in the first data packet of TLS/HTTP proto
+			for delta in 1 2 3 4 5; do
+				for f in '' '--orig-ttl=1 --orig-mod-start=s1 --orig-mod-cutoff=d1'; do
+					pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=-$delta $f $e && ok=1
+					[ "$ok" = 1 -a "$SCANLEVEL" != force ] && break
 				done
-				[ "$ok" = 1 -a "$SCANLEVEL" != force ] && break
 			done
+			[ "$SCANLEVEL" = force ] && {
+				for orig in 1 2 3; do
+					for delta in 1 2 3 4 5; do
+						pktws_curl_test_update_vary $1 $2 $3 $desync ${orig:+--orig-autottl=+$orig} --dpi-desync-ttl=1 --dpi-desync-autottl=-$delta $e && ok=1
+					done
+					[ "$ok" = 1 -a "$SCANLEVEL" != force ] && break
+				done
+			}
 			[ "$ok" = 1 ] &&
 			{
 				echo "WARNING ! although autottl worked it requires testing on multiple domains to find out reliable delta"
@@ -1420,6 +1466,7 @@ pktws_check_domain_http_bypass_()
 				[ "$SCANLEVEL" = force ] || {
 					[ "$desync" = fake ] && need_fake=0
 					[ "$desync" = fakedsplit ] && need_fakedsplit=0
+					[ "$desync" = hostfakesplit ] && need_hostfakesplit=0
 					[ "$desync" = fakeddisorder ] && need_fakeddisorder=0
 				}
 			}			

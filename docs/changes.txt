@@ -546,3 +546,4 @@ v71.5
 
 winws: --wf-raw-part
 nfqws: --dpi-desync=hostfakesplit
+blockcheck: new strategies
