@@ -207,7 +207,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --methodeol                                        ; добавить перевод строки в unix стиле ('\n') перед методом и убрать пробел из Host: : "GET / ... Host: domain.com" => "\nGET  / ... Host:domain.com"
 --hostspell=HoST                                   ; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
 --domcase                                          ; домен после Host: сделать таким : TeSt.cOm
---dpi-desync=[<mode0>,]<mode>[,<mode2]             ; атака по десинхронизации DPI. mode : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper
+--dpi-desync=[<mode0>,]<mode>[,<mode2]             ; атака по десинхронизации DPI. mode : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit hostfakesplit fakeddisorder ipfrag2 udplen tamper
 --dpi-desync-fwmark=<int|0xHEX>                    ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
 --dpi-desync-ttl=<int>                             ; установить ttl для десинхронизирующих пакетов
 --dpi-desync-ttl6=<int>                            ; установить ipv6 hop limit для десинхронизирующих пакетов. если не указано, используется значение --dpi-desync-ttl
@@ -220,6 +220,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-split-seqovl=N|-N|marker+N|marker-N   ; единичный маркер, определяющий величину перекрытия sequence в режимах split и disorder. для split поддерживается только положительное число.
 --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; чем заполнять фейковую часть overlap
 --dpi-desync-fakedsplit-pattern=<filename>|0xHEX   ; чем заполнять фейки в fakedsplit/fakeddisorder
+--dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; маркер дополнительного разреза сегмента с оригинальным хостом. должен попадать в пределы хоста.
 --dpi-desync-ts-increment=<int|0xHEX>              ; инкремент TSval для ts. по умолчанию -600000
 --dpi-desync-badseq-increment=<int|0xHEX>          ; инкремент sequence number для badseq. по умолчанию -10000
 --dpi-desync-badack-increment=<int|0xHEX>          ; инкремент ack sequence number для badseq. по умолчанию -66000
@@ -404,6 +405,7 @@ dvtws, собираемый из тех же исходников (см. [док
  * `multisplit`. нарезаем запрос на указанных в `--dpi-desync-split-pos` позициях.
  * `multidisorder`. нарезаем запрос на указанных в `--dpi-desync-split-pos` позициях и отправляем в обратном порядке.
  * `fakedsplit`. нарезаем запрос на 2 части, обрамляя каждую часть фейками : фейк 1-й части, 1 часть, фейк 1-й части, фейк 2-й части, 2 часть, фейк 2-й части
+ * `hostfakesplit`. фейкование части запроса с хостом : оригинал до хоста, фейк хоста, оригинал хоста (+ опционально нарезка маркером midhost), фейк хоста, оригинал после хоста
  * `fakeddisorder`. аналогично `fakedsplit`, только в обратном порядке : фейк 2-й части, 2 часть, фейк 2-й части, фейк 1-й части, 1 часть, фейк 1 части.
 
 Содержимое фейков в `fakedsplit`/`fakeddisorder` определяется параметром `--dpi-desync-fakedsplit-pattern` (по умолчанию 0x00).
@@ -413,6 +415,12 @@ dvtws, собираемый из тех же исходников (см. [док
 
 Использование `fakedsplit` или `fakeddisorder` на TLS kyber с md5sig fooling может привести к ошибкам "message too long", если позиция сплита мала,
 поскольку будет превышение MTU из-за md5 tcp option.
+
+Режим 'hostfakesplit' имеет задачу минимального вмешательства фейком - как раз по той части запроса, на основании которой DPI принимает решение о блокировке. Конкретно - имени хоста.
+Фейк хоста генерируется каждый раз случайно из набора `[a-z,0-9]`. При длине более 7 символов за 3 символа до конца ставится точка, имитируя TLD.
+Опционально можно разрезать оригинальный фейк. Например, `--dpi-desync-hostfakesplit-midhost=midsld`. Позиция нарезки должна попадать внутрь хоста.
+Многопакетные запросы поддерживаются только, если исходная нарезка пакетов не включает позиции имени хоста. В последнем случае дурение отменяется.
+Для ipv4 ip_id ставится одинаковым в фейках и оригинале хоста.
 
 Для определения позиций нарезки используются маркеры.
 
@@ -1744,6 +1752,8 @@ SECURE_DNS=0|1 - принудительно выключить или включ
 DOH_SERVERS - список URL DoH через пробел для автоматического выбора работающего сервера
 DOH_SERVER - конкретный DoH URL, отказ от поиска
 UNBLOCKED_DOM - незаблокированный домен, который используется для тестов IP block
+SIMULATE=1 - включить режим симуляции для отладки логики скрипта. отключаются реальные запросы через curl, заменяются рандомным результатом.
+SIM_SUCCESS_RATE=<percent> - вероятность успеха симуляции в процентах
 ```
 
 Пример запуска с переменными:\
