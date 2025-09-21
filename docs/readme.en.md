@@ -180,7 +180,7 @@ nfqws takes the following parameters:
  --dup-badack-increment=<int|0xHEX>             ; badseq fooling ackseq signed increment for dup. default -66000
  --dup-start=[n|d|s]N                           ; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N
  --dup-cutoff=[n|d|s]N                          ; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
- --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper
+ --dpi-desync=[<mode0>,]<mode>[,<mode2>]        ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit hostfakesplit fakeddisorder ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>                ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                         ; set ttl for desync packet
  --dpi-desync-ttl6=<int>                        ; set ipv6 hop limit for desync packet. by default ttl value is used.
@@ -196,6 +196,7 @@ nfqws takes the following parameters:
  --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment
  --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder
+ --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-ts-increment=<int|0xHEX>          ; ts fooling TSval signed increment. default -600000
@@ -344,6 +345,7 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
  * `multisplit`. split request at specified in `--dpi-desync-split-pos` positions
  * `multidisorder`. same as `multisplit` but send in reverse order
  * `fakedsplit`. split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `hostfakesplit`. fake host part of the request : before host, random fake host, real host (optinally split this part), random fake host repeat, after host
  * `fakeddisorder`. same as `fakedsplit` but with another order : fake 2nd segment, 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
 
 Positions are defined by markers.
@@ -372,6 +374,12 @@ In `multisplit`or `multidisorder` case split is cancelled if no position remaine
 First relative markers are searched. If no suitable found absolute markers are searched. If nothing found position 1 is used.
 
 For example, `--dpi-desync-split-pos=method+2,midsld,5` means `method+2` for http, `midsld` for TLS and 5 for others.
+
+`hostfakesplit` only fakes hostname part of the request making it hard to destinguish between real and fake host names.
+It works for tcp protocols with host : TLS and HTTP. Real hostname can be additionally split using `--dpi-desync-hostfakesplit-midhost` marker.
+For example, `--dpi-desync-hostfakesplit-midhost=midsld`. Position must be within host range or split won't happen.
+Multi-packet queries are supported if hostname part is not already split. If it is fooling is cancelled.
+Fake host names are generated randomly on the fly using `[0-9a-z]` pattern. If host length is >= 7 dot is placed to simulate 3-char TLD.
 
 ### Sequence numbers overlap
 
