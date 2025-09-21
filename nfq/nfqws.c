@@ -1165,6 +1165,7 @@ static void SplitDebug(void)
 		for(int x=0;x<dp->split_count;x++)
 			DLOG("profile %d multisplit %s %d\n",dp->n,posmarker_name(dp->splits[x].marker),dp->splits[x].pos);
 		if (!PROTO_POS_EMPTY(&dp->seqovl)) DLOG("profile %d seqovl %s %d\n",dp->n,posmarker_name(dp->seqovl.marker),dp->seqovl.pos);
+		if (!PROTO_POS_EMPTY(&dp->hostfakesplit_midhost)) DLOG("profile %d hostfakesplit midhost %s %d\n",dp->n,posmarker_name(dp->hostfakesplit_midhost.marker),dp->hostfakesplit_midhost.pos);
 	}
 }
 
@@ -1620,7 +1621,7 @@ static void exithelp(void)
 		" --methodeol\t\t\t\t\t; add '\\n' before method and remove space from Host:\n"
 		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes :\n"
 		"\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
-		"\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder ipfrag2 udplen tamper\n"
+		"\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder hostfakesplit ipfrag2 udplen tamper\n"
 #ifdef __linux__
 		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
@@ -1640,6 +1641,7 @@ static void exithelp(void)
 		" --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
+		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ts-increment=<int|0xHEX>\t\t; ts fooling TSval signed increment. default %d\n"
@@ -1716,7 +1718,8 @@ void check_dp(const struct desync_profile *dp)
 	// only linux has connbytes limiter
 	if ((dp->desync_any_proto && !dp->desync_cutoff &&
 		(dp->desync_mode==DESYNC_FAKE || dp->desync_mode==DESYNC_RST || dp->desync_mode==DESYNC_RSTACK ||
-		 dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER))
+		 dp->desync_mode==DESYNC_FAKEDSPLIT || dp->desync_mode==DESYNC_FAKEDDISORDER || dp->desync_mode==DESYNC_HOSTFAKESPLIT ||
+		 dp->desync_mode2==DESYNC_FAKEDSPLIT || dp->desync_mode2==DESYNC_FAKEDDISORDER || dp->desync_mode2==DESYNC_HOSTFAKESPLIT))
 		||
 		dp->dup_repeats && !dp->dup_cutoff)
 	{
@@ -1817,6 +1820,7 @@ enum opt_indices {
 	IDX_DPI_DESYNC_SPLIT_SEQOVL,
 	IDX_DPI_DESYNC_SPLIT_SEQOVL_PATTERN,
 	IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN,
+	IDX_DPI_DESYNC_HOSTFAKESPLIT_MIDHOST,
 	IDX_DPI_DESYNC_IPFRAG_POS_TCP,
 	IDX_DPI_DESYNC_IPFRAG_POS_UDP,
 	IDX_DPI_DESYNC_TS_INCREMENT,
@@ -1945,6 +1949,7 @@ static const struct option long_options[] = {
 	[IDX_DPI_DESYNC_SPLIT_SEQOVL] = {"dpi-desync-split-seqovl", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_SPLIT_SEQOVL_PATTERN] = {"dpi-desync-split-seqovl-pattern", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN] = {"dpi-desync-fakedsplit-pattern", required_argument, 0, 0},
+	[IDX_DPI_DESYNC_HOSTFAKESPLIT_MIDHOST] = {"dpi-desync-hostfakesplit-midhost", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_IPFRAG_POS_TCP] = {"dpi-desync-ipfrag-pos-tcp", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_IPFRAG_POS_UDP] = {"dpi-desync-ipfrag-pos-udp", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TS_INCREMENT] = {"dpi-desync-ts-increment", required_argument, 0, 0},
@@ -2579,6 +2584,19 @@ int main(int argc, char **argv)
 				size_t sz=sizeof(buf);
 				load_file_or_exit(optarg,buf,&sz);
 				fill_pattern(dp->fsplit_pattern,sizeof(dp->fsplit_pattern),buf,sz);
+			}
+			break;
+		case IDX_DPI_DESYNC_HOSTFAKESPLIT_MIDHOST:
+			if (!strcmp(optarg,"0"))
+			{
+				// allow zero = disable midhost split
+				dp->hostfakesplit_midhost.marker=PM_ABS;
+				dp->hostfakesplit_midhost.pos=0;
+			}
+			else if (!parse_split_pos(optarg, &dp->hostfakesplit_midhost))
+			{
+				DLOG_ERR("Invalid argument for dpi-desync-hostfakesplit-midhost\n");
+				exit_clean(1);
 			}
 			break;
 		case IDX_DPI_DESYNC_IPFRAG_POS_TCP:
