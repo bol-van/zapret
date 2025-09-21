@@ -804,7 +804,7 @@ nft_scheme()
 	make_comma_list iplist $3
 
 	nft add table inet $NFT_TABLE
-	nft "add chain inet $NFT_TABLE postnat { type filter hook output priority 102; }"
+	nft "add chain inet $NFT_TABLE postnat { type filter hook postrouting priority 102; }"
 	nft "add rule inet $NFT_TABLE postnat meta nfproto ipv${IPV} $1 dport $2 mark and $DESYNC_MARK == 0 ip${ipver} daddr {$iplist} ct mark set ct mark or $DESYNC_MARK queue num $QNUM"
 	# for strategies with incoming packets involved (autottl)
 	nft "add chain inet $NFT_TABLE prenat { type filter hook prerouting priority -102; }"
