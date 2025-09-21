@@ -2103,8 +2103,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 
 					DLOG("sending hostfakesplit fake(2) host %zu-%zu len=%zu : ",pos_host,pos_endhost-1,host_size);
-					free(fakehost);
 					hexdump_limited_dlog(fakehost,host_size,PKTDATA_MAXDUMP); DLOG("\n");
+					free(fakehost);
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt2, pkt2_len))
 						goto send_orig;
 						
