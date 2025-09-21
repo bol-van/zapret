@@ -2035,7 +2035,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						DLOG("fakehost out of memory\n");
 						goto send_orig;
 					}
-					fill_random_az09(fakehost,host_size);
+					fill_random_az(fakehost,1);
+					fill_random_az09(fakehost+1,host_size-1);
 					if (host_size>=7) fakehost[host_size-4] = '.';
 					DLOG("generated fake host: %s\n",fakehost);
 
