@@ -891,7 +891,7 @@ static bool runtime_tls_mod(int fake_n,const struct fake_tls_mod_cache *modcache
 			if (payload_len<44)
 				DLOG("fake[%d] cannot apply dupsid tls mod. data payload is too short.\n",fake_n);
 			else if (fake_data[43]!=payload[43])
-				DLOG("fake[%d] cannot apply dupsid tls mod. fake and orig session id length mismatch.\n",fake_n);
+				DLOG("fake[%d] cannot apply dupsid tls mod. fake and orig session id length mismatch : %u!=%u.\n",fake_n,fake_data[43],payload[43]);
 			else if (payload_len<(44+payload[43]))
 				DLOG("fake[%d] cannot apply dupsid tls mod. data payload is not valid.\n",fake_n);
 			else
