@@ -76,8 +76,13 @@ struct fake_tls_mod_cache
 };
 struct fake_tls_mod
 {
-	char sni[64];
+	char sni[128];
 	uint32_t mod;
+};
+struct hostfakesplit_mod
+{
+	char host[128];
+	size_t host_size;
 };
 
 typedef enum {SS_NONE=0,SS_SYN,SS_SYNACK,SS_ACKSYN} t_synack_split;
@@ -131,6 +136,8 @@ struct desync_profile
 
 	struct fake_tls_mod tls_mod_last;
 	struct blob_item *tls_fake_last;
+
+	struct hostfakesplit_mod hfs_mod;
 
 	int udplen_increment;
 

@@ -1098,6 +1098,49 @@ err:
 	return false;
 }
 
+static bool parse_hostfakesplit_mod(char *opt, struct hostfakesplit_mod *hfs_mod)
+{
+	char *e,*e2,*p,c,c2;
+
+	for (p=opt ; p ; )
+	{
+		for (e2=p ; *e2 && *e2!=',' && *e2!='=' ; e2++);
+
+		if ((e = strchr(e2,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (*e2=='=')
+		{
+			c2=*e2;
+			*e2=0;
+		}
+		else
+			e2=NULL;
+
+		if (!strcmp(p,"host"))
+		{
+			if (!e2 || !e2[1] || e2[1]==',') goto err;
+			strncpy(hfs_mod->host,e2+1,sizeof(hfs_mod->host)-1);
+			hfs_mod->host[sizeof(hfs_mod->host)-1-1]=0;
+			hfs_mod->host_size = strlen(hfs_mod->host); // cache value
+		}
+		else if (strcmp(p,"none"))
+			goto err;
+
+		if (e2) *e2=c2;
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+err:
+	if (e2) *e2=c2;
+	if (e) *e++=c;
+	return false;
+}
+
 static bool parse_fooling(char *opt, unsigned int *fooling_mode)
 {
 	char *e,*p = opt;
@@ -1642,6 +1685,7 @@ static void exithelp(void)
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
 		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
+		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t; can be none or host=<hostname>\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ts-increment=<int|0xHEX>\t\t; ts fooling TSval signed increment. default %d\n"
@@ -1821,6 +1865,7 @@ enum opt_indices {
 	IDX_DPI_DESYNC_SPLIT_SEQOVL_PATTERN,
 	IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN,
 	IDX_DPI_DESYNC_HOSTFAKESPLIT_MIDHOST,
+	IDX_DPI_DESYNC_HOSTFAKESPLIT_MOD,
 	IDX_DPI_DESYNC_IPFRAG_POS_TCP,
 	IDX_DPI_DESYNC_IPFRAG_POS_UDP,
 	IDX_DPI_DESYNC_TS_INCREMENT,
@@ -1950,6 +1995,7 @@ static const struct option long_options[] = {
 	[IDX_DPI_DESYNC_SPLIT_SEQOVL_PATTERN] = {"dpi-desync-split-seqovl-pattern", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN] = {"dpi-desync-fakedsplit-pattern", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_HOSTFAKESPLIT_MIDHOST] = {"dpi-desync-hostfakesplit-midhost", required_argument, 0, 0},
+	[IDX_DPI_DESYNC_HOSTFAKESPLIT_MOD] = {"dpi-desync-hostfakesplit-mod", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_IPFRAG_POS_TCP] = {"dpi-desync-ipfrag-pos-tcp", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_IPFRAG_POS_UDP] = {"dpi-desync-ipfrag-pos-udp", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TS_INCREMENT] = {"dpi-desync-ts-increment", required_argument, 0, 0},
@@ -2596,6 +2642,13 @@ int main(int argc, char **argv)
 			else if (!parse_split_pos(optarg, &dp->hostfakesplit_midhost))
 			{
 				DLOG_ERR("Invalid argument for dpi-desync-hostfakesplit-midhost\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DPI_DESYNC_HOSTFAKESPLIT_MOD:
+			if (!parse_hostfakesplit_mod(optarg,&dp->hfs_mod))
+			{
+				DLOG_ERR("Invalid fakehostsplit mod : %s\n",optarg);
 				exit_clean(1);
 			}
 			break;

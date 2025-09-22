@@ -2036,9 +2036,36 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						DLOG("fakehost out of memory\n");
 						goto send_orig;
 					}
-					fill_random_az(fakehost,1);
-					fill_random_az09(fakehost+1,host_size-1);
-					if (host_size>=7) fakehost[host_size-4] = '.';
+					if (*dp->hfs_mod.host)
+					{
+						if (host_size<=dp->hfs_mod.host_size)
+						{
+							// "google.com" => "gle.com"
+							// "google.com" => "google.com"
+							memcpy(fakehost,dp->hfs_mod.host+dp->hfs_mod.host_size-host_size,host_size);
+						}
+						else
+						{
+							// "google.com" => "nb4auv9.google.com"
+							// "google.com" => ".google.com"
+							sz = host_size - dp->hfs_mod.host_size;
+							memcpy(fakehost+sz,dp->hfs_mod.host,dp->hfs_mod.host_size);
+							fakehost[--sz]='.';
+							if (sz)
+							{
+								fill_random_az(fakehost,1);
+								sz--;
+							}
+							fill_random_az09(fakehost+1,sz);
+						}
+					}
+					else
+					{
+						fill_random_az(fakehost,1);
+						fill_random_az09(fakehost+1,host_size-1);
+						if (host_size>=7) fakehost[host_size-4] = '.';
+					}
+					fakehost[host_size]=0;
 					DLOG("generated fake host: %s\n",fakehost);
 
 					pkt2_len = sizeof(pkt2);
