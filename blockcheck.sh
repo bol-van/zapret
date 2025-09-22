@@ -1097,7 +1097,7 @@ tpws_curl_test()
 		shift; shift;
 		strategy="$@"
 		strategy_append_extra_tpws
-		report_append "ipv${IPV} $dom $testf : tpws ${WF:+$WF }$strategy"
+		report_append "$dom" "$testf ipv${IPV}" "tpws ${WF:+$WF }$strategy"
 	}
 	return $code
 }
@@ -1116,7 +1116,7 @@ pktws_curl_test()
 	[ "$code" = 0 ] && {
 		strategy="$@"
 		strategy_append_extra_pktws
-		report_append "ipv${IPV} $dom $testf : $PKTWSD ${WF:+$WF }$strategy"
+		report_append "$dom" "$testf ipv${IPV}" "$PKTWSD ${WF:+$WF }$strategy"
 	}
 	return $code
 }
@@ -1156,8 +1156,35 @@ tpws_curl_test_update()
 
 report_append()
 {
+	# $1 - domain
+	# $2 - test function + ipver
+	# $3 - value
+	local hashstr hash hashvar hashcountvar val ct
+
+	# save resources if only one domain
+	[ "$DOMAINS_COUNT" -gt 1 ] && {
+		hashstr="$2 : $3"
+		hash="$(echo -n "$hashstr" | md5)"
+		hashvar=RESHASH_${hash}
+		hashcountvar=${hashvar}_COUNTER
+
+		NRESHASH=${NRESHASH:-0}
+
+		eval val="\$$hashvar"
+		if [ -n "$val" ]; then
+			eval ct="\$$hashcountvar"
+			ct=$(($ct + 1))
+			eval $hashcountvar="\$ct"
+		else
+			eval $hashvar=\"$hashstr\"
+			eval $hashcountvar=1
+			eval RES_$NRESHASH="\$hash"
+			NRESHASH=$(($NRESHASH+1))
+		fi
+	}
+
 	NREPORT=${NREPORT:-0}
-	eval REPORT_${NREPORT}=\"$@\"
+	eval REPORT_${NREPORT}=\"$2 $1 : $3\"
 	NREPORT=$(($NREPORT+1))
 }
 report_print()
@@ -1168,6 +1195,22 @@ report_print()
 		eval s=\"\${REPORT_$n}\"
 		echo $s
 		n=$(($n+1))
+	done
+}
+result_intersection_print()
+{
+	local n=0 hash hashvar hashcountvar ct val
+	while : ; do
+		eval hash=\"\$RES_$n\"
+		[ -n "$hash" ] || break
+		hashvar=RESHASH_${hash}
+		hashcountvar=${hashvar}_COUNTER
+		eval ct=\"\$$hashcountvar\"
+		[ "$ct" = "$DOMAINS_COUNT" ] && {
+			eval val=\"\$$hashvar\"
+			echo "$val"
+		}
+		n=$(($n + 1))
 	done
 }
 report_strategy()
@@ -1181,12 +1224,11 @@ report_strategy()
 		strategy="$(echo "$strategy" | xargs)"
 		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
-#		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
 		return 0
 	else
 		echo "$1: $3 strategy for ipv${IPV} $2 not found"
 		echo
-		report_append "ipv${IPV} $2 $1 : $3 not working"
+		report_append "$2" "$1 ipv${IPV}" "$3 not working"
 		return 1
 	fi
 }
@@ -1675,17 +1717,19 @@ check_domain_prolog()
 
 	local code
 
+	[ "$SIMULATE" = 1 ] && return 0
+
 	echo
 	echo \* $1 ipv$IPV $3
 
 	echo "- checking without DPI bypass"
 	curl_test $1 $3 && {
-		report_append "ipv${IPV} $3 $1 : working without bypass"
+		report_append "$3" "$1 ipv${IPV}" "working without bypass"
 		[ "$SCANLEVEL" = force ] || return 1
 	}
 	code=$?
 	curl_has_reason_to_continue $code || {
-		report_append "ipv${IPV} $3 $1 : test aborted, no reason to continue. curl code $(curl_translate_code $code)"
+		report_append "$3" "$1 ipv${IPV}" "test aborted, no reason to continue. curl code $(curl_translate_code $code)"
 		return 1
 	}
 	return 0
@@ -1869,6 +1913,7 @@ ask_params()
 			[ -n "$dom" ] && DOMAINS="$dom"
 		}
 	}
+	DOMAINS_COUNT="$(echo "$DOMAINS" | wc -w | trim)"
 
 	local IPVS_def=4
 	[ -n "$IPVS" ] || {
@@ -2248,6 +2293,18 @@ cleanup
 echo
 echo \* SUMMARY
 report_print
+[ "$DOMAINS_COUNT" -gt 1 ] && {
+	echo
+	echo \* COMMON
+	result_intersection_print
+	echo
+	[ "$SCANLEVEL" = force ] || {
+		echo "blockcheck optimizes test sequence. To save time some strategies can be skipped if their test is considered useless."
+		echo "That's why COMMON intersection can miss strategies that would work for all domains."
+		echo "Use \"force\" scan level to test all strategies and generate trustable intersection."
+		echo "Current scan level was \"$SCANLEVEL\"".
+	}
+}
 echo
 echo "Please note this SUMMARY does not guarantee a magic pill for you to copy/paste and be happy."
 echo "Understanding how strategies work is very desirable."

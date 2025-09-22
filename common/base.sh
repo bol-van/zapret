@@ -318,6 +318,12 @@ setup_md5()
 	exists $MD5 || MD5=md5
 }
 
+md5()
+{
+	setup_md5
+	$MD5 | cut -d ' ' -f1
+}
+
 setup_random()
 {
 	[ -n "$RCUT" ] && return
@@ -330,7 +336,6 @@ random()
 {
 	# $1 - min, $2 - max
 	local r rs
-	setup_md5
 	setup_random
 	if [ -c /dev/urandom ]; then
 		read rs </dev/urandom
@@ -338,7 +343,7 @@ random()
 		rs="$RANDOM$RANDOM$(date)"
 	fi
 	# shells use signed int64
-	r=1$(echo $rs | $MD5 | sed 's/[^0-9]//g' | $RCUT)
+	r=1$(echo $rs | md5 | sed 's/[^0-9]//g' | $RCUT)
 	echo $(( ($r % ($2-$1+1)) + $1 ))
 }
 
