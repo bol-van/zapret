@@ -1164,7 +1164,7 @@ report_append()
 	# save resources if only one domain
 	[ "$DOMAINS_COUNT" -gt 1 ] && {
 		hashstr="$2 : $3"
-		hash="$(echo -n "$hashstr" | md5)"
+		hash="$(echo -n "$hashstr" | md5f)"
 		hashvar=RESHASH_${hash}
 		hashcountvar=${hashvar}_COUNTER
 

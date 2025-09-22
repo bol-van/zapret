@@ -318,7 +318,7 @@ setup_md5()
 	exists $MD5 || MD5=md5
 }
 
-md5()
+md5f()
 {
 	setup_md5
 	$MD5 | cut -d ' ' -f1
@@ -343,7 +343,7 @@ random()
 		rs="$RANDOM$RANDOM$(date)"
 	fi
 	# shells use signed int64
-	r=1$(echo $rs | md5 | sed 's/[^0-9]//g' | $RCUT)
+	r=1$(echo $rs | md5f | sed 's/[^0-9]//g' | $RCUT)
 	echo $(( ($r % ($2-$1+1)) + $1 ))
 }
 
