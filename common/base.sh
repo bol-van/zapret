@@ -297,10 +297,10 @@ minsleep()
 
 replace_char()
 {
-	local a=$1
-	local b=$2
+	local a="$1"
+	local b="$2"
 	shift; shift
-	echo "$@" | tr $a $b
+	echo "$@" | tr "$a" "$b"
 }
 
 replace_str()
