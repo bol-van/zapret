@@ -197,7 +197,7 @@ nfqws takes the following parameters:
  --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder
  --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.
- --dpi-desync-hostfakesplit-mod=mod[,mod]       ; can be none or host=<hostname>
+ --dpi-desync-hostfakesplit-mod=mod[,mod]       ; can be none, host=<hostname>, altorder=0|1
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-ts-increment=<int|0xHEX>          ; ts fooling TSval signed increment. default -600000
@@ -346,7 +346,7 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
  * `multisplit`. split request at specified in `--dpi-desync-split-pos` positions
  * `multidisorder`. same as `multisplit` but send in reverse order
  * `fakedsplit`. split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
- * `hostfakesplit`. fake host part of the request : before host, random fake host, real host (optionally split this part), random fake host repeat, after host
+ * `hostfakesplit`. fake host part of the request. Mode 1 (altorder=0) : before host, random fake host, real host (optionally split this part), random fake host repeat, after host. Mode 2 (altorder=1) : before host, random fake host, after host, real host (optionally split this part).
  * `fakeddisorder`. same as `fakedsplit` but with another order : fake 2nd segment, 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
 
 Positions are defined by markers.
@@ -388,6 +388,7 @@ If original hostname size is less than template size it will be cut : "habr.com"
 If original hostname size is larger than template size by one, dot will be appended to the left : "www.xxx.com" => ".google.com"..
 That's why it's a good idea to use short hostnames in template : "ya.ru", "vk.com", "x.com".
 
+`--dpi-desync-hostfakesplit-mod=altorder=1` switches to alternate segment ordering. `altorder=1` sends the whole request with faked host sequentally, then real host segment.
 
 ### Sequence numbers overlap
 
