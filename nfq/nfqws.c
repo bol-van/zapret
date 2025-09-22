@@ -1127,6 +1127,12 @@ static bool parse_hostfakesplit_mod(char *opt, struct hostfakesplit_mod *hfs_mod
 			hfs_mod->host[sizeof(hfs_mod->host)-1-1]=0;
 			hfs_mod->host_size = strlen(hfs_mod->host); // cache value
 		}
+		else if (!strcmp(p,"altorder"))
+		{
+			if (!e2 || !e2[1] || e2[1]==',') goto err;
+			hfs_mod->ordering = atoi(e2+1);
+			if (hfs_mod->ordering<0 || hfs_mod->ordering>1) goto err;
+		}
 		else if (strcmp(p,"none"))
 			goto err;
 
@@ -1685,7 +1691,7 @@ static void exithelp(void)
 		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
 		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
-		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t; can be none or host=<hostname>\n"
+		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t; mods can be none,host=<hostname>,altorder=0|1\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ts-increment=<int|0xHEX>\t\t; ts fooling TSval signed increment. default %d\n"

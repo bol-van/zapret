@@ -83,6 +83,7 @@ struct hostfakesplit_mod
 {
 	char host[128];
 	size_t host_size;
+	int ordering;
 };
 
 typedef enum {SS_NONE=0,SS_SYN,SS_SYNACK,SS_ACKSYN} t_synack_split;
