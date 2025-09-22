@@ -197,6 +197,7 @@ nfqws takes the following parameters:
  --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder
  --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.
+ --dpi-desync-hostfakesplit-mod=mod[,mod]       ; can be none or host=<hostname>
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ipfrag-pos-udp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-ts-increment=<int|0xHEX>          ; ts fooling TSval signed increment. default -600000
@@ -379,7 +380,14 @@ For example, `--dpi-desync-split-pos=method+2,midsld,5` means `method+2` for htt
 It works for tcp protocols with host : TLS and HTTP. Real hostname can be additionally split using `--dpi-desync-hostfakesplit-midhost` marker.
 For example, `--dpi-desync-hostfakesplit-midhost=midsld`. Position must be within host range or split won't happen.
 Multi-packet queries are supported if hostname part is not already split. If it is fooling is cancelled.
-Fake host names are generated randomly on the fly using `[0-9a-z]` pattern. If host length is >= 7 dot is placed to simulate 3-char TLD.
+
+By default fake host names are generated randomly on the fly using `[0-9a-z]` pattern. If host length is >= 7 dot is placed to simulate 3-char TLD.
+It's possible to set fake host template : `--dpi-desync-hostfakesplit-mod=host=<hostname>`.
+Template hostname will be expanded to the left to original hostname size with random characters from `[0-9a-z]` pattern : "www.networksolutions.com" -> "h8xmdba4tv7a8.google.com".
+If original hostname size is less than template size it will be cut : "habr.com" -> "ogle.com".
+If original hostname size is larger than template size by one, dot will be appended to the left : "www.xxx.com" => ".google.com"..
+That's why it's a good idea to use short hostnames in template : "ya.ru", "vk.com", "x.com".
+
 
 ### Sequence numbers overlap
 
