@@ -1288,7 +1288,11 @@ pktws_curl_test_update_vary()
 		splits="method+2 midsld"
 		[ "$sec" = 0 ] || splits="1 midsld 1,midsld"
 	fi
-	test_has_hostfakesplit $desync && fake1="--dpi-desync-hostfakesplit-midhost=midsld"
+	test_has_hostfakesplit $desync && {
+		fake1="--dpi-desync-hostfakesplit-mod=altorder=1"
+		fake2="--dpi-desync-hostfakesplit-midhost=midsld"
+		fake3="--dpi-desync-hostfakesplit-mod=altorder=1 --dpi-desync-hostfakesplit-midhost=midsld"
+	}
 	for fake in '' "$fake1" "$fake2" "$fake3" ; do
 		[ "$fake" = "-" ] && continue
 		if [ -n "$splits" ]; then
