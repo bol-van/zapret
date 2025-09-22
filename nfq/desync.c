@@ -1820,8 +1820,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		else if (dp->desync_mode==DESYNC_HOSTFAKESPLIT || dp->desync_mode2==DESYNC_HOSTFAKESPLIT)
 		{
 			struct proto_pos splits[2] = {
-				{ marker: PM_HOST, pos: 0},
-				{ marker: PM_HOST_END, pos: 0}
+				{ .marker = PM_HOST, .pos = 0},
+				{ .marker = PM_HOST_END, .pos = 0}
 			};
 			split_pos=0;
 			ResolveMultiPos(rdata_payload, rlen_payload, l7proto, splits, 2, multisplit_pos, &multisplit_count);
@@ -2006,7 +2006,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					uint16_t ip_id_fake = (uint16_t)random();
 					uint8_t *seg;
 					size_t seg_len, host_size, pos_host, pos_endhost, pos_split_host, sz;
-					char *fakehost;
+					uint8_t *fakehost;
 
 					seg = dis->data_payload;
 					seg_len = dis->len_payload;
