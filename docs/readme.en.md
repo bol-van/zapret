@@ -350,7 +350,8 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
  * `multisplit`. split request at specified in `--dpi-desync-split-pos` positions
  * `multidisorder`. same as `multisplit` but send in reverse order
  * `fakedsplit`. split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
- * `hostfakesplit`. fake host part of the request. Mode 1 (altorder=0) : before host, random fake host, real host (optionally split this part), random fake host repeat, after host. Mode 2 (altorder=1) : before host, random fake host, after host, real host (optionally split this part).
+ * `hostfakesplit` (altorder=0). fake host part of the request : before host, random fake host, real host (optionally split this part), random fake host repeat, after host
+ * `hostfakesplit` (altorder=1). fake host part of the request : before host, random fake host, after host, real host (optionally split this part)
  * `fakeddisorder`. same as `fakedsplit` but with another order : fake 2nd segment, 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
 
 Positions are defined by markers.
