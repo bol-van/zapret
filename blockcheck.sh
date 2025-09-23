@@ -1286,6 +1286,8 @@ pktws_curl_test_update_vary()
 	if test_has_fakedsplit $desync ; then
 		splits="method+2 midsld"
 		[ "$sec" = 0 ] || splits="1 midsld"
+		# do not send fake first
+		fake1='--dpi-desync-fakedsplit-mod=altorder=1'
 	elif test_has_split $desync ; then
 		splits="method+2 midsld"
 		[ "$sec" = 0 ] || splits="1 midsld 1,midsld"
