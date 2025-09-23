@@ -196,6 +196,7 @@ nfqws takes the following parameters:
  --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment
  --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder
+ --dpi-desync-fakedsplit-mod=mod[,mod]          ; mods can be none,altorder=0|1|2|3
  --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.
  --dpi-desync-hostfakesplit-mod=mod[,mod]       ; can be none, host=<hostname>, altorder=0|1
  --dpi-desync-ipfrag-pos-tcp=<8..9216>          ; ip frag position starting from the transport header. multiple of 8, default 8.
@@ -349,7 +350,10 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
 
  * `multisplit`. split request at specified in `--dpi-desync-split-pos` positions
  * `multidisorder`. same as `multisplit` but send in reverse order
- * `fakedsplit`. split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `fakedsplit` (altorder=0). split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `fakedsplit` (altorder=1). less fakes : 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `fakedsplit` (altorder=2). less fakes : 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `fakedsplit` (altorder=3). less fakes : 1st segment, fake 2nd segment, 2nd segment
  * `hostfakesplit` (altorder=0). fake host part of the request : before host, random fake host, real host (optionally split this part), random fake host repeat, after host
  * `hostfakesplit` (altorder=1). fake host part of the request : before host, random fake host, after host, real host (optionally split this part)
  * `fakeddisorder`. same as `fakedsplit` but with another order : fake 2nd segment, 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
@@ -381,6 +385,8 @@ First relative markers are searched. If no suitable found absolute markers are s
 
 For example, `--dpi-desync-split-pos=method+2,midsld,5` means `method+2` for http, `midsld` for TLS and 5 for others.
 
+`--dpi-desync-fakedsplit-mod=altorder=N` switches `fakedsplit` to alternate segment ordering.
+
 `hostfakesplit` only fakes hostname part of the request making it hard to destinguish between real and fake host names.
 It works for tcp protocols with host : TLS and HTTP. Real hostname can be additionally split using `--dpi-desync-hostfakesplit-midhost` marker.
 For example, `--dpi-desync-hostfakesplit-midhost=midsld`. Position must be within host range or split won't happen.
@@ -393,7 +399,7 @@ If original hostname size is less than template size it will be cut : "habr.com"
 If original hostname size is larger than template size by one, dot will be appended to the left : "www.xxx.com" => ".google.com"..
 That's why it's a good idea to use short hostnames in template : "ya.ru", "vk.com", "x.com".
 
-`--dpi-desync-hostfakesplit-mod=altorder=1` switches to alternate segment ordering. `altorder=1` sends the whole request with faked host sequentally, then real host segment.
+`--dpi-desync-hostfakesplit-mod=altorder=1` switches `hostfakesplit` to alternate segment ordering. `altorder=1` sends the whole request with faked host sequentally, then real host segment.
 
 ### Sequence numbers overlap
 
