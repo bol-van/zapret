@@ -204,6 +204,7 @@ nfqws takes the following parameters:
  --dpi-desync-badseq-increment=<int|0xHEX>      ; badseq fooling seq signed increment. default -10000
  --dpi-desync-badack-increment=<int|0xHEX>      ; badseq fooling ackseq signed increment. default -66000
  --dpi-desync-any-protocol=0|1                  ; 0(default)=desync only http and tls  1=desync any nonempty data packet
+ --dpi-desync-fake-tcp-mod=mod[,mod]            ; comma separated list of tcp fake mods. available mods : none,seq
  --dpi-desync-fake-http=<filename>|0xHEX        ; file containing fake http request
  --dpi-desync-fake-tls=<filename>|0xHEX|!       ; file containing fake TLS ClientHello (for https). '!' = standard fake
  --dpi-desync-fake-tls-mod=mod[,mod]            ; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap
@@ -316,6 +317,9 @@ Resulting order would be : `fake1 fake1 fake1 fake2 fake2 fake2 fake3 fake3 fake
 
 
 ### FAKE mods
+
+By default all tcp fakes are sent with the same sequence as original packet.
+This can be changed by `--dpi-desync-fake-tcp-mod=seq`. In the latter case all fakes are sent as if they would be tcp segments of a single fake.
 
 **nfqws** has built-in TLS fake. It can be customized with `--dpi-desync-fake-tls` option.
 Customized fake data can be anything - valid TLS Client Hello or arbitrary data.

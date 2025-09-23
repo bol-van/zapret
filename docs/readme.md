@@ -226,6 +226,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-badseq-increment=<int|0xHEX>          ; инкремент sequence number для badseq. по умолчанию -10000
 --dpi-desync-badack-increment=<int|0xHEX>          ; инкремент ack sequence number для badseq. по умолчанию -66000
 --dpi-desync-any-protocol=0|1                      ; 0(default)=работать только по http request и tls clienthello  1=по всем непустым пакетам данных
+--dpi-desync-fake-tcp-mod=mod[,mod]                ; список через запятую режимов runtime модификации tcp фейков (любых) : none, seq
 --dpi-desync-fake-http=<filename>|0xHEX	           ; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному www.iana.org
 --dpi-desync-fake-tls=<filename>|0xHEX|!           ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному. '!' = стандартный фейк
 --dpi-desync-fake-tls-mod=mod[,mod]                ; список через запятую режимов runtime модификации фейков : none,rnd,rndsni,sni=<sni>,dupsid,padencap
@@ -372,6 +373,10 @@ dvtws, собираемый из тех же исходников (см. [док
 Итоговый порядок будет такой : `fake1 fake1 fake1 fake2 fake2 fake2 fake3 fake3 fake3 .....`
 
 ### МОДИФИКАЦИЯ ФЕЙКОВ
+
+Любые tcp фейки отправляются с исходным sequence по умолчанию, даже если их несколько.
+Если задать `--dpi-desync-fake-tcp-mod=seq`, то несколько фейков будут отправлены с увеличением sequence number таким образом,
+как будто они являются tcp сегментами одного фейка.
 
 В nfqws зашит базовый вариант фейка для TLS. Его можно переопределить опцией `--dpi-desync-fake-tls`.
 Переопределение фейков дает возможность использовать любые данные в качестве фейка для TLS.
