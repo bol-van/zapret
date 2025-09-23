@@ -1897,6 +1897,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 				{
 					struct blob_item *fake_item;
+					size_t fake_size;
 					uint8_t *fake_data;
 					uint8_t fake_data_buf[FAKE_MAX_TCP];
 					int n=0;
@@ -1920,25 +1921,28 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							default:
 								fake_data = fake_item->data;
 						}
+						fake_data += fake_item->offset;
+						fake_size = fake_item->size - fake_item->offset;
+
 						pkt1_len = sizeof(pkt1);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, false, 0, htonl(sequence), dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
 							DF,ttl_fake,IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
 							dp->desync_fooling_mode,dp->desync_ts_increment,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
-							fake_data, fake_item->size, pkt1, &pkt1_len))
+							fake_data, fake_size, pkt1, &pkt1_len))
 						{
 							reasm_orig_cancel(ctrack);
 							goto send_orig;
 						}
 
 						DLOG("sending fake[%d] seq=+%u : ", n, sequence-sequence0);
-						hexdump_limited_dlog(fake_data,fake_item->size,PKTDATA_MAXDUMP); DLOG("\n");
+						hexdump_limited_dlog(fake_data,fake_size,PKTDATA_MAXDUMP); DLOG("\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						{
 							reasm_orig_cancel(ctrack);
 							goto send_orig;
 						}
 						ip_id=IP4_IP_ID_NEXT(ip_id);
-						if (dp->tcp_mod.seq) sequence += fake_item->size;
+						if (dp->tcp_mod.seq) sequence += fake_size;
 					}
 				}
 				bFake = true;
@@ -3065,6 +3069,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_FAKE:
 				if (!reasm_offset)
 				{
+					size_t fake_size;
+					uint8_t *fake_data;
 					struct blob_item *fake_item;
 					int n=0;
 
@@ -3073,16 +3079,20 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					LIST_FOREACH(fake_item, fake, next)
 					{
 						n++;
+
+						fake_data=fake_item->data + fake_item->offset;
+						fake_size=fake_item->size - fake_item->offset;
+
 						pkt1_len = sizeof(pkt1);
 						if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
 							DF,ttl_fake, IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
 							dp->desync_fooling_mode, NULL, 0, 0,
-							fake_item->data, fake_item->size, pkt1, &pkt1_len))
+							fake_data, fake_size, pkt1, &pkt1_len))
 						{
 							goto send_orig;
 						}
 						DLOG("sending fake[%d] : ", n);
-						hexdump_limited_dlog(fake_item->data,fake_item->size,PKTDATA_MAXDUMP); DLOG("\n");
+						hexdump_limited_dlog(fake_data,fake_size,PKTDATA_MAXDUMP); DLOG("\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 							goto send_orig;
 						ip_id=IP4_IP_ID_NEXT(ip_id);

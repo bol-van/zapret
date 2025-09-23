@@ -547,5 +547,6 @@ v71.5
 winws: --wf-raw-part
 nfqws: --dpi-desync=hostfakesplit
 nfqws: --dpi-desync-fake-tcp-mod=seq
+nfqws: --dpi-desync-fake-tls=!+offset
 blockcheck: new strategies
 blockcheck: curl test simulation : SIMULATE=1

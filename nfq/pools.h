@@ -157,6 +157,7 @@ struct blob_item {
 	uint8_t *data;	// main data blob
 	size_t size;	// main data blob size
 	size_t size_buf;// main data blob allocated size
+	size_t offset;  // optional offset to useful data
 	void *extra;	// any data without size
 	void *extra2;	// any data without size
 	LIST_ENTRY(blob_item) next;

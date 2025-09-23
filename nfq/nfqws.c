@@ -1423,6 +1423,11 @@ static bool onetime_tls_mod(struct desync_profile *dp)
 		}
 		if (!onetime_tls_mod_blob(dp->n,n,tls_mod,fake_tls->data,&fake_tls->size,fake_tls->size_buf,(struct fake_tls_mod_cache*)fake_tls->extra))
 			return false;
+		if (fake_tls->offset >= fake_tls->size)
+		{
+			DLOG("profile %d fake[%d] tls mod shrinked data to %zu and offset %zu is now out of data range\n", dp->n, n, fake_tls->size, fake_tls->offset);
+			return false;
+		}
 	}
 	return true;
 }
@@ -1740,7 +1745,7 @@ static void exithelp(void)
 		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
 		" --dpi-desync-fake-tcp-mod=mod[,mod]\t\t; comma separated list of tcp fake mods. available mods : none,seq\n"
 		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
-		" --dpi-desync-fake-tls=<filename>|0xHEX|!\t; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-fake-tls=<filename>|0xHEX|![+offset] ; file containing fake TLS ClientHello (for https)\n"
 		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap\n"
 		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
 		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
@@ -2761,9 +2766,18 @@ int main(int argc, char **argv)
 			break;
 		case IDX_DPI_DESYNC_FAKE_TLS:
 			{
-				dp->tls_fake_last = strcmp(optarg,"!") ?
-					load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4+sizeof(dp->tls_mod_last.sni)) :
-					load_const_blob_to_collection(fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),&dp->fake_tls,4+sizeof(dp->tls_mod_last.sni));
+				if (optarg[0]=='!' && (optarg[1]==0 || optarg[1]=='+'))
+				{
+					dp->tls_fake_last = load_const_blob_to_collection(fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),&dp->fake_tls,4+sizeof(dp->tls_mod_last.sni));
+					if (optarg[1]=='+') dp->tls_fake_last->offset=atoi(optarg+1);
+				}
+				else
+					dp->tls_fake_last = load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4+sizeof(dp->tls_mod_last.sni));
+				if (dp->tls_fake_last->offset >= dp->tls_fake_last->size)
+				{
+					DLOG_ERR("offset %zu is out of data range %zu\n",dp->tls_fake_last->offset,dp->tls_fake_last->size);
+					exit_clean(1);
+				}
 				if (!(dp->tls_fake_last->extra2 = malloc(sizeof(struct fake_tls_mod))))
 				{
 					DLOG_ERR("out of memory\n");
