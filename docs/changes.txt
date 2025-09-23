@@ -546,6 +546,6 @@ v71.5
 
 winws: --wf-raw-part
 nfqws: --dpi-desync=hostfakesplit
+nfqws: --dpi-desync-fake-tcp-mod=seq
 blockcheck: new strategies
 blockcheck: curl test simulation : SIMULATE=1
-blockcheck: print strategies that work for all tested domains. can be trusted only if SCANLEVEL=force.

@@ -1147,6 +1147,46 @@ err:
 	return false;
 }
 
+static bool parse_tcpmod(char *opt, struct tcp_mod *tcp_mod)
+{
+	char *e,*e2,*p,c,c2;
+
+	for (p=opt ; p ; )
+	{
+		for (e2=p ; *e2 && *e2!=',' && *e2!='=' ; e2++);
+
+		if ((e = strchr(e2,',')))
+		{
+			c=*e;
+			*e=0;
+		}
+
+		if (*e2=='=')
+		{
+			c2=*e2;
+			*e2=0;
+		}
+		else
+			e2=NULL;
+
+		if (!strcmp(p,"seq"))
+		{
+			tcp_mod->seq = true;
+		}
+		else if (strcmp(p,"none"))
+			goto err;
+
+		if (e2) *e2=c2;
+		if (e) *e++=c;
+		p = e;
+	}
+	return true;
+err:
+	if (e2) *e2=c2;
+	if (e) *e++=c;
+	return false;
+}
+
 static bool parse_fooling(char *opt, unsigned int *fooling_mode)
 {
 	char *e,*p = opt;
@@ -1698,6 +1738,7 @@ static void exithelp(void)
 		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
 		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
+		" --dpi-desync-fake-tcp-mod=mod[,mod]\t\t; comma separated list of tcp fake mods. available mods : none,seq\n"
 		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
 		" --dpi-desync-fake-tls=<filename>|0xHEX|!\t; file containing fake TLS ClientHello (for https)\n"
 		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap\n"
@@ -1878,6 +1919,7 @@ enum opt_indices {
 	IDX_DPI_DESYNC_BADSEQ_INCREMENT,
 	IDX_DPI_DESYNC_BADACK_INCREMENT,
 	IDX_DPI_DESYNC_ANY_PROTOCOL,
+	IDX_DPI_DESYNC_FAKE_TCP_MOD,
 	IDX_DPI_DESYNC_FAKE_HTTP,
 	IDX_DPI_DESYNC_FAKE_TLS,
 	IDX_DPI_DESYNC_FAKE_TLS_MOD,
@@ -2008,6 +2050,7 @@ static const struct option long_options[] = {
 	[IDX_DPI_DESYNC_BADSEQ_INCREMENT] = {"dpi-desync-badseq-increment", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_BADACK_INCREMENT] = {"dpi-desync-badack-increment", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_ANY_PROTOCOL] = {"dpi-desync-any-protocol", optional_argument, 0, 0},
+	[IDX_DPI_DESYNC_FAKE_TCP_MOD] = {"dpi-desync-fake-tcp-mod", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_HTTP] = {"dpi-desync-fake-http", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_TLS] = {"dpi-desync-fake-tls", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_TLS_MOD] = {"dpi-desync-fake-tls-mod", required_argument, 0, 0},
@@ -2705,6 +2748,13 @@ int main(int argc, char **argv)
 			break;
 		case IDX_DPI_DESYNC_ANY_PROTOCOL:
 			dp->desync_any_proto = !optarg || atoi(optarg);
+			break;
+		case IDX_DPI_DESYNC_FAKE_TCP_MOD:
+			if (!parse_tcpmod(optarg,&dp->tcp_mod))
+			{
+				DLOG_ERR("Invalid tcp mod : %s\n",optarg);
+				exit_clean(1);
+			}
 			break;
 		case IDX_DPI_DESYNC_FAKE_HTTP:
 			load_blob_to_collection(optarg, &dp->fake_http, FAKE_MAX_TCP,0);

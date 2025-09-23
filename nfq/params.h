@@ -85,6 +85,10 @@ struct hostfakesplit_mod
 	size_t host_size;
 	int ordering;
 };
+struct tcp_mod
+{
+	bool seq;
+};
 
 typedef enum {SS_NONE=0,SS_SYN,SS_SYNACK,SS_ACKSYN} t_synack_split;
 
@@ -139,6 +143,8 @@ struct desync_profile
 	struct blob_item *tls_fake_last;
 
 	struct hostfakesplit_mod hfs_mod;
+
+	struct tcp_mod tcp_mod;
 
 	int udplen_increment;
 
