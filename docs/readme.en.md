@@ -136,7 +136,7 @@ For BSD systems there is dvtws. Its built from the same source and has almost th
 nfqws takes the following parameters:
 
 ```
- @<config_file>					           ; read file for options. must be the only argument. other options are ignored.
+ @<config_file>                                            ; read file for options. must be the only argument. other options are ignored.
 
  --debug=0|1
  --dry-run                                                 ; verify parameters and exit with code 0 if successful
