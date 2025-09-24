@@ -835,20 +835,25 @@ static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr
 }
 
 
-#if defined(BSD)
-// BSD pass to divert socket ip_id=0 and does not auto set it if sent via divert socket
 static uint16_t IP4_IP_ID_FIX(const struct ip *ip)
 {
 	return ip ? ip->ip_id ? ip->ip_id : (uint16_t)random() : 0;
 }
-#define IP4_IP_ID_NEXT(ip_id) net16_add(ip_id,+1)
-#define IP4_IP_ID_PREV(ip_id) net16_add(ip_id,-1)
-#else
-// in linux kernel sets increasing ip_id if it's zero
-#define IP4_IP_ID_FIX(x) 0
-#define IP4_IP_ID_NEXT(ip_id) ip_id
-#define IP4_IP_ID_PREV(ip_id) ip_id
-#endif
+static uint16_t IP4_IP_ID_ADD(uint16_t ip_id,uint16_t inc)
+{
+	if (ip_id)
+	{
+		ip_id+=net16_add(ip_id,inc);
+		if (!ip_id) ip_id=net16_add(ip_id,((int16_t)inc)<0 ? -1 : 1); // do not allow zero
+	}
+	return ip_id;
+}
+#define IP4_IP_ID_ADD(ip_id,inc) (ip_id ? net16_add(ip_id,inc) : 0)
+#define IP4_IP_ID_NEXT(ip_id) IP4_IP_ID_ADD(ip_id,+1)
+#define IP4_IP_ID_PREV(ip_id) IP4_IP_ID_ADD(ip_id,-1)
+//#define IP4_IP_ID_FIX(x) 0
+//#define IP4_IP_ID_NEXT(ip_id) ip_id
+//#define IP4_IP_ID_PREV(ip_id) ip_id
 
 
 // fake_mod buffer must at least sizeof(desync_profile->fake_tls)
@@ -1433,7 +1438,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		size_t multisplit_pos[MAX_SPLITS];
 		int multisplit_count;
 		int i;
-		uint16_t ip_id;
+		uint16_t ip_id = IP4_IP_ID_FIX(dis->ip);
+
 		bool bHaveHost=false, bHostIsIp=false;
 		t_l7proto l7proto = UNKNOWN;
 
@@ -1904,8 +1910,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					uint32_t sequence, sequence0;
 
 					sequence = sequence0 = ntohl(dis->tcp->th_seq);
-					ip_id = IP4_IP_ID_FIX(dis->ip);
-
 					LIST_FOREACH(fake_item, fake, next)
 					{
 						n++;
@@ -1933,7 +1937,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							reasm_orig_cancel(ctrack);
 							goto send_orig;
 						}
-
 						DLOG("sending fake[%d] seq=+%u : ", n, sequence-sequence0);
 						hexdump_limited_dlog(fake_data,fake_size,PKTDATA_MAXDUMP); DLOG("\n");
 						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
@@ -1952,7 +1955,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				if (reasm_offset) break;
 				pkt1_len = sizeof(pkt1);
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (dp->desync_mode==DESYNC_RSTACK ? TH_ACK:0), false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
-					DF,ttl_fake,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6),
+					DF,ttl_fake,IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6),
 					dp->desync_fooling_mode,dp->desync_ts_increment,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 					NULL, 0, pkt1, &pkt1_len))
 				{
@@ -1965,6 +1968,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					reasm_orig_cancel(ctrack);
 					goto send_orig;
 				}
+				ip_id=IP4_IP_ID_NEXT(ip_id);
 				bFake = true;
 				break;
 			case DESYNC_HOPBYHOP:
@@ -2022,8 +2026,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					pos_endhost = multisplit_pos[1];
 					pos_split_host = multisplit_count>=3 ? multisplit_pos[2] : 0;
 					host_size = pos_endhost-pos_host;
-
-					ip_id = IP4_IP_ID_FIX(dis->ip);
 
 					// before_host segment
 					pkt1_len = sizeof(pkt1);
@@ -2167,8 +2169,6 @@ send_orig_clean:
 					size_t seg_len,from,to;
 					unsigned int seqovl;
 
-					ip_id = IP4_IP_ID_FIX(dis->ip);
-
 					for (i=0,from=0 ; i<=multisplit_count ; i++)
 					{
 						to = i==multisplit_count ? dis->len_payload : multisplit_pos[i];
@@ -2240,8 +2240,7 @@ send_orig_clean:
 					size_t seg_len,from,to;
 					unsigned int seqovl;
 
-					ip_id = IP4_IP_ID_FIX(dis->ip);
-
+					ip_id=IP4_IP_ID_ADD(ip_id,(uint16_t)multisplit_count);
 					for (i=multisplit_count-1,to=dis->len_payload ; i>=-1 ; i--)
 					{
 						from = i>=0 ? multisplit_pos[i] : 0;
@@ -2304,7 +2303,7 @@ send_orig_clean:
 					}
 					fill_pattern(pat,dis->len_payload,dp->fsplit_pattern,sizeof(dp->fsplit_pattern));
 
-					ip_id = IP4_IP_ID_FIX(dis->ip);
+					ip_id=IP4_IP_ID_NEXT(ip_id);
 
 					if (seqovl_pos>=split_pos)
 					{
@@ -2338,7 +2337,6 @@ send_orig_clean:
 							dp->desync_fooling_mode,dp->desync_ts_increment,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 							pat+split_pos, dis->len_payload-split_pos, fakeseg2, &fakeseg2_len))
 						goto send_orig;
-					ip_id=IP4_IP_ID_PREV(ip_id);
 					DLOG("sending fake(1) 2nd out-of-order tcp segment %zu-%zu len=%zu : ",split_pos,dis->len_payload-1, dis->len_payload-split_pos);
 					hexdump_limited_dlog(pat+split_pos,dis->len_payload-split_pos,PKTDATA_MAXDUMP); DLOG("\n");
 					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg2, fakeseg2_len))
@@ -2350,19 +2348,17 @@ send_orig_clean:
 							fooling_orig,dp->desync_ts_increment,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 							seg, seg_len, pkt1, &pkt1_len))
 						goto send_orig;
-					ip_id=IP4_IP_ID_PREV(ip_id);
 					DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu seqovl=%u : ",split_pos,dis->len_payload-1, dis->len_payload-split_pos, seqovl);
 					hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						goto send_orig;
 
-					if (dis->ip) ((struct ip*)fakeseg2)->ip_id = ip_id;
-					ip_id=IP4_IP_ID_PREV(ip_id);
-
 					DLOG("sending fake(2) 2nd out-of-order tcp segment %zu-%zu len=%zu : ",split_pos,dis->len_payload-1, dis->len_payload-split_pos);
 					hexdump_limited_dlog(pat+split_pos,dis->len_payload-split_pos,PKTDATA_MAXDUMP); DLOG("\n");
 					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg2, fakeseg2_len))
 						goto send_orig;
+
+					ip_id=IP4_IP_ID_PREV(ip_id);
 
 					seg_len = sizeof(fakeseg);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
@@ -2370,7 +2366,6 @@ send_orig_clean:
 							dp->desync_fooling_mode,dp->desync_ts_increment,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 							pat, split_pos, fakeseg, &seg_len))
 						goto send_orig;
-					ip_id=IP4_IP_ID_PREV(ip_id);
 					DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
 					hexdump_limited_dlog(pat,split_pos,PKTDATA_MAXDUMP); DLOG("\n");
 					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
@@ -2382,7 +2377,6 @@ send_orig_clean:
 							fooling_orig,dp->desync_ts_increment,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 							dis->data_payload, split_pos, pkt1, &pkt1_len))
 						goto send_orig;
-					ip_id=IP4_IP_ID_PREV(ip_id);
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
 					hexdump_limited_dlog(dis->data_payload,split_pos,PKTDATA_MAXDUMP); DLOG("\n");
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
@@ -2409,8 +2403,6 @@ send_orig_clean:
 						goto send_orig;
 					}
 					fill_pattern(pat,dis->len_payload,dp->fsplit_pattern,sizeof(dp->fsplit_pattern));
-
-					ip_id = IP4_IP_ID_FIX(dis->ip);
 
 					fakeseg_len = sizeof(fakeseg);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
@@ -2530,7 +2522,6 @@ send_orig_clean:
 					uint8_t *pkt_orig;
 					size_t pkt_orig_len;
 
-					ip_id = IP4_IP_ID_FIX(dis->ip);
 					uint32_t ident = dis->ip ? ip_id ? ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 					size_t ipfrag_pos = (dp->desync_ipfrag_pos_tcp && dp->desync_ipfrag_pos_tcp<dis->transport_len) ? dp->desync_ipfrag_pos_tcp : 24;
 
@@ -2738,7 +2729,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	{
 		struct blob_collection_head *fake;
 		bool bHaveHost=false, bHostIsIp=false;
-		uint16_t ip_id;
+		uint16_t ip_id = IP4_IP_ID_FIX(dis->ip);
 
 		if (IsQUICInitial(dis->data_payload,dis->len_payload))
 		{
@@ -3083,8 +3074,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					struct blob_item *fake_item;
 					int n=0;
 
-					ip_id = IP4_IP_ID_FIX(dis->ip);
-
 					LIST_FOREACH(fake_item, fake, next)
 					{
 						n++;
@@ -3139,7 +3128,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		{
 			case DESYNC_UDPLEN:
 				pkt1_len = sizeof(pkt1);
-				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, DF, ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6), fooling_orig, dp->udplen_pattern, sizeof(dp->udplen_pattern), dp->udplen_increment, dis->data_payload, dis->len_payload, pkt1, &pkt1_len))
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, DF, ttl_orig,IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6), fooling_orig, dp->udplen_pattern, sizeof(dp->udplen_pattern), dp->udplen_increment, dis->data_payload, dis->len_payload, pkt1, &pkt1_len))
 				{
 					DLOG("could not construct packet with modified length. too large ?\n");
 					break;
@@ -3164,7 +3153,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					memcpy(pkt2+pkt2_len,dis->data_payload+1,szcopy);
 					pkt2_len+=szcopy;
 					pkt1_len = sizeof(pkt1);
-					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, DF, ttl_orig,IP4_TOS(dis->ip),IP4_IP_ID_FIX(dis->ip),IP6_FLOW(dis->ip6), fooling_orig, NULL, 0 , 0, pkt2, pkt2_len, pkt1, &pkt1_len))
+					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, DF, ttl_orig,IP4_TOS(dis->ip),ip_id,IP6_FLOW(dis->ip6), fooling_orig, NULL, 0 , 0, pkt2, pkt2_len, pkt1, &pkt1_len))
 					{
 						DLOG("could not construct packet with modified length. too large ?\n");
 						break;
