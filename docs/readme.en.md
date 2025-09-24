@@ -160,7 +160,7 @@ nfqws takes the following parameters:
  --hostspell                                               ; exact spelling of "Host" header. must be 4 chars. default is "host"
  --hostnospace                                             ; remove space after Host: and add it to User-Agent: to preserve packet size
  --domcase                                                 ; mix domain case : Host: TeSt.cOm
- --methodeol					           ; add '\n' before method and remove space after Host:
+ --methodeol                                               ; add '\n' before method and remove space after Host:
  --synack-split=[syn|synack|acksyn]                        ; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN
  --orig-ttl=<int>                                          ; set TTL for original packets
  --orig-ttl6=<int>                                         ; set ipv6 hop limit for original packets. by default ttl value is used
