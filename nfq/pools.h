@@ -164,7 +164,7 @@ struct blob_item {
 };
 LIST_HEAD(blob_collection_head, blob_item);
 struct blob_item *blob_collection_add(struct blob_collection_head *head);
-struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve);
+struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve, size_t offset);
 void blob_collection_destroy(struct blob_collection_head *head);
 bool blob_collection_empty(const struct blob_collection_head *head);
 

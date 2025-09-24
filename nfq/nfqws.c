@@ -176,7 +176,7 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	*ifin=0;
 	if (ifidx_in) if_indextoname(ifidx_in,ifin);
 
-	DLOG("packet: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifin, ifidx_in, ifout, ifidx_out);
+	DLOG("\npacket: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifin, ifidx_in, ifout, ifidx_out);
 
 	if (ilen >= 0)
 	{
@@ -502,7 +502,7 @@ static int dvt_main(void)
 
 					ReloadCheck();
 
-					DLOG("packet: id=%u len=%zu\n", id, len);
+					DLOG("\npacket: id=%u len=%zu\n", id, len);
 					verdict = processPacketData(&mark, NULL, NULL, buf, &len);
 					switch (verdict & VERDICT_MASK)
 					{
@@ -627,7 +627,7 @@ static int win_main(const char *windivert_filter)
 
 			*ifname=0;
 			snprintf(ifname,sizeof(ifname),"%u.%u", wa.Network.IfIdx, wa.Network.SubIfIdx);
-			DLOG("packet: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx);
+			DLOG("\npacket: id=%u len=%zu %s IPv6=%u IPChecksum=%u TCPChecksum=%u UDPChecksum=%u IfIdx=%u.%u\n", id, len, wa.Outbound ? "outbound" : "inbound", wa.IPv6, wa.IPChecksum, wa.TCPChecksum, wa.UDPChecksum, wa.Network.IfIdx, wa.Network.SubIfIdx);
 			if (wa.Impostor)
 			{
 				DLOG("windivert: passing impostor packet\n");
@@ -747,8 +747,16 @@ static bool parse_net32_signed(const char *opt, uint32_t *value)
 		return sscanf(opt, "%d", (int32_t*)value)>0;
 	}
 }
-static void load_file_or_exit(const char *filename, void *buf, size_t *size)
+static void load_file_or_exit(const char *filename, void *buf, size_t *size, size_t *offset)
 {
+	size_t ofs;
+
+	// 0xaabbcc
+	// filename
+	// @filename
+	// +123@filename
+
+	if (offset) *offset=0;
 	if (filename[0]=='0' && filename[1]=='x')
 	{
 		if (!parse_hex_str(filename+2,buf,size) || !*size)
@@ -760,12 +768,35 @@ static void load_file_or_exit(const char *filename, void *buf, size_t *size)
 	}
 	else
 	{
+		ofs=0;
+		if (filename[0]=='+')
+		{
+			filename++;
+			if (sscanf(filename,"%zu",&ofs)!=1)
+			{
+				DLOG("offset read error: %s\n",filename);
+				exit_clean(1);
+			}
+			while(*filename && *filename!='@') filename++;
+			if (*filename=='@') filename++;
+		}
+		else if (filename[0]=='@')
+			filename++;
 		if (!load_file_nonempty(filename,buf,size))
 		{
 			DLOG_ERR("could not read %s\n",filename);
 			exit_clean(1);
 		}
-		DLOG("read %zu bytes from %s\n",*size,filename);
+		DLOG("read %zu bytes from '%s'. offset=%zu\n",*size,filename,ofs);
+		if (ofs>=*size)
+		{
+			DLOG("'%s' : offset %zu is out of data range %zu\n",filename,ofs,*size);
+			exit_clean(1);
+		}
+		if (offset)
+			*offset=ofs;
+		else
+			memmove(buf,(uint8_t*)buf+ofs,*size-=ofs);
 	}
 }
 
@@ -1478,13 +1509,14 @@ static struct blob_item *load_blob_to_collection(const char *filename, struct bl
 {
 	struct blob_item *blob = blob_collection_add(blobs);
 	uint8_t *p;
+
 	if (!blob || (!(blob->data = malloc(max_size+size_reserve))))
 	{
 		DLOG_ERR("out of memory\n");
 		exit_clean(1);
 	}
 	blob->size = max_size;
-	load_file_or_exit(filename,blob->data,&blob->size);
+	load_file_or_exit(filename,blob->data,&blob->size,&blob->offset);
 	p = realloc(blob->data,blob->size+size_reserve);
 	if (!p)
 	{
@@ -1495,8 +1527,13 @@ static struct blob_item *load_blob_to_collection(const char *filename, struct bl
 	blob->size_buf = blob->size+size_reserve;
 	return blob;
 }
-static struct blob_item *load_const_blob_to_collection(const void *data,size_t sz, struct blob_collection_head *blobs, size_t size_reserve)
+static struct blob_item *load_const_blob_to_collection(const void *data,size_t sz, struct blob_collection_head *blobs, size_t size_reserve, size_t offset)
 {
+	if (offset >= sz)
+	{
+		DLOG_ERR("offset %zu is out of data range %zu\n",offset,sz);
+		exit_clean(1);
+	}
 	struct blob_item *blob = blob_collection_add(blobs);
 	if (!blob || (!(blob->data = malloc(sz+size_reserve))))
 	{
@@ -1505,6 +1542,7 @@ static struct blob_item *load_const_blob_to_collection(const void *data,size_t s
 	}
 	blob->size = sz;
 	blob->size_buf = sz+size_reserve;
+	blob->offset = offset;
 	memcpy(blob->data,data,sz);
 	return blob;
 }
@@ -1659,149 +1697,149 @@ static void exithelp(void)
 {
 	printf(
 #if !defined( __OpenBSD__) && !defined(__ANDROID__)
-		" @<config_file>|$<config_file>\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
+		" @<config_file>|$<config_file>\t\t\t\t; read file for options. must be the only argument. other options are ignored.\n\n"
 #endif
 #ifdef __ANDROID__
 		" --debug=0|1|syslog|android|@<filename>\n"
 #else
 		" --debug=0|1|syslog|@<filename>\n"
 #endif
-		" --version\t\t\t\t\t; print version and exit\n"
-		" --dry-run\t\t\t\t\t; verify parameters and exit with code 0 if successful\n"
+		" --version\t\t\t\t\t\t; print version and exit\n"
+		" --dry-run\t\t\t\t\t\t; verify parameters and exit with code 0 if successful\n"
 		" --comment=any_text\n"
 #ifdef __linux__
 		" --qnum=<nfqueue_number>\n"
 #elif defined(BSD)
-		" --port=<port>\t\t\t\t\t; divert port\n"
+		" --port=<port>\t\t\t\t\t\t; divert port\n"
 #endif
-		" --daemon\t\t\t\t\t; daemonize\n"
-		" --pidfile=<filename>\t\t\t\t; write pid to file\n"
+		" --daemon\t\t\t\t\t\t; daemonize\n"
+		" --pidfile=<filename>\t\t\t\t\t; write pid to file\n"
 #ifndef __CYGWIN__
-		" --user=<username>\t\t\t\t; drop root privs\n"
-		" --uid=uid[:gid1,gid2,...]\t\t\t; drop root privs\n"
+		" --user=<username>\t\t\t\t\t; drop root privs\n"
+		" --uid=uid[:gid1,gid2,...]\t\t\t\t; drop root privs\n"
 #endif
 #ifdef __linux__
-		" --bind-fix4\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
-		" --bind-fix6\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
+		" --bind-fix4\t\t\t\t\t\t; apply outgoing interface selection fix for generated ipv4 packets\n"
+		" --bind-fix6\t\t\t\t\t\t; apply outgoing interface selection fix for generated ipv6 packets\n"
 #endif
-		" --ctrack-timeouts=S:E:F[:U]\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
-		" --ctrack-disable=[0|1]\t\t\t\t; 1 or no argument disables conntrack\n"
-		" --ipcache-lifetime=<int>\t\t\t; time in seconds to keep cached hop count and domain name (default %u). 0 = no expiration\n"
-		" --ipcache-hostname=[0|1]\t\t\t; 1 or no argument enables ip->hostname caching\n"
+		" --ctrack-timeouts=S:E:F[:U]\t\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
+		" --ctrack-disable=[0|1]\t\t\t\t\t; 1 or no argument disables conntrack\n"
+		" --ipcache-lifetime=<int>\t\t\t\t; time in seconds to keep cached hop count and domain name (default %u). 0 = no expiration\n"
+		" --ipcache-hostname=[0|1]\t\t\t\t; 1 or no argument enables ip->hostname caching\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"
-		" --wf-iface=<int>[.<int>]\t\t\t; numeric network interface and subinterface indexes\n"
-		" --wf-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
-		" --wf-tcp=[~]port1[-port2]\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
-		" --wf-udp=[~]port1[-port2]\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
-		" --wf-raw-part=<filter>|@<filename>\t\t; partial raw windivert filter string or filename\n"
-		" --wf-filter-lan=0|1\t\t\t\t; add excluding filter for non-global IP (default : 1)\n"
-		" --wf-raw=<filter>|@<filename>\t\t\t; full raw windivert filter string or filename. replaces --wf-tcp,--wf-udp,--wf-raw-part\n"
-		" --wf-save=<filename>\t\t\t\t; save windivert filter string to a file and exit\n"
+		" --wf-iface=<int>[.<int>]\t\t\t\t; numeric network interface and subinterface indexes\n"
+		" --wf-l3=ipv4|ipv6\t\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
+		" --wf-tcp=[~]port1[-port2]\t\t\t\t; TCP port filter. ~ means negation. multiple comma separated values allowed.\n"
+		" --wf-udp=[~]port1[-port2]\t\t\t\t; UDP port filter. ~ means negation. multiple comma separated values allowed.\n"
+		" --wf-raw-part=<filter>|@<filename>\t\t\t; partial raw windivert filter string or filename\n"
+		" --wf-filter-lan=0|1\t\t\t\t\t; add excluding filter for non-global IP (default : 1)\n"
+		" --wf-raw=<filter>|@<filename>\t\t\t\t; full raw windivert filter string or filename. replaces --wf-tcp,--wf-udp,--wf-raw-part\n"
+		" --wf-save=<filename>\t\t\t\t\t; save windivert filter string to a file and exit\n"
 		"\nLOGICAL NETWORK FILTER:\n"
-		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t; enable winws only if any of specified wifi SSIDs connected\n"
-		" --nlm-filter=net1[,net2,net3,...]\t\t; enable winws only if any of specified NLM network is connected. names and GUIDs are accepted.\n"
-		" --nlm-list[=all]\t\t\t\t; list Network List Manager (NLM) networks. connected only or all.\n"
+		" --ssid-filter=ssid1[,ssid2,ssid3,...]\t\t\t; enable winws only if any of specified wifi SSIDs connected\n"
+		" --nlm-filter=net1[,net2,net3,...]\t\t\t; enable winws only if any of specified NLM network is connected. names and GUIDs are accepted.\n"
+		" --nlm-list[=all]\t\t\t\t\t; list Network List Manager (NLM) networks. connected only or all.\n"
 #endif
 		"\nMULTI-STRATEGY:\n"
-		" --new\t\t\t\t\t\t; begin new strategy\n"
-		" --skip\t\t\t\t\t\t; do not use this strategy\n"
-		" --filter-l3=ipv4|ipv6\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
-		" --filter-tcp=[~]port1[-port2]|*\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list allowed.\n"
-		" --filter-udp=[~]port1[-port2]|*\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
+		" --new\t\t\t\t\t\t\t; begin new strategy\n"
+		" --skip\t\t\t\t\t\t\t; do not use this strategy\n"
+		" --filter-l3=ipv4|ipv6\t\t\t\t\t; L3 protocol filter. multiple comma separated values allowed.\n"
+		" --filter-tcp=[~]port1[-port2]|*\t\t\t; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp. comma separated list allowed.\n"
+		" --filter-udp=[~]port1[-port2]|*\t\t\t; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp. comma separated list allowed.\n"
 		" --filter-l7=[http|tls|quic|wireguard|dht|discord|stun|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.\n"
 #ifdef HAS_FILTER_SSID
-		" --filter-ssid=ssid1[,ssid2,ssid3,...]\t\t; per profile wifi SSID filter\n"
+		" --filter-ssid=ssid1[,ssid2,ssid3,...]\t\t\t; per profile wifi SSID filter\n"
 #endif
-		" --ipset=<filename>\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
-		" --ipset-ip=<ip_list>\t\t\t\t; comma separated fixed subnet list\n"
-		" --ipset-exclude=<filename>\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
-		" --ipset-exclude-ip=<ip_list>\t\t\t; comma separated fixed subnet list\n"
+		" --ipset=<filename>\t\t\t\t\t; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-ip=<ip_list>\t\t\t\t\t; comma separated fixed subnet list\n"
+		" --ipset-exclude=<filename>\t\t\t\t; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)\n"
+		" --ipset-exclude-ip=<ip_list>\t\t\t\t; comma separated fixed subnet list\n"
 		"\nHOSTLIST FILTER:\n"
-		" --hostlist=<filename>\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-domains=<domain_list>\t\t; comma separated fixed domain list\n"
-		" --hostlist-exclude=<filename>\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
-		" --hostlist-exclude-domains=<domain_list>\t; comma separated fixed domain list\n"
-		" --hostlist-auto=<filename>\t\t\t; detect DPI blocks and build hostlist automatically\n"
-		" --hostlist-auto-fail-threshold=<int>\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
-		" --hostlist-auto-fail-time=<int>\t\t; all failed attemps must be within these seconds (default : %d)\n"
-		" --hostlist-auto-retrans-threshold=<int>\t; how many request retransmissions cause attempt to fail (default : %d)\n"
-		" --hostlist-auto-debug=<logfile>\t\t; debug auto hostlist positives\n"
+		" --hostlist=<filename>\t\t\t\t\t; apply dpi desync only to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-domains=<domain_list>\t\t\t; comma separated fixed domain list\n"
+		" --hostlist-exclude=<filename>\t\t\t\t; do not apply dpi desync to the listed hosts (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)\n"
+		" --hostlist-exclude-domains=<domain_list>\t\t; comma separated fixed domain list\n"
+		" --hostlist-auto=<filename>\t\t\t\t; detect DPI blocks and build hostlist automatically\n"
+		" --hostlist-auto-fail-threshold=<int>\t\t\t; how many failed attempts cause hostname to be added to auto hostlist (default : %d)\n"
+		" --hostlist-auto-fail-time=<int>\t\t\t; all failed attemps must be within these seconds (default : %d)\n"
+		" --hostlist-auto-retrans-threshold=<int>\t\t; how many request retransmissions cause attempt to fail (default : %d)\n"
+		" --hostlist-auto-debug=<logfile>\t\t\t; debug auto hostlist positives\n"
 		"\nTAMPER:\n"
-		" --wsize=<window_size>[:<scale_factor>]\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
-		" --wssize=<window_size>[:<scale_factor>]\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
-		" --wssize-cutoff=[n|d|s]N\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --synack-split=[syn|synack|acksyn]\t\t; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN\n"
-		" --orig-ttl=<int>\t\t\t\t; set TTL for original packets\n"
-		" --orig-ttl6=<int>\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
-		" --orig-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
-		" --orig-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --orig-autottl for ipv6 only\n"
-		" --orig-mod-start=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
-		" --orig-mod-cutoff=[n|d|s]N\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --dup=<int>\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
-		" --dup-replace=[0|1]\t\t\t\t; 1 or no argument means do not send original, only dups\n"
-		" --dup-ttl=<int>\t\t\t\t; set TTL for dups\n"
-		" --dup-ttl6=<int>\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
-		" --dup-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
-		" --dup-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --dup-autottl for ipv6 only\n"
-		" --dup-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
-		" --dup-ts-increment=<int|0xHEX>\t\t\t; ts fooling TSval signed increment for dup. default %d\n"
-		" --dup-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment for dup. default %d\n"
-		" --dup-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
-		" --dup-start=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
-		" --dup-cutoff=[n|d|s]N\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
-		" --hostcase\t\t\t\t\t; change Host: => host:\n"
-		" --hostspell\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
-		" --hostnospace\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
-		" --domcase\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
-		" --methodeol\t\t\t\t\t; add '\\n' before method and remove space from Host:\n"
-		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t; try to desync dpi state. modes :\n"
-		"\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
-		"\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder hostfakesplit ipfrag2 udplen tamper\n"
+		" --wsize=<window_size>[:<scale_factor>]\t\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
+		" --wssize=<window_size>[:<scale_factor>]\t\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
+		" --wssize-cutoff=[n|d|s]N\t\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --synack-split=[syn|synack|acksyn]\t\t\t; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN\n"
+		" --orig-ttl=<int>\t\t\t\t\t; set TTL for original packets\n"
+		" --orig-ttl6=<int>\t\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
+		" --orig-autottl=[<delta>[:<min>[-<max>]]|-]\t\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
+		" --orig-autottl6=[<delta>[:<min>[-<max>]]|-]\t\t; overrides --orig-autottl for ipv6 only\n"
+		" --orig-mod-start=[n|d|s]N\t\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
+		" --orig-mod-cutoff=[n|d|s]N\t\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --dup=<int>\t\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
+		" --dup-replace=[0|1]\t\t\t\t\t; 1 or no argument means do not send original, only dups\n"
+		" --dup-ttl=<int>\t\t\t\t\t; set TTL for dups\n"
+		" --dup-ttl6=<int>\t\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
+		" --dup-autottl=[<delta>[:<min>[-<max>]]|-]\t\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
+		" --dup-autottl6=[<delta>[:<min>[-<max>]]|-]\t\t; overrides --dup-autottl for ipv6 only\n"
+		" --dup-fooling=<mode>[,<mode>]\t\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
+		" --dup-ts-increment=<int|0xHEX>\t\t\t\t; ts fooling TSval signed increment for dup. default %d\n"
+		" --dup-badseq-increment=<int|0xHEX>\t\t\t; badseq fooling seq signed increment for dup. default %d\n"
+		" --dup-badack-increment=<int|0xHEX>\t\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
+		" --dup-start=[n|d|s]N\t\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
+		" --dup-cutoff=[n|d|s]N\t\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --hostcase\t\t\t\t\t\t; change Host: => host:\n"
+		" --hostspell\t\t\t\t\t\t; exact spelling of \"Host\" header. must be 4 chars. default is \"host\"\n"
+		" --hostnospace\t\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
+		" --domcase\t\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
+		" --methodeol\t\t\t\t\t\t; add '\\n' before method and remove space from Host:\n"
+		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t\t; try to desync dpi state. modes :\n"
+		"\t\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
+		"\t\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder hostfakesplit ipfrag2 udplen tamper\n"
 #ifdef __linux__
-		" --dpi-desync-fwmark=<int|0xHEX>\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
+		" --dpi-desync-fwmark=<int|0xHEX>\t\t\t; override fwmark for desync packet. default = 0x%08X (%u)\n"
 #elif defined(SO_USER_COOKIE)
-		" --dpi-desync-sockarg=<int|0xHEX>\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
+		" --dpi-desync-sockarg=<int|0xHEX>\t\t\t; override sockarg (SO_USER_COOKIE) for desync packet. default = 0x%08X (%u)\n"
 #endif
-		" --dpi-desync-ttl=<int>\t\t\t\t; set ttl for fakes packets\n"
-		" --dpi-desync-ttl6=<int>\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
-		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]  ; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
-		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-] ; overrides --dpi-desync-autottl for ipv6 only\n"
-		" --dpi-desync-fooling=<mode>[,<mode>]\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
-		" --dpi-desync-repeats=<N>\t\t\t; send every desync packet N times\n"
-		" --dpi-desync-skip-nosni=0|1\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
-		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t; comma separated list of split positions\n"
-		"\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
-		"\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
-		"\t\t\t\t\t\t; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise\n"
-		" --dpi-desync-split-seqovl=N|-N|marker+N|marker-N ; use sequence overlap before first sent original split segment\n"
-		" --dpi-desync-split-seqovl-pattern=<filename>|0xHEX ; pattern for the fake part of overlap\n"
-		" --dpi-desync-fakedsplit-pattern=<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
-		" --dpi-desync-fakedsplit-mod=mod[,mod]\t\t; mods can be none,altorder=0|1|2|3\n"
+		" --dpi-desync-ttl=<int>\t\t\t\t\t; set ttl for fakes packets\n"
+		" --dpi-desync-ttl6=<int>\t\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
+		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
+		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --dpi-desync-autottl for ipv6 only\n"
+		" --dpi-desync-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
+		" --dpi-desync-repeats=<N>\t\t\t\t; send every desync packet N times\n"
+		" --dpi-desync-skip-nosni=0|1\t\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
+		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t\t; comma separated list of split positions\n"
+		"\t\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
+		"\t\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
+		"\t\t\t\t\t\t\t; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise\n"
+		" --dpi-desync-split-seqovl=N|-N|marker+N|marker-N\t; use sequence overlap before first sent original split segment\n"
+		" --dpi-desync-split-seqovl-pattern=[+ofs]@<filename>|0xHEX ; pattern for the fake part of overlap\n"
+		" --dpi-desync-fakedsplit-pattern=[+ofs]@<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
+		" --dpi-desync-fakedsplit-mod=mod[,mod]\t\t\t; mods can be none,altorder=0|1|2|3\n"
 		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
-		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t; mods can be none,host=<hostname>,altorder=0|1\n"
-		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-ts-increment=<int|0xHEX>\t\t; ts fooling TSval signed increment. default %d\n"
-		" --dpi-desync-badseq-increment=<int|0xHEX>\t; badseq fooling seq signed increment. default %d\n"
-		" --dpi-desync-badack-increment=<int|0xHEX>\t; badseq fooling ackseq signed increment. default %d\n"
-		" --dpi-desync-any-protocol=0|1\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
-		" --dpi-desync-fake-tcp-mod=mod[,mod]\t\t; comma separated list of tcp fake mods. available mods : none,seq\n"
-		" --dpi-desync-fake-http=<filename>|0xHEX\t; file containing fake http request\n"
-		" --dpi-desync-fake-tls=<filename>|0xHEX|![+offset] ; file containing fake TLS ClientHello (for https)\n"
-		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap\n"
-		" --dpi-desync-fake-unknown=<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
-		" --dpi-desync-fake-syndata=<filename>|0xHEX\t; file containing SYN data payload\n"
-		" --dpi-desync-fake-quic=<filename>|0xHEX\t; file containing fake QUIC Initial\n"
-		" --dpi-desync-fake-wireguard=<filename>|0xHEX\t; file containing fake wireguard handshake initiation\n"
-		" --dpi-desync-fake-dht=<filename>|0xHEX\t\t; file containing DHT protocol fake payload (d1...e)\n"
-		" --dpi-desync-fake-discord=<filename>|0xHEX\t; file containing discord protocol fake payload (Voice IP Discovery)\n"
-		" --dpi-desync-fake-stun=<filename>|0xHEX\t; file containing STUN protocol fake payload\n"
-		" --dpi-desync-fake-unknown-udp=<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
-		" --dpi-desync-udplen-increment=<int>\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
-		" --dpi-desync-udplen-pattern=<filename>|0xHEX\t; udp tail fill pattern\n"
-		" --dpi-desync-start=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
-		" --dpi-desync-cutoff=[n|d|s]N\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
+		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t\t; mods can be none,host=<hostname>,altorder=0|1\n"
+		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
+		" --dpi-desync-ts-increment=<int|0xHEX>\t\t\t; ts fooling TSval signed increment. default %d\n"
+		" --dpi-desync-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment. default %d\n"
+		" --dpi-desync-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment. default %d\n"
+		" --dpi-desync-any-protocol=0|1\t\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
+		" --dpi-desync-fake-tcp-mod=mod[,mod]\t\t\t; comma separated list of tcp fake mods. available mods : none,seq\n"
+		" --dpi-desync-fake-http=[+ofs]@<filename>|0xHEX\t\t; file containing fake http request\n"
+		" --dpi-desync-fake-tls=[+ofs]@<filename>|0xHEX|![+offset] ; file containing fake TLS ClientHello (for https)\n"
+		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap\n"
+		" --dpi-desync-fake-unknown=[+ofs]@<filename>|0xHEX\t; file containing unknown protocol fake payload\n"
+		" --dpi-desync-fake-syndata=[+ofs]@<filename>|0xHEX\t; file containing SYN data payload\n"
+		" --dpi-desync-fake-quic=[+ofs]@<filename>|0xHEX\t\t; file containing fake QUIC Initial\n"
+		" --dpi-desync-fake-wireguard=[+ofs]@<filename>|0xHEX\t; file containing fake wireguard handshake initiation\n"
+		" --dpi-desync-fake-dht=[+ofs]@<filename>|0xHEX\t\t; file containing DHT protocol fake payload (d1...e)\n"
+		" --dpi-desync-fake-discord=[+ofs]@<filename>|0xHEX\t; file containing discord protocol fake payload (Voice IP Discovery)\n"
+		" --dpi-desync-fake-stun=[+ofs]@<filename>|0xHEX\t\t; file containing STUN protocol fake payload\n"
+		" --dpi-desync-fake-unknown-udp=[+ofs]@<filename>|0xHEX\t; file containing unknown udp protocol fake payload\n"
+		" --dpi-desync-udplen-increment=<int>\t\t\t; increase or decrease udp packet length by N bytes (default %u). negative values decrease length.\n"
+		" --dpi-desync-udplen-pattern=[+ofs]@<filename>|0xHEX\t; udp tail fill pattern\n"
+		" --dpi-desync-start=[n|d|s]N\t\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
+		" --dpi-desync-cutoff=[n|d|s]N\t\t\t\t; apply dpi desync only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n",
 		CTRACK_T_SYN, CTRACK_T_EST, CTRACK_T_FIN, CTRACK_T_UDP,
 		IPCACHE_LIFETIME,
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT, HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
@@ -2719,7 +2757,7 @@ int main(int argc, char **argv)
 			{
 				char buf[sizeof(dp->seqovl_pattern)];
 				size_t sz=sizeof(buf);
-				load_file_or_exit(optarg,buf,&sz);
+				load_file_or_exit(optarg,buf,&sz,NULL);
 				fill_pattern(dp->seqovl_pattern,sizeof(dp->seqovl_pattern),buf,sz);
 			}
 			break;
@@ -2727,7 +2765,7 @@ int main(int argc, char **argv)
 			{
 				char buf[sizeof(dp->fsplit_pattern)];
 				size_t sz=sizeof(buf);
-				load_file_or_exit(optarg,buf,&sz);
+				load_file_or_exit(optarg,buf,&sz,NULL);
 				fill_pattern(dp->fsplit_pattern,sizeof(dp->fsplit_pattern),buf,sz);
 			}
 			break;
@@ -2814,22 +2852,14 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_DPI_DESYNC_FAKE_HTTP:
-			load_blob_to_collection(optarg, &dp->fake_http, FAKE_MAX_TCP,0);
+			load_blob_to_collection(optarg, &dp->fake_http, FAKE_MAX_TCP, 0);
 			break;
 		case IDX_DPI_DESYNC_FAKE_TLS:
 			{
 				if (optarg[0]=='!' && (optarg[1]==0 || optarg[1]=='+'))
-				{
-					dp->tls_fake_last = load_const_blob_to_collection(fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),&dp->fake_tls,4+sizeof(dp->tls_mod_last.sni));
-					if (optarg[1]=='+') dp->tls_fake_last->offset=atoi(optarg+1);
-				}
+					dp->tls_fake_last = load_const_blob_to_collection(fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),&dp->fake_tls,4+sizeof(dp->tls_mod_last.sni), optarg[1]=='+' ? (size_t)atoi(optarg+1) : 0);
 				else
 					dp->tls_fake_last = load_blob_to_collection(optarg, &dp->fake_tls, FAKE_MAX_TCP,4+sizeof(dp->tls_mod_last.sni));
-				if (dp->tls_fake_last->offset >= dp->tls_fake_last->size)
-				{
-					DLOG_ERR("offset %zu is out of data range %zu\n",dp->tls_fake_last->offset,dp->tls_fake_last->size);
-					exit_clean(1);
-				}
 				if (!(dp->tls_fake_last->extra2 = malloc(sizeof(struct fake_tls_mod))))
 				{
 					DLOG_ERR("out of memory\n");
@@ -2854,7 +2884,7 @@ int main(int argc, char **argv)
 			break;
 		case IDX_DPI_DESYNC_FAKE_SYNDATA:
 			dp->fake_syndata_size = sizeof(dp->fake_syndata);
-			load_file_or_exit(optarg,dp->fake_syndata,&dp->fake_syndata_size);
+			load_file_or_exit(optarg,dp->fake_syndata,&dp->fake_syndata_size,NULL);
 			break;
 		case IDX_DPI_DESYNC_FAKE_QUIC:
 			load_blob_to_collection(optarg, &dp->fake_quic, FAKE_MAX_UDP, 0);
@@ -2885,7 +2915,7 @@ int main(int argc, char **argv)
 			{
 				char buf[sizeof(dp->udplen_pattern)];
 				size_t sz=sizeof(buf);
-				load_file_or_exit(optarg,buf,&sz);
+				load_file_or_exit(optarg,buf,&sz,NULL);
 				fill_pattern(dp->udplen_pattern,sizeof(dp->udplen_pattern),buf,sz);
 			}
 			break;
@@ -3170,7 +3200,7 @@ int main(int argc, char **argv)
 			if (optarg[0]=='@')
 			{
 				size_t sz = sizeof(windivert_filter)-1;
-				load_file_or_exit(optarg+1,windivert_filter,&sz);
+				load_file_or_exit(optarg,windivert_filter,&sz,NULL);
 				windivert_filter[sz] = 0;
 			}
 			else
@@ -3186,7 +3216,7 @@ int main(int argc, char **argv)
 				if (optarg[0]=='@')
 				{
 					size_t sz = sizeof(wfpart)-1;
-					load_file_or_exit(optarg+1,wfpart,&sz);
+					load_file_or_exit(optarg,wfpart,&sz,NULL);
 					wfpart[sz] = 0;
 				}
 				else
@@ -3283,6 +3313,7 @@ int main(int argc, char **argv)
 	LIST_FOREACH(dpl, &params.desync_profiles, next)
 	{
 		dp = &dpl->dp;
+
 		// not specified - use desync_ttl value instead
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6=dp->desync_ttl;
 		if (dp->dup_ttl6 == 0xFF) dp->dup_ttl6=dp->dup_ttl;

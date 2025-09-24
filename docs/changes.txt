@@ -547,7 +547,7 @@ v71.5
 winws: --wf-raw-part
 nfqws: --dpi-desync=hostfakesplit
 nfqws: --dpi-desync-fake-tcp-mod=seq
-nfqws: --dpi-desync-fake-tls=!+offset
+nfqws: --dpi-desync-fake-tls=!+offset , --dpi-desync-fake-xxx=[+offset]@filename
 nfqws: --dpi-desync-fakedsplit-mod=altorder
 nfqws: optimize ipv4 ip_id. apply ip_id on all OS the same way.
 blockcheck: new strategies

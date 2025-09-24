@@ -579,8 +579,9 @@ struct blob_item *blob_collection_add(struct blob_collection_head *head)
 	}
 	return entry;
 }
-struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve)
+struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, const void *data, size_t size, size_t size_reserve, size_t offset)
 {
+	if (offset>=size) return NULL;
 	struct blob_item *entry = calloc(1,sizeof(struct blob_item));
 	if (!entry) return NULL;
 	if (!(entry->data = malloc(size+size_reserve))) 
@@ -591,6 +592,7 @@ struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, co
 	if (data) memcpy(entry->data,data,size);
 	entry->size = size;
 	entry->size_buf = size+size_reserve;
+	entry->offset = offset;
 
 	// insert to the end
 	struct blob_item *itemc,*iteml=LIST_FIRST(head);
