@@ -1814,7 +1814,7 @@ static void exithelp(void)
 		" --dpi-desync-split-seqovl=N|-N|marker+N|marker-N\t; use sequence overlap before first sent original split segment\n"
 		" --dpi-desync-split-seqovl-pattern=[+ofs]@<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-fakedsplit-pattern=[+ofs]@<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
-		" --dpi-desync-fakedsplit-mod=mod[,mod]\t\t\t; mods can be none,altorder=0|1|2|3\n"
+		" --dpi-desync-fakedsplit-mod=mod[,mod]\t\t\t; mods can be none,altorder=0|1|2|3 + 0|8|16\n"
 		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
 		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t\t; mods can be none,host=<hostname>,altorder=0|1\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
