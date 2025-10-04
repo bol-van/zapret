@@ -542,13 +542,15 @@ init.d: custom scripts 50-discord-media, 50-stun4all
 init.d: windivert filters for discord media, stun, wireguard
 readme: hardware problems description
 
-v71.5
+v72
 
 winws: --wf-raw-part
 nfqws: --dpi-desync=hostfakesplit
 nfqws: --dpi-desync-fake-tcp-mod=seq
 nfqws: --dpi-desync-fake-tls=!+offset , --dpi-desync-fake-xxx=[+offset]@filename
-nfqws: --dpi-desync-fakedsplit-mod=altorder
+nfqws: --dpi-desync-fakedsplit-mod=altorder  for fakedsplit/fakeddisorder
+nfqws: --dpi-desync-hostfakesplit-mod=altorder
+nfqws: fakedsplit/fakeddisorder normalize fake split pattern offset to reasm offset
 nfqws: optimize ipv4 ip_id. apply ip_id on all OS the same way.
 blockcheck: new strategies
 blockcheck: curl test simulation : SIMULATE=1
