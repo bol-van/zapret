@@ -381,7 +381,7 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
  * `altorder=8`. original, fake
  * `altorder=16`. original
 
-Resulting `altorder=N` is the sum of two altorder parts mentioned above.
+Resulting `altorder=N` is the sum of two `altorder` parts mentioned above.
 
 `--dpi-desync-fakedsplit-pattern` defines data payload of fakes in `fakedsplit`/`fakeddisorder`. By default pattern is simple `0x00`.
 Offset of split part + offset of current packet in multi-packet message define offset in the pattern.
