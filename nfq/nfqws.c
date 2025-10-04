@@ -2762,6 +2762,7 @@ int main(int argc, char **argv)
 		break;
 		case IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN:
 		{
+			free(dp->fsplit_pattern);
 			if (!(dp->fsplit_pattern = malloc(dp->fsplit_pattern_size=32768)))
 			{
 				DLOG_ERR("out of memory\n");
