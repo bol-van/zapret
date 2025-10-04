@@ -3320,6 +3320,16 @@ int main(int argc, char **argv)
 		if (dp->desync_ttl6 == 0xFF) dp->desync_ttl6 = dp->desync_ttl;
 		if (dp->dup_ttl6 == 0xFF) dp->dup_ttl6 = dp->dup_ttl;
 		if (dp->orig_mod_ttl6 == 0xFF) dp->orig_mod_ttl6 = dp->orig_mod_ttl;
+		if (!dp->fsplit_pattern)
+		{
+			if (dp->fsplit_pattern=calloc(1,1))
+				dp->fsplit_pattern_size=1;
+			else
+			{
+				DLOG_ERR("out of memory\n");
+				exit_clean(1);
+			}
+		}
 		if (!AUTOTTL_ENABLED(dp->desync_autottl6)) dp->desync_autottl6 = dp->desync_autottl;
 		if (!AUTOTTL_ENABLED(dp->orig_autottl6)) dp->orig_autottl6 = dp->orig_autottl;
 		if (!AUTOTTL_ENABLED(dp->dup_autottl6)) dp->dup_autottl6 = dp->dup_autottl;
