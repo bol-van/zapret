@@ -378,8 +378,10 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
 `fakedsplit`/`fakeddisorder` TCP segments of multi-packet messages without split pos :
 
  * `altorder=0`. fake, original, fake
- * `altorder=1`. original, fake
- * `altorder=2`. original
+ * `altorder=8`. original, fake
+ * `altorder=16`. original
+
+Resulting altorder number is the sum of two altorder parts mentioned above.
 
 `--dpi-desync-fakedsplit-pattern` defines data payload of fakes in `fakedsplit`/`fakeddisorder`. By default pattern is simple `0x00`.
 Offset of split part + offset of current packet in multi-packet message define offset in the pattern.
