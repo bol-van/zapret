@@ -70,7 +70,7 @@ static inline uint32_t pntoh32(const uint8_t *p) {
 }
 
 bool parse_hex_str(const char *s, uint8_t *pbuf, size_t *size);
-void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize);
+void fill_pattern(uint8_t *buf,size_t bufsize,const void *pattern,size_t patsize,size_t offset);
 
 int fprint_localtime(FILE *F);
 

@@ -420,7 +420,7 @@ bool prepare_udp_segment4(
 
 	memcpy(payload,data,len);
 	if (padding)
-		fill_pattern(payload+len,padlen,padding,padding_size);
+		fill_pattern(payload+len,padlen,padding,padding_size,0);
 	else
 		memset(payload+len,0,padlen);
 	udp4_fix_checksum(udp,ip_payload_len,&ip->ip_src,&ip->ip_dst);
@@ -509,7 +509,7 @@ bool prepare_udp_segment6(
 
 	memcpy(payload,data,len);
 	if (padding)
-		fill_pattern(payload+len,padlen,padding,padding_size);
+		fill_pattern(payload+len,padlen,padding,padding_size,0);
 	else
 		memset(payload+len,0,padlen);
 	udp6_fix_checksum(udp,transport_payload_len,&ip6->ip6_src,&ip6->ip6_dst);

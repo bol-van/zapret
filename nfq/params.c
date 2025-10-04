@@ -20,6 +20,7 @@ const char *progname = "nfqws";
 #error UNKNOWN_SYSTEM_TIME
 #endif
 
+const char * tld[6] = { "com","org","net","edu","gov","biz" };
 
 int DLOG_FILE(FILE *F, const char *format, va_list args)
 {
@@ -297,6 +298,8 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 }
 static void dp_clear_dynamic(struct desync_profile *dp)
 {
+	free(dp->fsplit_pattern);
+
 	hostlist_collection_destroy(&dp->hl_collection);
 	hostlist_collection_destroy(&dp->hl_collection_exclude);
 	ipset_collection_destroy(&dp->ips_collection);

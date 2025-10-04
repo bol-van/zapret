@@ -68,6 +68,8 @@
 
 #define MAX_GIDS 64
 
+extern const char * tld[6];
+
 enum log_target { LOG_TARGET_CONSOLE=0, LOG_TARGET_FILE, LOG_TARGET_SYSLOG, LOG_TARGET_ANDROID };
 
 struct fake_tls_mod_cache
@@ -140,8 +142,9 @@ struct desync_profile
 	uint32_t desync_ts_increment, desync_badseq_increment, desync_badseq_ack_increment;
 
 	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht,fake_discord,fake_stun;
-	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],fsplit_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
-	size_t fake_syndata_size;
+	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
+	uint8_t *fsplit_pattern;
+	size_t fake_syndata_size, fsplit_pattern_size;
 
 	struct fake_tls_mod tls_mod_last;
 	struct blob_item *tls_fake_last;

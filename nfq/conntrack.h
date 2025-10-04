@@ -83,13 +83,15 @@ typedef struct
 	bool b_cutoff;				// mark for deletion
 	bool b_wssize_cutoff, b_desync_cutoff, b_dup_cutoff, b_orig_mod_cutoff;
 
+	uint16_t ip_id;
+
 	t_l7proto l7proto;
 	bool l7proto_discovered;
 	char *hostname;
 	bool hostname_is_ip;
 	bool hostname_discovered;
 	bool hostname_ah_check;			// should perform autohostlist checks
-	
+
 	t_reassemble reasm_orig;
 	struct rawpacket_tailhead delayed;
 } t_ctrack;
