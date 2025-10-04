@@ -552,5 +552,6 @@ nfqws: --dpi-desync-fakedsplit-mod=altorder  for fakedsplit/fakeddisorder
 nfqws: --dpi-desync-hostfakesplit-mod=altorder
 nfqws: fakedsplit/fakeddisorder normalize fake split pattern offset to reasm offset
 nfqws: optimize ipv4 ip_id. apply ip_id on all OS the same way.
+blockcheck: print PRETTY_NAME from /etc/os-release
 blockcheck: new strategies
 blockcheck: curl test simulation : SIMULATE=1

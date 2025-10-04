@@ -412,6 +412,10 @@ check_system()
 	else
 		uname -a
 	fi
+	[ -f /etc/os-release ] && {
+		. /etc/os-release
+		[ -n "$PRETTY_NAME" ] && echo "distro: $PRETTY_NAME"
+	}
 	echo firewall type is $FWTYPE
 	echo CURL=$CURL
 	$CURL --version
