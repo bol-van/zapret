@@ -1,4 +1,4 @@
-# zapret v71.5
+# zapret v72
 
 # SCAMMER WARNING
 
@@ -196,7 +196,7 @@ nfqws takes the following parameters:
  --dpi-desync-split-seqovl=N|-N|marker+N|marker-N          ; use sequence overlap before first sent original split segment
  --dpi-desync-split-seqovl-pattern=[+ofs]@<filename>|0xHEX ; pattern for the fake part of overlap
  --dpi-desync-fakedsplit-pattern=[+ofs]@<filename>|0xHEX   ; fake pattern for fakedsplit/fakeddisorder
- --dpi-desync-fakedsplit-mod=mod[,mod]                     ; mods can be none,altorder=0|1|2|3
+ --dpi-desync-fakedsplit-mod=mod[,mod]                     ; mods can be none,altorder=0|1|2|3 + 0|8|16
  --dpi-desync-hostfakesplit-midhost=marker+N|marker-N      ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.
  --dpi-desync-hostfakesplit-mod=mod[,mod]                  ; can be none, host=<hostname>, altorder=0|1
  --dpi-desync-ipfrag-pos-tcp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 8.
@@ -354,13 +354,35 @@ Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni -
 
  * `multisplit`. split request at specified in `--dpi-desync-split-pos` positions
  * `multidisorder`. same as `multisplit` but send in reverse order
- * `fakedsplit` (altorder=0). split request into 2 segments adding fakes in the middle of them : fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
- * `fakedsplit` (altorder=1). less fakes : 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
- * `fakedsplit` (altorder=2). less fakes : 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
- * `fakedsplit` (altorder=3). less fakes : 1st segment, fake 2nd segment, 2nd segment
+ * `fakedsplit`. sequental one position split with fake mix
  * `hostfakesplit` (altorder=0). fake host part of the request : before host, random fake host, real host (optionally split this part), random fake host repeat, after host
  * `hostfakesplit` (altorder=1). fake host part of the request : before host, random fake host, after host, real host (optionally split this part)
- * `fakeddisorder`. same as `fakedsplit` but with another order : fake 2nd segment, 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
+ * `fakedsplit`. reverse one position split with fake mix
+
+`--dpi-desync-fakedsplit-mod=altorder=N` specifies number which influence to the presence of individual fakes in `fakedsplit`/`fakeddisorder`.
+
+`fakedsplit` TCP segments of multi-packet messages with split pos :
+
+ * `altorder=0`. fake 1st segment, 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `altorder=1`. 1st segment, fake 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `altorder=2`. 1st segment, fake 2nd segment, 2nd segment, fake 2nd segment
+ * `altorder=3`. 1st segment, fake 2nd segment, 2nd segment
+
+`fakeddisorder` TCP segments of multi-packet messages with split pos :
+
+ * `altorder=0`. fake 2nd segment, 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
+ * `altorder=1`. 2nd segment, fake 2nd segment, fake 1st segment, 1st segment, fake 1st segment
+ * `altorder=2`. 2nd segment, fake 1st segment, 1st segment, fake 1st segment
+ * `altorder=3`. 1st segment, fake 1st segment, 1st segment
+
+`fakedsplit`/`fakeddisorder` TCP segments of multi-packet messages without split pos :
+
+ * `altorder=0`. fake, original, fake
+ * `altorder=1`. original, fake
+ * `altorder=2`. original
+
+`--dpi-desync-fakedsplit-pattern` defines data payload of fakes in `fakedsplit`/`fakeddisorder`. By default pattern is simple `0x00`.
+Offset of split part + offset of current packet in multi-packet message define offset in the pattern.
 
 Positions are defined by markers.
 
@@ -396,7 +418,7 @@ It works for tcp protocols with host : TLS and HTTP. Real hostname can be additi
 For example, `--dpi-desync-hostfakesplit-midhost=midsld`. Position must be within host range or split won't happen.
 Multi-packet queries are supported if hostname part is not already split. If it is fooling is cancelled.
 
-By default fake host names are generated randomly on the fly using `[0-9a-z]` pattern. If host length is >= 7 dot is placed to simulate 3-char TLD.
+By default fake host names are generated randomly on the fly using `[0-9a-z]` pattern. If host length is >= 7 dot is placed to simulate 3-char TLD and last 3 chars are replaces with a random known 3-char TLD.
 It's possible to set fake host template : `--dpi-desync-hostfakesplit-mod=host=<hostname>`.
 Template hostname will be expanded to the left to original hostname size with random characters from `[0-9a-z]` pattern : "www.networksolutions.com" -> "h8xmdba4tv7a8.google.com".
 If original hostname size is less than template size it will be cut : "habr.com" -> "ogle.com".
