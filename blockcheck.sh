@@ -415,6 +415,9 @@ check_system()
 	[ -f /etc/os-release ] && {
 		. /etc/os-release
 		[ -n "$PRETTY_NAME" ] && echo "distro: $PRETTY_NAME"
+		[ -n "$OPENWRT_RELEASE" ] && echo "openwrt release: $OPENWRT_RELEASE"
+		[ -n "$OPENWRT_BOARD" ] && echo "openwrt board: $OPENWRT_BOARD"
+		[ -n "$OPENWRT_ARCH" ] && echo "openwrt arch: $OPENWRT_ARCH"
 	}
 	echo firewall type is $FWTYPE
 	echo CURL=$CURL
