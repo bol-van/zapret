@@ -3322,8 +3322,8 @@ int main(int argc, char **argv)
 		if (dp->orig_mod_ttl6 == 0xFF) dp->orig_mod_ttl6 = dp->orig_mod_ttl;
 		if (!dp->fsplit_pattern)
 		{
-			if (dp->fsplit_pattern=calloc(1,1))
-				dp->fsplit_pattern_size=1;
+			if (dp->fsplit_pattern=calloc(64,1))
+				dp->fsplit_pattern_size=64;
 			else
 			{
 				DLOG_ERR("out of memory\n");
