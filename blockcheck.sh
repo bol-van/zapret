@@ -400,6 +400,9 @@ check_system()
 			# ts fooling requires timestamps. they are disabled by default in windows.
 			echo enabling tcp timestamps
 			netsh interface tcp set global timestamps=enabled >/dev/null
+			# they may not enable additional fake protection if ECN is enabled
+			echo enabling ECN
+			netsh int tcp set global ecn=enabled >/dev/null
 			;;
 		*)
 			echo $UNAME not supported
