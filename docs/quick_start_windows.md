@@ -168,7 +168,7 @@
    > Например, нужно изменить количество повторов фейков или задать свой фейк.
    > Это делается через шелл-переменные `PKTWS_EXTRA`, `TPWS_EXTRA`. Пользуйтесь шеллом `cygwin/cygwin-admin.cmd`.
    >
-   > ```PKTWS_EXTRA="--dpi-desync-repeats=10 --dpi-desync-fake-tls=/tmp/tls.bin" blockcheck
+   > ```PKTWS_EXTRA="--dpi-desync-repeats=10 --dpi-desync-fake-tls=/tmp/tls.bin" blockcheck```
    >
    > Перебор всех комбинаций может привести к ожиданию неделями, поэтому выбран разумный
    > костяк проверки, на который вы можете навешивать свои кустомизации.
