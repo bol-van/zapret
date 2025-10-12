@@ -842,7 +842,7 @@ static uint16_t IP4_IP_ID_FIX(const struct ip *ip, t_ip_id_mode mode)
 		switch(mode)
 		{
 			case IPID_RND:
-				return (uint16_t)random();
+				return (uint16_t)(random()%0xFFFF + 1);
 			case IPID_SEQ:
 			case IPID_SEQ_GROUP:
 				return ip->ip_id ? ip->ip_id : (uint16_t)random();
@@ -857,7 +857,7 @@ static uint16_t IP4_IP_ID_ADD(uint16_t ip_id, uint16_t inc, t_ip_id_mode mode)
 	switch(mode)
 	{
 		case IPID_RND:
-			return (uint16_t)random();
+			return (uint16_t)(random()%0xFFFF + 1);;
 		case IPID_SEQ_GROUP:
 		case IPID_SEQ:
 			if (ip_id)
