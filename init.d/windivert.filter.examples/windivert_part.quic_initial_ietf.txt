@@ -1,0 +1,4 @@
+  outbound and
+  udp.PayloadLength>=256 and
+  udp.Payload[0]>=0xC0 and udp.Payload[0]<0xD0 and
+  udp.Payload[1]=0 and udp.Payload16[1]=0 and udp.Payload[4]=1
