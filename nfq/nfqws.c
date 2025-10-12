@@ -1792,6 +1792,7 @@ static void exithelp(void)
 		" --hostnospace\t\t\t\t\t\t; remove space after Host: and add it to User-Agent: to preserve packet size\n"
 		" --domcase\t\t\t\t\t\t; mix domain case : Host: TeSt.cOm\n"
 		" --methodeol\t\t\t\t\t\t; add '\\n' before method and remove space from Host:\n"
+		" --ip-id=zero|seq|seqgroup|rnd\t\t\t\t; ipv4 ip_id assignment scheme\n"
 		" --dpi-desync=[<mode0>,]<mode>[,<mode2>]\t\t; try to desync dpi state. modes :\n"
 		"\t\t\t\t\t\t\t; synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1\n"
 		"\t\t\t\t\t\t\t; multisplit multidisorder fakedsplit fakeddisorder hostfakesplit ipfrag2 udplen tamper\n"
@@ -1959,6 +1960,7 @@ enum opt_indices {
 	IDX_HOSTNOSPACE,
 	IDX_DOMCASE,
 	IDX_METHODEOL,
+	IDX_IP_ID,
 	IDX_DPI_DESYNC,
 #ifdef __linux__
 	IDX_DPI_DESYNC_FWMARK,
@@ -2091,6 +2093,7 @@ static const struct option long_options[] = {
 	[IDX_HOSTNOSPACE] = {"hostnospace", no_argument, 0, 0},
 	[IDX_DOMCASE] = {"domcase", no_argument, 0, 0},
 	[IDX_METHODEOL] = {"methodeol", no_argument, 0, 0},
+	[IDX_IP_ID] = {"ip-id", required_argument, 0, 0},
 	[IDX_DPI_DESYNC] = {"dpi-desync", required_argument, 0, 0},
 #ifdef __linux__
 	[IDX_DPI_DESYNC_FWMARK] = {"dpi-desync-fwmark", required_argument, 0, 0},
@@ -2486,6 +2489,21 @@ int main(int argc, char **argv)
 			}
 			dp->methodeol = true;
 			break;
+		case IDX_IP_ID:
+			if (!strcmp(optarg,"zero"))
+				dp->ip_id_mode = IPID_ZERO;
+			else if (!strcmp(optarg,"seq"))
+				dp->ip_id_mode = IPID_SEQ;
+			else if (!strcmp(optarg,"seqgroup"))
+				dp->ip_id_mode = IPID_SEQ_GROUP;
+			else if (!strcmp(optarg,"rnd"))
+				dp->ip_id_mode = IPID_RND;
+			else
+			{
+				DLOG_ERR("invalid ip_id mode : %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
 		case IDX_DPI_DESYNC:
 		{
 			char *mode = optarg, *mode2, *mode3;
@@ -2707,8 +2725,8 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			dp->split_count += ct;
+			break;
 		}
-		break;
 		case IDX_DPI_DESYNC_SPLIT_HTTP_REQ:
 			// obsolete arg
 			DLOG_CONDUP("WARNING ! --dpi-desync-split-http-req is deprecated. use --dpi-desync-split-pos with markers.\n", MAX_SPLITS);
@@ -3323,7 +3341,7 @@ int main(int argc, char **argv)
 		if (dp->orig_mod_ttl6 == 0xFF) dp->orig_mod_ttl6 = dp->orig_mod_ttl;
 		if (!dp->fsplit_pattern)
 		{
-			if (dp->fsplit_pattern=calloc(64,1))
+			if ((dp->fsplit_pattern=calloc(64,1)))
 				dp->fsplit_pattern_size=64;
 			else
 			{

@@ -97,6 +97,7 @@ struct tcp_mod
 };
 
 typedef enum {SS_NONE=0,SS_SYN,SS_SYNACK,SS_ACKSYN} t_synack_split;
+typedef enum {IPID_SEQ=0,IPID_SEQ_GROUP,IPID_RND,IPID_ZERO} t_ip_id_mode;
 
 struct desync_profile
 {
@@ -108,6 +109,8 @@ struct desync_profile
 	unsigned int wssize_cutoff;
 
 	t_synack_split synack_split;
+
+	t_ip_id_mode ip_id_mode;
 
 	bool hostcase, hostnospace, domcase, methodeol;
 	char hostspell[4];

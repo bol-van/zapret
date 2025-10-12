@@ -555,3 +555,7 @@ nfqws: optimize ipv4 ip_id. apply ip_id on all OS the same way.
 blockcheck: print PRETTY_NAME and some OPENWRT_xxx from /etc/os-release
 blockcheck: new strategies
 blockcheck: curl test simulation : SIMULATE=1
+
+v72.1
+
+nfqws: --ip-id=seq|seqgroup|rnd|zero
