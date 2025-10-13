@@ -1392,6 +1392,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 	bSack = tcp_has_sack(dis->tcp);
 	nmss = tcp_find_mss(dis->tcp);
 
+	uint16_t ip_id=0;
+	if (replay && ctrack_replay->ip_id) ip_id = ctrack_replay->ip_id;
+	if (!ip_id) ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
+
 	if (!replay)
 	{
 		if (tcp_syn_segment(dis->tcp))
@@ -1401,7 +1405,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_SYNACK:
 				pkt1_len = sizeof(pkt1);
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN | TH_ACK, false, 0, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
-					DF, ttl_fake, IP4_TOS(dis->ip), IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode), IP6_FLOW(dis->ip6),
+					DF, ttl_fake, IP4_TOS(dis->ip), ip_id, IP6_FLOW(dis->ip6),
 					dp->desync_fooling_mode, dp->desync_ts_increment, dp->desync_badseq_increment, dp->desync_badseq_ack_increment,
 					NULL, 0, pkt1, &pkt1_len))
 				{
@@ -1425,11 +1429,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				}
 				pkt1_len = sizeof(pkt1);
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, bSack, nmss, dis->tcp->th_seq, dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,
-					DF, ttl_orig, IP4_TOS(dis->ip), IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode), IP6_FLOW(dis->ip6),
+					DF, ttl_orig, IP4_TOS(dis->ip), ip_id, IP6_FLOW(dis->ip6),
 					0, 0, 0, 0, dp->fake_syndata, dp->fake_syndata_size, pkt1, &pkt1_len))
 				{
 					goto send_orig;
 				}
+				ip_id = IP4_IP_ID_NEXT(ip_id,dp->ip_id_mode);
 				DLOG("sending SYN with fake data : ");
 				hexdump_limited_dlog(dp->fake_syndata, dp->fake_syndata_size, PKTDATA_MAXDUMP); DLOG("\n");
 				if (!rawsend_rep(dp->desync_repeats, (struct sockaddr *)&dst, desync_fwmark, ifout, pkt1, pkt1_len))
@@ -1456,7 +1461,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		size_t multisplit_pos[MAX_SPLITS];
 		int multisplit_count;
 		int i;
-		uint16_t ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
 
 		bool bHaveHost = false, bHostIsIp = false;
 		t_l7proto l7proto = UNKNOWN;
@@ -2633,7 +2637,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			return VERDICT_DROP;
 		}
 		case DESYNC_IPFRAG2:
-			if (!reasm_offset)
+			if (reasm_offset)
+				goto unsplitted_part;
+			else
 			{
 				verdict_tcp_csum_fix(verdict, dis->tcp, dis->transport_len, dis->ip, dis->ip6);
 
@@ -2671,6 +2677,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				hexdump_limited_dlog(pkt2, pkt2_len, IP_MAXDUMP); DLOG("\n");
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout, pkt2, pkt2_len))
 					goto send_orig;
+
+				if (replay) ctrack_replay->ip_id = IP4_IP_ID_NEXT(ip_id,dp->ip_id_mode);
 
 				return VERDICT_DROP;
 			}
@@ -2858,7 +2866,10 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	{
 		struct blob_collection_head *fake;
 		bool bHaveHost = false, bHostIsIp = false;
-		uint16_t ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
+		uint16_t ip_id=0;
+
+		if (replay && ctrack_replay->ip_id) ip_id = ctrack_replay->ip_id;
+		if (!ip_id) ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
 
 		if (IsQUICInitial(dis->data_payload, dis->len_payload))
 		{
@@ -3304,8 +3315,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			uint8_t *pkt_orig;
 			size_t pkt_orig_len;
 
-			// freebsd do not set ip.id
-			ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
 			uint32_t ident = dis->ip ? ip_id ? ip_id : htons(1 + random() % 0xFFFF) : htonl(1 + random() % 0xFFFFFFFF);
 			size_t ipfrag_pos = (dp->desync_ipfrag_pos_udp && dp->desync_ipfrag_pos_udp < dis->transport_len) ? dp->desync_ipfrag_pos_udp : sizeof(struct udphdr);
 
@@ -3337,6 +3346,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			hexdump_limited_dlog(pkt2, pkt2_len, IP_MAXDUMP); DLOG("\n");
 			if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout, pkt2, pkt2_len))
 				goto send_orig;
+
+			if (replay) ctrack_replay->ip_id = IP4_IP_ID_NEXT(ip_id,dp->ip_id_mode);
 
 			return ct_new_postnat_fix(ctrack, dis->ip, dis->ip6, NULL);
 		}
