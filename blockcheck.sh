@@ -41,6 +41,8 @@ CURL_MAX_TIME_QUIC=${CURL_MAX_TIME_QUIC:-$CURL_MAX_TIME}
 CURL_MAX_TIME_DOH=${CURL_MAX_TIME_DOH:-2}
 MIN_TTL=${MIN_TTL:-1}
 MAX_TTL=${MAX_TTL:-12}
+MIN_AUTOTTL_DELTA=${MIN_AUTOTTL_DELTA:-1}
+MAX_AUTOTTL_DELTA=${MAX_AUTOTTL_DELTA:-5}
 USER_AGENT=${USER_AGENT:-Mozilla}
 HTTP_PORT=${HTTP_PORT:-80}
 HTTPS_PORT=${HTTPS_PORT:-443}
@@ -1330,7 +1332,7 @@ pktws_check_domain_http_bypass_()
 	# $2 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $3 - domain
 
-	local ok ttls s f f2 e desync pos fooling frag sec="$2" delta orig splits
+	local ok ttls attls s f f2 e desync pos fooling frag sec="$2" delta orig splits
 	local need_split need_disorder need_fakedsplit need_hostfakesplit need_fakeddisorder need_fake need_wssize
 	local splits_http='method+2 midsld method+2,midsld'
 	local splits_tls='2 1 sniext+1 sniext+4 host+1 midsld 1,midsld 1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1'
@@ -1342,6 +1344,7 @@ pktws_check_domain_http_bypass_()
 	}
 
 	ttls=$(seq -s ' ' $MIN_TTL $MAX_TTL)
+	attls=$(seq -s ' ' $MIN_AUTOTTL_DELTA $MAX_AUTOTTL_DELTA)
 	need_wssize=1
 	for e in '' '--wssize 1:6'; do
 		need_split=
@@ -1500,7 +1503,7 @@ pktws_check_domain_http_bypass_()
 			ok=0
 			# orig-ttl=1 with start/cutoff limiter drops empty ACK packet in response to SYN,ACK. it does not reach DPI or server.
 			# missing ACK is transmitted in the first data packet of TLS/HTTP proto
-			for delta in 1 2 3 4 5; do
+			for delta in $attls; do
 				for f in '' '--orig-ttl=1 --orig-mod-start=s1 --orig-mod-cutoff=d1'; do
 					pktws_curl_test_update_vary $1 $2 $3 $desync --dpi-desync-ttl=1 --dpi-desync-autottl=-$delta $f $e && ok=1
 					[ "$ok" = 1 -a "$SCANLEVEL" != force ] && break
@@ -1508,7 +1511,7 @@ pktws_check_domain_http_bypass_()
 			done
 			[ "$SCANLEVEL" = force ] && {
 				for orig in 1 2 3; do
-					for delta in 1 2 3 4 5; do
+					for delta in $attls; do
 						pktws_curl_test_update_vary $1 $2 $3 $desync ${orig:+--orig-autottl=+$orig} --dpi-desync-ttl=1 --dpi-desync-autottl=-$delta $e && ok=1
 					done
 					[ "$ok" = 1 -a "$SCANLEVEL" != force ] && break
