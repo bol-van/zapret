@@ -1,4 +1,4 @@
-# zapret v72
+# zapret v72.1
 
 # SCAMMER WARNING
 
@@ -23,6 +23,7 @@ ___
   - [Fake mods](#fake-mods)
   - [TCP segmentation](#tcp-segmentation)
   - [Sequence numbers overlap](#sequence-numbers-overlap)
+  - [IP_ID assignment](#ip_id-assignment)
   - [ipv6 specific modes](#ipv6-specific-modes)
   - [Original modding](#original-modding)
   - [Duplicates](#duplicates)
@@ -180,6 +181,7 @@ nfqws takes the following parameters:
  --dup-badack-increment=<int|0xHEX>                        ; badseq fooling ackseq signed increment for dup. default -66000
  --dup-start=[n|d|s]N                                      ; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N
  --dup-cutoff=[n|d|s]N                                     ; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N
+ --ip-id=zero|seq|seqgroup|rnd                             ; ipv4 ip_id assignment scheme
  --dpi-desync=[<mode0>,]<mode>[,<mode2>]                   ; try to desync dpi state. modes : synack fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit hostfakesplit fakeddisorder ipfrag2 udplen tamper
  --dpi-desync-fwmark=<int|0xHEX>                           ; override fwmark for desync packet. default = 0x40000000 (1073741824)
  --dpi-desync-ttl=<int>                                    ; set ttl for desync packet
@@ -438,6 +440,21 @@ In `disorder` mode OS receives fake and real part of the second segment but does
 All unix OS except Solaris preserve last received data. This is not the case for Windows servers and `disorder` with `seqovl` will not work.
 Disorder requires `seqovl` to be less than split position. Otherwise `seqovl` is not possible and will be cancelled.
 Method allows to avoid separate fakes. Fakes and real data are mixed.
+
+### IP_ID assignment
+
+Some DPIs check ipv4 ip_id value. OS normally increment ip_id value every packet. Some anti-DPI software may send fakes or tcp segments with the same ip_id as original causing block trigger.
+
+Sequental ip_id will be broken in case of sending fakes or additional tcp segments because OS knows nothing about them. But still there are options how to assignt ip_id to generated packets.
+
+`ip-id` parameter sets ip_id assignment scheme for a desync profile :
+
+ * `seq` (default) : increment ip_id for every next packet. in `multidisorder` case increase ip_id for the number of tcp segments then decrease by 1 every packet.
+ * `seqgroup` : same as `seq` but send fake replacements with the same ip_id as original parts. related only to fake tcp segments with the same size and same sequence as originals.
+ * `rnd` : assign random ip_id
+ * `zero` : always set zero. Linux and BSD will send zero, Windows will replace zero with it's own counter.
+
+ipv6 header lacks ip_id field, `ip-id` parameter ignored for ipv6.
 
 ### ipv6 specific modes
 
