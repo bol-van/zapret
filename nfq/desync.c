@@ -1651,6 +1651,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			{
 				DLOG("desync profile changed by revealed l7 protocol or hostname !\n");
 				autottl_rediscover(ctrack_replay, dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, ifout);
+				ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
 				// re-evaluate start/cutoff limiters
 				if (replay)
 				{
@@ -3118,6 +3119,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			{
 				DLOG("desync profile changed by revealed l7 protocol or hostname !\n");
 				autottl_rediscover(ctrack_replay, dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, ifout);
+				ip_id = IP4_IP_ID_FIX(dis->ip,dp->ip_id_mode);
 				// re-evaluate start/cutoff limiters
 				if (replay)
 				{
