@@ -559,3 +559,5 @@ blockcheck: curl test simulation : SIMULATE=1
 v72.1
 
 nfqws: --ip-id=seq|seqgroup|rnd|zero
+blockcheck: MIN_AUTOTTL_DELTA,MAX_AUTOTTL_DELTA
+init.d: 50-quic4all custom
