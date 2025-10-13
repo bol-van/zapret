@@ -208,7 +208,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --methodeol                                               ; добавить перевод строки в unix стиле ('\n') перед методом и убрать пробел из Host: : "GET / ... Host: domain.com" => "\nGET  / ... Host:domain.com"
 --hostspell=HoST                                          ; точное написание заголовка Host (можно "HOST" или "HoSt"). автоматом включает --hostcase
 --domcase                                                 ; домен после Host: сделать таким : TeSt.cOm
---ip_id=seq|seqgroup|rnd|zero                             ; режим назначения ip_id для генерированных пакетов
+--ip-id=seq|seqgroup|rnd|zero                             ; режим назначения ip_id для генерированных пакетов
 --dpi-desync=[<mode0>,]<mode>[,<mode2]                    ; атака по десинхронизации DPI. mode : synack syndata fake fakeknown rst rstack hopbyhop destopt ipfrag1 multisplit multidisorder fakedsplit hostfakesplit fakeddisorder ipfrag2 udplen tamper
 --dpi-desync-fwmark=<int|0xHEX>                           ; бит fwmark для пометки десинхронизирующих пакетов, чтобы они повторно не падали в очередь. default = 0x40000000
 --dpi-desync-ttl=<int>                                    ; установить ttl для десинхронизирующих пакетов
