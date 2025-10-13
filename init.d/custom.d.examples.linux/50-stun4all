@@ -14,7 +14,6 @@ zapret_custom_daemons()
 	local opt="--qnum=$QNUM_STUN4ALL $NFQWS_OPT_DESYNC_STUN"
 	do_nfqws $1 $DNUM_STUN4ALL "$opt"
 }
-# size = 156 (8 udp header + 148 payload) && payload starts with 0x01000000
 zapret_custom_firewall()
 {
         # $1 - 1 - run, 0 - stop
