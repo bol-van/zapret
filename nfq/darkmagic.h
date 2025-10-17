@@ -69,7 +69,7 @@ uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 // seq and wsize have network byte order
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
-	uint8_t tcp_flags,
+	uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -88,7 +88,7 @@ bool prepare_tcp_segment4(
 	uint8_t *buf, size_t *buflen);
 bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
-	uint8_t tcp_flags,
+	uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -105,7 +105,7 @@ bool prepare_tcp_segment6(
 	uint8_t *buf, size_t *buflen);
 bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
-	uint8_t tcp_flags,
+	uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -178,6 +178,8 @@ bool ip_frag(
 	uint8_t *pkt2, size_t *pkt2_size);
 	
 bool rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl);
+uint16_t get_tcp_flags(const struct tcphdr *tcp);
+void apply_tcp_flags(struct tcphdr *tcp, uint16_t fl);
 
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport);
 void extract_endpoints(const struct ip *ip,const struct ip6_hdr *ip6hdr,const struct tcphdr *tcphdr,const struct udphdr *udphdr, struct sockaddr_storage *src, struct sockaddr_storage *dst);

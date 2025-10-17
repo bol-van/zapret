@@ -97,7 +97,7 @@ struct tcp_mod
 };
 
 typedef enum {SS_NONE=0,SS_SYN,SS_SYNACK,SS_ACKSYN} t_synack_split;
-typedef enum {IPID_SEQ=0,IPID_SEQ_GROUP,IPID_RND,IPID_ZERO} t_ip_id_mode;
+typedef enum {IPID_SEQ=0,IPID_SEQ_GROUP,IPID_RND,IPID_ZERO,IPID_SAME} t_ip_id_mode;
 
 struct desync_profile
 {
@@ -106,6 +106,7 @@ struct desync_profile
 	uint16_t wsize,wssize;
 	uint8_t wscale,wsscale;
 	char wssize_cutoff_mode; // n - packets, d - data packets, s - relative sequence
+	bool wssize_no_forced_cutoff;
 	unsigned int wssize_cutoff;
 
 	t_synack_split synack_split;
@@ -131,11 +132,14 @@ struct desync_profile
 	uint32_t dup_fooling_mode;
 	uint32_t dup_ts_increment, dup_badseq_increment, dup_badseq_ack_increment;
 	autottl dup_autottl, dup_autottl6;
+	uint16_t dup_tcp_flags_set, dup_tcp_flags_unset;
+	t_ip_id_mode dup_ip_id_mode;
 
 	char orig_mod_start_mode, orig_mod_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int orig_mod_start, orig_mod_cutoff;
 	uint8_t orig_mod_ttl, orig_mod_ttl6;
 	autottl orig_autottl, orig_autottl6;
+	uint16_t orig_tcp_flags_set, orig_tcp_flags_unset;
 
 	char desync_start_mode, desync_cutoff_mode; // n - packets, d - data packets, s - relative sequence
 	unsigned int desync_start, desync_cutoff;
@@ -143,6 +147,7 @@ struct desync_profile
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
 	uint32_t desync_ts_increment, desync_badseq_increment, desync_badseq_ack_increment;
+	uint16_t desync_tcp_flags_set, desync_tcp_flags_unset;
 
 	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht,fake_discord,fake_stun;
 	uint8_t fake_syndata[FAKE_MAX_TCP],seqovl_pattern[FAKE_MAX_TCP],udplen_pattern[FAKE_MAX_UDP];
@@ -184,7 +189,7 @@ struct desync_profile
 #define PROFILE_IPSETS_ABSENT(dp) (!LIST_FIRST(&(dp)->ips_collection) && !LIST_FIRST(&(dp)->ips_collection_exclude))
 #define PROFILE_IPSETS_EMPTY(dp) (ipset_collection_is_empty(&(dp)->ips_collection) && ipset_collection_is_empty(&(dp)->ips_collection_exclude))
 #define PROFILE_HOSTLISTS_EMPTY(dp) (hostlist_collection_is_empty(&(dp)->hl_collection) && hostlist_collection_is_empty(&(dp)->hl_collection_exclude))
-#define PROFILE_HAS_ORIG_MOD(dp) ((dp)->orig_mod_ttl || (dp)->orig_mod_ttl6)
+#define PROFILE_HAS_ORIG_MOD(dp) ((dp)->orig_mod_ttl || (dp)->orig_mod_ttl6 || (dp)->orig_tcp_flags_set || (dp)->orig_tcp_flags_unset)
 
 struct desync_profile_list {
 	struct desync_profile dp;

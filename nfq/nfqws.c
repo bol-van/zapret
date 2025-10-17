@@ -1303,6 +1303,63 @@ static bool parse_strlist(char *opt, struct str_list_head *list)
 	return true;
 }
 
+static bool parse_tcpflags(char *opt, uint16_t *fl)
+{
+	unsigned int u;
+	char *e, *p, c;
+
+	if (sscanf(optarg, "0x%X", &u)<=0 && sscanf(optarg, "%u", &u)<=0)
+	{
+		*fl=0;
+		for (p = opt; p; )
+		{
+			if ((e = strchr(p, ',')))
+			{
+				c = *e;
+				*e = 0;
+			}
+
+			if (!strcasecmp(p, "FIN"))
+				*fl |= TH_FIN;
+			else if (!strcasecmp(p, "SYN"))
+				*fl |= TH_SYN;
+			else if (!strcasecmp(p, "RST"))
+				*fl |= TH_RST;
+			else if (!strcasecmp(p, "PSH") || !strcasecmp(p, "PUSH"))
+				*fl |= TH_PUSH;
+			else if (!strcasecmp(p, "ACK"))
+				*fl |= TH_ACK;
+			else if (!strcasecmp(p, "URG"))
+				*fl |= TH_URG;
+			else if (!strcasecmp(p, "ECE"))
+				*fl |= 0x40;
+			else if (!strcasecmp(p, "CWR"))
+				*fl |= 0x80;
+			else if (!strcasecmp(p, "AE") || !strcasecmp(p, "AECN") || !strcasecmp(p, "ACCECN"))
+				*fl |= 0x100;
+			else if (!strcasecmp(p, "R1"))
+				*fl |= 0x200;
+			else if (!strcasecmp(p, "R2"))
+				*fl |= 0x400;
+			else if (!strcasecmp(p, "R3"))
+				*fl |= 0x800;
+			else
+				return false;
+			if (e) *e++ = c;
+			p = e;
+		}
+
+		return true;
+	}
+	else
+	{
+		*fl = u & 0xFFF;
+		return *fl==u;
+	}
+}
+
+
+
 static void split_compat(struct desync_profile *dp)
 {
 	if (!dp->split_count)
@@ -1768,11 +1825,14 @@ static void exithelp(void)
 		" --wsize=<window_size>[:<scale_factor>]\t\t\t; set window size. 0 = do not modify. OBSOLETE !\n"
 		" --wssize=<window_size>[:<scale_factor>]\t\t; set window size for server. 0 = do not modify. default scale_factor = 0.\n"
 		" --wssize-cutoff=[n|d|s]N\t\t\t\t; apply server wsize only to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
+		" --wssize-forced-cutoff=0|1\t\t\t\t; 1(default)=auto cutoff wssize on known protocol\n"
 		" --synack-split=[syn|synack|acksyn]\t\t\t; perform TCP split handshake : send SYN only, SYN+ACK or ACK+SYN\n"
 		" --orig-ttl=<int>\t\t\t\t\t; set TTL for original packets\n"
 		" --orig-ttl6=<int>\t\t\t\t\t; set ipv6 hop limit for original packets. by default ttl value is used\n"
 		" --orig-autottl=[<delta>[:<min>[-<max>]]|-]\t\t; auto ttl mode for both ipv4 and ipv6. default: +%d:%u-%u\n"
 		" --orig-autottl6=[<delta>[:<min>[-<max>]]|-]\t\t; overrides --orig-autottl for ipv6 only\n"
+		" --orig-tcp-flags-set=<int|0xHEX|flaglist>\t\t; set these tcp flags (flags |= value). value can be int, hex or comma separated list : FIN,SYN,RST,PSH,ACK,URG,ECE,CWR,AE,R1,R2,R3\n"
+		" --orig-tcp-flags-unset=<int|0xHEX|flaglist>\t\t; unset these tcp flags (flags &= ~value)\n"
 		" --orig-mod-start=[n|d|s]N\t\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --orig-mod-cutoff=[n|d|s]N\t\t\t\t; apply orig TTL mod to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --dup=<int>\t\t\t\t\t\t; duplicate original packets. send N dups before original.\n"
@@ -1781,10 +1841,13 @@ static void exithelp(void)
 		" --dup-ttl6=<int>\t\t\t\t\t; set ipv6 hop limit for dups. by default ttl value is used\n"
 		" --dup-autottl=[<delta>[:<min>[-<max>]]|-]\t\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
 		" --dup-autottl6=[<delta>[:<min>[-<max>]]|-]\t\t; overrides --dup-autottl for ipv6 only\n"
+		" --dup-tcp-flags-set=<int|0xHEX|flaglist>\t\t; set these tcp flags (flags |= value). value can be int, hex or comma separated list : FIN,SYN,RST,PSH,ACK,URG,ECE,CWR,AE,R1,R2,R3\n"
+		" --dup-tcp-flags-unset=<int|0xHEX|flaglist>\t\t; unset these tcp flags (flags &= ~value)\n"
 		" --dup-fooling=<mode>[,<mode>]\t\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
 		" --dup-ts-increment=<int|0xHEX>\t\t\t\t; ts fooling TSval signed increment for dup. default %d\n"
 		" --dup-badseq-increment=<int|0xHEX>\t\t\t; badseq fooling seq signed increment for dup. default %d\n"
 		" --dup-badack-increment=<int|0xHEX>\t\t\t; badseq fooling ackseq signed increment for dup. default %d\n"
+		" --dup-ip-id=same|zero|seq|rnd\t\t\t\t; ipv4 ip_id mode for dupped packets\n"
 		" --dup-start=[n|d|s]N\t\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) greater or equal than N\n"
 		" --dup-cutoff=[n|d|s]N\t\t\t\t\t; apply dup to packet numbers (n, default), data packet numbers (d), relative sequence (s) less than N\n"
 		" --hostcase\t\t\t\t\t\t; change Host: => host:\n"
@@ -1805,6 +1868,8 @@ static void exithelp(void)
 		" --dpi-desync-ttl6=<int>\t\t\t\t; set ipv6 hop limit for fake packet. by default --dpi-desync-ttl value is used.\n"
 		" --dpi-desync-autottl=[<delta>[:<min>[-<max>]]|-]\t; auto ttl mode for both ipv4 and ipv6. default: %d:%u-%u\n"
 		" --dpi-desync-autottl6=[<delta>[:<min>[-<max>]]|-]\t; overrides --dpi-desync-autottl for ipv6 only\n"
+		" --dpi-desync-tcp-flags-set=<int|0xHEX|flaglist>\t; set these tcp flags (flags |= value). value can be int, hex or comma separated list : FIN,SYN,RST,PSH,ACK,URG,ECE,CWR,AE,R1,R2,R3\n"
+		" --dpi-desync-tcp-flags-unset=<int|0xHEX|flaglist>\t; unset these tcp flags (flags &= ~value)\n"
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
@@ -1816,7 +1881,7 @@ static void exithelp(void)
 		" --dpi-desync-split-seqovl-pattern=[+ofs]@<filename>|0xHEX ; pattern for the fake part of overlap\n"
 		" --dpi-desync-fakedsplit-pattern=[+ofs]@<filename>|0xHEX ; fake pattern for fakedsplit/fakeddisorder\n"
 		" --dpi-desync-fakedsplit-mod=mod[,mod]\t\t\t; mods can be none,altorder=0|1|2|3 + 0|8|16\n"
-		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
+		" --dpi-desync-hostfakesplit-midhost=marker+N|marker-N\t; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.\n"
 		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t\t; mods can be none,host=<hostname>,altorder=0|1\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
@@ -1950,6 +2015,7 @@ enum opt_indices {
 	IDX_WSIZE,
 	IDX_WSSIZE,
 	IDX_WSSIZE_CUTOFF,
+	IDX_WSSIZE_FORCED_CUTOFF,
 	IDX_SYNACK_SPLIT,
 	IDX_CTRACK_TIMEOUTS,
 	IDX_CTRACK_DISABLE,
@@ -1972,23 +2038,30 @@ enum opt_indices {
 	IDX_DUP_TTL6,
 	IDX_DUP_AUTOTTL,
 	IDX_DUP_AUTOTTL6,
+	IDX_DUP_TCP_FLAGS_SET,
+	IDX_DUP_TCP_FLAGS_UNSET,
 	IDX_DUP_FOOLING,
 	IDX_DUP_TS_INCREMENT,
 	IDX_DUP_BADSEQ_INCREMENT,
 	IDX_DUP_BADACK_INCREMENT,
 	IDX_DUP_REPLACE,
+	IDX_DUP_IP_ID,
 	IDX_DUP_START,
 	IDX_DUP_CUTOFF,
 	IDX_ORIG_TTL,
 	IDX_ORIG_TTL6,
 	IDX_ORIG_AUTOTTL,
 	IDX_ORIG_AUTOTTL6,
+	IDX_ORIG_TCP_FLAGS_SET,
+	IDX_ORIG_TCP_FLAGS_UNSET,
 	IDX_ORIG_MOD_START,
 	IDX_ORIG_MOD_CUTOFF,
 	IDX_DPI_DESYNC_TTL,
 	IDX_DPI_DESYNC_TTL6,
 	IDX_DPI_DESYNC_AUTOTTL,
 	IDX_DPI_DESYNC_AUTOTTL6,
+	IDX_DPI_DESYNC_TCP_FLAGS_SET,
+	IDX_DPI_DESYNC_TCP_FLAGS_UNSET,
 	IDX_DPI_DESYNC_FOOLING,
 	IDX_DPI_DESYNC_REPEATS,
 	IDX_DPI_DESYNC_SKIP_NOSNI,
@@ -2083,6 +2156,7 @@ static const struct option long_options[] = {
 	[IDX_WSIZE] = {"wsize", required_argument, 0, 0},
 	[IDX_WSSIZE] = {"wssize", required_argument, 0, 0},
 	[IDX_WSSIZE_CUTOFF] = {"wssize-cutoff", required_argument, 0, 0},
+	[IDX_WSSIZE_FORCED_CUTOFF] = {"wssize-forced-cutoff", required_argument, 0, 0},
 	[IDX_SYNACK_SPLIT] = {"synack-split", optional_argument, 0, 0},
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
 	[IDX_CTRACK_DISABLE] = {"ctrack-disable", optional_argument, 0, 0},
@@ -2105,23 +2179,30 @@ static const struct option long_options[] = {
 	[IDX_DUP_TTL6] = {"dup-ttl6", required_argument, 0, 0},
 	[IDX_DUP_AUTOTTL] = {"dup-autottl", optional_argument, 0, 0},
 	[IDX_DUP_AUTOTTL6] = {"dup-autottl6", optional_argument, 0, 0},
+	[IDX_DUP_TCP_FLAGS_SET] = {"dup-tcp-flags-set", optional_argument, 0, 0},
+	[IDX_DUP_TCP_FLAGS_UNSET] = {"dup-tcp-flags-unset", optional_argument, 0, 0},
 	[IDX_DUP_FOOLING] = {"dup-fooling", required_argument, 0, 0},
 	[IDX_DUP_TS_INCREMENT] = {"dup-ts-increment", required_argument, 0, 0},
 	[IDX_DUP_BADSEQ_INCREMENT] = {"dup-badseq-increment", required_argument, 0, 0},
 	[IDX_DUP_BADACK_INCREMENT] = {"dup-badack-increment", required_argument, 0, 0},
 	[IDX_DUP_REPLACE] = {"dup-replace", optional_argument, 0, 0},
+	[IDX_DUP_IP_ID] = {"dup-ip-id", required_argument, 0, 0},
 	[IDX_DUP_START] = {"dup-start", required_argument, 0, 0},
 	[IDX_DUP_CUTOFF] = {"dup-cutoff", required_argument, 0, 0},
 	[IDX_ORIG_TTL] = {"orig-ttl", required_argument, 0, 0},
 	[IDX_ORIG_TTL6] = {"orig-ttl6", required_argument, 0, 0},
 	[IDX_ORIG_AUTOTTL] = {"orig-autottl", optional_argument, 0, 0},
 	[IDX_ORIG_AUTOTTL6] = {"orig-autottl6", optional_argument, 0, 0},
+	[IDX_ORIG_TCP_FLAGS_SET] = {"orig-tcp-flags-set", optional_argument, 0, 0},
+	[IDX_ORIG_TCP_FLAGS_UNSET] = {"orig-tcp-flags-unset", optional_argument, 0, 0},
 	[IDX_ORIG_MOD_START] = {"orig-mod-start", required_argument, 0, 0},
 	[IDX_ORIG_MOD_CUTOFF] = {"orig-mod-cutoff", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TTL] = {"dpi-desync-ttl", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_TTL6] = {"dpi-desync-ttl6", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_AUTOTTL] = {"dpi-desync-autottl", optional_argument, 0, 0},
 	[IDX_DPI_DESYNC_AUTOTTL6] = {"dpi-desync-autottl6", optional_argument, 0, 0},
+	[IDX_DPI_DESYNC_TCP_FLAGS_SET] = {"dpi-desync-tcp-flags-set", optional_argument, 0, 0},
+	[IDX_DPI_DESYNC_TCP_FLAGS_UNSET] = {"dpi-desync-tcp-flags-unset", optional_argument, 0, 0},
 	[IDX_DPI_DESYNC_FOOLING] = {"dpi-desync-fooling", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_REPEATS] = {"dpi-desync-repeats", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_SKIP_NOSNI] = {"dpi-desync-skip-nosni", optional_argument, 0, 0},
@@ -2423,6 +2504,9 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case IDX_WSSIZE_FORCED_CUTOFF:
+			dp->wssize_no_forced_cutoff = !atoi(optarg);
+			break;
 		case IDX_SYNACK_SPLIT:
 			dp->synack_split = SS_SYN;
 			if (optarg)
@@ -2594,6 +2678,20 @@ int main(int argc, char **argv)
 			}
 			params.autottl_present = true;
 			break;
+		case IDX_DUP_TCP_FLAGS_SET:
+			if (!parse_tcpflags(optarg, &dp->dup_tcp_flags_set))
+			{
+				DLOG_ERR("invalid tcp flags\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DUP_TCP_FLAGS_UNSET:
+			if (!parse_tcpflags(optarg, &dp->dup_tcp_flags_unset))
+			{
+				DLOG_ERR("invalid tcp flags\n");
+				exit_clean(1);
+			}
+			break;
 		case IDX_DUP_REPLACE:
 			dp->dup_replace = !optarg || atoi(optarg);
 			break;
@@ -2639,6 +2737,21 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			break;
+		case IDX_DUP_IP_ID:
+			if (!strcmp(optarg,"zero"))
+				dp->dup_ip_id_mode = IPID_ZERO;
+			else if (!strcmp(optarg,"same"))
+				dp->dup_ip_id_mode = IPID_SAME;
+			else if (!strcmp(optarg,"seq"))
+				dp->dup_ip_id_mode = IPID_SEQ;
+			else if (!strcmp(optarg,"rnd"))
+				dp->dup_ip_id_mode = IPID_RND;
+			else
+			{
+				DLOG_ERR("invalid dup ip_id mode : %s\n",optarg);
+				exit_clean(1);
+			}
+			break;
 
 		case IDX_ORIG_TTL:
 			dp->orig_mod_ttl = (uint8_t)atoi(optarg);
@@ -2661,6 +2774,20 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			params.autottl_present = true;
+			break;
+		case IDX_ORIG_TCP_FLAGS_SET:
+			if (!parse_tcpflags(optarg, &dp->orig_tcp_flags_set))
+			{
+				DLOG_ERR("invalid tcp flags\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_ORIG_TCP_FLAGS_UNSET:
+			if (!parse_tcpflags(optarg, &dp->orig_tcp_flags_unset))
+			{
+				DLOG_ERR("invalid tcp flags\n");
+				exit_clean(1);
+			}
 			break;
 		case IDX_ORIG_MOD_CUTOFF:
 			if (!parse_cutoff(optarg, &dp->orig_mod_cutoff, &dp->orig_mod_cutoff_mode))
@@ -2698,6 +2825,20 @@ int main(int argc, char **argv)
 				exit_clean(1);
 			}
 			params.autottl_present = true;
+			break;
+		case IDX_DPI_DESYNC_TCP_FLAGS_SET:
+			if (!parse_tcpflags(optarg, &dp->desync_tcp_flags_set))
+			{
+				DLOG_ERR("invalid tcp flags\n");
+				exit_clean(1);
+			}
+			break;
+		case IDX_DPI_DESYNC_TCP_FLAGS_UNSET:
+			if (!parse_tcpflags(optarg, &dp->desync_tcp_flags_unset))
+			{
+				DLOG_ERR("invalid tcp flags\n");
+				exit_clean(1);
+			}
 			break;
 		case IDX_DPI_DESYNC_FOOLING:
 			if (!parse_fooling(optarg, &dp->desync_fooling_mode))
@@ -2776,8 +2917,8 @@ int main(int argc, char **argv)
 			size_t sz = sizeof(buf);
 			load_file_or_exit(optarg, buf, &sz, NULL);
 			fill_pattern(dp->seqovl_pattern, sizeof(dp->seqovl_pattern), buf, sz, 0);
+			break;
 		}
-		break;
 		case IDX_DPI_DESYNC_FAKEDSPLIT_PATTERN:
 		{
 			free(dp->fsplit_pattern);
@@ -2788,8 +2929,8 @@ int main(int argc, char **argv)
 			}
 			load_file_or_exit(optarg, dp->fsplit_pattern, &dp->fsplit_pattern_size, NULL);
 			dp->fsplit_pattern = realloc(dp->fsplit_pattern, dp->fsplit_pattern_size);
+			break;
 		}
-		break;
 		case IDX_DPI_DESYNC_FAKEDSPLIT_MOD:
 			if (!parse_fakedsplit_mod(optarg, &dp->fs_mod))
 			{

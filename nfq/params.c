@@ -237,6 +237,7 @@ void dp_init(struct desync_profile *dp)
 	dp->hostlist_auto_fail_time = HOSTLIST_AUTO_FAIL_TIME_DEFAULT;
 	dp->hostlist_auto_retrans_threshold = HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT;
 	dp->filter_ipv4 = dp->filter_ipv6 = true;
+	dp->dup_ip_id_mode = IPID_SAME;
 }
 bool dp_fake_defaults(struct desync_profile *dp)
 {

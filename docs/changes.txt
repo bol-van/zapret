@@ -561,3 +561,10 @@ v72.1
 nfqws: --ip-id=seq|seqgroup|rnd|zero
 blockcheck: MIN_AUTOTTL_DELTA,MAX_AUTOTTL_DELTA
 init.d: 50-quic4all custom
+
+72.2
+
+nfqws: --wssize-forced-cutoff
+nfqws: --orig-tcp-flags, --dup-tcp-flags, --dpi-desync-tcp-flags
+nfqws: --dup-ip-id
+

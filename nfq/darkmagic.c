@@ -111,7 +111,7 @@ bool tcp_has_sack(struct tcphdr *tcp)
 
 // n prefix (nsport, nwsize) means network byte order
 static void fill_tcphdr(
-	struct tcphdr *tcp, uint32_t fooling, uint8_t tcp_flags,
+	struct tcphdr *tcp, uint32_t fooling, uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -142,7 +142,8 @@ static void fill_tcphdr(
 	tcp->th_off = 5;
 	if ((fooling & FOOL_DATANOACK) && !(tcp_flags & (TH_SYN|TH_RST)) && data_len)
 		tcp_flags &= ~TH_ACK;
-	*((uint8_t*)tcp+13)= tcp_flags;
+	tcp->th_flags = (uint8_t)tcp_flags;
+	tcp->th_x2 = (tcp_flags>>8) & 0xF;
 	tcp->th_win     = nwsize;
 	if (nmss)
 	{
@@ -231,7 +232,7 @@ static void fill_ip6hdr(struct ip6_hdr *ip6, const struct in6_addr *src, const s
 
 bool prepare_tcp_segment4(
 	const struct sockaddr_in *src, const struct sockaddr_in *dst,
-	uint8_t tcp_flags,
+	uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -271,7 +272,7 @@ bool prepare_tcp_segment4(
 
 bool prepare_tcp_segment6(
 	const struct sockaddr_in6 *src, const struct sockaddr_in6 *dst,
-	uint8_t tcp_flags,
+	uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -358,7 +359,7 @@ bool prepare_tcp_segment6(
 
 bool prepare_tcp_segment(
 	const struct sockaddr *src, const struct sockaddr *dst,
-	uint8_t tcp_flags,
+	uint16_t tcp_flags,
 	bool sack,
 	uint16_t nmss,
 	uint32_t nseq, uint32_t nack_seq,
@@ -680,6 +681,20 @@ bool rewrite_ttl(struct ip *ip, struct ip6_hdr *ip6, uint8_t ttl)
 	}
 	return false;
 }
+
+void apply_tcp_flags(struct tcphdr *tcp, uint16_t fl)
+{
+	if (tcp)
+	{
+		tcp->th_flags = (uint8_t)fl;
+		tcp->th_x2 = (fl>>8) & 0xF;
+	}
+}
+uint16_t get_tcp_flags(const struct tcphdr *tcp)
+{
+	return tcp->th_flags | (tcp->th_x2<<8);
+}
+
 
 
 void extract_ports(const struct tcphdr *tcphdr, const struct udphdr *udphdr, uint8_t *proto, uint16_t *sport, uint16_t *dport)
