@@ -932,14 +932,19 @@ static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcach
 	return b;
 }
 
-static void rewrite_tcp_flags(uint16_t *flags, uint16_t unset, uint16_t set, const char *what)
+static bool rewrite_tcp_flags(uint16_t *flags, uint16_t unset, uint16_t set, const char *what)
 {
 	if (set || unset)
 	{
 		uint16_t fl_new = *flags & ~unset | set;
-		DLOG("rewrite %s tcp flags 0x%03X => 0x%03X\n", what, *flags, fl_new);
-		*flags = fl_new;
+		if (fl_new!=*flags)
+		{
+			DLOG("rewrite %s tcp flags 0x%03X => 0x%03X\n", what, *flags, fl_new);
+			*flags = fl_new;
+			return true;
+		}
 	}
+	return false;
 }
 
 static uint8_t orig_mod(const struct desync_profile *dp, const t_ctrack *ctrack, struct dissect *dis)
@@ -963,9 +968,11 @@ static uint8_t orig_mod(const struct desync_profile *dp, const t_ctrack *ctrack,
 		if (dis->tcp)
 		{
 			uint16_t flags = get_tcp_flags(dis->tcp);
-			rewrite_tcp_flags(&flags, dp->orig_tcp_flags_unset, dp->orig_tcp_flags_set, "original");
-			apply_tcp_flags(dis->tcp,flags);
-			bModded = true;
+			if (rewrite_tcp_flags(&flags, dp->orig_tcp_flags_unset, dp->orig_tcp_flags_set, "original"))
+			{
+				apply_tcp_flags(dis->tcp,flags);
+				bModded = true;
+			}
 		}
 	}
 	return bModded;
