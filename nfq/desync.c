@@ -1018,7 +1018,7 @@ static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 		uint8_t ttl_orig, ttl_dup, scale_factor;
 		uint16_t flags_dup;
 		uint32_t *timestamps;
-		bool sack, DF;
+		bool sack, DF, bTF;
 
 		extract_endpoints(dis->ip, dis->ip6, dis->tcp, NULL, &src, &dst);
 		ttl_orig = dis->ip ? dis->ip->ip_ttl : dis->ip6->ip6_ctlun.ip6_un1.ip6_un1_hlim;
@@ -1029,11 +1029,10 @@ static bool tcp_orig_send(uint8_t verdict, uint32_t fwmark, const char *ifout, c
 		{
 			ttl_dup = (ctrack && ctrack->dup_autottl) ? ctrack->dup_autottl : (dis->ip6 ? (dp->dup_ttl6 ? dp->dup_ttl6 : ttl_orig) : (dp->dup_ttl ? dp->dup_ttl : ttl_orig));
 
-			if (dp->dup_fooling_mode || dp->dup_tcp_flags_set || dp->dup_tcp_flags_unset || (dis->ip && dp->dup_ip_id_mode!=IPID_SAME))
+			flags_dup = dis->tcp->th_flags;
+			bTF = rewrite_tcp_flags(&flags_dup, dp->dup_tcp_flags_unset, dp->dup_tcp_flags_set, "dup");
+			if (bTF || dp->dup_fooling_mode || (dis->ip && dp->dup_ip_id_mode!=IPID_SAME))
 			{
-				flags_dup = dis->tcp->th_flags;
-				rewrite_tcp_flags(&flags_dup, dp->dup_tcp_flags_unset, dp->dup_tcp_flags_set, "dup");
-
 				scale_factor = tcp_find_scale_factor(dis->tcp);
 				timestamps = tcp_find_timestamps(dis->tcp);
 				sack = tcp_has_sack(dis->tcp);
