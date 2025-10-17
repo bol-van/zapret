@@ -965,6 +965,7 @@ static uint8_t orig_mod(const struct desync_profile *dp, const t_ctrack *ctrack,
 			uint16_t flags = get_tcp_flags(dis->tcp);
 			rewrite_tcp_flags(&flags, dp->orig_tcp_flags_unset, dp->orig_tcp_flags_set, "original");
 			apply_tcp_flags(dis->tcp,flags);
+			bModded = true;
 		}
 	}
 	return bModded;
