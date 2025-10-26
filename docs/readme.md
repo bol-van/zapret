@@ -1665,7 +1665,7 @@ LISTS_RELOAD=-  отключает перезагрузку листов.
 
 В системе запуска это обыграно следующим образом.
 Присутствуют 2 include списка :
-`ipset/zapret-hosts-users.txt.gz` или `ipset/zapret-hosts-users.txt`,
+`ipset/zapret-hosts-user.txt.gz` или `ipset/zapret-hosts-user.txt`,
 `ipset/zapret-hosts.txt.gz` или `ipset/zapret-hosts.txt`
 и 1 exclude список
 `ipset/zapret-hosts-user-exclude.txt.gz` или `ipset/zapret-hosts-user-exclude.txt`
