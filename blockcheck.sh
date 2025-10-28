@@ -247,7 +247,7 @@ mdig_vars()
 	# $1 - ip version 4/6
 	# $2 - hostname
 
-	hostvar=$(echo $2 | sed -e 's/[\.-]/_/g')
+	hostvar=$(echo $2 | sed -e 's/[\.-/?&#@%*$^~=!()]/_/g')
 	cachevar=DNSCACHE_${hostvar}_$1
 	countvar=${cachevar}_COUNT
 	eval count=\$${countvar}
@@ -278,17 +278,18 @@ mdig_cache()
 mdig_resolve()
 {
 	# $1 - ip version 4/6
-	# $2 - hostname
+	# $2 - hostname, possibly with uri : rutracker.org/xxx/xxxx
+	local hostvar cachevar countvar count ip n sdom
 
-	local hostvar cachevar countvar count ip n
-	mdig_vars "$@"
+	split_by_separator "$2" / sdom
+	mdig_vars "$1" "$sdom"
 	if [ -n "$count" ]; then
 		n=$(random 0 $(($count-1)))
 		eval ip=\$${cachevar}_$n
 		echo $ip
 		return 0
 	else
-		mdig_cache "$@" && mdig_resolve "$@"
+		mdig_cache "$1" "$sdom" && mdig_resolve "$1" "$sdom"
 	fi
 }
 mdig_resolve_all()
@@ -297,7 +298,9 @@ mdig_resolve_all()
 	# $2 - hostname
 
 	local hostvar cachevar countvar count ip ips n
-	mdig_vars "$@"
+
+	split_by_separator "$2" / sdom
+	mdig_vars "$1" "$sdom"
 	if [ -n "$count" ]; then
 		n=0
 		while [ "$n" -le $count ]; do
@@ -312,7 +315,7 @@ mdig_resolve_all()
 		echo "$ips"
 		return 0
 	else
-		mdig_cache "$@" && mdig_resolve_all "$@"
+		mdig_cache "$1" "$sdom" && mdig_resolve_all "$1" "$sdom"
 	fi
 }
 
@@ -645,15 +648,16 @@ hdrfile_location()
 curl_with_subst_ip()
 {
 	# $1 - domain
-	# $2 - port
-	# $3 - ip
-	# $4+ - curl params
-	local ip="$3"
+	# $2 - uri
+	# $3 - port
+	# $4 - ip
+	# $5+ - curl params
+	local ip="$4"
 	case "$ip" in
 		*:*) ip="[$ip]" ;;
 	esac
-	local connect_to="--connect-to $1::$ip${2:+:$2}" arg
-	shift ; shift ; shift
+	local connect_to="--connect-to $1::$ip${3:+:$3}" arg
+	shift ; shift ; shift; shift
 	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
 	[ "$CURL_CMD" = 1 ] && echo $CURL ${arg:+$arg }$connect_to "$@"
 	ALL_PROXY="$ALL_PROXY" $CURL ${arg:+$arg }$connect_to "$@"
@@ -665,10 +669,13 @@ curl_with_dig()
 	# $3 - port
 	# $4+ - curl params
 	local dom=$2 port=$3
-	local ip=$(mdig_resolve $1 $dom)
+	local sdom suri ip
+
+	split_by_separator "$dom" / sdom suri
+	ip=$(mdig_resolve $1 $sdom)
 	shift ; shift ; shift
 	if [ -n "$ip" ]; then
-		curl_with_subst_ip $dom $port $ip "$@"
+		curl_with_subst_ip "$sdom" "$suri" $port $ip "$@"
 	else
 		return 6
 	fi
@@ -731,7 +738,7 @@ curl_test_https_tls12()
 	# $3 - subst ip
 
 	# do not use tls 1.3 to make sure server certificate is not encrypted
-	curl_probe $1 $2 $HTTPS_PORT "$3" -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
+	curl_probe $1 $2 $HTTPS_PORT "$3" $HTTPS_HEAD -Ss -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.2 $TLSMAX12 "https://$2" -o /dev/null 2>&1
 }
 curl_test_https_tls13()
 {
@@ -740,7 +747,7 @@ curl_test_https_tls13()
 	# $3 - subst ip
 
 	# force TLS1.3 mode
-	curl_probe $1 $2 $HTTPS_PORT "$3" -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
+	curl_probe $1 $2 $HTTPS_PORT "$3" $HTTPS_HEAD -Ss -A "$USER_AGENT" --max-time $CURL_MAX_TIME $CURL_OPT --tlsv1.3 $TLSMAX13 "https://$2" -o /dev/null 2>&1
 }
 
 curl_test_http3()
@@ -749,7 +756,7 @@ curl_test_http3()
 	# $2 - domain name
 
 	# force QUIC only mode without tcp
-	curl_with_dig $1 $2 $QUIC_PORT -ISs -A "$USER_AGENT" --max-time $CURL_MAX_TIME_QUIC --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
+	curl_with_dig $1 $2 $QUIC_PORT $HTTPS_HEAD -Ss -A "$USER_AGENT" --max-time $CURL_MAX_TIME_QUIC --http3-only $CURL_OPT "https://$2" -o /dev/null 2>&1
 }
 
 ipt_aux_scheme()
@@ -1857,6 +1864,9 @@ configure_curl_opt()
 	curl_supports_tls13 && TLS13=1
 	HTTP3=
 	curl_supports_http3 && HTTP3=1
+
+	HTTPS_HEAD=-I
+	[ "$CURL_HTTPS_GET" = 1 ] && HTTPS_HEAD=
 }
 
 linux_ipv6_defrag_can_be_disabled()
@@ -1925,7 +1935,7 @@ ask_params()
 	[ -n "$DOMAINS" ] || {
 		DOMAINS="$DOMAINS_DEFAULT"
 		[ "$BATCH" = 1 ] || {
-			echo "specify domain(s) to test. multiple domains are space separated."
+			echo "specify domain(s) to test. multiple domains are space separated. URIs are supported (rutracker.org/forum/index.php)"
 			printf "domain(s) (default: $DOMAINS) : "
 			read dom
 			[ -n "$dom" ] && DOMAINS="$dom"
@@ -2267,7 +2277,6 @@ sigsilent()
 	unprepare_all
 	exit 1
 }
-
 
 fsleep_setup
 fix_sbin_path

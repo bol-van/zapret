@@ -568,3 +568,7 @@ nfqws: --wssize-forced-cutoff
 nfqws: --orig-tcp-flags, --dup-tcp-flags, --dpi-desync-tcp-flags
 nfqws: --dup-ip-id
 
+73.3
+
+blockcheck: support URIs
+blockcheck: CURL_HTTPS_GET=1 suppresses -I curl option for https (HEAD -> GET)

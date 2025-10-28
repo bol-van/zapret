@@ -93,6 +93,18 @@ trim()
 {
 	awk '{gsub(/^ +| +$/,"")}1'
 }
+split_by_separator()
+{
+	# $1 - string
+	# $2 - separator
+	# $3 - var name to get "before" part
+	# $4 - var name to get "after" part
+	local before="${1%%$2*}"
+	local after="${1#*$2}"
+	[ "$after" = "$1" ] && after=
+	[ -n "$3" ] && eval $3="\$before"
+	[ -n "$4" ] && eval $4="\$after"
+}
 
 dir_is_not_empty()
 {
