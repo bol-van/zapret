@@ -247,7 +247,7 @@ mdig_vars()
 	# $1 - ip version 4/6
 	# $2 - hostname
 
-	hostvar=$(echo $2 | sed -e 's/[\.-/?&#@%*$^:~=!()]/_/g')
+	hostvar=$(echo $2 | sed -e 's/[\./?&#@%*$^:~=!()+-]/_/g')
 	cachevar=DNSCACHE_${hostvar}_$1
 	countvar=${cachevar}_COUNT
 	eval count=\$${countvar}
@@ -297,7 +297,7 @@ mdig_resolve_all()
 	# $1 - ip version 4/6
 	# $2 - hostname
 
-	local hostvar cachevar countvar count ip ips n
+	local hostvar cachevar countvar count ip ips n sdom
 
 	split_by_separator "$2" / sdom
 	mdig_vars "$1" "$sdom"
