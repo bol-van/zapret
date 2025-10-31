@@ -133,7 +133,7 @@ nft_fw_tpws6()
 }
 nft_fw_nfqws_post4()
 {
-	_nft_fw_nfqws_post4 "$1" $2 "$IFACE_WAN"
+	_nft_fw_nfqws_post4 "$1" $2 "$IFACE_WAN" "$IFACE_LAN"
 }
 nft_fw_nfqws_post6()
 {
