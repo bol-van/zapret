@@ -52,14 +52,6 @@ bool l7_proto_match(t_l7proto l7proto, uint32_t filter_l7)
 		(l7proto==STUN && (filter_l7 & L7_PROTO_STUN));
 }
 
-#define PM_ABS		0
-#define PM_HOST		1
-#define PM_HOST_END	2
-#define PM_HOST_SLD	3
-#define PM_HOST_MIDSLD	4
-#define PM_HOST_ENDSLD	5
-#define PM_HTTP_METHOD	6
-#define PM_SNI_EXT	7
 bool IsHostMarker(uint8_t posmarker)
 {
 	switch(posmarker)
