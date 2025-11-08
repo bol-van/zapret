@@ -12,7 +12,7 @@ tpws в режиме socks можно запускать под более-ме�
 Установить WSL : 
  `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all`
 
-Скопировать на целевую систему `binaries/linux-x86_64/tpws_wsl.tgz`.
+Из релиза скопировать на целевую систему `binaries/linux-x86_64/tpws_wsl.tgz`.
 
 Выполнить :
  `wsl --import tpws "%USERPROFILE%\tpws" tpws_wsl.tgz`
