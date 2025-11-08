@@ -936,7 +936,6 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t *
 		{
 		case 0: // Hop-by-Hop Options
 		case 43: // routing
-		case 51: // authentication
 		case 60: // Destination Options
 		case 135: // mobility
 		case 139: // Host Identity Protocol Version v2
@@ -946,6 +945,11 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t *
 			break;
 		case 44: // fragment. length fixed to 8, hdrlen field defined as reserved
 			hdrlen = 8;
+			break;
+		case 51: // authentication
+			// special case. length in ah header is in 32-bit words minus 2
+			if (*len < 2) return; // error
+			hdrlen = 8 + ((*data)[1] << 2);
 			break;
 		case 59: // no next header
 			return; // error
