@@ -219,7 +219,7 @@ doh_resolve()
 	# $1 - ip version 4/6
 	# $2 - hostname
 	# $3 - doh server URL. use $DOH_SERVER if empty
-	"$MDIG" --family=$1 --dns-make-query=$2 | $CURL --max-time $CURL_MAX_TIME_DOH -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | "$MDIG" --dns-parse-query
+	"$MDIG" --family=$1 --dns-make-query=$2 | "$CURL" --max-time $CURL_MAX_TIME_DOH -s --data-binary @- -H "Content-Type: application/dns-message" "${3:-$DOH_SERVER}" | "$MDIG" --dns-parse-query
 }
 doh_find_working()
 {
@@ -426,7 +426,7 @@ check_system()
 	}
 	echo firewall type is $FWTYPE
 	echo CURL=$CURL
-	$CURL --version
+	"$CURL" --version
 }
 
 zp_already_running()
@@ -598,12 +598,12 @@ curl_translate_code()
 curl_supports_tls13()
 {
 	local r
-	$CURL --tlsv1.3 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
+	"$CURL" --tlsv1.3 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
 	# this is online test because there's no other way to trigger library incompatibility case
-	$CURL --tlsv1.3 --max-time 1 -Is -o /dev/null https://iana.org 2>/dev/null
+	"$CURL" --tlsv1.3 --max-time 1 -Is -o /dev/null https://iana.org 2>/dev/null
 	r=$?
 	[ $r != 4 -a $r != 35 ]
 }
@@ -611,16 +611,16 @@ curl_supports_tls13()
 curl_supports_tlsmax()
 {
 	# supported only in OpenSSL and LibreSSL
-	$CURL --version | grep -Fq -e OpenSSL -e LibreSSL -e BoringSSL -e GnuTLS -e quictls || return 1
+	"$CURL" --version | grep -Fq -e OpenSSL -e LibreSSL -e BoringSSL -e GnuTLS -e quictls || return 1
 	# supported since curl 7.54
-	$CURL --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
+	"$CURL" --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? != 2 ]
 }
 
 curl_supports_connect_to()
 {
-	$CURL --connect-to 127.0.0.1:: -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
+	"$CURL" --connect-to 127.0.0.1:: -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	[ "$?" != 2 ]
 }
 
@@ -628,7 +628,7 @@ curl_supports_http3()
 {
 	# if it has http3 : curl: (3) HTTP/3 requested for non-HTTPS URL
 	# otherwise : curl: (2) option --http3-only: is unknown
-	$CURL --connect-to 127.0.0.1:: -o /dev/null --max-time 1 --http3-only http://127.0.0.1:65535 2>/dev/null
+	"$CURL" --connect-to 127.0.0.1:: -o /dev/null --max-time 1 --http3-only http://127.0.0.1:65535 2>/dev/null
 	[ "$?" != 2 ]
 }
 
@@ -660,7 +660,7 @@ curl_with_subst_ip()
 	shift ; shift ; shift; shift
 	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
 	[ "$CURL_CMD" = 1 ] && echo $CURL ${arg:+$arg }$connect_to "$@"
-	ALL_PROXY="$ALL_PROXY" $CURL ${arg:+$arg }$connect_to "$@"
+	ALL_PROXY="$ALL_PROXY" "$CURL" ${arg:+$arg }$connect_to "$@"
 }
 curl_with_dig()
 {
@@ -1927,7 +1927,7 @@ ask_params()
 	curl_supports_connect_to || {
 		echo "installed curl does not support --connect-to option. pls install at least curl 7.49"
 		echo "current curl version:"
-		$CURL --version
+		"$CURL" --version
 		exitp 1
 	}
 
