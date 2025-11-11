@@ -1205,12 +1205,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("using cached desync profile %d\n", dp->n);
 		else if (!ctrack_replay->dp_search_complete)
 		{
-			if (!ctrack_replay->hostname && !bReverse)
-			{
-				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, host, sizeof(host), &ctrack_replay->hostname_is_ip) && *host)
-					if (!(ctrack_replay->hostname = strdup(host)))
-						DLOG_ERR("strdup(host): out of memory\n");
-			}
 			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->hostname_is_ip, ctrack_replay->l7proto, ssid, NULL, NULL, NULL);
 			ctrack_replay->dp_search_complete = true;
 		}
@@ -2811,12 +2805,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			DLOG("using cached desync profile %d\n", dp->n);
 		else if (!ctrack_replay->dp_search_complete)
 		{
-			if (!ctrack_replay->hostname && !bReverse)
-			{
-				if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, host, sizeof(host), &ctrack_replay->hostname_is_ip) && *host)
-					if (!(ctrack_replay->hostname = strdup(host)))
-						DLOG_ERR("strdup(host): out of memory\n");
-			}
 			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->hostname_is_ip, ctrack_replay->l7proto, ssid, NULL, NULL, NULL);
 			ctrack_replay->dp_search_complete = true;
 		}
