@@ -3198,7 +3198,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					if (ctrack_replay->hostname_ah_check)
 					{
 						// first request is not retrans
-						if (!bDiscoveredHostname)
+						if (!bDiscoveredHostname && !reasm_offset)
 							process_retrans_fail(ctrack_replay, IPPROTO_UDP, (struct sockaddr*)&src);
 					}
 				}
