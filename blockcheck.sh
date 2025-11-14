@@ -648,16 +648,15 @@ hdrfile_location()
 curl_with_subst_ip()
 {
 	# $1 - domain
-	# $2 - uri
-	# $3 - port
-	# $4 - ip
-	# $5+ - curl params
-	local ip="$4"
+	# $2 - port
+	# $3 - ip
+	# $4+ - curl params
+	local ip="$3"
 	case "$ip" in
 		*:*) ip="[$ip]" ;;
 	esac
-	local connect_to="--connect-to $1::$ip${3:+:$3}" arg
-	shift ; shift ; shift; shift
+	local connect_to="--connect-to $1::$ip${2:+:$2}" arg
+	shift ; shift ; shift;
 	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
 	[ "$CURL_CMD" = 1 ] && echo $CURL ${arg:+$arg }$connect_to "$@"
 	ALL_PROXY="$ALL_PROXY" "$CURL" ${arg:+$arg }$connect_to "$@"
@@ -675,7 +674,7 @@ curl_with_dig()
 	ip=$(mdig_resolve $1 $sdom)
 	shift ; shift ; shift
 	if [ -n "$ip" ]; then
-		curl_with_subst_ip "$sdom" "$suri" $port $ip "$@"
+		curl_with_subst_ip "$sdom" "$port" "$ip" "$@"
 	else
 		return 6
 	fi
