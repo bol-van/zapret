@@ -367,7 +367,7 @@ int aes_setkey(aes_context *ctx,   // AES context provided by our caller
 	}
 
 #if AES_DECRYPTION
-	if (mode == DECRYPT)   // expand our key for encryption or decryption
+	if (mode == AES_DECRYPT)   // expand our key for encryption or decryption
 		return(aes_set_decryption_key(ctx, key, keysize));
 	else     /* ENCRYPT */
 #endif /* AES_DECRYPTION */
@@ -399,7 +399,7 @@ int aes_cipher(aes_context *ctx,
 
 #if AES_DECRYPTION  // whether AES decryption is supported
 
-	if (ctx->mode == DECRYPT)
+	if (ctx->mode == AES_DECRYPT)
 	{
 		for (i = (ctx->rounds >> 1) - 1; i > 0; i--)
 		{

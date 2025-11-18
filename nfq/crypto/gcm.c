@@ -246,7 +246,7 @@ int gcm_setkey(gcm_context *ctx,   // pointer to caller-provided gcm context
  *
  ******************************************************************************/
 int gcm_start(gcm_context *ctx,    // pointer to user-provided GCM context
-	int mode,            // GCM_ENCRYPT or GCM_DECRYPT
+	int mode,            // AES_ENCRYPT or AES_DECRYPT
 	const uchar *iv,     // pointer to initialization vector
 	size_t iv_len,       // IV length in bytes (should == 12)
 	const uchar *add,    // ptr to additional AEAD data (NULL if none)
@@ -288,6 +288,7 @@ int gcm_start(gcm_context *ctx,    // pointer to user-provided GCM context
 		for (i = 0; i < 16; i++) ctx->y[i] ^= work_buf[i];
 		gcm_mult(ctx, ctx->y, ctx->y);
 	}
+
 	if ((ret = aes_cipher(&ctx->aes_ctx, ctx->y, ctx->base_ectr)) != 0)
 		return(ret);
 
@@ -427,7 +428,7 @@ int gcm_finish(gcm_context *ctx,   // pointer to user-provided GCM context
  ******************************************************************************/
 int gcm_crypt_and_tag(
 	gcm_context *ctx,       // gcm context with key already setup
-	int mode,               // cipher direction: GCM_ENCRYPT or GCM_DECRYPT
+	int mode,               // cipher direction: AES_ENCRYPT or AES_DECRYPT
 	const uchar *iv,        // pointer to the 12-byte initialization vector
 	size_t iv_len,          // byte length if the IV. should always be 12
 	const uchar *add,       // pointer to the non-ciphered additional data
