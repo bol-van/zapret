@@ -2,3 +2,4 @@
 *.cmd eol=crlf
 *.bat eol=crlf
 init.d/windivert.filter.examples/** eol=crlf
+files/** binary
