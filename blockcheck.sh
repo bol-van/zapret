@@ -241,7 +241,26 @@ doh_find_working()
 	echo all DoH servers failed
 	return 1
 }
+split_by_separator()
+{
+	# $1 - text
+	# $2 - separator
+	# $3 - variable to store left part
+	# $4 - variable to store right part (optional)
 
+	local s="$1"
+	local sep="$2"
+	local left right
+
+	left="${s%%$sep*}"
+	if [ "$left" = "$s" ]; then
+		right=""
+	else
+		right="${s#*$sep}"
+	fi
+	eval $3=\"\$left\"
+	[ -n "$4" ] && eval $4=\"\$right\"
+}
 mdig_vars()
 {
 	# $1 - ip version 4/6
