@@ -468,7 +468,7 @@ jobs:
           (
             cd ${{ env.repo_dir }}
             rm -rf binaries/{android*,freebsd*,mac*,win*,x86_64/tpws_wsl.tgz} \
-                   init.d/{openrc,macos,pfsense,runit,s6,systemd} \
+                   init.d/{openrc,macos,pfsense,runit,s6,systemd,windivert.filter.examples} \
                    tpws nfq ip2net mdig docs files/huawei Makefile
           )
           tar --owner=0 --group=0 -czf ${{ env.repo_dir }}-openwrt-embedded.tar.gz ${{ env.repo_dir }}
