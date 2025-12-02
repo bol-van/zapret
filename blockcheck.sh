@@ -482,7 +482,7 @@ check_prerequisites()
 		exitp 6
 	}
 
-	local prog progs='curl'
+	local prog progs="$CURL"
 	[ "$SKIP_PKTWS" = 1 ] || {
 		case "$UNAME" in
 			Linux)
