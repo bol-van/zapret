@@ -4,6 +4,10 @@ which()
 	# 'command -v' replacement does not work exactly the same way. it outputs shell aliases if present
 	# $1 - executable name
 	local IFS=:
+	[ "$1" != "${1#/}" ] && [ -x "$1" ] && {
+		echo "$1"
+		return 0
+	}
 	for p in $PATH; do
 	    [ -x "$p/$1" ] && {
 		echo "$p/$1"
