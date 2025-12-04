@@ -219,6 +219,9 @@ void dp_init(struct desync_profile *dp)
 	LIST_INIT(&dp->ips_collection_exclude);
 	LIST_INIT(&dp->pf_tcp);
 	LIST_INIT(&dp->pf_udp);
+#ifdef HAS_FILTER_SSID
+	LIST_INIT(&dp->filter_ssid);
+#endif
 
 	memcpy(dp->hostspell, "host", 4); // default hostspell
 	dp->desync_skip_nosni = true;
