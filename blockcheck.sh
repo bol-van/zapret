@@ -278,44 +278,45 @@ mdig_cache()
 mdig_resolve()
 {
 	# $1 - ip version 4/6
-	# $2 - hostname, possibly with uri : rutracker.org/xxx/xxxx
-	local hostvar cachevar countvar count ip n sdom
+	# $2 - var to receive result
+	# $3 - hostname, possibly with uri : rutracker.org/xxx/xxxx
+	local hostvar cachevar countvar count n sdom
 
-	split_by_separator "$2" / sdom
+	split_by_separator "$3" / sdom
 	mdig_vars "$1" "$sdom"
 	if [ -n "$count" ]; then
 		n=$(random 0 $(($count-1)))
-		eval ip=\$${cachevar}_$n
-		echo $ip
+		eval $2=\$${cachevar}_$n
 		return 0
 	else
-		mdig_cache "$1" "$sdom" && mdig_resolve "$1" "$sdom"
+		mdig_cache "$1" "$sdom" && mdig_resolve "$1" "$2" "$sdom"
 	fi
 }
 mdig_resolve_all()
 {
 	# $1 - ip version 4/6
-	# $2 - hostname
+	# $2 - var to receive result
+	# $3 - hostname
 
-	local hostvar cachevar countvar count ip ips n sdom
+	local hostvar cachevar countvar count ip__ ips__ n sdom
 
-	split_by_separator "$2" / sdom
+	split_by_separator "$3" / sdom
 	mdig_vars "$1" "$sdom"
 	if [ -n "$count" ]; then
 		n=0
 		while [ "$n" -le $count ]; do
-			eval ip=\$${cachevar}_$n
-			if [ -n "$ips" ]; then
-				ips="$ips $ip"
+			eval ip__=\$${cachevar}_$n
+			if [ -n "$ips__" ]; then
+				ips__="$ips__ $ip__"
 			else
-				ips="$ip"
+				ips__="$ip__"
 			fi
 			n=$(($n + 1))
 		done
-		echo "$ips"
+		eval $2="\$ips__"
 		return 0
 	else
-		mdig_cache "$1" "$sdom" && mdig_resolve_all "$1" "$sdom"
+		mdig_cache "$1" "$sdom" && mdig_resolve_all "$1" "$2" "$sdom"
 	fi
 }
 
@@ -671,7 +672,7 @@ curl_with_dig()
 	local sdom suri ip
 
 	split_by_separator "$dom" / sdom suri
-	ip=$(mdig_resolve $1 $sdom)
+	mdig_resolve $1 ip $sdom
 	shift ; shift ; shift
 	if [ -n "$ip" ]; then
 		curl_with_subst_ip "$sdom" "$port" "$ip" "$@"
@@ -1005,7 +1006,7 @@ check_domain_port_block()
 	echo
 	echo \* port block tests ipv$IPV $1:$2
 	if netcat_setup; then
-		ips=$(mdig_resolve_all $IPV $1)
+		mdig_resolve_all $IPV ips $1
 		if [ -n "$ips" ]; then
 			for ip in $ips; do
 				if netcat_test $ip $2; then
@@ -1705,7 +1706,7 @@ check_dpi_ip_block()
 
 	echo "> testing $UNBLOCKED_DOM on it's original ip"
 	if curl_test $1 $UNBLOCKED_DOM; then
-		unblocked_ip=$(mdig_resolve $IPV $UNBLOCKED_DOM)
+		mdig_resolve $IPV unblocked_ip $UNBLOCKED_DOM
 		[ -n "$unblocked_ip" ] || {
 			echo $UNBLOCKED_DOM does not resolve. tests not possible.
 			return 1
@@ -1714,7 +1715,7 @@ check_dpi_ip_block()
 		echo "> testing $blocked_dom on $unblocked_ip ($UNBLOCKED_DOM)"
 		curl_test $1 $blocked_dom $unblocked_ip detail
 
-		blocked_ips=$(mdig_resolve_all $IPV $blocked_dom)
+		mdig_resolve_all $IPV blocked_ips $blocked_dom
 		for blocked_ip in $blocked_ips; do
 			echo "> testing $UNBLOCKED_DOM on $blocked_ip ($blocked_dom)"
 			curl_test $1 $UNBLOCKED_DOM $blocked_ip detail
@@ -1765,6 +1766,8 @@ check_domain_http_tcp()
 	# $3 - encrypted test : 0 = plain, 1 - encrypted with server reply risk, 2 - encrypted without server reply risk
 	# $4 - domain
 
+	local ips
+
 	# in case was interrupted before
 	pktws_ipt_unprepare_tcp $2
 	ws_kill
@@ -1773,15 +1776,11 @@ check_domain_http_tcp()
 
 	[ "$SKIP_IPBLOCK" = 1 ] || check_dpi_ip_block $1 $4
 
-	[ "$SKIP_TPWS" = 1 ] || {
-		echo
-		tpws_check_domain_http_bypass $1 $3 $4
-	}
-
 	[ "$SKIP_PKTWS" = 1 ] || {
 		echo
 	        echo preparing $PKTWSD redirection
-		pktws_ipt_prepare_tcp $2 "$(mdig_resolve_all $IPV $4)"
+		mdig_resolve_all $IPV ips $4
+		pktws_ipt_prepare_tcp $2 "$ips"
 
 		pktws_check_domain_http_bypass $1 $3 $4
 
@@ -1795,6 +1794,8 @@ check_domain_http_udp()
 	# $2 - port
 	# $3 - domain
 
+	local ips
+
 	# in case was interrupted before
 	pktws_ipt_unprepare_udp $2
 	ws_kill
@@ -1804,7 +1805,8 @@ check_domain_http_udp()
 	[ "$SKIP_PKTWS" = 1 ] || {
 		echo
 	        echo preparing $PKTWSD redirection
-		pktws_ipt_prepare_udp $2 "$(mdig_resolve_all $IPV $3)"
+		mdig_resolve_all $IPV ips $4
+		pktws_ipt_prepare_udp $2 "$ips"
 
 		pktws_check_domain_http3_bypass $1 $3
 
