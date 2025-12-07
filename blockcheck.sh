@@ -1805,7 +1805,7 @@ check_domain_http_udp()
 	[ "$SKIP_PKTWS" = 1 ] || {
 		echo
 	        echo preparing $PKTWSD redirection
-		mdig_resolve_all $IPV ips $4
+		mdig_resolve_all $IPV ips $3
 		pktws_ipt_prepare_udp $2 "$ips"
 
 		pktws_check_domain_http3_bypass $1 $3
