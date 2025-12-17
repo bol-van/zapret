@@ -1624,8 +1624,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		bool bDiscoveredL7;
 		if (ctrack_replay)
 		{
-			bDiscoveredL7 = !ctrack_replay->l7proto_discovered && ctrack_replay->l7proto != UNKNOWN;
-			ctrack_replay->l7proto_discovered = true;
+			if ((bDiscoveredL7 = !ctrack_replay->l7proto_discovered && ctrack_replay->l7proto != UNKNOWN))
+				ctrack_replay->l7proto_discovered = true;
 		}
 		else
 			bDiscoveredL7 = !ctrack_replay && l7proto != UNKNOWN;
@@ -3095,8 +3095,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		bool bDiscoveredL7;
 		if (ctrack_replay)
 		{
-			bDiscoveredL7 = !ctrack_replay->l7proto_discovered && ctrack_replay->l7proto != UNKNOWN;
-			ctrack_replay->l7proto_discovered = true;
+			if ((bDiscoveredL7 = !ctrack_replay->l7proto_discovered && ctrack_replay->l7proto != UNKNOWN))
+				ctrack_replay->l7proto_discovered = true;
 		}
 		else
 			bDiscoveredL7 = !ctrack_replay && l7proto != UNKNOWN;

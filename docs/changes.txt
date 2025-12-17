@@ -576,3 +576,7 @@ blockcheck: CURL_HTTPS_GET=1 suppresses -I curl option for https (HEAD -> GET)
 73.4
 
 blockcheck: fix broken dns cache
+
+73.5
+
+nfqws2: fix broken l7proto profile rediscovery
