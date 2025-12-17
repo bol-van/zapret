@@ -298,7 +298,6 @@ extern struct wlan_interface_collection wlans;
 
 void wlan_info_deinit(void);
 bool wlan_info_init(void);
-bool wlan_info_get(void);
 bool wlan_info_get_rate_limited(void);
 const char *wlan_ssid_search_ifname(const char *ifname);
 const char *wlan_ssid_search_ifidx(int ifidx);

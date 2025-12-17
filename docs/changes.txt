@@ -579,4 +579,5 @@ blockcheck: fix broken dns cache
 
 73.5
 
-nfqws2: fix broken l7proto profile rediscovery
+nfqws: fix broken l7proto profile rediscovery
+nfqws: backport from nfqws2 nl80211 ssid discovery fix for newer kernels
