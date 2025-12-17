@@ -1,5 +1,3 @@
-# zapret v72.4
-
 # SCAMMER WARNING
 
 This software is free and open source under [MIT license](./LICENSE.txt).
