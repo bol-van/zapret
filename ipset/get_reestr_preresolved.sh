@@ -39,7 +39,7 @@ getuser && {
 #	dl "$IPB4" "$ZIPLIST_IPBAN" 8192 1048576
  }
  [ "$DISABLE_IPV6" != "1" ] && {
-	dl "$URL6" "$ZIPLIST6" 4096 4194304
+	dl "$URL6" "$ZIPLIST6" 2048 4194304
 #	dl "$IPB6" "$ZIPLIST_IPBAN6" 128 1048576
  }
 }
