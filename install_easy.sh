@@ -268,10 +268,10 @@ select_getlist()
 		echo
 		if ask_yes_no $D "do you want to auto download ip/host list"; then
 			if [ "$MODE_FILTER" = "hostlist" -o "$MODE_FILTER" = "autohostlist" ] ; then
-				GETLISTS="get_refilter_domains.sh get_antizapret_domains.sh get_reestr_resolvable_domains.sh get_reestr_hostlist.sh"
+				GETLISTS="get_refilter_domains.sh get_antizapret_domains.sh get_reestr_resolvable_domains.sh"
 				GETLIST_DEF="get_antizapret_domains.sh"
 			else
-				GETLISTS="get_user.sh get_refilter_ipsum.sh get_antifilter_ip.sh get_antifilter_ipsmart.sh get_antifilter_ipsum.sh get_antifilter_ipresolve.sh get_antifilter_allyouneed.sh get_reestr_resolve.sh get_reestr_preresolved.sh get_reestr_preresolved_smart.sh"
+				GETLISTS="get_user.sh get_refilter_ipsum.sh get_antifilter_ip.sh get_antifilter_ipsmart.sh get_antifilter_ipsum.sh get_antifilter_ipresolve.sh get_antifilter_allyouneed.sh get_reestr_preresolved.sh get_reestr_preresolved_smart.sh"
 				GETLIST_DEF="get_antifilter_allyouneed.sh"
 			fi
 			ask_list GETLIST "$GETLISTS" "$GETLIST_DEF" && write_config_var GETLIST

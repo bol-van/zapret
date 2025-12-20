@@ -9,8 +9,8 @@ TMPLIST="$TMPDIR/list_nethub.txt"
 
 BASEURL="https://raw.githubusercontent.com/bol-van/rulist/main"
 URL="$BASEURL/reestr_hostname_resolvable.txt"
-IPB4="$BASEURL/reestr_ipban4.txt"
-IPB6="$BASEURL/reestr_ipban6.txt"
+#IPB4="$BASEURL/reestr_ipban4.txt"
+#IPB6="$BASEURL/reestr_ipban6.txt"
 
 dl()
 {
@@ -36,8 +36,8 @@ dl "$URL" "$ZHOSTLIST" 65536 67108864
 
 hup_zapret_daemons
 
-[ "$DISABLE_IPV4" != "1" ] && dl "$IPB4" "$ZIPLIST_IPBAN" 8192 1048576
-[ "$DISABLE_IPV6" != "1" ] && dl "$IPB6" "$ZIPLIST_IPBAN6" 128 1048576
+#[ "$DISABLE_IPV4" != "1" ] && dl "$IPB4" "$ZIPLIST_IPBAN" 8192 1048576
+#[ "$DISABLE_IPV6" != "1" ] && dl "$IPB6" "$ZIPLIST_IPBAN6" 128 1048576
 
 getipban
 "$IPSET_DIR/create_ipset.sh"

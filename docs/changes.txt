@@ -581,3 +581,7 @@ blockcheck: fix broken dns cache
 
 nfqws: fix broken l7proto profile rediscovery
 nfqws: backport from nfqws2 nl80211 ssid discovery fix for newer kernels
+
+73.6
+
+ipset: remove zapret-info based scripts because it's gone
