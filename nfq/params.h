@@ -62,6 +62,7 @@
 #define FAKE_TLS_MOD_RND_SNI		0x40
 #define FAKE_TLS_MOD_SNI		0x80
 #define FAKE_TLS_MOD_PADENCAP		0x100
+#define FAKE_TLS_MOD_ALTSNI		0x200
 
 #define FAKE_MAX_TCP	1460
 #define FAKE_MAX_UDP	1472
@@ -76,9 +77,16 @@ struct fake_tls_mod_cache
 {
 	size_t extlen_offset, padlen_offset;
 };
+struct altsni_pool
+{
+	char **domains;      // array of domain strings
+	size_t count;        // number of domains
+	size_t capacity;     // allocated capacity
+};
 struct fake_tls_mod
 {
 	char sni[128];
+	struct altsni_pool *altsni;  // pool of domains for random SNI selection
 	uint32_t mod;
 };
 struct hostfakesplit_mod

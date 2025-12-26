@@ -878,11 +878,12 @@ static uint16_t IP4_IP_ID_ADD(uint16_t ip_id, uint16_t inc, t_ip_id_mode mode)
 
 
 // fake_mod buffer must at least sizeof(desync_profile->fake_tls)
-// size does not change
 // return : true - altered, false - not altered
-static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcache, const struct fake_tls_mod *tls_mod, const uint8_t *fake_data, size_t fake_data_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod)
+// fake_data_size_out receives the new size if altered
+static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcache, const struct fake_tls_mod *tls_mod, const uint8_t *fake_data, size_t fake_data_size, size_t fake_mod_buf_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod, size_t *fake_data_size_out)
 {
 	bool b = false;
+	*fake_data_size_out = fake_data_size;
 	if (modcache) // it's filled only if it's TLS
 	{
 		if (tls_mod->mod & FAKE_TLS_MOD_PADENCAP)
@@ -926,6 +927,74 @@ static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcach
 				memcpy(fake_mod + 44, payload + 44, fake_mod[43]); // session id
 				b = true;
 				DLOG("fake[%d] applied dupsid tls mod\n", fake_n);
+			}
+		}
+		// Apply altsni - randomly select domain from pool
+		if (tls_mod->mod & FAKE_TLS_MOD_ALTSNI)
+		{
+			if (!tls_mod->altsni || !tls_mod->altsni->count)
+				DLOG("fake[%d] altsni set but no domains loaded\n", fake_n);
+			else
+			{
+				const uint8_t *ext;
+				size_t extlen, slen;
+				const uint8_t *current_data = b ? fake_mod : fake_data;
+				size_t current_size = *fake_data_size_out;
+
+				if (!TLSFindExt(current_data, current_size, 0, &ext, &extlen, false))
+				{
+					DLOG("fake[%d] altsni: cannot find SNI extension\n", fake_n);
+				}
+				else
+				{
+					size_t sniext_offset = ext - current_data;
+					if (!TLSAdvanceToHostInSNI(&ext, &extlen, &slen))
+					{
+						DLOG("fake[%d] altsni: invalid SNI structure\n", fake_n);
+					}
+					else
+					{
+						const char *random_sni = tls_mod->altsni->domains[random() % tls_mod->altsni->count];
+						size_t slen_new = strlen(random_sni);
+						ssize_t slen_delta = (ssize_t)slen_new - (ssize_t)slen;
+						size_t sni_offset = ext - current_data;
+						size_t new_size = (slen_delta >= 0) ? current_size + (size_t)slen_delta : current_size - (size_t)(-slen_delta);
+
+						if (new_size > fake_mod_buf_size)
+						{
+							DLOG("fake[%d] not enough space for altsni (need %zu, have %zu)\n", fake_n, new_size, fake_mod_buf_size);
+						}
+						else
+						{
+							if (!b) memcpy(fake_mod, fake_data, fake_data_size);
+
+							uint8_t *sniext = fake_mod + sniext_offset;
+							uint8_t *sni = fake_mod + sni_offset;
+
+							if (slen_delta)
+							{
+								memmove(sni + slen_new, sni + slen, fake_mod + current_size - (sni + slen));
+								// Update TLS record length
+								phton16(fake_mod + 3, (uint16_t)(pntoh16(fake_mod + 3) + slen_delta));
+								// Update handshake length
+								phton24(fake_mod + 6, (uint32_t)(pntoh24(fake_mod + 6) + slen_delta));
+								// Update extensions length
+								if (modcache->extlen_offset)
+									phton16(fake_mod + modcache->extlen_offset, (uint16_t)(pntoh16(fake_mod + modcache->extlen_offset) + slen_delta));
+								// Update SNI extension length (ext type 2 bytes before data)
+								phton16(sniext - 2, (uint16_t)(pntoh16(sniext - 2) + slen_delta));
+								// Update SNI list length
+								phton16(sniext, (uint16_t)(pntoh16(sniext) + slen_delta));
+								// Update hostname length (2 bytes before hostname)
+								phton16(sni - 2, (uint16_t)(pntoh16(sni - 2) + slen_delta));
+								*fake_data_size_out = new_size;
+							}
+							memcpy(sni, random_sni, slen_new);
+							b = true;
+							DLOG("fake[%d] applied altsni: %s (size_delta=%zd)\n", fake_n, random_sni, slen_delta);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1963,7 +2032,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 			{
 				struct blob_item *fake_item;
-				size_t fake_size;
+				size_t fake_size, fake_size_mod;
 				uint8_t *fake_data;
 				uint8_t fake_data_buf[FAKE_MAX_TCP];
 				int n = 0;
@@ -1973,11 +2042,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				LIST_FOREACH(fake_item, fake, next)
 				{
 					n++;
+					fake_size_mod = fake_item->size;
 					switch (l7proto)
 					{
 					case TLS:
 						if ((fake_item->size <= sizeof(fake_data_buf)) &&
-							runtime_tls_mod(n, (struct fake_tls_mod_cache *)fake_item->extra, (struct fake_tls_mod *)fake_item->extra2, fake_item->data, fake_item->size, rdata_payload, rlen_payload, fake_data_buf))
+							runtime_tls_mod(n, (struct fake_tls_mod_cache *)fake_item->extra, (struct fake_tls_mod *)fake_item->extra2, fake_item->data, fake_item->size, sizeof(fake_data_buf), rdata_payload, rlen_payload, fake_data_buf, &fake_size_mod))
 						{
 							fake_data = fake_data_buf;
 							break;
@@ -1986,7 +2056,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						fake_data = fake_item->data;
 					}
 					fake_data += fake_item->offset;
-					fake_size = fake_item->size - fake_item->offset;
+					fake_size = fake_size_mod - fake_item->offset;
 
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_fake, false, 0, htonl(sequence), dis->tcp->th_ack, dis->tcp->th_win, scale_factor, timestamps,

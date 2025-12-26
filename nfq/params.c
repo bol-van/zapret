@@ -314,6 +314,16 @@ static void dp_clear_dynamic(struct desync_profile *dp)
 	strlist_destroy(&dp->filter_ssid);
 #endif
 	HostFailPoolDestroy(&dp->hostlist_auto_fail_counters);
+	// Clean up altsni pool if present
+	if (dp->tls_mod_last.altsni)
+	{
+		struct altsni_pool *pool = dp->tls_mod_last.altsni;
+		for (size_t i = 0; i < pool->count; i++)
+			free(pool->domains[i]);
+		free(pool->domains);
+		free(pool);
+		dp->tls_mod_last.altsni = NULL;
+	}
 	struct blob_collection_head **fake,*fakes[] = {&dp->fake_http, &dp->fake_tls, &dp->fake_unknown, &dp->fake_unknown_udp, &dp->fake_quic, &dp->fake_wg, &dp->fake_dht, &dp->fake_discord, &dp->fake_stun, NULL};
 	for(fake=fakes;*fake;fake++) blob_collection_destroy(*fake);
 }

@@ -59,6 +59,126 @@ static bool bReload = false;
 bool bQuit = false;
 #endif
 
+// altsni pool management functions
+static struct altsni_pool* altsni_pool_create(void)
+{
+	struct altsni_pool *pool = malloc(sizeof(struct altsni_pool));
+	if (!pool) return NULL;
+	pool->domains = NULL;
+	pool->count = 0;
+	pool->capacity = 0;
+	return pool;
+}
+
+static bool altsni_pool_add(struct altsni_pool *pool, const char *domain)
+{
+	if (!pool || !domain || !*domain) return false;
+	
+	// Check domain length (max 127 to fit in sni field)
+	size_t len = strlen(domain);
+	if (len > 127) {
+		DLOG_ERR("altsni domain too long: %s\n", domain);
+		return false;
+	}
+	
+	// Expand array if needed
+	if (pool->count >= pool->capacity) {
+		size_t new_cap = pool->capacity ? pool->capacity * 2 : 16;
+		char **new_domains = realloc(pool->domains, new_cap * sizeof(char*));
+		if (!new_domains) return false;
+		pool->domains = new_domains;
+		pool->capacity = new_cap;
+	}
+	
+	pool->domains[pool->count] = strdup(domain);
+	if (!pool->domains[pool->count]) return false;
+	pool->count++;
+	return true;
+}
+
+static void altsni_pool_destroy(struct altsni_pool *pool)
+{
+	if (!pool) return;
+	for (size_t i = 0; i < pool->count; i++)
+		free(pool->domains[i]);
+	free(pool->domains);
+	free(pool);
+}
+
+static const char* altsni_pool_get_random(const struct altsni_pool *pool)
+{
+	if (!pool || !pool->count) return NULL;
+	return pool->domains[random() % pool->count];
+}
+
+// Parse comma-separated domain list
+static bool parse_altsni_domains(const char *opt, struct altsni_pool *pool)
+{
+	char *copy = strdup(opt);
+	if (!copy) return false;
+	
+	char *saveptr;
+	char *token = strtok_r(copy, ",", &saveptr);
+	while (token) {
+		// Skip leading spaces
+		while (*token == ' ') token++;
+		char *end = token + strlen(token) - 1;
+		while (end > token && *end == ' ') *end-- = 0;
+		
+		if (*token && !altsni_pool_add(pool, token)) {
+			free(copy);
+			return false;
+		}
+		token = strtok_r(NULL, ",", &saveptr);
+	}
+	
+	free(copy);
+	return pool->count > 0;
+}
+
+// Load domains from file
+static bool load_altsni_file(const char *filename, struct altsni_pool *pool)
+{
+	FILE *f = fopen(filename, "r");
+	if (!f) {
+		DLOG_PERROR("fopen altsni file");
+		return false;
+	}
+	
+	char line[256];
+	int line_num = 0;
+	while (fgets(line, sizeof(line), f)) {
+		line_num++;
+		
+		// Remove newline
+		char *nl = strchr(line, '\n');
+		if (nl) *nl = 0;
+		char *cr = strchr(line, '\r');
+		if (cr) *cr = 0;
+		
+		// Skip leading whitespace
+		char *p = line;
+		while (*p == ' ' || *p == '\t') p++;
+		
+		// Skip empty lines and comments
+		if (!*p || *p == '#') continue;
+		
+		// Remove trailing whitespace
+		char *end = p + strlen(p) - 1;
+		while (end > p && (*end == ' ' || *end == '\t')) *end-- = 0;
+		
+		if (!altsni_pool_add(pool, p)) {
+			DLOG_ERR("altsni file %s line %d: failed to add domain\n", filename, line_num);
+			fclose(f);
+			return false;
+		}
+	}
+	
+	fclose(f);
+	DLOG_CONDUP("Loaded %zu altsni domains from %s\n", pool->count, filename);
+	return pool->count > 0;
+}
+
 static void onhup(int sig)
 {
 	printf("HUP received ! Lists will be reloaded.\n");
@@ -1111,6 +1231,8 @@ static bool parse_tlsmod_list(char *opt, struct fake_tls_mod *tls_mod)
 			strncpy(tls_mod->sni, e2 + 1, sizeof(tls_mod->sni) - 1);
 			tls_mod->sni[sizeof(tls_mod->sni) - 1 - 1] = 0;
 		}
+		else if (!strcmp(p, "altsni"))
+			tls_mod->mod |= FAKE_TLS_MOD_ALTSNI;
 		else if (!strcmp(p, "padencap"))
 			tls_mod->mod |= FAKE_TLS_MOD_PADENCAP;
 		else if (!strcmp(p, "dupsid"))
@@ -1395,7 +1517,7 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, const struct fake_tl
 	size_t extlen;
 
 	modcache->extlen_offset = modcache->padlen_offset = 0;
-	if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_PADENCAP))
+	if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_ALTSNI | FAKE_TLS_MOD_PADENCAP))
 	{
 		if (!TLSFindExtLen(fake_tls, *fake_tls_size, &modcache->extlen_offset))
 		{
@@ -1403,7 +1525,7 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, const struct fake_tl
 			return false;
 		}
 		DLOG("profile %d fake[%d] tls extensions length offset : %zu\n", profile_n, fake_n, modcache->extlen_offset);
-		if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI))
+		if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_ALTSNI))
 		{
 			size_t slen;
 			if (!TLSFindExt(fake_tls, *fake_tls_size, 0, &ext, &extlen, false))
@@ -1539,6 +1661,13 @@ static bool onetime_tls_mod(struct desync_profile *dp)
 			tls_mod->mod |= FAKE_TLS_MOD_RND | FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_DUP_SID; // old behavior compat + dup_sid
 		if (!(tls_mod->mod & ~FAKE_TLS_MOD_SAVE_MASK))
 			continue;
+
+		// Validate altsni: mod is set but no domains provided
+		if ((tls_mod->mod & FAKE_TLS_MOD_ALTSNI) && (!tls_mod->altsni || !tls_mod->altsni->count))
+		{
+			DLOG_ERR("profile %d fake[%d] altsni mod set but no domains provided. Use --dpi-desync-fake-tls-altsni\n", dp->n, n);
+			return false;
+		}
 
 		if (!IsTLSClientHello(fake_tls->data, fake_tls->size, false) || (fake_tls->size < (44 + fake_tls->data[43]))) // has session id ?
 		{
@@ -1892,7 +2021,8 @@ static void exithelp(void)
 		" --dpi-desync-fake-tcp-mod=mod[,mod]\t\t\t; comma separated list of tcp fake mods. available mods : none,seq\n"
 		" --dpi-desync-fake-http=[+ofs]@<filename>|0xHEX\t\t; fake http request\n"
 		" --dpi-desync-fake-tls=[+ofs]@<filename>|0xHEX|![+offset] ; fake TLS ClientHello (for https)\n"
-		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap\n"
+		" --dpi-desync-fake-tls-mod=mod[,mod]\t\t\t; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,altsni,dupsid,padencap\n"
+		" --dpi-desync-fake-tls-altsni=dom1,dom2|@file\t\t; domains for altsni mod. @ prefix loads from file (one domain per line, # for comments)\n"
 		" --dpi-desync-fake-unknown=[+ofs]@<filename>|0xHEX\t; unknown protocol fake payload\n"
 		" --dpi-desync-fake-syndata=[+ofs]@<filename>|0xHEX\t; SYN data payload\n"
 		" --dpi-desync-fake-quic=[+ofs]@<filename>|0xHEX\t\t; fake QUIC Initial\n"
@@ -2084,6 +2214,7 @@ enum opt_indices {
 	IDX_DPI_DESYNC_FAKE_HTTP,
 	IDX_DPI_DESYNC_FAKE_TLS,
 	IDX_DPI_DESYNC_FAKE_TLS_MOD,
+	IDX_DPI_DESYNC_FAKE_TLS_ALTSNI,
 	IDX_DPI_DESYNC_FAKE_UNKNOWN,
 	IDX_DPI_DESYNC_FAKE_SYNDATA,
 	IDX_DPI_DESYNC_FAKE_QUIC,
@@ -2225,6 +2356,7 @@ static const struct option long_options[] = {
 	[IDX_DPI_DESYNC_FAKE_HTTP] = {"dpi-desync-fake-http", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_TLS] = {"dpi-desync-fake-tls", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_TLS_MOD] = {"dpi-desync-fake-tls-mod", required_argument, 0, 0},
+	[IDX_DPI_DESYNC_FAKE_TLS_ALTSNI] = {"dpi-desync-fake-tls-altsni", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_UNKNOWN] = {"dpi-desync-fake-unknown", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_SYNDATA] = {"dpi-desync-fake-syndata", required_argument, 0, 0},
 	[IDX_DPI_DESYNC_FAKE_QUIC] = {"dpi-desync-fake-quic", required_argument, 0, 0},
@@ -3042,6 +3174,49 @@ int main(int argc, char **argv)
 			if (dp->tls_fake_last)
 				*(struct fake_tls_mod*)dp->tls_fake_last->extra2 = dp->tls_mod_last;
 			break;
+		case IDX_DPI_DESYNC_FAKE_TLS_ALTSNI:
+		{
+			// Create pool if not already created
+			if (!dp->tls_mod_last.altsni)
+			{
+				dp->tls_mod_last.altsni = altsni_pool_create();
+				if (!dp->tls_mod_last.altsni)
+				{
+					DLOG_ERR("out of memory for altsni pool\n");
+					exit_clean(1);
+				}
+			}
+
+			// Determine: file or comma-separated list
+			if (optarg[0] == '@')
+			{
+				// Load from file
+				if (!load_altsni_file(optarg + 1, dp->tls_mod_last.altsni))
+				{
+					DLOG_ERR("Failed to load altsni file: %s\n", optarg + 1);
+					exit_clean(1);
+				}
+			}
+			else
+			{
+				// Parse comma-separated list
+				if (!parse_altsni_domains(optarg, dp->tls_mod_last.altsni))
+				{
+					DLOG_ERR("Failed to parse altsni list: %s\n", optarg);
+					exit_clean(1);
+				}
+			}
+			DLOG("Loaded %zu altsni domains\n", dp->tls_mod_last.altsni->count);
+
+			// Update tls_fake_last if it exists
+			if (dp->tls_fake_last)
+			{
+				struct fake_tls_mod *tls_mod = (struct fake_tls_mod*)dp->tls_fake_last->extra2;
+				if (tls_mod)
+					tls_mod->altsni = dp->tls_mod_last.altsni;
+			}
+		}
+		break;
 		case IDX_DPI_DESYNC_FAKE_UNKNOWN:
 			load_blob_to_collection(optarg, &dp->fake_unknown, FAKE_MAX_TCP, 0);
 			break;
