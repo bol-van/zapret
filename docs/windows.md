@@ -183,7 +183,9 @@ https://hackandpwn.com/windows-7-esu-patching/
 http://www.bifido.net/tweaks-and-scripts/8-extended-security-updates-installer.html
 и обновить систему
 
-3) Использовать UpdatePack7R2 от simplix : https://blog.simplix.info
+3) Использовать готовый патчер-взламыватель ESU - "BypassESU". Его надо искать по названию.
+
+4) Использовать UpdatePack7R2 от simplix : https://blog.simplix.info
 > [!WARNING]
 > Но с этим паком есть проблема. Автор из Украины, он очень обиделся на русских.
 > Если в панели управления стоит регион RU или BY, появляется неприятный диалог.
