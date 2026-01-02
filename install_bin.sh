@@ -31,7 +31,7 @@ select_test_method()
 	elif exists zsh && [ "$UNAME" != CYGWIN ] ; then
 		TEST=zsh
 	elif [ "$UNAME" != Darwin -a "$UNAME" != CYGWIN ]; then
-		if exists hexdump and exists dd; then
+		if exists hexdump && exists dd; then
 			# macos does not use ELF
 			TEST=elf
 			ELF=
