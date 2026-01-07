@@ -87,7 +87,7 @@ static bool dom_valid(char *dom)
 static void invalid_domain_beautify(char *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
-		if (*dom < 0x20 || *dom>0x7F) *dom = '?';
+		if (*dom < 0x20 || *dom<0) *dom = '?';
 	if (*dom) *dom = 0;
 }
 

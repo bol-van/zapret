@@ -2304,7 +2304,6 @@ int main(int argc, char **argv)
 #endif
 
 	srandom(time(NULL));
-	mask_from_preflen6_prepare();
 
 	PRINT_VER;
 

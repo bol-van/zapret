@@ -1897,7 +1897,6 @@ int main(int argc, char *argv[])
 	set_console_io_buffering();
 	set_env_exedir(argv[0]);
 	srand(time(NULL));
-	mask_from_preflen6_prepare();
 
 	PRINT_VER;
 

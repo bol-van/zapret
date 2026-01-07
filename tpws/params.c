@@ -219,14 +219,14 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 	dp_init(&entry->dp);
 
 	// add to the tail
-	struct desync_profile_list *dpn,*dpl=LIST_FIRST(&params.desync_profiles);
+	struct desync_profile_list *dpn,*dpl=LIST_FIRST(head);
 	if (dpl)
 	{
 		while ((dpn=LIST_NEXT(dpl,next))) dpl = dpn;
 		LIST_INSERT_AFTER(dpl, entry, next);
 	}
 	else
-		LIST_INSERT_HEAD(&params.desync_profiles, entry, next);
+		LIST_INSERT_HEAD(head, entry, next);
 
 	return entry;
 }
