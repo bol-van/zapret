@@ -1776,6 +1776,11 @@ check_domain_http_tcp()
 
 	[ "$SKIP_IPBLOCK" = 1 ] || check_dpi_ip_block $1 $4
 
+	[ "$SKIP_TPWS" = 1 ] || {
+		echo
+		tpws_check_domain_http_bypass $1 $3 $4
+	}
+
 	[ "$SKIP_PKTWS" = 1 ] || {
 		echo
 	        echo preparing $PKTWSD redirection

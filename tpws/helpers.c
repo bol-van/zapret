@@ -27,7 +27,7 @@
 
 int unique_size_t(size_t *pu, int ct)
 {
-	int i, j, u;
+	size_t i, j, u;
 	for (i = j = 0; j < ct; i++)
 	{
 		u = pu[j++];
@@ -475,34 +475,6 @@ bool set_env_exedir(const char *argv0)
 	return bOK;
 }
 
-
-static void mask_from_preflen6_make(uint8_t plen, struct in6_addr *a)
-{
-	if (plen >= 128)
-		memset(a->s6_addr, 0xFF, 16);
-	else
-	{
-		uint8_t n = plen >> 3;
-		memset(a->s6_addr, 0xFF, n);
-		memset(a->s6_addr + n, 0x00, 16 - n);
-		a->s6_addr[n] = (uint8_t)(0xFF00 >> (plen & 7));
-	}
-}
-struct in6_addr ip6_mask[129];
-void mask_from_preflen6_prepare(void)
-{
-	for (int plen = 0; plen <= 128; plen++) mask_from_preflen6_make(plen, ip6_mask + plen);
-}
-
-#if defined(__GNUC__) && !defined(__llvm__)
-__attribute__((optimize("no-strict-aliasing")))
-#endif
-void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result)
-{
-	// int 128 can cause alignment segfaults because sin6_addr in struct sockaddr_in6 is 8-byte aligned, not 16-byte
-	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
-	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
-}
 
 void str_cidr4(char *s, size_t s_len, const struct cidr4 *cidr)
 {

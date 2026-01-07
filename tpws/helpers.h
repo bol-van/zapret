@@ -124,18 +124,6 @@ void print_cidr6(const struct cidr6 *cidr);
 bool parse_cidr4(char *s, struct cidr4 *cidr);
 bool parse_cidr6(char *s, struct cidr6 *cidr);
 
-static inline uint32_t mask_from_preflen(uint32_t preflen)
-{
-	return preflen ? preflen<32 ? ~((1 << (32-preflen)) - 1) : 0xFFFFFFFF : 0;
-}
-void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result);
-extern struct in6_addr ip6_mask[129];
-void mask_from_preflen6_prepare(void);
-static inline const struct in6_addr *mask_from_preflen6(uint8_t preflen)
-{
-	return ip6_mask+preflen;
-}
-
 void msleep(unsigned int ms);
 #ifdef __linux__
 bool socket_supports_notsent();
