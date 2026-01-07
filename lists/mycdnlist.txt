@@ -1,0 +1,15 @@
+cloudflare-ech.com
+discord-attachments-uploads-prd.storage.googleapis.com
+cdn.betterttv.net
+cdn.frankerfacez.com
+detectportal.firefox.com
+4pda.ws
+phncdn.com
+etahub.com
+xvideos-cdn.com
+doppiocdn.live
+ingest.sentry.io
+cdnbunny.org
+cdn.strapsco.com
+i.kym-cdn.com
+doppiocdn.media

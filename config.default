@@ -1,14 +1,11 @@
-# this file is included from init scripts
-# change values here
-
 # can help in case /tmp has not enough space
-#TMPDIR=/opt/zapret/tmp
+#TMPDIR=/data/zapret/tmp
 
 # redefine user for zapret daemons. required on Keenetic
 #WS_USER=nobody
 
 # override firewall type : iptables,nftables,ipfw
-#FWTYPE=iptables
+FWTYPE=iptables
 # nftables only : set this to 0 to use pre-nat mode. default is post-nat.
 # pre-nat mode disables some bypass techniques for forwarded traffic but allows to see client IP addresses in debug log
 #POSTNAT=0
@@ -47,12 +44,6 @@ GZIP_LISTS=1
 DESYNC_MARK=0x40000000
 DESYNC_MARK_POSTNAT=0x20000000
 
-# do not pass outgoing traffic to tpws/nfqws not marked with this bit
-# this setting allows to write your own rules to limit traffic that should be fooled
-# for example based on source IP or incoming interface name
-# no filter if not defined
-#FILTER_MARK=0x10000000
-
 TPWS_SOCKS_ENABLE=0
 # tpws socks listens on this port on localhost and LAN interfaces
 TPPORT_SOCKS=987
@@ -74,10 +65,10 @@ TPWS_OPT="
 --filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>
 "
 
-NFQWS_ENABLE=0
+NFQWS_ENABLE=1
 # redirect outgoing traffic with connbytes limiter applied in both directions.
-NFQWS_PORTS_TCP=80,443
-NFQWS_PORTS_UDP=443
+NFQWS_PORTS_TCP=80,443,4244,5222-5228,5242,50318,59234
+NFQWS_PORTS_UDP=443,590-1400,3478-3481,5349,19294-19344
 # PKT_OUT means connbytes dir original
 # PKT_IN means connbytes dir reply
 # this is --dpi-desync-cutoff=nX kernel mode implementation for linux. it saves a lot of CPU.
@@ -94,16 +85,75 @@ NFQWS_UDP_PKT_IN=0
 # use <HOSTLIST> and <HOSTLIST_NOAUTO> placeholders to engage standard hostlists and autohostlist in ipset dir
 # hostlist markers are replaced to empty string if MODE_FILTER does not satisfy
 # <HOSTLIST_NOAUTO> appends ipset/zapret-hosts-auto.txt as normal list
+
+# just notes: --debug=@debug.log /data/zapret/lists/ /data/zapret/files/fake/
+#GoogleVideo first UDP strats!!! UDP for Quick. You maybe need change only TCP or UDP or both strats. For enable starats just delete --skip
+#Стратегия DISCORD вместо просто fake. Если закомментировать - будет использоваться просто fake
+#NFQWS_OPT_DESYNC_DISCORD_MEDIA="--dpi-desync=fake --dpi-desync-autottl --dup=2 --dup-autottl --dup-cutoff=n3"
+#Стратегия ТГ, ВА и т.п. вместо просто fake. Если закомментировать - будет использоваться просто fake
+#NFQWS_OPT_DESYNC_STUN="--dpi-desync=fake --dpi-desync-autottl --dup=2 --dup-autottl --dup-cutoff=n3"
 NFQWS_OPT="
---filter-tcp=80 --dpi-desync=fake,multisplit --dpi-desync-split-pos=method+2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
---filter-tcp=443 --dpi-desync=fake,multidisorder --dpi-desync-split-pos=1,midsld --dpi-desync-fooling=badseq,md5sig <HOSTLIST> --new
---filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST_NOAUTO>
+--filter-tcp=80
+--hostlist=/data/zapret/ipset/zapret-hosts-user.txt
+--dpi-desync=fake,fakedsplit
+--dpi-desync-autottl=2
+--dpi-desync-fooling=md5sig
+--dpi-desync-fooling=datanoack
+--new
+--filter-tcp=443
+--hostlist=/data/zapret/ipset/zapret-hosts-google.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fake-tls=0x00000000
+--dpi-desync-fake-tls=!
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=2
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+--new
+--filter-tcp=443
+--hostlist=/data/zapret/ipset/zapret-hosts-user.txt
+--dpi-desync=hostfakesplit
+--dpi-desync-hostfakesplit-mod=host=max.ru
+--dpi-desync-hostfakesplit-midhost=host-2
+--dpi-desync-split-seqovl=726
+--dpi-desync-fooling=badsum,badseq
+--dpi-desync-badseq-increment=0
+--new
+--filter-udp=443
+--hostlist=/data/zapret/ipset/zapret-hosts-user.txt
+--dpi-desync=fake,udplen
+--dpi-desync-fake-quic=/data/zapret/files/fake/quic_initial_www_google_com.bin
+--dpi-desync-repeats=20
+--dpi-desync-udplen-increment=24
+--new
+--filter-udp=443,590-1400,3478-3481,5349,19294-19344
+--filter-l7=stun
+--dpi-desync=fake
+
+--new
+--filter-udp=443,590-1400,3478-3481,5349,19294-19344
+--hostlist=/data/zapret/ipset/cust1.txt
+--dpi-desync=fake,udplen
+--dpi-desync-fake-quic=/data/zapret/files/fake/quic_initial_www_google_com.bin
+--dpi-desync-repeats=20
+--dpi-desync-udplen-increment=24
+--new
+--filter-tcp=443,4244,5222-5228,5242,50318,59234
+--hostlist=/data/zapret/ipset/cust1.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fake-tls=0x00000000
+--dpi-desync-fake-tls=!
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=2
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
 "
 
-# none,ipset,hostlist,autohostlist
-MODE_FILTER=none
 
-# donttouch,none,software,hardware
+# none,ipset,hostlist,autohostlist
+MODE_FILTER=hostlist
+
+# openwrt only : donttouch,none,software,hardware
 FLOWOFFLOAD=donttouch
 
 # openwrt: specify networks to be treated as LAN. default is "lan"
@@ -118,7 +168,7 @@ FLOWOFFLOAD=donttouch
 # it's possible to specify multiple interfaces like this : IFACE_LAN="eth0 eth1 eth2"
 # if IFACE_WAN6 is not defined it take the value of IFACE_WAN
 #IFACE_LAN=eth0
-#IFACE_WAN=eth1
+#IFACE_WAN=eth0
 #IFACE_WAN6="ipsec0 wireguard0 he_net"
 
 # should start/stop command of init scripts apply firewall rules ?

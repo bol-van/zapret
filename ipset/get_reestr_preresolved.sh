@@ -10,8 +10,8 @@ TMPLIST="$TMPDIR/list.txt"
 BASEURL="https://raw.githubusercontent.com/bol-van/rulist/main"
 URL4="$BASEURL/reestr_resolved4.txt"
 URL6="$BASEURL/reestr_resolved6.txt"
-#IPB4="$BASEURL/reestr_ipban4.txt"
-#IPB6="$BASEURL/reestr_ipban6.txt"
+IPB4="$BASEURL/reestr_ipban4.txt"
+IPB6="$BASEURL/reestr_ipban6.txt"
 
 dl()
 {
@@ -35,12 +35,12 @@ dl()
 
 getuser && {
  [ "$DISABLE_IPV4" != "1" ] && {
-	dl "$URL4" "$ZIPLIST" 4096 4194304
-#	dl "$IPB4" "$ZIPLIST_IPBAN" 8192 1048576
+ 	dl "$URL4" "$ZIPLIST" 32768 4194304
+ 	dl "$IPB4" "$ZIPLIST_IPBAN" 8192 1048576
  }
  [ "$DISABLE_IPV6" != "1" ] && {
-	dl "$URL6" "$ZIPLIST6" 2048 4194304
-#	dl "$IPB6" "$ZIPLIST_IPBAN6" 128 1048576
+ 	dl "$URL6" "$ZIPLIST6" 8192 4194304
+ 	dl "$IPB6" "$ZIPLIST_IPBAN6" 128 1048576
  }
 }
 

@@ -5,7 +5,7 @@
 EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
 ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
-ZAPRET_TARGET=${ZAPRET_TARGET:-/opt/zapret}
+ZAPRET_TARGET=${ZAPRET_TARGET:-/data/zapret}
 ZAPRET_TARGET_RW=${ZAPRET_RW:-"$ZAPRET_TARGET"}
 ZAPRET_TARGET_CONFIG="$ZAPRET_TARGET_RW/config"
 ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
@@ -268,10 +268,10 @@ select_getlist()
 		echo
 		if ask_yes_no $D "do you want to auto download ip/host list"; then
 			if [ "$MODE_FILTER" = "hostlist" -o "$MODE_FILTER" = "autohostlist" ] ; then
-				GETLISTS="get_refilter_domains.sh get_antizapret_domains.sh get_reestr_resolvable_domains.sh"
+				GETLISTS="get_refilter_domains.sh get_antizapret_domains.sh get_reestr_resolvable_domains.sh get_reestr_hostlist.sh"
 				GETLIST_DEF="get_antizapret_domains.sh"
 			else
-				GETLISTS="get_user.sh get_refilter_ipsum.sh get_antifilter_ip.sh get_antifilter_ipsmart.sh get_antifilter_ipsum.sh get_antifilter_ipresolve.sh get_antifilter_allyouneed.sh get_reestr_preresolved.sh get_reestr_preresolved_smart.sh"
+				GETLISTS="get_user.sh get_refilter_ipsum.sh get_antifilter_ip.sh get_antifilter_ipsmart.sh get_antifilter_ipsum.sh get_antifilter_ipresolve.sh get_antifilter_allyouneed.sh get_reestr_resolve.sh get_reestr_preresolved.sh get_reestr_preresolved_smart.sh"
 				GETLIST_DEF="get_antifilter_allyouneed.sh"
 			fi
 			ask_list GETLIST "$GETLISTS" "$GETLIST_DEF" && write_config_var GETLIST
@@ -829,12 +829,12 @@ install_openwrt()
 	"$INIT_SCRIPT_SRC" stop_fw
 	"$INIT_SCRIPT_SRC" stop_daemons
 
-	select_fwtype
-	select_ipv6
-	check_prerequisites_openwrt
-	ask_config
-	ask_config_tmpdir
-	ask_config_offload
+	#select_fwtype
+	#select_ipv6
+	#check_prerequisites_openwrt
+	#ask_config
+	#ask_config_tmpdir
+	#ask_config_offload
 	# stop and reinstall sysv init
 	install_sysv_init
 	[ "$FWTYPE_OLD" != "$FWTYPE" -a "$FWTYPE_OLD" = iptables -a -n "$OPENWRT_FW3" ] && remove_openwrt_firewall
