@@ -1,3 +1,0 @@
-#!/bin/sh
-/opt/zapret/init.d/sysv/zapret start
-exec chpst -b zapret sleep infinity

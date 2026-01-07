@@ -1,3 +1,0 @@
-  outbound and
-  udp.PayloadLength=148 and
-  udp.Payload[0]=0x01

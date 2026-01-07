@@ -1,2 +1,0 @@
-#!/bin/execlineb -P
-exec /opt/zapret/init.d/sysv/zapret stop
