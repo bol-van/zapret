@@ -1233,6 +1233,8 @@ static bool parse_tlsmod_list(char *opt, struct fake_tls_mod *tls_mod)
 		}
 		else if (!strcmp(p, "altsni"))
 			tls_mod->mod |= FAKE_TLS_MOD_ALTSNI;
+		else if (!strcmp(p, "dupip"))
+			tls_mod->mod |= FAKE_TLS_MOD_DUPIP;
 		else if (!strcmp(p, "padencap"))
 			tls_mod->mod |= FAKE_TLS_MOD_PADENCAP;
 		else if (!strcmp(p, "dupsid"))
@@ -1517,7 +1519,7 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, const struct fake_tl
 	size_t extlen;
 
 	modcache->extlen_offset = modcache->padlen_offset = 0;
-	if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_ALTSNI | FAKE_TLS_MOD_PADENCAP))
+	if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_ALTSNI | FAKE_TLS_MOD_DUPIP | FAKE_TLS_MOD_PADENCAP))
 	{
 		if (!TLSFindExtLen(fake_tls, *fake_tls_size, &modcache->extlen_offset))
 		{
@@ -1525,7 +1527,7 @@ static bool onetime_tls_mod_blob(int profile_n, int fake_n, const struct fake_tl
 			return false;
 		}
 		DLOG("profile %d fake[%d] tls extensions length offset : %zu\n", profile_n, fake_n, modcache->extlen_offset);
-		if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_ALTSNI))
+		if (tls_mod->mod & (FAKE_TLS_MOD_RND_SNI | FAKE_TLS_MOD_SNI | FAKE_TLS_MOD_ALTSNI | FAKE_TLS_MOD_DUPIP))
 		{
 			size_t slen;
 			if (!TLSFindExt(fake_tls, *fake_tls_size, 0, &ext, &extlen, false))

@@ -880,7 +880,7 @@ static uint16_t IP4_IP_ID_ADD(uint16_t ip_id, uint16_t inc, t_ip_id_mode mode)
 // fake_mod buffer must at least sizeof(desync_profile->fake_tls)
 // return : true - altered, false - not altered
 // fake_data_size_out receives the new size if altered
-static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcache, const struct fake_tls_mod *tls_mod, const uint8_t *fake_data, size_t fake_data_size, size_t fake_mod_buf_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod, size_t *fake_data_size_out)
+static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcache, const struct fake_tls_mod *tls_mod, const uint8_t *fake_data, size_t fake_data_size, size_t fake_mod_buf_size, const uint8_t *payload, size_t payload_len, uint8_t *fake_mod, size_t *fake_data_size_out, const struct sockaddr *dst_addr)
 {
 	bool b = false;
 	*fake_data_size_out = fake_data_size;
@@ -929,11 +929,20 @@ static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcach
 				DLOG("fake[%d] applied dupsid tls mod\n", fake_n);
 			}
 		}
-		// Apply altsni - randomly select domain from pool
-		if (tls_mod->mod & FAKE_TLS_MOD_ALTSNI)
+		// Apply altsni and/or dupip - randomly select domain from pool or use destination IP
+		if (tls_mod->mod & (FAKE_TLS_MOD_ALTSNI | FAKE_TLS_MOD_DUPIP))
 		{
-			if (!tls_mod->altsni || !tls_mod->altsni->count)
-				DLOG("fake[%d] altsni set but no domains loaded\n", fake_n);
+			bool has_altsni = (tls_mod->mod & FAKE_TLS_MOD_ALTSNI) && tls_mod->altsni && tls_mod->altsni->count;
+			bool has_dupip = (tls_mod->mod & FAKE_TLS_MOD_DUPIP) && dst_addr;
+			
+			if (!has_altsni && !has_dupip)
+			{
+				if (tls_mod->mod & FAKE_TLS_MOD_ALTSNI)
+					DLOG("fake[%d] altsni set but no domains loaded\n", fake_n);
+				if (tls_mod->mod & FAKE_TLS_MOD_DUPIP)
+					DLOG("fake[%d] dupip set but no destination address\n", fake_n);
+			}
+			
 			else
 			{
 				const uint8_t *ext;
@@ -943,26 +952,45 @@ static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcach
 
 				if (!TLSFindExt(current_data, current_size, 0, &ext, &extlen, false))
 				{
-					DLOG("fake[%d] altsni: cannot find SNI extension\n", fake_n);
+					DLOG("fake[%d] altsni/dupip: cannot find SNI extension\n", fake_n);
 				}
 				else
 				{
 					size_t sniext_offset = ext - current_data;
 					if (!TLSAdvanceToHostInSNI(&ext, &extlen, &slen))
 					{
-						DLOG("fake[%d] altsni: invalid SNI structure\n", fake_n);
+						DLOG("fake[%d] altsni/dupip: invalid SNI structure\n", fake_n);
 					}
 					else
 					{
-						const char *random_sni = tls_mod->altsni->domains[random() % tls_mod->altsni->count];
-						size_t slen_new = strlen(random_sni);
+						// Note: ip_str must remain in scope until memcpy(sni, selected_sni, ...) is called
+						char ip_str[INET6_ADDRSTRLEN];
+						const char *selected_sni;
+						
+						// Calculate total options: altsni domains count + 1 if dupip is enabled
+						size_t total_options = (has_altsni ? tls_mod->altsni->count : 0) + (has_dupip ? 1 : 0);
+						size_t choice = random() % total_options;
+						
+						if (has_altsni && choice < tls_mod->altsni->count)
+						{
+							// Select from altsni pool
+							selected_sni = tls_mod->altsni->domains[choice];
+						}
+						else
+						{
+							// Use destination IP (dupip)
+							ntop46(dst_addr, ip_str, sizeof(ip_str));
+							selected_sni = ip_str;
+						}
+						
+						size_t slen_new = strlen(selected_sni);
 						ssize_t slen_delta = (ssize_t)slen_new - (ssize_t)slen;
 						size_t sni_offset = ext - current_data;
 						size_t new_size = (slen_delta >= 0) ? current_size + (size_t)slen_delta : current_size - (size_t)(-slen_delta);
 
 						if (new_size > fake_mod_buf_size)
 						{
-							DLOG("fake[%d] not enough space for altsni (need %zu, have %zu)\n", fake_n, new_size, fake_mod_buf_size);
+							DLOG("fake[%d] not enough space for altsni/dupip (need %zu, have %zu)\n", fake_n, new_size, fake_mod_buf_size);
 						}
 						else
 						{
@@ -974,24 +1002,20 @@ static bool runtime_tls_mod(int fake_n, const struct fake_tls_mod_cache *modcach
 							if (slen_delta)
 							{
 								memmove(sni + slen_new, sni + slen, fake_mod + current_size - (sni + slen));
-								// Update TLS record length
 								phton16(fake_mod + 3, (uint16_t)(pntoh16(fake_mod + 3) + slen_delta));
-								// Update handshake length
 								phton24(fake_mod + 6, (uint32_t)(pntoh24(fake_mod + 6) + slen_delta));
-								// Update extensions length
 								if (modcache->extlen_offset)
 									phton16(fake_mod + modcache->extlen_offset, (uint16_t)(pntoh16(fake_mod + modcache->extlen_offset) + slen_delta));
-								// Update SNI extension length (ext type 2 bytes before data)
 								phton16(sniext - 2, (uint16_t)(pntoh16(sniext - 2) + slen_delta));
-								// Update SNI list length
 								phton16(sniext, (uint16_t)(pntoh16(sniext) + slen_delta));
-								// Update hostname length (2 bytes before hostname)
 								phton16(sni - 2, (uint16_t)(pntoh16(sni - 2) + slen_delta));
 								*fake_data_size_out = new_size;
 							}
-							memcpy(sni, random_sni, slen_new);
+							memcpy(sni, selected_sni, slen_new);
 							b = true;
-							DLOG("fake[%d] applied altsni: %s (size_delta=%zd)\n", fake_n, random_sni, slen_delta);
+							DLOG("fake[%d] applied %s: %s (size_delta=%zd)\n", fake_n, 
+								(has_altsni && has_dupip) ? "altsni+dupip" : (has_dupip ? "dupip" : "altsni"),
+								selected_sni, slen_delta);
 						}
 					}
 				}
@@ -2047,7 +2071,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 					case TLS:
 						if ((fake_item->size <= sizeof(fake_data_buf)) &&
-							runtime_tls_mod(n, (struct fake_tls_mod_cache *)fake_item->extra, (struct fake_tls_mod *)fake_item->extra2, fake_item->data, fake_item->size, sizeof(fake_data_buf), rdata_payload, rlen_payload, fake_data_buf, &fake_size_mod))
+							runtime_tls_mod(n, (struct fake_tls_mod_cache *)fake_item->extra, (struct fake_tls_mod *)fake_item->extra2, fake_item->data, fake_item->size, sizeof(fake_data_buf), rdata_payload, rlen_payload, fake_data_buf, &fake_size_mod, (struct sockaddr *)&dst))
 						{
 							fake_data = fake_data_buf;
 							break;
