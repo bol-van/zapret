@@ -49,7 +49,7 @@ static int ucmp(const void * a, const void * b, void *arg)
 }
 static uint32_t mask_from_bitcount(uint32_t zct)
 {
-	return zct<32 ? ~((1 << zct) - 1) : 0;
+	return zct<32 ? ~((1u << zct) - 1) : 0;
 }
 // make presorted array unique. return number of unique items.
 // 1,1,2,3,3,0,0,0 (ct=8) => 1,2,3,0 (ct=4)
@@ -138,7 +138,7 @@ static void mask_from_bitcount6_make(uint32_t zct, struct in6_addr *a)
 		int32_t n = (127 - zct) >> 3;
 		memset(a->s6_addr,0xFF,n);
 		memset(a->s6_addr+n,0x00,16-n);
-		a->s6_addr[n] = ~((1 << (zct & 7)) - 1);
+		a->s6_addr[n] = ~((1u << (zct & 7)) - 1);
 	}
 }
 static struct in6_addr ip6_mask[129];
