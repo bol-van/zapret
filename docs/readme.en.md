@@ -216,7 +216,8 @@ nfqws takes the following parameters:
  --dpi-desync-fake-tcp-mod=mod[,mod]                       ; comma separated list of tcp fake mods. available mods : none,seq
  --dpi-desync-fake-http=[+ofs]@<filename>|0xHEX            ; file containing fake http request
  --dpi-desync-fake-tls=[+ofs]@<filename>|0xHEX|![+offset]  ; file containing fake TLS ClientHello (for https). '!' = standard fake
- --dpi-desync-fake-tls-mod=mod[,mod]                       ; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,dupsid,padencap
+ --dpi-desync-fake-tls-mod=mod[,mod]                       ; comma separated list of TLS fake mods. available mods : none,rnd,rndsni,sni=<sni>,altsni,dupsid,dupip,padencap
+ --dpi-desync-fake-tls-altsni=dom1,dom2|@file              ; domains for altsni modifier. @ prefix loads from file (one domain per line, # for comments)
  --dpi-desync-fake-unknown=[+ofs]@<filename>|0xHEX         ; file containing unknown protocol fake payload
  --dpi-desync-fake-syndata=[+ofs]@<filename>|0xHEX         ; file containing SYN data payload
  --dpi-desync-fake-quic=[+ofs]@<filename>|0xHEX            ; file containing fake QUIC Initial
@@ -350,6 +351,8 @@ It's possible to use TLS Client Hello with any fingerprint and any SNI.
  * `dupsid`. Copy `session ID` from original TLS Client Hello. Takes precedence over `rnd`. Applied on every request.
  * `sni=<sni>`. Set specified SNI value. Changes TLS fake length, fixes lengths in TLS structure. Applied once at startup before `rndsni`.
  * `padencap`. Padding extension is extended by original TLS Client Hello size (including multi packet variation with kyber). Padding extension is added to the end if not present, otherwise it must be the last extension. All lengths are increased. Fake size is not changed. Can be useful if DPI does not analyze sequence numbers properly. Applied on every request.
+ * `altsni`. Replaces SNI in fake TLS Client Hello with a randomly selected domain from a predefined pool of domains. The domain pool is specified using the `--dpi-desync-fake-tls-altsni` parameter and can be provided as a comma-separated list of domains or loaded from a file (with @ prefix). The file should contain one domain per line, with # at the beginning of a line indicating a comment. Each domain size must not exceed 127 bytes. The total length of the TLS fake and the lengths in the TLS Client Hello structure are adjusted according to the size of the selected domain. Applied on every request. Can be combined with the `dupip` modifier - in this case, the SNI selection is made from a combined pool of altsni domains and the destination IP address. Requires a valid TLS Client Hello fake with SNI extension to work correctly.
+ * `dupip`. Replaces SNI in fake TLS Client Hello with the destination server's IP address converted to text form (e.g., "192.0.2.1" or "2001:db8::1"). This modifier allows creating fake packets with SNI matching the actual IP address, which can mislead DPI. The total length of the TLS fake and the lengths in the TLS Client Hello structure are adjusted according to the IP address length. Applied on every request. Can be combined with the `altsni` modifier - in this case, the IP address is added to the pool of possible SNI values along with the altsni domain list, and the selection is made randomly from the combined pool. Requires a valid TLS Client Hello fake with SNI extension to work correctly.
 
 By default if custom fake is not defined `rnd,rndsni,dupsid` mods are applied. If defined - `none`.
 This behaviour is compatible with previous versions with addition of `dupsid`.
@@ -360,7 +363,26 @@ This way it's possible to use different mods for every TLS fake.
 
 If a mod is set to non-TLS fake it causes error. Use `--dpi-desync-fake-tls-mod=none'.
 
-Example : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni --dpi-desync-fake-tls=0xaabbccdd --dpi-desync-fake-tls-mod=none'
+Usage examples:
+
+* Basic example with `rndsni`:
+  `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni --dpi-desync-fake-tls=0xaabbccdd --dpi-desync-fake-tls-mod=none`
+
+* Using `altsni` with domain list:
+  `--dpi-desync-fake-tls-mod=altsni --dpi-desync-fake-tls-altsni=google.com,facebook.com,twitter.com`
+
+* Using `altsni` with file loading:
+  `--dpi-desync-fake-tls-mod=altsni --dpi-desync-fake-tls-altsni=@/path/to/domains.txt`
+
+* Using only `dupip`:
+  `--dpi-desync-fake-tls-mod=dupip`
+
+* Combining `altsni` and `dupip` (random selection between domains from list and destination IP address):
+  `--dpi-desync-fake-tls-mod=altsni,dupip --dpi-desync-fake-tls-altsni=ya.ru,vk.com,ok.ru`
+
+* Combining with other modifiers:
+  `--dpi-desync-fake-tls-mod=rnd,altsni,dupsid --dpi-desync-fake-tls-altsni=example.com,example.org`
+
 
 ### TCP segmentation
 
