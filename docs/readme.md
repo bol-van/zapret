@@ -238,7 +238,8 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-fake-tcp-mod=mod[,mod]                       ; список через запятую режимов runtime модификации tcp фейков (любых) : none, seq
 --dpi-desync-fake-http=[+ofs]@<filename>|0xHEX	          ; файл, содержащий фейковый http запрос для dpi-desync=fake, на замену стандартному www.iana.org
 --dpi-desync-fake-tls=[+ofs]@<filename>|0xHEX|![+offset]  ; файл, содержащий фейковый tls clienthello для dpi-desync=fake, на замену стандартному. '!' = стандартный фейк
---dpi-desync-fake-tls-mod=mod[,mod]                       ; список через запятую режимов runtime модификации фейков : none,rnd,rndsni,sni=<sni>,dupsid,padencap
+--dpi-desync-fake-tls-mod=mod[,mod]                       ; список через запятую режимов runtime модификации фейков : none,rnd,rndsni,sni=<sni>,altsni,dupsid,dupip,padencap
+--dpi-desync-fake-tls-altsni=dom1,dom2|@file              ; домены для модификатора altsni. @ префикс загружает из файла (один домен на строку, # для комментариев)
 --dpi-desync-fake-unknown=[+ofs]@<filename>|0xHEX         ; файл, содержащий фейковый пейлоад неизвестного протокола для dpi-desync=fake, на замену стандартным нулям 256 байт
 --dpi-desync-fake-syndata=[+ofs]@<filename>|0xHEX         ; файл, содержащий фейковый пейлоад пакета SYN для режима десинхронизации syndata
 --dpi-desync-fake-quic=[+ofs]@<filename>|0xHEX            ; файл, содержащий фейковый QUIC Initial
@@ -412,6 +413,8 @@ hex строка начинается с "0x". Имя файла можно пи
  * `rndsni`. Рандомизировать SNI. Если SNI >=7 символов, применяется случайный домен 2 уровня с известным TLD, иначе заполняется случайными символами без точки. Выполняется один раз при старте.
  * `sni=<sni>`. Заменить sni на указанное значение. Макс длина SNI - 63 байта. Общая длина TLS фейка и длины в структуре TLS Client Hello меняются. Выполняется один раз при старте. Если сочетается с `rndsni`, выполняется до него.
  * `padencap`. Расширяется padding extension на размер передаваемого TLS Client Hello (включая многопакетный вариант с kyber). Если padding отсутствует, он добавляется в конец. Если присутствует - требуется, чтобы padding шел последним extension. Правятся все длины, чтобы создать видимость включения передаваемого TLS Client Hello в padding extension. Размер фейка не изменяется. Расчет идет на DPI, который не анализирует sequence numbers должным образом. Выполняется на каждый запрос.
+ * `altsni`. Заменяет SNI в фейковом TLS Client Hello на случайно выбранный домен из заранее определенного пула доменов. Пул доменов задается параметром `--dpi-desync-fake-tls-altsni` и может быть указан как список доменов через запятую или загружен из файла (с префиксом @). Файл должен содержать один домен на строку, символ # в начале строки обозначает комментарий. Размер каждого домена не должен превышать 127 байт. Общая длина TLS фейка и длины в структуре TLS Client Hello меняются в соответствии с размером выбранного домена. Выполняется на каждый запрос. Может сочетаться с модификатором `dupip` - в этом случае для выбора SNI используется объединенный пул из списка доменов altsni и IP-адреса назначения. Для корректной работы требуется наличие валидного TLS Client Hello в качестве фейка с расширением SNI.
+ * `dupip`. Заменяет SNI в фейковом TLS Client Hello на IP-адрес сервера назначения, преобразованный в текстовую форму (например, "192.0.2.1" или "2001:db8::1"). Этот модификатор позволяет создавать фейковые пакеты с SNI, соответствующим реальному IP-адресу, что может вводить DPI в заблуждение. Общая длина TLS фейка и длины в структуре TLS Client Hello меняются в соответствии с длиной IP-адреса. Выполняется на каждый запрос. Может сочетаться с модификатором `altsni` - в этом случае IP-адрес добавляется в пул возможных значений SNI вместе со списком доменов altsni, и выбор производится случайным образом из объединенного пула. Для корректной работы требуется наличие валидного TLS Client Hello в качестве фейка с расширением SNI.
 
 По умолчанию если не задан собственный фейк для TLS используются модификации `rnd,rndsni,dupsid`. Если фейк задан, используется `none`.
 Это соответствует поведению программы более старых версий с добавлением функции `dupsid`.
@@ -424,7 +427,26 @@ hex строка начинается с "0x". Имя файла можно пи
 Если сначала идет TLS фейк, для него задан режим однократной модификации, затем идет не TLS фейк, то будет ошибка.
 Нужно использовать `--dpi-desync-fake-tls-mod=none'.
 
-Пример : `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni --dpi-desync-fake-tls=0xaabbccdd --dpi-desync-fake-tls-mod=none'
+Примеры использования:
+
+* Базовый пример с `rndsni`:
+  `--dpi-desync-fake-tls=iana_org.bin --dpi-desync-fake-tls-mod=rndsni --dpi-desync-fake-tls=0xaabbccdd --dpi-desync-fake-tls-mod=none`
+
+* Использование `altsni` со списком доменов:
+  `--dpi-desync-fake-tls-mod=altsni --dpi-desync-fake-tls-altsni=google.com,facebook.com,twitter.com`
+
+* Использование `altsni` с загрузкой из файла:
+  `--dpi-desync-fake-tls-mod=altsni --dpi-desync-fake-tls-altsni=@/path/to/domains.txt`
+
+* Использование только `dupip`:
+  `--dpi-desync-fake-tls-mod=dupip`
+
+* Комбинирование `altsni` и `dupip` (случайный выбор между доменами из списка и IP-адресом назначения):
+  `--dpi-desync-fake-tls-mod=altsni,dupip --dpi-desync-fake-tls-altsni=ya.ru,vk.com,ok.ru`
+
+* Комбинирование с другими модификаторами:
+  `--dpi-desync-fake-tls-mod=rnd,altsni,dupsid --dpi-desync-fake-tls-altsni=example.com,example.org`
+
 
 ### TCP СЕГМЕНТАЦИЯ
 
