@@ -98,6 +98,7 @@ hostfail_pool *HostFailPoolFind(hostfail_pool *p,const char *s)
 }
 void HostFailPoolDel(hostfail_pool **p, hostfail_pool *elem)
 {
+	free(elem->str);
 	HASH_DEL(*p, elem);
 	free(elem);
 }
@@ -108,11 +109,7 @@ void HostFailPoolPurge(hostfail_pool **pp)
 	HASH_ITER(hh, *pp, elem, tmp)
 	{
 		if (now >= elem->expire)
-		{
-			free(elem->str);
-			HASH_DEL(*pp, elem);
-			free(elem);
-		}
+			HostFailPoolDel(pp, elem);
 	}
 }
 static time_t host_fail_purge_prev=0;
