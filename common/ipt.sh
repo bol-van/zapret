@@ -43,7 +43,7 @@ ipt6_add_del()
 }
 ipt6a_add_del()
 {
-	on_off_function ipt6 ipt6a_del "$@"
+	on_off_function ipt6a ipt6_del "$@"
 }
 
 is_ipt_flow_offload_avail()
