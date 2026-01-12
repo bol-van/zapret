@@ -8,7 +8,7 @@ zapret является свободным и open source.
 
 Эта версия zapret более не развивается и находится в режиме EOL (End-Of-Life). Никаких новых функций больше не будет. Только багфиксы.
 
-[Актуальная версия - zapret 2](#https://github.com/bol-van/zapret2)
+[Актуальная версия - zapret 2](https://github.com/bol-van/zapret2)
 
 # Multilanguage README
 
