@@ -256,7 +256,7 @@ check_system()
 
 get_free_space_mb()
 {
-    df -m $PWD | awk '/[0-9]%/{print $(NF-2)}'
+    df -m "$1" | awk '/[0-9]%/{print $(NF-2)}'
 }
 get_ram_kb()
 {
