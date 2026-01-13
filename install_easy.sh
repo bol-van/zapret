@@ -323,7 +323,7 @@ ask_config_tmpdir()
 		echo /tmp in openwrt is tmpfs. on low RAM systems there may be not enough RAM to store downloaded files
 		echo default tmpfs has size of 50% RAM
 		echo "RAM  : $(get_ram_mb) Mb"
-		echo "DISK : $(get_free_space_mb) Mb"
+		echo "DISK : $(get_free_space_mb "$EXEDIR/tmp") Mb"
 		echo select temp file location
 		[ -z "$TMPDIR" ] && TMPDIR=/tmp
 		ask_list TMPDIR "/tmp $EXEDIR/tmp" && {

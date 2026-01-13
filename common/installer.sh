@@ -256,7 +256,7 @@ check_system()
 
 get_free_space_mb()
 {
-    df -m $PWD | awk '/[0-9]%/{print $(NF-2)}'
+    df -m "$1" | awk '/[0-9]%/{print $(NF-2)}'
 }
 get_ram_kb()
 {
@@ -521,11 +521,6 @@ openwrt_fw_section_configure()
 install_openwrt_firewall()
 {
 	echo \* installing firewall script $1
-	
-	[ -n "MODE" ] || {
-		echo should specify MODE in $ZAPRET_CONFIG
-		exitp 7
-	}
 	
 	echo "linking : $FW_SCRIPT_SRC => $OPENWRT_FW_INCLUDE"
 	ln -fs "$FW_SCRIPT_SRC" "$OPENWRT_FW_INCLUDE"

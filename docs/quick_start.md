@@ -193,9 +193,9 @@
    > профилях автоматически отражаются во всех остальных.
    >
    > Если стратегии отличаются по версии ip протокола, и вы не можете их
-   > обьединить, фильтр пишется так:
+   > объединить, фильтр пишется так:
    > ```sh
-   > "--filter-l3=ipv4 --filter-udp=443 lпараметры для quic ipv4' <HOSTLIST_NOAUTO> --new
+   > "--filter-l3=ipv4 --filter-udp=443 'параметры для quic ipv4' <HOSTLIST_NOAUTO> --new
    > --filter-l3=ipv4 --filter-tcp=80 'параметры для http ipv4' <HOSTLIST> --new
    > --filter-l3=ipv4 --filter-tcp=443 'параметры для https ipv4' <HOSTLIST> --new
    > --filter-l3=ipv6 --filter-udp=443 'параметры для quic ipv6' <HOSTLIST_NOAUTO> --new

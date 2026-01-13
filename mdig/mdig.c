@@ -30,7 +30,8 @@
 #endif
 #include <time.h>
 
-#define RESOLVER_EAGAIN_ATTEMPTS 2
+#define RESOLVER_EAGAIN_ATTEMPTS	10
+#define RESOLVER_EAGAIN_DELAY		500
 
 static void trimstr(char *s)
 {
@@ -97,7 +98,7 @@ static struct
 {
 	char verbose;
 	char family;
-	int threads;
+	int threads, eagain, eagain_delay;
 	time_t start_time;
 	pthread_mutex_t flock;
 	pthread_mutex_t slock; // stats lock
@@ -193,10 +194,11 @@ static void *t_resolver(void *arg)
 	int i, r;
 	char dom[256];
 	bool is_ok;
-	struct addrinfo hints;
-	struct addrinfo *result;
+	struct addrinfo hints, *result;
+	struct timespec ts_eagain = { .tv_sec = glob.eagain_delay/1000, .tv_nsec=glob.eagain_delay%1000*1000000 };
 
 	VLOG("started");
+
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = (glob.family == FAMILY4) ? AF_INET : (glob.family == FAMILY6) ? AF_INET6 : AF_UNSPEC;
@@ -244,12 +246,16 @@ static void *t_resolver(void *arg)
 			else if (dom_valid(dom))
 			{
 				VLOG("resolving %s", dom);
-				for (i = 0; i < RESOLVER_EAGAIN_ATTEMPTS; i++)
+				for (i = 0; i < glob.eagain; i++)
 				{
 					if ((r = getaddrinfo(dom, NULL, &hints, &result)))
 					{
 						VLOG("failed to resolve %s : result %d (%s)", dom, r, eai_str(r));
-						if (r == EAI_AGAIN) continue; // temporary failure. should retry
+						if (r == EAI_AGAIN)
+						{
+							nanosleep(&ts_eagain, NULL);
+							continue; // temporary failure. should retry
+						}
 					}
 					else
 					{
@@ -447,14 +453,18 @@ int dns_parse_query()
 static void exithelp(void)
 {
 	printf(
-		" --threads=<threads_number>\n"
 		" --family=<4|6|46>\t\t; ipv4, ipv6, ipv4+ipv6\n"
+		" --threads=<threads_number>\n"
+		" --eagain=<eagain_retries>\t; how many times to retry if EAGAIN received. default %u\n"
+		" --eagain-delay=<ms>\t\t; time in msec to wait between EAGAIN attempts. default %u\n"
 		" --verbose\t\t\t; print query progress to stderr\n"
 		" --stats=N\t\t\t; print resolve stats to stderr every N domains\n"
 		" --log-resolved=<file>\t\t; log successfully resolved domains to a file\n"
 		" --log-failed=<file>\t\t; log failed domains to a file\n"
 		" --dns-make-query=<domain>\t; output to stdout binary blob with DNS query. use --family to specify ip version.\n"
-		" --dns-parse-query\t\t; read from stdin binary DNS answer blob and parse it to ipv4/ipv6 addresses\n"
+		" --dns-parse-query\t\t; read from stdin binary DNS answer blob and parse it to ipv4/ipv6 addresses\n",
+		RESOLVER_EAGAIN_ATTEMPTS,
+		RESOLVER_EAGAIN_DELAY
 	);
 	exit(1);
 }
@@ -469,6 +479,8 @@ static void exithelp(void)
 
 enum opt_indices {
 	IDX_HELP,
+	IDX_EAGAIN,
+	IDX_EAGAIN_DELAY,
 	IDX_THREADS,
 	IDX_FAMILY,
 	IDX_VERBOSE,
@@ -483,6 +495,8 @@ enum opt_indices {
 static const struct option long_options[] = {
 	[IDX_HELP] = {"help", no_argument, 0, 0},
 	[IDX_THREADS] = {"threads", required_argument, 0, 0},
+	[IDX_EAGAIN] = {"eagain", required_argument, 0, 0},
+	[IDX_EAGAIN_DELAY] = {"eagain-delay", required_argument, 0, 0},
 	[IDX_FAMILY] = {"family", required_argument, 0, 0},
 	[IDX_VERBOSE] = {"verbose", no_argument, 0, 0},
 	[IDX_STATS] = {"stats", required_argument, 0, 0},
@@ -503,6 +517,8 @@ int main(int argc, char **argv)
 	*fn1 = *fn2 = *dom = 0;
 	glob.family = FAMILY4;
 	glob.threads = 1;
+	glob.eagain = RESOLVER_EAGAIN_ATTEMPTS;
+	glob.eagain_delay = RESOLVER_EAGAIN_DELAY;
 	while ((v = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1)
 	{
 		if (v) exithelp();
@@ -513,10 +529,26 @@ int main(int argc, char **argv)
 			exithelp();
 			break;
 		case IDX_THREADS:
-			glob.threads = optarg ? atoi(optarg) : 0;
+			glob.threads = atoi(optarg);
 			if (glob.threads <= 0 || glob.threads > 100)
 			{
 				fprintf(stderr, "thread number must be within 1..100\n");
+				return 1;
+			}
+			break;
+		case IDX_EAGAIN:
+			glob.eagain = atoi(optarg);
+			if (glob.eagain <= 0 || glob.eagain > 1000)
+			{
+				fprintf(stderr, "eagain must be within 1..1000\n");
+				return 1;
+			}
+			break;
+		case IDX_EAGAIN_DELAY:
+			glob.eagain_delay = atoi(optarg);
+			if (glob.eagain_delay < 0 || glob.eagain_delay > 100000)
+			{
+				fprintf(stderr, "eagain-delay must be within 0..100000\n");
 				return 1;
 			}
 			break;

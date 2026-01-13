@@ -615,24 +615,18 @@ bool IsQUICCryptoHello(const uint8_t *data, size_t len, size_t *hello_offset, si
 uint8_t QUICDraftVersion(uint32_t version)
 {
 	/* IETF Draft versions */
-	if ((version >> 8) == 0xff0000) {
+	if ((version >> 8) == 0xff0000)
 		return (uint8_t)version;
-	}
 	/* Facebook mvfst, based on draft -22. */
-	if (version == 0xfaceb001) {
+	if (version == 0xfaceb001)
 		return 22;
-	}
 	/* Facebook mvfst, based on draft -27. */
-	if (version == 0xfaceb002 || version == 0xfaceb00e) {
+	if (version == 0xfaceb002 || version == 0xfaceb00e)
 		return 27;
-	}
 	/* GQUIC Q050, T050 and T051: they are not really based on any drafts,
 	 * but we must return a sensible value */
-	if (version == 0x51303530 ||
-		version == 0x54303530 ||
-		version == 0x54303531) {
+	if (version == 0x51303530 || version == 0x54303530 || version == 0x54303531)
 		return 27;
-	}
 	/* https://tools.ietf.org/html/draft-ietf-quic-transport-32#section-15
 	   "Versions that follow the pattern 0x?a?a?a?a are reserved for use in
 	   forcing version negotiation to be exercised"
@@ -640,19 +634,17 @@ uint8_t QUICDraftVersion(uint32_t version)
 	   used to select a proper salt (which depends on the version itself), but
 	   we don't have a real version here! Let's hope that we need to handle
 	   only latest drafts... */
-	if ((version & 0x0F0F0F0F) == 0x0a0a0a0a) {
+	if ((version & 0x0F0F0F0F) == 0x0a0a0a0a)
 		return 29;
-	}
 	/* QUIC (final?) constants for v1 are defined in draft-33, but draft-34 is the
 	   final draft version */
-	if (version == 0x00000001) {
+	if (version == 0x00000001)
 		return 34;
-	}
 	/* QUIC Version 2 */
 	/* TODO: for the time being use 100 as a number for V2 and let see how v2 drafts evolve */
-	if (version == 0x709A50C4) {
+	if ((version == 0x709A50C4) || (version == 0x6b3343cf))
 		return 100;
-	}
+
 	return 0;
 }
 
@@ -662,7 +654,7 @@ static bool is_quic_draft_max(uint32_t draft_version, uint8_t max_version)
 }
 static bool is_quic_v2(uint32_t version)
 {
-    return version == 0x6b3343cf;
+    return (version == 0x709A50C4) || (version == 0x6b3343cf);
 }
 
 static bool quic_hkdf_expand_label(const uint8_t *secret, uint8_t secret_len, const char *label, uint8_t *out, size_t out_len)
@@ -811,6 +803,7 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
 	pn_offset += tvb_get_varint(data + pn_offset, &token_len);
 	pn_offset += token_len;
+	if (pn_offset >= data_len) return false;
 	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
 	pn_offset += tvb_get_varint(data + pn_offset, &payload_len);
 	if (payload_len<20 || (pn_offset + payload_len)>data_len) return false;

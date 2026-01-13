@@ -192,7 +192,7 @@ static uint16_t tcpopt_len(bool sack, bool mss, uint32_t fooling, const uint32_t
 	if (sack) t+=2;
 	if (mss) t+=4;
 	if (fooling & FOOL_MD5SIG) t+=18;
-	if ((fooling & FOOL_TS) || timestamps) t+=10;
+	if (timestamps) t+=10;
 	if (scale_factor!=SCALE_NONE) t+=3;
 	return (t+3)&~3;
 }
