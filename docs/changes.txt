@@ -591,3 +591,7 @@ blockcheck: fix tpws test regression
 
 nfqws,tpws: memleak fix
 mdig: --eagain, --eagain-delay
+
+73.8
+
+nfqws: fix breaking tcp if ts fooling is enabled but no timestamps present
