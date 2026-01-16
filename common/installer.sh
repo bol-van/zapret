@@ -827,7 +827,9 @@ select_fwtype()
 		echo WARNING ! if you need large lists it may be necessary to fall back to iptables+ipset firewall
 	}
 	echo select firewall type :
-	ask_list FWTYPE "iptables nftables" "$FWTYPE" && write_config_var FWTYPE
+	ask_list FWTYPE "iptables nftables" "$FWTYPE"
+	# always write config var to prevent auto discovery every time
+	write_config_var FWTYPE
 }
 
 dry_run_tpws_()
