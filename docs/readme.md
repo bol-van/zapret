@@ -237,6 +237,8 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-fakedsplit-mod=mod[,mod]                     ; может быть none, altorder=0|1|2|3 + 0|8|16
 --dpi-desync-hostfakesplit-midhost=marker+N|marker-N      ; маркер дополнительного разреза сегмента с оригинальным хостом. должен попадать в пределы хоста.
 --dpi-desync-hostfakesplit-mod=mod[,mod]                  ; может быть none, host=<hostname>, altorder=0|1
+--dpi-desync-ipfrag-pos-tcp=<8..9216>                     ; позиция ip фрагментации tcp, начиная с транспортного заголовка. должно быть кратно 8, по умолчанию - 32.
+--dpi-desync-ipfrag-pos-udp=<8..9216>                     ; позиция ip фрагментации udp, начиная с транспортного заголовка. должно быть кратно 8, по умолчанию - 8.
 --dpi-desync-ts-increment=<int|0xHEX>                     ; инкремент TSval для ts. по умолчанию -600000
 --dpi-desync-badseq-increment=<int|0xHEX>                 ; инкремент sequence number для badseq. по умолчанию -10000
 --dpi-desync-badack-increment=<int|0xHEX>                 ; инкремент ack sequence number для badseq. по умолчанию -66000
