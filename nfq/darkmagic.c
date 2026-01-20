@@ -928,6 +928,7 @@ void proto_skip_ipv6(uint8_t **data, size_t *len, uint8_t *proto_type, uint8_t *
 	if (proto_type) *proto_type = 0; // put error in advance
 
 	HeaderType = (*data)[6]; // NextHeader field
+	if (proto_type) *proto_type = HeaderType;
 	if (last_header_type) *last_header_type = (*data)+6;
 	*data += 40; *len -= 40; // skip ipv6 base header
 	while (*len > 0) // need at least one byte for NextHeader field

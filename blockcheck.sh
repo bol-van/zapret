@@ -1573,7 +1573,7 @@ pktws_check_domain_http3_bypass_()
 
 	for fake in '' "--dpi-desync-fake-quic=$ZAPRET_BASE/files/fake/quic_initial_www_google_com.bin"; do
 		for rep in '' 2 5 10 20; do
-			pktws_curl_test_update $1 $2 --dpi-desync=fake ${fake:+$fake }${rep:+--dpi-desync-repeats=$rep} && [ "$SCANLEVEL" != force ] && {
+			pktws_curl_test_update $1 $2 --dpi-desync=fake ${fake:+"$fake" }${rep:+--dpi-desync-repeats=$rep} && [ "$SCANLEVEL" != force ] && {
 				[ "$SCANLEVEL" = quick ] && return
 				break
 			}

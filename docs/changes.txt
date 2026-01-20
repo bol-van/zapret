@@ -595,3 +595,8 @@ mdig: --eagain, --eagain-delay
 73.8
 
 nfqws: fix breaking tcp if ts fooling is enabled but no timestamps present
+
+73.9
+
+blockcheck: fix detection of http redirection if domain/URI specified
+install_easy: fix writing of ask_list variables
