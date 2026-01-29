@@ -1702,7 +1702,9 @@ If this is the case then run another script in background and add some delay the
 
 Are welcome here :
 
-USDT `0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E`
+USDT ERC `0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E` 
+
+USDT TRC `TEzAAtn4VhndqEaAyuCM78xh5W2gCjwWEo`
 
 BTC  `bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve`
 
