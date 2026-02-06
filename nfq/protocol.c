@@ -984,6 +984,7 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	offset += 1 + data[offset];
 
 	// token length
+	if (offset>=len || (offset + tvb_get_size(data[offset])) > len) return false;
 	offset += tvb_get_varint(data + offset, &sz);
 	offset += sz;
 	if (offset >= len) return false;
