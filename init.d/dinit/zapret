@@ -1,0 +1,9 @@
+type            = scripted
+command         = /opt/zapret/init.d/sysv/zapret start
+stop-command    = /opt/zapret/init.d/sysv/zapret stop
+depends-on      = network.target
+before          = login.target
+restart         = false
+logfile         = /var/log/dinit/zapret.log
+smooth-recovery = false
+run-as          = root
