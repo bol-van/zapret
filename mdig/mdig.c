@@ -80,15 +80,15 @@ static bool dom_valid(char *dom)
 {
 	if (!dom || *dom=='.') return false;
 	for (; *dom; dom++)
-	if (*dom < 0x20 || (*dom & 0x80) || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
-		return false;
+		if (!(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
+			return false;
 	return true;
 }
 
 static void invalid_domain_beautify(char *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
-		if (*dom < 0x20 || *dom<0) *dom = '?';
+		if (*dom < 0x20 || (*dom & 0x80)) *dom = '?';
 	if (*dom) *dom = 0;
 }
 
@@ -220,7 +220,7 @@ static void *t_resolver(void *arg)
 			{
 				if ((family == AF_INET && (glob.family & FAMILY4)) || (family == AF_INET6 && (glob.family & FAMILY6)))
 				{
-					unsigned int mask;
+					unsigned int mask=0;
 					bool mask_needed = false;
 					if (s_mask)
 					{
@@ -436,7 +436,7 @@ int dns_parse_query()
 	_setmode(_fileno(stdin), _O_BINARY);
 #endif
 	l = fread(a,1,sizeof(a),stdin);
-	if (!l || !feof(stdin))
+	if (!l || ferror(stdin))
 	{
 		fprintf(stderr, "could not read DNS reply blob from stdin\n");
 		return 10;
@@ -455,8 +455,8 @@ static void exithelp(void)
 	printf(
 		" --family=<4|6|46>\t\t; ipv4, ipv6, ipv4+ipv6\n"
 		" --threads=<threads_number>\n"
-		" --eagain=<eagain_retries>\t; how many times to retry if EAGAIN received. default %u\n"
-		" --eagain-delay=<ms>\t\t; time in msec to wait between EAGAIN attempts. default %u\n"
+		" --eagain=<eagain_retries>\t; how many times to retry if EAI_AGAIN received. default %u\n"
+		" --eagain-delay=<ms>\t\t; time in msec to wait between EAI_AGAIN attempts. default %u\n"
 		" --verbose\t\t\t; print query progress to stderr\n"
 		" --stats=N\t\t\t; print resolve stats to stderr every N domains\n"
 		" --log-resolved=<file>\t\t; log successfully resolved domains to a file\n"

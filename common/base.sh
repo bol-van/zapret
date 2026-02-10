@@ -109,6 +109,10 @@ split_by_separator()
 	[ -n "$3" ] && eval $3="\$before"
 	[ -n "$4" ] && eval $4="\$after"
 }
+tolower()
+{
+	echo "$@" | tr 'A-Z' 'a-z'
+}
 
 dir_is_not_empty()
 {

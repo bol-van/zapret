@@ -310,7 +310,7 @@ size_t HttpPos(uint8_t posmarker, int16_t pos, const uint8_t *data, size_t sz)
 			if (sz<10) break;
 			if (*method=='\n' || *method=='\r') method++;
 			if (*method=='\n' || *method=='\r') method++;
-			for (p=method,i=0;i<7;i++) if (*p>='A' && *p<='Z') p++;
+			for (p=method,i=0; i<9 && *p>='A' && *p<='Z'; i++,p++);
 			if (i<3 || *p!=' ') break;
 			return CheckPos(sz,method-data+pos);
 		case PM_HOST:
@@ -962,9 +962,9 @@ bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host
 
 bool IsQUICInitial(const uint8_t *data, size_t len)
 {
-	// too small packets are not likely to be initials with client hello
+	// too small packets are not likely to be initials
 	// long header, fixed bit
-	if (len < 256 || (data[0] & 0xC0)!=0xC0) return false;
+	if (len < 128 || (data[0] & 0xF0)!=0xC0) return false;
 
 	uint32_t ver = QUICExtractVersion(data,len);
 	if (QUICDraftVersion(ver) < 11) return false;
@@ -973,10 +973,10 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	// quic v2 : initial packets are 01b
 	if ((data[0] & 0x30) != (is_quic_v2(ver) ? 0x10 : 0x00)) return false;
 
-	uint64_t offset=5, sz;
+	uint64_t offset=5, sz, sz2;
 
-	// DCID. must be present
-	if (!data[offset] || data[offset] > QUIC_MAX_CID_LENGTH) return false;
+	// DCID
+	if (data[offset] > QUIC_MAX_CID_LENGTH) return false;
 	offset += 1 + data[offset];
 
 	// SCID
@@ -984,18 +984,19 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	offset += 1 + data[offset];
 
 	// token length
+	if (offset>=len || (offset + tvb_get_size(data[offset])) > len) return false;
 	offset += tvb_get_varint(data + offset, &sz);
 	offset += sz;
 	if (offset >= len) return false;
 
 	// payload length
-	if ((offset + tvb_get_size(data[offset])) > len) return false;
+	sz2 = tvb_get_size(data[offset]);
+	if ((offset + sz2) > len) return false;
 	tvb_get_varint(data + offset, &sz);
-	offset += sz;
+	offset += sz2 + sz;
 	if (offset > len) return false;
 
-	// client hello cannot be too small. likely ACK
-	return sz>=96;
+	return true;
 }
 
 

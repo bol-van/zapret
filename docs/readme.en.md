@@ -207,8 +207,8 @@ nfqws takes the following parameters:
  --dpi-desync-fakedsplit-mod=mod[,mod]                     ; mods can be none,altorder=0|1|2|3 + 0|8|16
  --dpi-desync-hostfakesplit-midhost=marker+N|marker-N      ; additionally split real hostname at specified marker. must be within host..endhost or won't be splitted.
  --dpi-desync-hostfakesplit-mod=mod[,mod]                  ; can be none, host=<hostname>, altorder=0|1
- --dpi-desync-ipfrag-pos-tcp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 8.
- --dpi-desync-ipfrag-pos-udp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 32.
+ --dpi-desync-ipfrag-pos-tcp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 32.
+ --dpi-desync-ipfrag-pos-udp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 8.
  --dpi-desync-ts-increment=<int|0xHEX>                     ; ts fooling TSval signed increment. default -600000
  --dpi-desync-badseq-increment=<int|0xHEX>                 ; badseq fooling seq signed increment. default -10000
  --dpi-desync-badack-increment=<int|0xHEX>                 ; badseq fooling ackseq signed increment. default -66000
@@ -1724,7 +1724,9 @@ If this is the case then run another script in background and add some delay the
 
 Are welcome here :
 
-USDT `0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E`
+USDT ERC `0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E` 
+
+USDT TRC `TEzAAtn4VhndqEaAyuCM78xh5W2gCjwWEo`
 
 BTC  `bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve`
 
