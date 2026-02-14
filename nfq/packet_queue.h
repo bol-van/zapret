@@ -15,7 +15,11 @@ struct rawpacket
 	uint8_t *packet;
 	TAILQ_ENTRY(rawpacket) next;
 };
-TAILQ_HEAD(rawpacket_tailhead, rawpacket);
+struct rawpacket_tailhead {
+	struct rawpacket *tqh_first;
+	struct rawpacket **tqh_last;
+	unsigned int cached_count;
+};
 
 void rawpacket_queue_init(struct rawpacket_tailhead *q);
 void rawpacket_queue_destroy(struct rawpacket_tailhead *q);

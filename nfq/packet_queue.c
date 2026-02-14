@@ -7,6 +7,7 @@
 void rawpacket_queue_init(struct rawpacket_tailhead *q)
 {
 	TAILQ_INIT(q);
+	q->cached_count = 0;
 }
 void rawpacket_free(struct rawpacket *rp)
 {
@@ -17,7 +18,11 @@ struct rawpacket *rawpacket_dequeue(struct rawpacket_tailhead *q)
 {
 	struct rawpacket *rp;
 	rp = TAILQ_FIRST(q);
-	if (rp)	TAILQ_REMOVE(q, rp, next);
+	if (rp)
+	{
+		TAILQ_REMOVE(q, rp, next);
+		q->cached_count--;
+	}
 	return rp;
 }
 void rawpacket_queue_destroy(struct rawpacket_tailhead *q)
@@ -53,16 +58,14 @@ struct rawpacket *rawpacket_queue(struct rawpacket_tailhead *q,const struct sock
 	rp->len_payload=len_payload;
 	
 	TAILQ_INSERT_TAIL(q, rp, next);
+	q->cached_count++;
 	
 	return rp;
 }
 
 unsigned int rawpacket_queue_count(const struct rawpacket_tailhead *q)
 {
-	const struct rawpacket *rp;
-	unsigned int ct=0;
-	TAILQ_FOREACH(rp, q, next) ct++;
-	return ct;
+	return q->cached_count;
 }
 bool rawpacket_queue_empty(const struct rawpacket_tailhead *q)
 {
