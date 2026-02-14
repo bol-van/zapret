@@ -209,7 +209,7 @@ nfqws takes the following parameters:
  --dpi-desync-hostfakesplit-mod=mod[,mod]                  ; can be none, host=<hostname>, altorder=0|1
  --dpi-desync-ipfrag-pos-tcp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 32.
  --dpi-desync-ipfrag-pos-udp=<8..9216>                     ; ip frag position starting from the transport header. multiple of 8, default 8.
- --dpi-desync-ts-increment=<int|0xHEX>                     ; ts fooling TSval signed increment. default -600000
+ --dpi-desync-ts-increment=<int|0xHEX|[+|-](N-M)|N-M>      ; ts fooling TSval signed increment or per-fake random value from range. default -600000
  --dpi-desync-badseq-increment=<int|0xHEX>                 ; badseq fooling seq signed increment. default -10000
  --dpi-desync-badack-increment=<int|0xHEX>                 ; badseq fooling ackseq signed increment. default -66000
  --dpi-desync-any-protocol=0|1                             ; 0(default)=desync only http and tls  1=desync any nonempty data packet
