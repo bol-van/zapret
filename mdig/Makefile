@@ -1,6 +1,6 @@
 CC ?= cc
 OPTIMIZE ?= -Os
-CFLAGS += -std=gnu99 $(OPTIMIZE)
+CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_WIN = -static
 LIBS = -lpthread
