@@ -25,6 +25,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <limits.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -865,6 +866,48 @@ static bool parse_net32_signed(const char *opt, uint32_t *value)
 	{
 		return sscanf(opt, "%d", (int32_t*)value) > 0;
 	}
+}
+static bool parse_desync_ts_increment(const char *opt, struct desync_profile *dp)
+{
+	int sign = 1;
+	const char *s = opt;
+	if (*s == '+' || *s == '-')
+	{
+		sign = (*s == '-') ? -1 : 1;
+		s++;
+	}
+	bool with_brackets = *s == '(';
+	if (with_brackets) s++;
+
+	const char *dash = strchr(s, '-');
+	if (dash && dash > s && dash[1])
+	{
+		char *e;
+		long long v0 = strtoll(s, &e, 10);
+		if (e != dash) return false;
+		long long v1 = strtoll(dash + 1, &e, 10);
+		if (with_brackets)
+		{
+			if (*e != ')') return false;
+			e++;
+		}
+		if (*e || v0 < 0 || v1 < 0 || v0 > v1 || v1 > INT_MAX) return false;
+
+		dp->desync_ts_increment_random = true;
+		dp->desync_ts_increment_min = (int32_t)(sign * v0);
+		dp->desync_ts_increment_max = (int32_t)(sign * v1);
+		if (dp->desync_ts_increment_min > dp->desync_ts_increment_max)
+		{
+			int32_t t = dp->desync_ts_increment_min;
+			dp->desync_ts_increment_min = dp->desync_ts_increment_max;
+			dp->desync_ts_increment_max = t;
+		}
+		return true;
+	}
+
+	if (with_brackets) return false;
+	dp->desync_ts_increment_random = false;
+	return parse_net32_signed(opt, &dp->desync_ts_increment);
 }
 static void load_file_or_exit(const char *filename, void *buf, size_t *size, size_t *offset)
 {
@@ -2016,7 +2059,7 @@ static void exithelp(void)
 		" --dpi-desync-hostfakesplit-mod=mod[,mod]\t\t; mods can be none,host=<hostname>,altorder=0|1\n"
 		" --dpi-desync-ipfrag-pos-udp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
 		" --dpi-desync-ipfrag-pos-tcp=<8..%u>\t\t\t; ip frag position starting from the transport header. multiple of 8, default %u.\n"
-		" --dpi-desync-ts-increment=<int|0xHEX>\t\t\t; ts fooling TSval signed increment. default %d\n"
+		" --dpi-desync-ts-increment=<int|0xHEX|[+|-](N-M)|N-M>\t; ts fooling TSval signed increment or random range per fake. default %d\n"
 		" --dpi-desync-badseq-increment=<int|0xHEX>\t\t; badseq fooling seq signed increment. default %d\n"
 		" --dpi-desync-badack-increment=<int|0xHEX>\t\t; badseq fooling ackseq signed increment. default %d\n"
 		" --dpi-desync-any-protocol=0|1\t\t\t\t; 0(default)=desync only http and tls  1=desync any nonempty data packet\n"
@@ -3117,9 +3160,9 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_DPI_DESYNC_TS_INCREMENT:
-			if (!parse_net32_signed(optarg, &dp->desync_ts_increment))
+			if (!parse_desync_ts_increment(optarg, dp))
 			{
-				DLOG_ERR("dpi-desync-ts-increment should be signed decimal or signed 0xHEX\n");
+				DLOG_ERR("dpi-desync-ts-increment should be signed decimal, signed 0xHEX, [+-](N-M) or N-M\n");
 				exit_clean(1);
 			}
 			break;

@@ -156,6 +156,8 @@ struct desync_profile
 	autottl desync_autottl, desync_autottl6;
 	uint32_t desync_fooling_mode;
 	uint32_t desync_ts_increment, desync_badseq_increment, desync_badseq_ack_increment;
+	bool desync_ts_increment_random;
+	int32_t desync_ts_increment_min, desync_ts_increment_max;
 	uint16_t desync_tcp_flags_set, desync_tcp_flags_unset;
 
 	struct blob_collection_head fake_http,fake_tls,fake_unknown,fake_unknown_udp,fake_quic,fake_wg,fake_dht,fake_discord,fake_stun;
