@@ -1206,7 +1206,7 @@ static bool load_split_pos_file(const char *filename, struct proto_pos *splits, 
 		DLOG_PERROR("fopen split-pos file");
 		return false;
 	}
-	char line[256], *p, *end;
+	char line[256], *p, *trim_pos;
 	int line_num = 0;
 	*split_count = 0;
 	while (fgets(line, sizeof(line), f))
@@ -1221,8 +1221,8 @@ static bool load_split_pos_file(const char *filename, struct proto_pos *splits, 
 		if ((p = strchr(line, '\r'))) *p = 0;
 		for (p = line; *p == ' ' || *p == '\t'; p++);
 		if (!*p || *p == '#') continue;
-		end = p + strlen(p) - 1;
-		while (end > p && (*end == ' ' || *end == '\t')) *end-- = 0;
+		trim_pos = p + strlen(p) - 1;
+		while (trim_pos > p && (*trim_pos == ' ' || *trim_pos == '\t')) *trim_pos-- = 0;
 		if (!parse_split_pos(p, splits + *split_count))
 		{
 			DLOG_ERR("split-pos file %s line %d: invalid split pos: %s\n", filename, line_num, p);

@@ -442,7 +442,7 @@ When splitting all markers are resolved to absolute offsets. If a relative posit
 
 In `multisplit`or `multidisorder` case split is cancelled if no position remained.
 
-`fakedsplit` и `fakeddisorder` use only one split position. It's searched from the  `--dpi-desync-split-pos` list by a special alorightm.
+`fakedsplit` и `fakeddisorder` use only one split position. It's searched from the  `--dpi-desync-split-pos` list by a special algorithm.
 If split positions were loaded from `@file`, one position is randomly selected from that file list for each fake packet.
 First relative markers are searched. If no suitable found absolute markers are searched. If nothing found position 1 is used.
 
