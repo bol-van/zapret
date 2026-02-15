@@ -1198,6 +1198,42 @@ static bool parse_split_pos_list(char *opt, struct proto_pos *splits, int splits
 	if (p) return false; // too much splits
 	return true;
 }
+static bool load_split_pos_file(const char *filename, struct proto_pos *splits, int splits_size, int *split_count)
+{
+	FILE *f = fopen(filename, "r");
+	if (!f)
+	{
+		DLOG_PERROR("fopen split-pos file");
+		return false;
+	}
+	char line[256], *p, *trim_pos;
+	int line_num = 0;
+	*split_count = 0;
+	while (fgets(line, sizeof(line), f))
+	{
+		line_num++;
+		if (*split_count >= splits_size)
+		{
+			fclose(f);
+			return false;
+		}
+		if ((p = strchr(line, '\n'))) *p = 0;
+		if ((p = strchr(line, '\r'))) *p = 0;
+		for (p = line; *p == ' ' || *p == '\t'; p++);
+		if (!*p || *p == '#') continue;
+		trim_pos = p + strlen(p) - 1;
+		while (trim_pos > p && (*trim_pos == ' ' || *trim_pos == '\t')) *trim_pos-- = 0;
+		if (!parse_split_pos(p, splits + *split_count))
+		{
+			DLOG_ERR("split-pos file %s line %d: invalid split pos: %s\n", filename, line_num, p);
+			fclose(f);
+			return false;
+		}
+		(*split_count)++;
+	}
+	fclose(f);
+	return *split_count > 0;
+}
 
 static bool parse_domain_list(char *opt, hostlist_pool **pp)
 {
@@ -2047,7 +2083,7 @@ static void exithelp(void)
 		" --dpi-desync-fooling=<mode>[,<mode>]\t\t\t; can use multiple comma separated values. modes : none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2\n"
 		" --dpi-desync-repeats=<N>\t\t\t\t; send every desync packet N times\n"
 		" --dpi-desync-skip-nosni=0|1\t\t\t\t; 1(default)=do not act on ClientHello without SNI\n"
-		" --dpi-desync-split-pos=N|-N|marker+N|marker-N\t\t; comma separated list of split positions\n"
+		" --dpi-desync-split-pos=N|-N|marker+N|marker-N|@file\t; comma separated list of split positions or file (one position per line)\n"
 		"\t\t\t\t\t\t\t; markers: method,host,endhost,sld,endsld,midsld,sniext\n"
 		"\t\t\t\t\t\t\t; full list is only used by multisplit and multidisorder\n"
 		"\t\t\t\t\t\t\t; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise\n"
@@ -3037,7 +3073,17 @@ int main(int argc, char **argv)
 		case IDX_DPI_DESYNC_SPLIT_POS:
 		{
 			int ct;
-			if (!parse_split_pos_list(optarg, dp->splits + dp->split_count, MAX_SPLITS - dp->split_count, &ct))
+			if (*optarg == '@')
+			{
+				if (!load_split_pos_file(optarg + 1, dp->splits + dp->split_count, MAX_SPLITS - dp->split_count, &ct))
+				{
+					DLOG_ERR("could not load split pos list from file or too much positions (before parsing - %u, max - %u) : %s\n", dp->split_count, MAX_SPLITS, optarg + 1);
+					exit_clean(1);
+				}
+				if (!dp->split_random_count) dp->split_random_start = dp->split_count;
+				dp->split_random_count += ct;
+			}
+			else if (!parse_split_pos_list(optarg, dp->splits + dp->split_count, MAX_SPLITS - dp->split_count, &ct))
 			{
 				DLOG_ERR("could not parse split pos list or too much positions (before parsing - %u, max - %u) : %s\n", dp->split_count, MAX_SPLITS, optarg);
 				exit_clean(1);

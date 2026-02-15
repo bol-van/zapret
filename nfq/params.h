@@ -131,6 +131,7 @@ struct desync_profile
 	// multisplit
 	struct proto_pos splits[MAX_SPLITS];
 	int split_count;
+	int split_random_start, split_random_count;
 	struct proto_pos seqovl,hostfakesplit_midhost;
 
 	char dup_start_mode, dup_cutoff_mode; // n - packets, d - data packets, s - relative sequence
