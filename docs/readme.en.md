@@ -197,7 +197,7 @@ nfqws takes the following parameters:
  --dpi-desync-fooling=<mode>[,<mode>]                      ; can use multiple comma separated values. modes : none md5sig ts badseq badsum datanoack hopbyhop hopbyhop2
  --dpi-desync-repeats=<N>                                  ; send every desync packet N times
  --dpi-desync-skip-nosni=0|1                               ; 1(default)=do not act on ClientHello without SNI (ESNI ?)
- --dpi-desync-split-pos=N|-N|marker+N|marker-N             ; comma separated list of split positions
+ --dpi-desync-split-pos=N|-N|marker+N|marker-N|@file       ; comma separated list of split positions or @file (one position per line)
                                                            ; markers: method,host,endhost,sld,endsld,midsld,sniext
                                                            ; full list is only used by multisplit and multidisorder
                                                            ; fakedsplit/fakeddisorder use first l7-protocol-compatible parameter if present, first abs value otherwise
@@ -443,6 +443,7 @@ When splitting all markers are resolved to absolute offsets. If a relative posit
 In `multisplit`or `multidisorder` case split is cancelled if no position remained.
 
 `fakedsplit` и `fakeddisorder` use only one split position. It's searched from the  `--dpi-desync-split-pos` list by a special alorightm.
+If split positions were loaded from `@file`, one position is randomly selected from that file list for each fake packet.
 First relative markers are searched. If no suitable found absolute markers are searched. If nothing found position 1 is used.
 
 For example, `--dpi-desync-split-pos=method+2,midsld,5` means `method+2` for http, `midsld` for TLS and 5 for others.

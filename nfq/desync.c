@@ -1964,8 +1964,18 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		else if (dp->desync_mode == DESYNC_FAKEDSPLIT || dp->desync_mode == DESYNC_FAKEDDISORDER || dp->desync_mode2 == DESYNC_FAKEDSPLIT || dp->desync_mode2 == DESYNC_FAKEDDISORDER)
 		{
 			multisplit_count = 0;
+			split_pos = 0;
+			if (dp->split_random_count > 0)
+			{
+				int n = random() % dp->split_random_count;
+				for (i = 0, split_pos = 0; i < dp->split_random_count && !split_pos; i++)
+				{
+					int k = dp->split_random_start + (n + i) % dp->split_random_count;
+					split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, dp->splits + k);
+				}
+			}
 			// first look for non-abs split
-			for (i = 0, split_pos = 0; i < dp->split_count && !split_pos; i++)
+			for (i = 0; i < dp->split_count && !split_pos; i++)
 				if (dp->splits[i].marker != PM_ABS)
 					split_pos = ResolvePos(rdata_payload, rlen_payload, l7proto, dp->splits + i);
 			// second look for abs split

@@ -230,7 +230,7 @@ dvtws, собираемый из тех же исходников (см. [док
 --dpi-desync-fooling=<fooling>                            ; дополнительные методики как сделать, чтобы фейковый пакет не дошел до сервера. none md5sig badseq badsum datanoack ts hopbyhop hopbyhop2
 --dpi-desync-repeats=<N>                                  ; посылать каждый генерируемый в nfqws пакет N раз (не влияет на остальные пакеты)
 --dpi-desync-skip-nosni=0|1                               ; 1(default)=не применять dpi desync для запросов без hostname в SNI, в частности для ESNI
---dpi-desync-split-pos=N|-N|marker+N|marker-N             ; список через запятую маркеров для tcp сегментации в режимах split и disorder
+--dpi-desync-split-pos=N|-N|marker+N|marker-N|@file       ; список через запятую маркеров для tcp сегментации или @file (одна позиция в строке)
 --dpi-desync-split-seqovl=N|-N|marker+N|marker-N          ; единичный маркер, определяющий величину перекрытия sequence в режимах split и disorder. для split поддерживается только положительное число.
 --dpi-desync-split-seqovl-pattern=[+ofs]@<filename>|0xHEX ; чем заполнять фейковую часть overlap
 --dpi-desync-fakedsplit-pattern=[+ofs]@<filename>|0xHEX   ; чем заполнять фейки в fakedsplit/fakeddisorder
@@ -540,6 +540,7 @@ hex строка начинается с "0x". Имя файла можно пи
 В вариантах `multisplit` и `multidisorder` если не осталось ни одной позиции, разбиение не происходит.
 
 Варианты `fakedsplit` и `fakeddisorder` применяют только одну позицию сплита. Ее поиск среди списка `--dpi-desync-split-pos` осуществляется особым образом.
+Если список задан через `@file`, для каждого формируемого фейка позиция выбирается случайно из строк этого файла.
 Сначала сверяются все относительные маркеры. Если среди них найден подходящий, применяется он. В противном случае сверяются все абсолютные маркеры.
 Если и среди них ничего не найдено, применяется позиция 1.
 
