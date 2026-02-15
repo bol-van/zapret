@@ -1,9 +1,11 @@
 CC ?= cc
 OPTIMIZE ?= -Os
-CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto
+MINSIZE ?= -flto=auto -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables
+CFLAGS += -std=gnu99 $(OPTIMIZE) $(MINSIZE)
 CFLAGS_SYSTEMD = -DUSE_SYSTEMD
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
+LDFLAGS += -Wl,--gc-sections
 LDFLAGS_ANDROID = -llog
 LIBS_LINUX = -lz -lnetfilter_queue -lnfnetlink -lmnl
 LIBS_SYSTEMD = -lsystemd

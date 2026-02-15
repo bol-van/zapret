@@ -165,7 +165,7 @@ fi
 unset PKTWS
 case $UNAME in
 	Linux)
-		ARCHLIST="my linux-x86_64 linux-x86 linux-arm64 linux-arm linux-mips64 linux-mipsel linux-mips linux-lexra linux-ppc"
+		ARCHLIST="my linux-x86_64 linux-x86 linux-arm64 linux-arm linux-mips64 linux-mipsel linux-mips linux-lexra linux-ppc linux-riscv64"
 		PKTWS=nfqws
 		;;
 	Darwin)
