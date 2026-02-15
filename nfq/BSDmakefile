@@ -1,6 +1,8 @@
 CC ?= cc
 OPTIMIZE ?= -Os
-CFLAGS += -std=gnu99 -s $(OPTIMIZE) -flto=auto -Wno-address-of-packed-member
+MINSIZE ?= -flto=auto -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables
+CFLAGS += -std=gnu99 -s $(OPTIMIZE) $(MINSIZE) -Wno-address-of-packed-member
+LDFLAGS += -Wl,--gc-sections
 LIBS = -lz
 SRC_FILES = *.c crypto/*.c
 

@@ -52,6 +52,8 @@ jobs:
             tool: i586-unknown-linux-musl
           - arch: x86_64
             tool: x86_64-unknown-linux-musl
+          - arch: riscv64
+            tool: riscv64-unknown-linux-musl
           - arch: lexra
             tool: mips-linux
             dir: rsdk-4.6.4-5281-EB-3.10-0.9.33-m32ub-20141001
@@ -69,7 +71,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
-          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
+          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'bol-van/musl-cross' }}
           DIR: ${{ matrix.arch == 'lexra' && matrix.dir || matrix.tool }}
         run: |
           if [[ "$ARCH" == lexra ]]; then
@@ -93,6 +95,8 @@ jobs:
           CFLAGS: ${{ matrix.env.CFLAGS != '' && matrix.env.CFLAGS || null }}
           LDFLAGS: ${{ matrix.env.LDFLAGS != '' && matrix.env.LDFLAGS || null }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MINSIZE: -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables
+          LDMINSIZE: -Wl,--gc-sections
         run: |
           DEPS_DIR=$GITHUB_WORKSPACE/deps
           export CC="$TARGET-gcc"
@@ -111,7 +115,8 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="-Os -flto=auto $CFLAGS" \
+              CFLAGS="-Os -flto=auto $MINSIZE $CFLAGS" \
+              LDFLAGS="$LDMINSIZE $LDFLAGS" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -123,7 +128,8 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            CFLAGS="-Os -flto=auto $CFLAGS" \
+            CFLAGS="-Os -flto=auto $MINSIZE $CFLAGS" \
+            LDFLAGS="$LDMINSIZE $LDFLAGS" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -134,8 +140,8 @@ jobs:
           install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
 
           # zapret
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $CFLAGS" \
-          LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $MINSIZE $CFLAGS" \
+          LDFLAGS="-L$DEPS_DIR/lib $LDMINSIZE $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
 
@@ -419,7 +425,7 @@ jobs:
                   if [[ $dir == *-linux-x86_64 ]]; then
                     tar -C $dir -czvf $dir/tpws_wsl.tgz tpws
                     run_upx $dir/*
-                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]] && [[ $dir != *-linux-lexra ]]; then
+                  elif [[ $dir =~ linux ]] && [[ $dir != *-linux-mips64 ]] && [[ $dir != *-linux-lexra ]] && [[ $dir != *-linux-riscv64 ]]; then
                     run_upx $dir/*
                   fi
                   ;;
@@ -448,6 +454,7 @@ jobs:
                 *-linux-mipselsf )      run_dir linux-mipsel ;;
                 *-linux-mipssf )        run_dir linux-mips ;;
                 *-linux-ppc )           run_dir linux-ppc ;;
+                *-linux-riscv64 )       run_dir linux-riscv64 ;;
                 *-linux-x86 )           run_dir linux-x86 ;;
                 *-linux-x86_64 )        run_dir linux-x86_64 ;;
                 *-linux-lexra )         run_dir linux-lexra ;;
