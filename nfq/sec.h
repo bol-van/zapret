@@ -72,6 +72,10 @@ bool dropcaps(void);
 
 # define ARCH_NR	AUDIT_ARCH_RISCV64
 
+#elif defined(__loongarch__) && __loongarch_grlen == 64
+
+# define ARCH_NR AUDIT_ARCH_LOONGARCH64
+
 #else
 
 # error "Platform does not support seccomp filter yet"
