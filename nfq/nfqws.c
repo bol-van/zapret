@@ -2304,6 +2304,7 @@ int main(int argc, char **argv)
 #endif
 
 	srandom(time(NULL));
+	aes_init_keygen_tables(); // required for aes
 
 	PRINT_VER;
 

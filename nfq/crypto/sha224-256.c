@@ -64,12 +64,12 @@
  * Add "length" to the length.
  * Set Corrupted when overflow has occurred.
  */
-static uint32_t addTemp;
-#define SHA224_256AddLength(context, length)               \
-  (addTemp = (context)->Length_Low, (context)->Corrupted = \
-    (((context)->Length_Low += (length)) < addTemp) &&     \
-    (++(context)->Length_High == 0) ? shaInputTooLong :    \
-                                      (context)->Corrupted )
+static int SHA224_256AddLength(SHA256Context *context, uint32_t length)
+{
+	uint32_t addTemp = context->Length_Low;
+	if (((context->Length_Low += length) < addTemp) && (++(context)->Length_High == 0)) context->Corrupted = shaInputTooLong;
+	return context->Corrupted;
+}
 
 /* Local Function Prototypes */
 static int SHA224_256Reset(SHA256Context *context, uint32_t *H0);
