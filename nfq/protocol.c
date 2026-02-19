@@ -962,14 +962,12 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 {
 	// too small packets are not likely to be initials
 	// long header, fixed bit
-	if (len < 128 || (data[0] & 0xF0)!=0xC0) return false;
+	if (len < 128) return false;
 
 	uint32_t ver = QUICExtractVersion(data,len);
 	if (QUICDraftVersion(ver) < 11) return false;
 
-	// quic v1 : initial packets are 00b
-	// quic v2 : initial packets are 01b
-	if ((data[0] & 0x30) != (is_quic_v2(ver) ? 0x10 : 0x00)) return false;
+	if ((data[0] & 0xF0) != (is_quic_v2(ver) ? 0xD0 : 0xC0)) return false;
 
 	uint64_t offset=5, sz, sz2;
 
