@@ -256,6 +256,8 @@ static bool nfq_init(struct nfq_handle **h, struct nfq_q_handle **qh)
 		// dot not fail. not supported on old linuxes <3.6 
 	}
 
+	nfnl_rcvbufsiz(nfq_nfnlh(*h), Q_RCVBUF);
+
 	DLOG_CONDUP("initializing raw sockets bind-fix4=%u bind-fix6=%u\n", params.bind_fix4, params.bind_fix6);
 	if (!rawsend_preinit(params.bind_fix4, params.bind_fix6))
 		goto exiterr;
@@ -350,7 +352,7 @@ static int nfq_main(void)
 			if (rd)
 			{
 				int r = nfq_handle_packet(h, (char *)buf, (int)rd);
-				if (r) DLOG_ERR("nfq_handle_packet error %d\n", r);
+				if (r<0) DLOG_ERR("nfq_handle_packet result %d, errno %d : %s\n", r, errno, strerror(errno));
 			}
 			else
 				DLOG("recv from nfq returned 0 !\n");
