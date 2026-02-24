@@ -600,8 +600,3 @@ nfqws: fix breaking tcp if ts fooling is enabled but no timestamps present
 
 blockcheck: fix detection of http redirection if domain/URI specified
 install_easy: fix writing of ask_list variables
-
-73.10
-
-* nfqws2: fix broken wifi ssid update
-* minor AI fixes
