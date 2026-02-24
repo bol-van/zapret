@@ -5,6 +5,8 @@ int aes_gcm_crypt(int mode, uint8_t *output, const uint8_t *input, size_t input_
 	int ret = 0;
 	gcm_context ctx;
 
+	gcm_initialize();
+
 	if (!(ret = gcm_setkey(&ctx, key, (const uint)key_len)))
 	{
 		ret = gcm_crypt_and_tag(&ctx, mode, iv, iv_len, adata, adata_len, input, output, input_length, atag, atag_len);

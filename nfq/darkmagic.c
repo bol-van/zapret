@@ -2096,6 +2096,7 @@ static bool scan_info(struct mnl_socket* nl, uint16_t wlan_family_id, struct wla
 	// wlan_info does not return ssid since kernel 5.19
 	// it's used to enumerate all wifi interfaces then call scan_info on each
 	if (!wlan_info(nl, wlan_family_id, &wc_all, false)) return false;
+	w->count=0;
 	for(int i=0;i<wc_all.count;i++)
 		if (!netlink_genl_simple_transact(nl, wlan_family_id, NLM_F_REQUEST | NLM_F_ACK | NLM_F_DUMP, NL80211_CMD_GET_SCAN, 0, scan_prepare, (void*)&wc_all.wlan[i].ifindex, scan_info_cb, w))
 			return false;

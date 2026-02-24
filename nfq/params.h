@@ -23,7 +23,8 @@
 
 #define RAW_SNDBUF	(64*1024)	// in bytes
 
-#define Q_MAXLEN	1024		// in packets
+#define Q_MAXLEN	4986		// in packets
+#define Q_RCVBUF	(1024*1024)	// in bytes
 
 #define BADSEQ_INCREMENT_DEFAULT 	-10000
 #define BADSEQ_ACK_INCREMENT_DEFAULT 	-66000

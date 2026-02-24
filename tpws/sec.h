@@ -20,6 +20,12 @@ bool dropcaps(void);
 #define arch_nr (offsetof(struct seccomp_data, arch))
 #define syscall_arg(x) (offsetof(struct seccomp_data, args[x]))
 
+#ifndef __AUDIT_ARCH_64BIT
+#define __AUDIT_ARCH_64BIT 0x80000000
+#endif
+#ifndef __AUDIT_ARCH_LE
+#define __AUDIT_ARCH_LE    0x40000000
+#endif
 #ifndef EM_RISCV
 #define EM_RISCV 243
 #endif
@@ -27,6 +33,12 @@ bool dropcaps(void);
 #define AUDIT_ARCH_RISCV64 (EM_RISCV | __AUDIT_ARCH_64BIT | __AUDIT_ARCH_LE)
 #endif
 
+#ifndef EM_LOONGARCH
+#define EM_LOONGARCH 258
+#endif
+#ifndef AUDIT_ARCH_LOONGARCH64
+#define AUDIT_ARCH_LOONGARCH64 (EM_LOONGARCH | __AUDIT_ARCH_64BIT | __AUDIT_ARCH_LE)
+#endif
 #if defined(__aarch64__)
 
 # define ARCH_NR	AUDIT_ARCH_AARCH64
@@ -80,6 +92,10 @@ bool dropcaps(void);
 #elif __riscv && __riscv_xlen == 64
 
 # define ARCH_NR	AUDIT_ARCH_RISCV64
+
+#elif defined(__loongarch__) && __loongarch_grlen == 64
+
+# define ARCH_NR AUDIT_ARCH_LOONGARCH64
 
 #else
 

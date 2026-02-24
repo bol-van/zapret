@@ -49,9 +49,10 @@ int hmac(SHAversion whichSha,
 	uint8_t digest[USHAMaxHashSize])
 {
 	HMACContext context;
-	return hmacReset(&context, whichSha, key, key_len) ||
-		hmacInput(&context, message_array, length) ||
-		hmacResult(&context, digest);
+	int ret;
+	if ((ret=hmacReset(&context, whichSha, key, key_len))) return ret;
+	if ((ret=hmacInput(&context, message_array, length))) return ret;
+	return hmacResult(&context, digest);
 }
 
 /*
@@ -101,10 +102,8 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
 	 */
 	if (key_len > blocksize) {
 		USHAContext tcontext;
-		int err = USHAReset(&tcontext, whichSha) ||
-			USHAInput(&tcontext, key, key_len) ||
-			USHAResult(&tcontext, tempkey);
-		if (err != shaSuccess) return err;
+		if ((ret=USHAReset(&tcontext, whichSha)) || (ret=USHAInput(&tcontext, key, key_len)) || (ret=USHAResult(&tcontext, tempkey)))
+			return ret;
 
 		key = tempkey;
 		key_len = hashsize;
@@ -134,9 +133,9 @@ int hmacReset(HMACContext *context, enum SHAversion whichSha,
 
 	/* perform inner hash */
 	/* init context for 1st pass */
-	ret = USHAReset(&context->shaContext, whichSha) ||
+	if (!(ret = USHAReset(&context->shaContext, whichSha)))
 		/* and start with inner pad */
-		USHAInput(&context->shaContext, k_ipad, blocksize);
+		ret = USHAInput(&context->shaContext, k_ipad, blocksize);
 	return context->Corrupted = ret;
 }
 
@@ -197,8 +196,7 @@ int hmacFinalBits(HMACContext *context,
 	if (context->Corrupted) return context->Corrupted;
 	if (context->Computed) return context->Corrupted = shaStateError;
 	/* then final bits of datagram */
-	return context->Corrupted =
-		USHAFinalBits(&context->shaContext, bits, bit_count);
+	return context->Corrupted = USHAFinalBits(&context->shaContext, bits, bit_count);
 }
 
 /*
@@ -229,21 +227,16 @@ int hmacResult(HMACContext *context, uint8_t *digest)
 
 	/* finish up 1st pass */
 	/* (Use digest here as a temporary buffer.) */
-	ret =
-		USHAResult(&context->shaContext, digest) ||
-
+	if (!(ret=USHAResult(&context->shaContext, digest)) &&
 		/* perform outer SHA */
 		/* init context for 2nd pass */
-		USHAReset(&context->shaContext, context->whichSha) ||
-
+		!(ret=USHAReset(&context->shaContext, context->whichSha)) &&
 		/* start with outer pad */
-		USHAInput(&context->shaContext, context->k_opad,
-			context->blockSize) ||
-
+		!(ret=USHAInput(&context->shaContext, context->k_opad, context->blockSize)) &&
 		/* then results of 1st hash */
-		USHAInput(&context->shaContext, digest, context->hashSize) ||
+		!(ret=USHAInput(&context->shaContext, digest, context->hashSize)))
 		/* finish up 2nd pass */
-		USHAResult(&context->shaContext, digest);
+		ret=USHAResult(&context->shaContext, digest);
 
 	context->Computed = 1;
 	return context->Corrupted = ret;

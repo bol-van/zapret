@@ -795,20 +795,18 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 		return false;
 	}
 
-	uint64_t payload_len,token_len;
-	size_t pn_offset;
+	uint64_t payload_len,token_len,pn_offset;
 	pn_offset = 1 + 4 + 1 + data[5];
 	if (pn_offset >= data_len) return false;
+	// SCID length
 	pn_offset += 1 + data[pn_offset];
-	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
+	if (pn_offset >= data_len || (pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
+	// token length
 	pn_offset += tvb_get_varint(data + pn_offset, &token_len);
 	pn_offset += token_len;
-	if (pn_offset >= data_len) return false;
-	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
+	if (pn_offset >= data_len || (pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
 	pn_offset += tvb_get_varint(data + pn_offset, &payload_len);
 	if (payload_len<20 || (pn_offset + payload_len)>data_len) return false;
-
-	aes_init_keygen_tables();
 
 	uint8_t sample_enc[16];
 	aes_context ctx;
@@ -827,13 +825,13 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 
  	phton64(aesiv + sizeof(aesiv) - 8, pntoh64(aesiv + sizeof(aesiv) - 8) ^ pkn);
 
-	size_t cryptlen = payload_len - pkn_len - 16;
+	uint64_t cryptlen = payload_len - pkn_len - 16;
 	if (cryptlen > *clean_len) return false;
-	*clean_len = cryptlen;
+	*clean_len = (size_t)cryptlen;
 	const uint8_t *decrypt_begin = data + pn_offset + pkn_len;
 
-	uint8_t atag[16],header[256];
-	size_t header_len = pn_offset + pkn_len;
+	uint8_t atag[16],header[2048];
+	uint64_t header_len = pn_offset + pkn_len;
 	if (header_len > sizeof(header)) return false; // not likely header will be so large
 	memcpy(header, data, header_len);
 	header[0] = packet0;
@@ -964,14 +962,12 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 {
 	// too small packets are not likely to be initials
 	// long header, fixed bit
-	if (len < 128 || (data[0] & 0xF0)!=0xC0) return false;
+	if (len < 128) return false;
 
 	uint32_t ver = QUICExtractVersion(data,len);
 	if (QUICDraftVersion(ver) < 11) return false;
 
-	// quic v1 : initial packets are 00b
-	// quic v2 : initial packets are 01b
-	if ((data[0] & 0x30) != (is_quic_v2(ver) ? 0x10 : 0x00)) return false;
+	if ((data[0] & 0xF0) != (is_quic_v2(ver) ? 0xD0 : 0xC0)) return false;
 
 	uint64_t offset=5, sz, sz2;
 
@@ -1021,7 +1017,7 @@ bool IsStunMessage(const uint8_t *data, size_t len)
 {
 	return len>=20 && // header size
 		(data[0]&0xC0)==0 && // 2 most significant bits must be zeroes
-		(data[3]&0b11)==0 && // length must be a multiple of 4
-		ntohl(*(uint32_t*)(&data[4]))==0x2112A442 && // magic cookie
-		ntohs(*(uint16_t*)(&data[2]))==len-20;
+		(data[3]&3)==0 && // length must be a multiple of 4
+		pntoh32(data+4)==0x2112A442 && // magic cookie
+		pntoh16(data+2)<=(len-20);
 }
