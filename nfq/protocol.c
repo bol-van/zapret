@@ -1017,7 +1017,7 @@ bool IsStunMessage(const uint8_t *data, size_t len)
 {
 	return len>=20 && // header size
 		(data[0]&0xC0)==0 && // 2 most significant bits must be zeroes
-		(data[3]&0b11)==0 && // length must be a multiple of 4
-		ntohl(*(uint32_t*)(&data[4]))==0x2112A442 && // magic cookie
-		ntohs(*(uint16_t*)(&data[2]))==len-20;
+		(data[3]&3)==0 && // length must be a multiple of 4
+		pntoh32(data+4)==0x2112A442 && // magic cookie
+		pntoh16(data+2)<=(len-20);
 }
