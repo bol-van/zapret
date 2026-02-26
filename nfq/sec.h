@@ -95,6 +95,10 @@ bool dropcaps(void);
 
 # define ARCH_NR AUDIT_ARCH_LOONGARCH64
 
+#elif defined(__e2k__)
+
+# define ARCH_NR	AUDIT_ARCH_E2K
+
 #else
 
 # error "Platform does not support seccomp filter yet"
