@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 
-bool service_run();
+bool service_run(int argc, char *argv[]);
 
 #endif
 
