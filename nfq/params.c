@@ -50,7 +50,7 @@ static char log_buf[1024];
 static size_t log_buf_sz=0;
 static void syslog_log_function(int priority, const char *line)
 {
-	syslog(priority,"%s",log_buf);
+	syslog(priority,"%s",line);
 }
 #ifdef __ANDROID__
 static enum android_LogPriority syslog_priority_to_android(int priority)
