@@ -9,6 +9,7 @@ LDFLAGS_ANDROID = -Wl,--gc-sections -llog
 LDFLAGS_BSD = -Wl,--gc-sections
 LDFLAGS_LINUX = -Wl,--gc-sections
 LDFLAGS_MAC = -Wl,-dead_strip
+LDFLAGS_WIN = -Wl,--gc-sections
 LIBS_LINUX = -lz -lnetfilter_queue -lnfnetlink -lmnl
 LIBS_SYSTEMD = -lsystemd
 LIBS_BSD = -lz
@@ -41,9 +42,9 @@ mac: $(SRC_FILES)
 	rm -f dvtwsx dvtwsa
 
 cygwin64:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LIBS_CYGWIN) $(LIBS_CYGWIN64) $(RES_CYGWIN64) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LIBS_CYGWIN) $(LIBS_CYGWIN64) $(RES_CYGWIN64) $(LDFLAGS) $(LDFLAGS_WIN)
 cygwin32:
-	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LIBS_CYGWIN) $(LIBS_CYGWIN32) $(RES_CYGWIN32) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_CYGWIN) -o winws $(SRC_FILES) $(LIBS_CYGWIN) $(LIBS_CYGWIN32) $(RES_CYGWIN32) $(LDFLAGS) $(LDFLAGS_WIN)
 cygwin: cygwin64
 
 clean:
