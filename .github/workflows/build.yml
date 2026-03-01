@@ -25,27 +25,13 @@ jobs:
           - arch: arm64
             tool: aarch64-unknown-linux-musl
           - arch: arm
-            tool: arm-unknown-linux-musleabi
-          # - arch: armhf
-          #   tool: arm-unknown-linux-musleabihf
-          # - arch: armv7
-          #   tool: armv7-unknown-linux-musleabi
-          # - arch: armv7hf
-          #   tool: armv7-unknown-linux-musleabihf
-          # - arch: mips64el
-          #   tool: mips64el-unknown-linux-musl
+            tool: armv7-unknown-linux-musleabi
           - arch: mips64
             tool: mips64-unknown-linux-musl
-          # - arch: mipsel
-          #   tool: mipsel-unknown-linux-musl
           - arch: mipselsf
             tool: mipsel-unknown-linux-muslsf
-          # - arch: mips
-          #   tool: mips-unknown-linux-musl
           - arch: mipssf
             tool: mips-unknown-linux-muslsf
-          # - arch: ppc64
-          #   tool: powerpc64-unknown-linux-musl
           - arch: ppc
             tool: powerpc-unknown-linux-musl
           - arch: x86
@@ -69,7 +55,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           TOOL: ${{ matrix.tool }}
-          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'spvkgn/musl-cross' }}
+          REPO: ${{ matrix.arch == 'lexra' && matrix.repo || 'bol-van/musl-cross' }}
           DIR: ${{ matrix.arch == 'lexra' && matrix.dir || matrix.tool }}
         run: |
           if [[ "$ARCH" == lexra ]]; then
@@ -102,6 +88,15 @@ jobs:
           export STRIP=$TARGET-strip
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
           export STAGING_DIR=$RUNNER_TEMP
+          OPTIMIZE=-Oz
+          case "$ARCH" in
+            lexra)
+              OPTIMIZE=-Os
+              ;;
+            arm)
+              CPU="-mcpu=cortex-a7 -mthumb"
+              ;;
+          esac
 
           # netfilter libs
           wget -qO- https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 | tar -xj
@@ -111,7 +106,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="-Os -flto=auto $CFLAGS" \
+              CFLAGS="$OPTIMIZE $CPU -flto=auto $CFLAGS" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
             )
@@ -123,7 +118,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            CFLAGS="-Os -flto=auto $CFLAGS" \
+            CFLAGS="$OPTIMIZE $CPU -flto=auto $CFLAGS" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -134,7 +129,8 @@ jobs:
           install -Dm644 -t $DEPS_DIR/include/sys /usr/include/x86_64-linux-gnu/sys/queue.h /usr/include/sys/capability.h
 
           # zapret
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static -I$DEPS_DIR/include $CFLAGS" \
+          OPTIMIZE=$OPTIMIZE \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -static $CPU -I$DEPS_DIR/include $CFLAGS" \
           LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret -j$(nproc)
           tar -C zapret/binaries/my -cJf zapret-linux-$ARCH.tar.xz .
