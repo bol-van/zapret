@@ -74,7 +74,7 @@ struct desync_profile
 	struct hostlist_collection_head hl_collection, hl_collection_exclude;
 	// pointer to autohostlist. NULL if no autohostlist for the profile.
 	struct hostlist_file *hostlist_auto;
-	int hostlist_auto_fail_threshold, hostlist_auto_fail_time, hostlist_auto_retrans_threshold;
+	int hostlist_auto_fail_threshold, hostlist_auto_fail_time;
 
 	hostfail_pool *hostlist_auto_fail_counters;
 };

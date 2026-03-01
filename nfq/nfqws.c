@@ -3169,7 +3169,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_HOSTLIST_AUTO_FAIL_THRESHOLD:
-			dp->hostlist_auto_fail_threshold = (uint8_t)atoi(optarg);
+			dp->hostlist_auto_fail_threshold = atoi(optarg);
 			if (dp->hostlist_auto_fail_threshold < 1 || dp->hostlist_auto_fail_threshold>20)
 			{
 				DLOG_ERR("auto hostlist fail threshold must be within 1..20\n");
@@ -3177,7 +3177,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_HOSTLIST_AUTO_FAIL_TIME:
-			dp->hostlist_auto_fail_time = (uint8_t)atoi(optarg);
+			dp->hostlist_auto_fail_time = atoi(optarg);
 			if (dp->hostlist_auto_fail_time < 1)
 			{
 				DLOG_ERR("auto hostlist fail time is not valid\n");
@@ -3185,7 +3185,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case IDX_HOSTLIST_AUTO_RETRANS_THRESHOLD:
-			dp->hostlist_auto_retrans_threshold = (uint8_t)atoi(optarg);
+			dp->hostlist_auto_retrans_threshold = atoi(optarg);
 			if (dp->hostlist_auto_retrans_threshold < 2 || dp->hostlist_auto_retrans_threshold>10)
 			{
 				DLOG_ERR("auto hostlist fail threshold must be within 2..10\n");
