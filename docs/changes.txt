@@ -606,6 +606,6 @@ install_easy: fix writing of ask_list variables
 * nfqws2: fix broken wifi ssid update
 * minor AI fixes
 
-73.11
+73.12
 
 * github: reduce binaries size

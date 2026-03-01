@@ -25,7 +25,7 @@ jobs:
           - arch: arm64
             tool: aarch64-unknown-linux-musl
           - arch: arm
-            tool: armv7-unknown-linux-musleabi
+            tool: armv6-unknown-linux-musleabi
           - arch: mips64
             tool: mips64-unknown-linux-musl
           - arch: mipselsf
