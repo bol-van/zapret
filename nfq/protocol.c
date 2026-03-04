@@ -866,7 +866,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 	uint64_t offset,sz,szmax=0,zeropos=0,pos=0;
 	bool found=false;
 	struct range64 ranges[MAX_DEFRAG_PIECES];
-	int i,range=0;
+	int i,j,range=0;
 
 	while(pos<clean_len)
 	{
@@ -893,19 +893,50 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 				memset(defrag_data+zeropos,0,offset-zeropos);
 			if ((offset+sz) > zeropos)
 				zeropos=offset+sz;
+
 			memcpy(defrag_data+offset,clean+pos,sz);
 			if ((offset+sz) > szmax) szmax = offset+sz;
 
 			found=true;
 			pos+=sz;
 
+			// remove exact duplicates early to save cpu
+			for(i=0;i<range;i++)
+				if (ranges[i].offset==offset && ranges[i].len==sz)
+					goto endloop;
+
 			ranges[range].offset = offset;
 			ranges[range].len = sz;
 			range++;
 		}
+endloop:
 	}
 	if (found)
 	{
+		qsort(ranges, range, sizeof(*ranges), cmp_range64);
+
+//		for(i=0 ; i<range ; i++)
+//			printf("range1 %llu-%llu\n",ranges[i].offset,ranges[i].offset+ranges[i].len);
+
+		if (range>0)
+		{
+			for (j=0,i=1; i < range; i++)
+			{
+				uint64_t current_end = ranges[j].offset + ranges[j].len;
+				uint64_t next_start = ranges[i].offset;
+				uint64_t next_end = ranges[i].offset + ranges[i].len;
+
+				if (next_start <= current_end)
+					ranges[j].len = MAX(next_end,current_end) - ranges[j].offset;
+				else
+					ranges[++j] = ranges[i];
+			}
+			range = j+1;
+		}
+
+//		for(i=0 ; i<range ; i++)
+//			printf("range2 %llu-%llu\n",ranges[i].offset,ranges[i].offset+ranges[i].len);
+
 		defrag[0] = 6;
 		defrag[1] = 0; // offset
 		// 2..9 - length 64 bit
@@ -914,21 +945,7 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 		defrag[2] |= 0xC0; // 64 bit value
 		*defrag_len = (size_t)(szmax+10);
 
-		qsort(ranges, range, sizeof(*ranges), cmp_range64);
-
-		//for(i=0 ; i<range ; i++)
-		//	printf("RANGE %zu len %zu\n",ranges[i].offset,ranges[i].len);
-
-		for(i=0,offset=0,*bFull=true ; i<range ; i++)
-		{
-			if (ranges[i].offset!=offset)
-			{
-				*bFull = false;
-				break;
-			}
-			offset += ranges[i].len;
-		}
-
+		*bFull = range==1 && !ranges[0].offset;
 		//printf("bFull=%u\n",*bFull);
 	}
 	return found;
@@ -974,6 +991,8 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	// DCID
 	if (data[offset] > QUIC_MAX_CID_LENGTH) return false;
 	offset += 1 + data[offset];
+
+	if (offset>=len) return false;
 
 	// SCID
 	if (data[offset] > QUIC_MAX_CID_LENGTH) return false;
