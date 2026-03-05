@@ -888,28 +888,27 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 			if ((pos+sz)>clean_len) return false;
 
 			if ((offset+sz)>defrag_data_len) return false; // defrag buf overflow
+
+			// remove exact duplicates early to save cpu
+			for(i=0;i<range;i++)
+				if (ranges[i].offset==offset && ranges[i].len==sz)
+					goto skip_range;
+
 			if (zeropos < offset)
 				// make sure no uninitialized gaps exist in case of not full fragment coverage
 				memset(defrag_data+zeropos,0,offset-zeropos);
 			if ((offset+sz) > zeropos)
 				zeropos=offset+sz;
 
-			memcpy(defrag_data+offset,clean+pos,sz);
-			if ((offset+sz) > szmax) szmax = offset+sz;
-
 			found=true;
-			pos+=sz;
-
-			// remove exact duplicates early to save cpu
-			for(i=0;i<range;i++)
-				if (ranges[i].offset==offset && ranges[i].len==sz)
-					goto endloop;
-
+			if ((offset+sz) > szmax) szmax = offset+sz;
+			memcpy(defrag_data+offset,clean+pos,sz);
 			ranges[range].offset = offset;
 			ranges[range].len = sz;
 			range++;
+skip_range:
+			pos+=sz;
 		}
-endloop:
 	}
 	if (found)
 	{
