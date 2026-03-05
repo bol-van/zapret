@@ -340,6 +340,9 @@ jobs:
             armeabi-v7a)
               CPU="-mthumb"
               ;;
+            arm64-v8a)
+              PAGESIZE="-Wl,-z,max-page-size=16384"
+              ;;
           esac
 
           # netfilter libs
@@ -360,7 +363,7 @@ jobs:
 
           # zapret
           CFLAGS="$CPU -DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -I$DEPS_DIR/include" \
-          LDFLAGS="-L$DEPS_DIR/lib" \
+          LDFLAGS="-L$DEPS_DIR/lib $PAGESIZE" \
           make -C zapret android -j$(nproc)
 
           # strip unwanted ELF sections to prevent warnings on old Android versions

@@ -609,3 +609,5 @@ install_easy: fix writing of ask_list variables
 73.12
 
 * github: reduce binaries size
+* github: use 16K page size for android arm64 build
+* nfqws: join fragments in quic CRYPTO reconstruction. allow intersections.
