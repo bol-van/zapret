@@ -568,45 +568,45 @@ nfqws: --wssize-forced-cutoff
 nfqws: --orig-tcp-flags, --dup-tcp-flags, --dpi-desync-tcp-flags
 nfqws: --dup-ip-id
 
-73.3
+72.3
 
 blockcheck: support URIs
 blockcheck: CURL_HTTPS_GET=1 suppresses -I curl option for https (HEAD -> GET)
 
-73.4
+72.4
 
 blockcheck: fix broken dns cache
 
-73.5
+72.5
 
 nfqws: fix broken l7proto profile rediscovery
 nfqws: backport from nfqws2 nl80211 ssid discovery fix for newer kernels
 
-73.6
+72.6
 
 ipset: remove zapret-info based scripts because it's gone
 blockcheck: fix tpws test regression
 
-73.7
+72.7
 
 nfqws,tpws: memleak fix
 mdig: --eagain, --eagain-delay
 
-73.8
+72.8
 
 nfqws: fix breaking tcp if ts fooling is enabled but no timestamps present
 
-73.9
+72.9
 
 blockcheck: fix detection of http redirection if domain/URI specified
 install_easy: fix writing of ask_list variables
 
-73.10
+72.10
 
 * nfqws2: fix broken wifi ssid update
 * minor AI fixes
 
-73.12
+72.12
 
 * github: reduce binaries size
 * github: use 16K page size for android arm64 build
