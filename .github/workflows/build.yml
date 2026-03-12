@@ -94,7 +94,7 @@ jobs:
               OPTIMIZE=-Os
               ;;
             arm)
-              CPU="-mcpu=cortex-a7 -mthumb"
+              CPU="-mcpu=arm1176jzf-s -mthumb"
               ;;
           esac
 
