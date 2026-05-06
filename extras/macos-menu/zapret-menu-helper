@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+
+ZAPRET_BASE=${ZAPRET_BASE:-/opt/zapret}
+
+stop_tpws() {
+  pids=$(/usr/bin/pgrep -x tpws 2>/dev/null || true)
+  if [ -n "$pids" ]; then
+    /bin/kill $pids 2>/dev/null || true
+    /bin/sleep 1
+    pids=$(/usr/bin/pgrep -x tpws 2>/dev/null || true)
+    [ -z "$pids" ] || /bin/kill -9 $pids 2>/dev/null || true
+  fi
+}
+
+case "${1:-}" in
+  start)
+    "$ZAPRET_BASE/init.d/macos/zapret" start
+    ;;
+  stop)
+    "$ZAPRET_BASE/init.d/macos/zapret" stop || true
+    stop_tpws
+    ;;
+  restart)
+    "$ZAPRET_BASE/zapret-menu-helper" stop
+    "$ZAPRET_BASE/zapret-menu-helper" start
+    ;;
+  update)
+    "$ZAPRET_BASE/ipset/get_refilter_domains.sh"
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|update}" >&2
+    exit 64
+    ;;
+esac
