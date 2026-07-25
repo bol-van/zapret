@@ -622,6 +622,137 @@ no_prereq_exit()
 	echo could not install prerequisites
 	exitp 6
 }
+
+no_builddep_exit()
+{
+	echo could not install build dependencies
+	exitp 6
+}
+
+as_root()
+{
+	# run a command as root. use sudo or su if required
+	if [ $(id -u) = "0" ]; then
+		"$@"
+	elif exists sudo; then
+		echo elevating with sudo
+		sudo "$@"
+	elif exists su; then
+		echo elevating with su
+		su root -c "$*"
+	else
+		echo root is required to install packages. su or sudo not found.
+		return 1
+	fi
+}
+
+can_build()
+{
+	# $1 - make target : empty, mac, systemd
+	# checks whether build tools and required development libraries are present
+
+	local cc tmp libs res
+
+	exists make || return 1
+	for cc in $CC cc gcc clang; do
+		exists "$cc" && break
+		cc=
+	done
+	[ -n "$cc" ] || return 1
+	# other systems only require standard build tools
+	[ "$UNAME" = "Linux" ] || return 0
+
+	# check required dev headers and libraries by test compilation
+	tmp="/tmp/zapret-build-test-$$"
+	{
+		echo "#include <zlib.h>"
+		echo "#include <sys/capability.h>"
+		echo "#include <libnetfilter_queue/libnetfilter_queue.h>"
+		echo "#include <libnfnetlink/libnfnetlink.h>"
+		echo "#include <libmnl/libmnl.h>"
+		[ "$1" = "systemd" ] && echo "#include <systemd/sd-daemon.h>"
+		echo "int main(void) { return 0; }"
+	} >"$tmp.c"
+	libs="-lz -lnetfilter_queue -lnfnetlink -lmnl"
+	[ "$1" = "systemd" ] && libs="$libs -lsystemd"
+	"$cc" -o "$tmp" "$tmp.c" $libs >/dev/null 2>&1
+	res=$?
+	rm -f "$tmp" "$tmp.c"
+	return $res
+}
+
+install_build_deps()
+{
+	# $1 - make target : empty, mac, systemd
+	# installs build tools and required development libraries
+
+	local APTGET DNF YUM PACMAN ZYPPER EOPKG APK
+	local PKGS SDEP
+
+	echo \* installing build dependencies
+
+	[ "$UNAME" = "Linux" ] || {
+		[ "$UNAME" = "Darwin" ] && {
+			echo you must install Xcode command line tools :
+			echo xcode-select --install
+		}
+		return 1
+	}
+
+	APTGET=$(whichq apt-get)
+	DNF=$(whichq dnf)
+	YUM=$(whichq yum)
+	PACMAN=$(whichq pacman)
+	ZYPPER=$(whichq zypper)
+	EOPKG=$(whichq eopkg)
+	APK=$(whichq apk)
+
+	if [ -x "$APTGET" ]; then
+		PKGS="build-essential zlib1g-dev libcap-dev libnetfilter-queue-dev libnfnetlink-dev libmnl-dev"
+		SDEP=libsystemd-dev
+	elif [ -x "$DNF" -o -x "$YUM" ]; then
+		PKGS="gcc make zlib-devel libcap-devel libnetfilter_queue-devel libnfnetlink-devel libmnl-devel"
+		SDEP=systemd-devel
+	elif [ -x "$PACMAN" ]; then
+		PKGS="gcc make zlib libcap libnetfilter_queue libnfnetlink libmnl"
+		SDEP=systemd-libs
+	elif [ -x "$ZYPPER" ]; then
+		PKGS="gcc make zlib-devel libcap-devel libnetfilter_queue-devel libnfnetlink-devel libmnl-devel"
+		SDEP=systemd-devel
+	elif [ -x "$EOPKG" ]; then
+		PKGS="gcc make zlib-devel libcap-devel libnetfilter-queue-devel libnfnetlink-devel libmnl-devel"
+		SDEP=systemd-devel
+	elif [ -x "$APK" ]; then
+		PKGS="build-base zlib-dev libcap-dev libnetfilter_queue-dev libnfnetlink-dev libmnl-dev"
+	else
+		echo supported package manager not found
+		echo "you must manually install : C compiler, make and development packages of zlib, libcap, libnetfilter_queue, libnfnetlink, libmnl and libsystemd (systemd based systems only)"
+		return 1
+	fi
+	[ "$1" = "systemd" ] && PKGS="$PKGS${SDEP:+ $SDEP}"
+
+	echo packages required : $PKGS
+
+	if [ -x "$APTGET" ]; then
+		as_root "$APTGET" update
+		as_root "$APTGET" install -y --no-install-recommends $PKGS || no_builddep_exit
+	elif [ -x "$DNF" ]; then
+		as_root "$DNF" -y install $PKGS || no_builddep_exit
+	elif [ -x "$YUM" ]; then
+		as_root "$YUM" -y install $PKGS || no_builddep_exit
+	elif [ -x "$PACMAN" ]; then
+		as_root "$PACMAN" -Sy
+		as_root "$PACMAN" --noconfirm --needed -S $PKGS || no_builddep_exit
+	elif [ -x "$ZYPPER" ]; then
+		as_root "$ZYPPER" --non-interactive install $PKGS || no_builddep_exit
+	elif [ -x "$EOPKG" ]; then
+		as_root "$EOPKG" -y install $PKGS || no_builddep_exit
+	elif [ -x "$APK" ]; then
+		as_root "$APK" update
+		as_root "$APK" add $PKGS || no_builddep_exit
+	fi
+}
+
 check_prerequisites_linux()
 {
 	echo \* checking prerequisites

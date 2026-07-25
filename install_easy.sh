@@ -91,7 +91,7 @@ check_bins()
 	}
 	if [ -n "$arch" ] ; then
 		echo found architecture "\"$arch\""
-	elif [ -f "$EXEDIR/Makefile" ] && exists make; then
+	elif [ -f "$EXEDIR/Makefile" ]; then
 		echo trying to compile
 		case $SYSTEM in
 			macos)
@@ -102,6 +102,11 @@ check_bins()
 				make_target=systemd
 				;;
 		esac
+		can_build "$make_target" || install_build_deps "$make_target"
+		can_build "$make_target" || {
+			echo build tools not found
+			exitp 8
+		}
 		CFLAGS="${cf:+$cf }${CFLAGS}" OPTIMIZE=-O2 make -C "$EXEDIR" $make_target || {
 			echo could not compile
 			make -C "$EXEDIR" clean
@@ -433,7 +438,7 @@ copy_openwrt()
 
 fix_perms_bin_test()
 {
-	[ -d "$1" ] || return
+	[ -d "$1/binaries" ] || return
 	find "$1/binaries" -name ip2net ! -perm -111 -exec chmod +x {} \;
 }
 fix_perms()
@@ -450,7 +455,7 @@ fix_perms()
 			chow=root:wheel
 	esac
 	chown -R $chow "$1"
-	find "$1/binaries" '(' -name tpws -o -name dvtws -o -name nfqws -o -name ip2net -o -name mdig ')' -exec chmod 755 {} \;
+	[ -d "$1/binaries" ] && find "$1/binaries" '(' -name tpws -o -name dvtws -o -name nfqws -o -name ip2net -o -name mdig ')' -exec chmod 755 {} \;
 	for f in \
 install_bin.sh \
 blockcheck.sh \
