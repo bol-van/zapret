@@ -219,6 +219,8 @@ bool resolver_init(int threads, int fd_signal_pipe)
 
 	pthread_attr_t attr;
 	if (pthread_attr_init(&attr)) goto ex;
+#ifndef __APPLE__
+	// somebody reported stack size crashes on macos
 	// set minimum thread stack size
 
 	if (pthread_attr_setstacksize(&attr,PTHREAD_STACK_MIN>32768 ? PTHREAD_STACK_MIN : 32768))
@@ -226,6 +228,7 @@ bool resolver_init(int threads, int fd_signal_pipe)
 		pthread_attr_destroy(&attr);
 		goto ex;
 	}
+#endif
 
 	for(t=0, resolver.threads=threads ; t<threads ; t++)
 	{
