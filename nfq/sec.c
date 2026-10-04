@@ -13,6 +13,7 @@
 
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#include <linux/securebits.h>
 #include <linux/seccomp.h>
 #include <linux/filter.h>
 // __X32_SYSCALL_BIT defined in linux/unistd.h
@@ -305,8 +306,15 @@ bool droproot(uid_t uid, const char *user, const gid_t *gid, int gid_count)
 #ifdef __linux__
 	if (prctl(PR_SET_KEEPCAPS, 1L))
 	{
-		DLOG_PERROR("prctl(PR_SET_KEEPCAPS)");
-		return false;
+		int e=errno;
+		// if SECBIT_NO_SETUID_FIXUP is set PR_SET_KEEPCAPS is not necessary
+		int bits = prctl(PR_GET_SECUREBITS);
+		if (bits<0 || !(bits & SECBIT_NO_SETUID_FIXUP))
+		{
+			errno=e;
+			DLOG_PERROR("prctl(PR_SET_KEEPCAPS)");
+			return false;
+		}
 	}
 #endif
 	if (user)
