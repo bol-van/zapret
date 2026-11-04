@@ -369,7 +369,7 @@ flush set inet $ZAPRET_NFT_TABLE lanif"
 				# bridge members must be added instead of the bridge itself
 				# some members may not support hw offload. example : lan1 lan2 lan3 support, wlan0 wlan1 - not
 				b=
-				devs=$(resolve_lower_devices $i)
+				devs=$(resolve_hw_offload $i)
 				for j in $devs; do
 					# do not display error if addition failed
 					nft_create_or_update_flowtable 'offload' $j && b=1 2>/dev/null
