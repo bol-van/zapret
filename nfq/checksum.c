@@ -146,11 +146,13 @@ void udp4_fix_checksum(struct udphdr *udp,size_t len, const struct in_addr *src_
 {
 	udp->uh_sum = 0;
 	udp->uh_sum = csum_tcpudp_magic(src_addr->s_addr,dest_addr->s_addr,len,IPPROTO_UDP,csum_partial(udp,len));
+	if (!udp->uh_sum) udp->uh_sum = 0xFFFF; // RFC 768
 }
 void udp6_fix_checksum(struct udphdr *udp,size_t len, const struct in6_addr *src_addr, const struct in6_addr *dest_addr)
 {
 	udp->uh_sum = 0;
 	udp->uh_sum = csum_ipv6_magic(src_addr,dest_addr,len,IPPROTO_UDP,csum_partial(udp,len));
+	if (!udp->uh_sum) udp->uh_sum = 0xFFFF; // RFC 768
 }
 void udp_fix_checksum(struct udphdr *udp,size_t len,const struct ip *ip,const struct ip6_hdr *ip6hdr)
 {
