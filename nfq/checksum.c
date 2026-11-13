@@ -7,8 +7,10 @@
 
 static uint16_t from64to16(uint64_t x)
 {
-	uint32_t u = (uint32_t)(uint16_t)x + (uint16_t)(x>>16) + (uint16_t)(x>>32) + (uint16_t)(x>>48);
-	return (uint16_t)u + (uint16_t)(u>>16);
+	x = (uint64_t)(uint32_t)x + (x>>32);
+	uint32_t u = (uint16_t)x + (x>>16);
+	u = (uint16_t)u + (u>>16);
+	return (uint16_t)u + (u>>16);
 }
 
 // this function preserves data alignment requirements (otherwise it will be damn slow on mips arch)
